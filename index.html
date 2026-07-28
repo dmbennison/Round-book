@@ -1,0 +1,2454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Round Book">
+<meta name="theme-color" content="#10344C">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.json">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
+<title>Round Book</title>
+<style>
+  :root{
+    --navy:#10344C;
+    --navy-dark:#0B2438;
+    --blue:#2F9BDE;
+    --blue-dim:#DCEFFA;
+    --green:#2E9E5B;
+    --green-dim:#E2F5EA;
+    --amber:#C98A1D;
+    --amber-dim:#FBF0DC;
+    --red:#C4453F;
+    --red-dim:#FAE4E2;
+    --bg:#F5F7F8;
+    --surface:#FFFFFF;
+    --ink:#1C2B36;
+    --ink-muted:#66798A;
+    --line:#E3E9EC;
+    --radius:14px;
+    --emphasis:var(--navy);
+  }
+  body.dark{
+    --bg:#0E1620;
+    --surface:#16212C;
+    --ink:#EAF1F6;
+    --ink-muted:#8CA0B3;
+    --line:#28394A;
+    --blue-dim:#173347;
+    --green-dim:#123321;
+    --amber-dim:#3A2C10;
+    --red-dim:#3A1616;
+    --emphasis:#EAF1F6;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color: transparent;}
+  html,body{height:100%;}
+  html{font-size:17px;}
+  html.text-small{font-size:15px;}
+  html.text-large{font-size:20px;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    padding-bottom:env(safe-area-inset-bottom);
+    -webkit-user-select:none;
+    user-select:none;
+  }
+  input, textarea{-webkit-user-select:text; user-select:text;}
+  h1,h2,h3{margin:0; font-family:-apple-system, BlinkMacSystemFont, sans-serif; letter-spacing:-0.01em;}
+
+  header{
+    background:var(--navy);
+    color:#fff;
+    padding:calc(env(safe-area-inset-top) + 14px) 16px 14px;
+    position:sticky; top:0; z-index:20;
+  }
+  .header-row{display:flex; align-items:center; justify-content:space-between; gap:10px;}
+  .brand{display:flex; align-items:center; gap:10px;}
+  .brand-mark{
+    width:34px;height:34px;border-radius:9px;
+    background:linear-gradient(160deg, var(--blue), #1c6fa3);
+    display:flex;align-items:center;justify-content:center;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.25);
+  }
+  .brand-mark svg{width:19px;height:19px;}
+  .brand h1{font-size:1.1875rem; font-weight:800;}
+  .brand .sub{font-size:0.6875rem; color:#A9C4D8; font-weight:600; letter-spacing:.04em; text-transform:uppercase; margin-top:1px;}
+  .icon-btn{
+    width:38px;height:38px;border-radius:10px;border:none;
+    background:rgba(255,255,255,0.12); color:#fff; display:flex;align-items:center;justify-content:center;
+  }
+  .icon-btn svg{width:19px;height:19px;}
+  .icon-btn:active{background:rgba(255,255,255,0.22);}
+
+  .tabs{display:flex; gap:6px; margin-top:14px; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none;}
+  .tabs::-webkit-scrollbar{display:none;}
+  .tab{
+    flex:0 0 auto; text-align:center; padding:9px 14px; border-radius:10px; font-size:0.8125rem; font-weight:700;
+    color:#B9D2E2; background:transparent; border:none; white-space:nowrap;
+  }
+  .tab.active{background:rgba(255,255,255,0.14); color:#fff;}
+
+  main{padding:14px 14px 100px;}
+  .search-wrap{position:relative; margin-bottom:14px;}
+  .search-wrap svg{position:absolute; left:12px; top:50%; transform:translateY(-50%); width:16px; height:16px; opacity:0.45;}
+  .search-wrap input{
+    width:100%; padding:11px 12px 11px 36px; border-radius:12px; border:1px solid var(--line);
+    background:var(--surface); font-size:0.9375rem; color:var(--ink);
+  }
+
+  .section-label{
+    font-size:0.6875rem; font-weight:800; text-transform:uppercase; letter-spacing:.06em;
+    color:var(--ink-muted); margin:18px 2px 8px;
+  }
+  .section-label:first-child{margin-top:0;}
+
+  .round-card{
+    background:var(--surface); border-radius:var(--radius); padding:14px 16px; margin-bottom:10px;
+    border:1px solid var(--line); display:flex; align-items:center; justify-content:space-between; gap:10px;
+    position:relative; overflow:hidden;
+  }
+  .round-card::before{
+    content:""; position:absolute; left:0; top:0; bottom:0; width:5px; background:var(--blue);
+  }
+  .round-card .rname{font-size:1rem; font-weight:800;}
+  .round-card .rcount{font-size:0.7812rem; color:var(--ink-muted); margin-top:2px;}
+  .badges{display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end;}
+  .badge{
+    font-size:0.7188rem; font-weight:800; padding:4px 8px; border-radius:20px; white-space:nowrap;
+  }
+  .badge.due{background:var(--amber-dim); color:var(--amber);}
+  .badge.overdue{background:var(--red-dim); color:var(--red);}
+  .badge.owed{background:var(--red-dim); color:var(--red);}
+  .badge.ok{background:var(--green-dim); color:var(--green);}
+  .badge.paused{background:var(--line); color:var(--ink-muted);}
+  .chev{opacity:0.35;}
+
+  .swipe-wrap{position:relative; border-radius:var(--radius); margin-bottom:10px; overflow:hidden;}
+  .swipe-bg{position:absolute; inset:0; display:flex; align-items:center; font-weight:800; font-size:0.875rem; color:#fff; padding:0 22px;}
+  .swipe-bg-left{background:var(--green); justify-content:flex-start;}
+  .swipe-bg-right{background:var(--blue); justify-content:flex-end;}
+  .cust-card{
+    background:var(--surface); border-radius:var(--radius); padding:14px 16px;
+    border:1px solid var(--line); position:relative; z-index:1; touch-action:pan-y;
+  }
+  .cust-top{display:flex; justify-content:space-between; align-items:flex-start; gap:10px;}
+  .cust-name{font-size:1rem; font-weight:800;}
+  .cust-addr{font-size:0.8125rem; color:var(--ink-muted); margin-top:2px;}
+  .cust-price{font-size:0.875rem; font-weight:800; color:var(--emphasis); white-space:nowrap;}
+  .cust-meta{display:flex; gap:6px; flex-wrap:wrap; margin-top:10px;}
+  .cust-actions{display:flex; gap:8px; margin-top:12px;}
+  .swipe-hint{font-size:0.7188rem; color:var(--ink-muted); margin:0 2px 12px; display:flex; align-items:center; gap:5px;}
+  .btn{
+    flex:1; padding:10px 8px; border-radius:10px; border:none; font-size:0.8438rem; font-weight:800;
+    display:flex; align-items:center; justify-content:center; gap:6px;
+  }
+  .btn svg{width:15px;height:15px;}
+  .btn-clean{background:var(--blue-dim); color:#1c6fa3;}
+  .btn-clean:active{background:#c8e6f8;}
+  .btn-paid{background:var(--green-dim); color:var(--green);}
+  .btn-paid:active{background:#cdefdc;}
+  .btn-open{background:var(--bg); color:var(--ink); flex:0 0 auto; width:42px;}
+
+  .empty{
+    text-align:center; padding:50px 20px; color:var(--ink-muted);
+  }
+  .empty svg{width:44px;height:44px; opacity:0.3; margin-bottom:10px;}
+  .empty b{display:block; color:var(--ink); font-size:0.9375rem; margin-bottom:4px;}
+  .empty p{font-size:0.8125rem; line-height:1.5;}
+
+  .fab{
+    position:fixed; right:18px; bottom:calc(env(safe-area-inset-bottom) + 18px); z-index:30;
+    width:56px; height:56px; border-radius:50%; border:none; background:var(--blue); color:#fff;
+    box-shadow:0 6px 18px rgba(47,155,222,0.45); display:flex; align-items:center; justify-content:center;
+  }
+  .fab svg{width:24px;height:24px;}
+  .fab:active{background:#2585c2;}
+
+  /* Overlay / sheet */
+  .overlay{
+    position:fixed; inset:0; background:rgba(11,36,56,0.4); z-index:40; display:none;
+    align-items:flex-end;
+  }
+  .overlay.show{display:flex;}
+  .sheet{
+    background:var(--bg); width:100%; max-height:92vh; overflow-y:auto;
+    border-radius:20px 20px 0 0; padding:8px 16px calc(env(safe-area-inset-bottom) + 20px);
+    animation:slideup .22s ease-out;
+  }
+  @keyframes slideup{from{transform:translateY(20px); opacity:0.4;} to{transform:translateY(0); opacity:1;}}
+  .sheet-handle{width:38px; height:4px; background:var(--line); border-radius:3px; margin:8px auto 6px;}
+  .sheet-head{display:flex; align-items:center; justify-content:space-between; padding:6px 2px 14px;}
+  .sheet-head h2{font-size:1.125rem; font-weight:800; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .sheet-close{width:32px;height:32px;border-radius:50%; border:none; background:var(--surface); color:var(--ink-muted); display:flex; align-items:center; justify-content:center;}
+
+  label{display:block; font-size:0.7812rem; font-weight:700; color:var(--ink-muted); margin:14px 2px 6px;}
+  label:first-of-type{margin-top:0;}
+  input[type=text], input[type=number], input[type=date], select, textarea{
+    width:100%; padding:12px; border-radius:11px; border:1px solid var(--line); background:var(--surface);
+    font-size:0.9688rem; color:var(--ink); font-family:inherit;
+  }
+  .row2{display:flex; gap:10px;}
+  .row2 > div{flex:1;}
+  .form-actions{display:flex; gap:10px; margin-top:20px;}
+  .btn-primary{background:var(--blue); color:#fff; padding:13px; border-radius:12px; border:none; font-weight:800; font-size:0.9375rem; flex:1;}
+  .btn-primary:active{background:#2585c2;}
+  .btn-danger-text{background:none; border:none; color:var(--red); font-weight:700; font-size:0.8438rem; padding:14px 2px 2px; width:100%; text-align:center;}
+
+  .hist-list{list-style:none; margin:0; padding:0;}
+  .hist-list li{
+    display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid var(--line); font-size:0.875rem;
+  }
+  .hist-list li:last-child{border-bottom:none;}
+  .hist-del{background:none; border:none; color:var(--ink-muted); font-size:0.75rem; padding:4px 8px;}
+
+  .stat-row{display:flex; gap:8px; margin-bottom:16px;}
+  .stat{flex:1; background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:12px; text-align:center;}
+  .stat .num{font-size:1.1875rem; font-weight:800;}
+  .stat .lbl{font-size:0.6562rem; color:var(--ink-muted); font-weight:700; text-transform:uppercase; letter-spacing:.03em; margin-top:2px;}
+
+  .backup-btn{
+    display:flex; align-items:center; gap:12px; background:var(--surface); border:1px solid var(--line);
+    border-radius:12px; padding:14px; margin-bottom:10px; text-align:left; width:100%;
+  }
+  .backup-btn svg{width:20px;height:20px; color:var(--blue); flex-shrink:0;}
+  .backup-btn .t1{font-size:0.9062rem; font-weight:700;}
+  .backup-btn .t2{font-size:0.75rem; color:var(--ink-muted); margin-top:1px;}
+  #importFile{display:none;}
+  .toast{
+    position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:var(--navy-dark); color:#fff;
+    padding:11px 18px; border-radius:24px; font-size:0.8438rem; font-weight:700; z-index:60; opacity:0; transition:opacity .2s;
+    pointer-events:none; max-width:88vw; text-align:center;
+  }
+  .toast.show{opacity:1; pointer-events:auto;}
+  .toast-undo-btn{margin-left:10px; background:rgba(255,255,255,0.2); border:none; color:#fff; font-weight:800; padding:5px 12px; border-radius:14px; font-size:0.7812rem; vertical-align:middle;}
+
+  .seg-row{display:flex; gap:8px; margin-bottom:14px;}
+  .seg-btn{
+    flex:1; padding:10px 6px; border-radius:11px; border:1px solid var(--line); background:var(--surface);
+    font-size:0.8438rem; font-weight:800; color:var(--ink-muted); display:flex; align-items:center; justify-content:center; gap:6px;
+  }
+  .seg-btn.active{background:var(--navy); border-color:var(--navy); color:#fff;}
+  .seg-btn .count{
+    font-size:0.6875rem; padding:1px 6px; border-radius:20px; background:rgba(0,0,0,0.06); color:inherit;
+  }
+  .seg-btn.active .count{background:rgba(255,255,255,0.22);}
+
+  .summary-overall{display:flex; gap:8px; margin-bottom:18px;}
+  .summary-overall .stat{flex:1;}
+  .summary-round{
+    background:var(--surface); border-radius:var(--radius); padding:14px 16px; margin-bottom:10px;
+    border:1px solid var(--line); display:flex; align-items:center; justify-content:space-between; gap:10px;
+    position:relative; overflow:hidden;
+  }
+  .summary-round::before{content:""; position:absolute; left:0; top:0; bottom:0; width:5px; background:var(--green);}
+  .summary-round .rname{font-size:1rem; font-weight:800;}
+  .summary-round .rcount{font-size:0.7812rem; color:var(--ink-muted); margin-top:2px;}
+  .summary-round .rtotal{font-size:1rem; font-weight:800; color:var(--emphasis); text-align:right;}
+  .summary-round .ravg{font-size:0.7188rem; color:var(--ink-muted); text-align:right; margin-top:2px;}
+
+  .print-area{display:none;}
+  .rpt-round-title{font-size:16px; font-weight:800; margin:20px 0 8px; border-bottom:2px solid #10344C; padding-bottom:4px;}
+  .rpt-round-title:first-child{margin-top:0;}
+  .rpt-table{width:100%; border-collapse:collapse; margin-bottom:4px;}
+  .rpt-table th{text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.03em; color:#66798A; padding:6px 8px; border-bottom:1px solid #ccc;}
+  .rpt-table td{font-size:13px; padding:7px 8px; border-bottom:1px solid #eee; vertical-align:top;}
+  .rpt-flag{font-weight:700;}
+  .rpt-flag.overdue{color:#C4453F;}
+  .rpt-flag.due{color:#C98A1D;}
+  .rpt-total{text-align:right; font-weight:800; font-size:14px; margin-top:6px;}
+  .rpt-header{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px;}
+  .rpt-header h1{font-size:20px;}
+  .rpt-header .rpt-date{font-size:12px; color:#66798A;}
+  .rpt-empty-note{font-size:12px; color:#66798A; padding:8px 0;}
+  .rpt-footer{margin-top:24px; padding-top:10px; border-top:1px solid #ccc; font-size:11px; color:#66798A; text-align:center;}
+  .rpt-page-break{page-break-before:always; break-before:page;}
+  .rpt-calendar{width:100%; border-collapse:collapse; table-layout:fixed;}
+  .rpt-calendar th{background:#10344C; color:#fff; font-size:11px; padding:6px; text-align:center; font-weight:700;}
+  .rpt-calendar td{border:1px solid #E3E9EC; vertical-align:top; padding:5px; height:74px; font-size:10px; overflow:hidden;}
+  .rpt-calendar td.outside{background:#F7F9FA; color:#B7C2CA;}
+  .rpt-calendar .daynum{font-weight:800; font-size:11.5px; margin-bottom:3px; color:#1C2B36;}
+  .rpt-calendar td.outside .daynum{color:#B7C2CA;}
+  .rpt-calendar .round-chip{display:block; background:#DCEFFA; color:#1c6fa3; border-radius:5px; padding:1px 4px; margin-bottom:2px; font-weight:700; font-size:9px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+
+  @media print{
+    body, body.dark{
+      --bg:#ffffff;
+      --surface:#ffffff;
+      --ink:#1C2B36;
+      --ink-muted:#66798A;
+      --line:#E3E9EC;
+    }
+    header, #backupBanner, main, .fab, .overlay, #importFile, .toast{
+      display:none !important;
+    }
+    .print-area{
+      display:block !important;
+      position:static;
+      width:100%;
+      padding:0;
+    }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-row">
+    <div class="brand">
+      <div class="brand-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M4 4h16v12H4z"/><path d="M4 10h16M10 4v12"/><path d="M14 20l3-3M18 20l1-1"/></svg>
+      </div>
+      <div>
+        <h1>Round Book</h1>
+        <div class="sub" id="dateNow"></div>
+      </div>
+    </div>
+    <div style="display:flex; gap:6px;">
+      <button class="icon-btn" onclick="openInfo()" aria-label="About">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+      </button>
+      <button class="icon-btn" onclick="openReports()" aria-label="Reports">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
+      </button>
+      <button class="icon-btn" onclick="openBackup()" aria-label="Backup">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+      </button>
+      <button class="icon-btn" onclick="openSettings()" aria-label="Settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </button>
+    </div>
+  </div>
+  <div class="tabs">
+    <button class="tab active" data-tab="rounds" onclick="setTab('rounds')">Rounds</button>
+    <button class="tab" data-tab="summary" onclick="setTab('summary')">Summary</button>
+    <button class="tab" data-tab="jobs" onclick="setTab('jobs')">One-off jobs</button>
+  </div>
+</header>
+
+<div id="backupBanner"></div>
+<div id="jobReminderBanner"></div>
+<main id="main"></main>
+
+<button class="fab" onclick="handleFabClick()" aria-label="Add">
+  <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+</button>
+
+<div class="overlay" id="overlay" onclick="if(event.target===this) closeSheet()">
+  <div class="sheet" id="sheet"></div>
+</div>
+
+<input type="file" id="importFile" accept="application/json">
+<div class="toast" id="toast"></div>
+<div class="print-area" id="printArea"></div>
+
+<script>
+/* ---------- storage ---------- */
+const STORE_KEY = 'roundBookData_v1';
+const DEFAULT_CLEAN_TEMPLATE = "Hi {name}, just a reminder I'll be round to clean your windows soon. Let me know if that's not convenient. Thanks!";
+const DEFAULT_PAY_TEMPLATE = "Hi {name}, a friendly reminder that your window cleaning payment of {amount} is outstanding. Thanks!";
+function migrateData(parsed){
+  parsed.customers = parsed.customers || [];
+  parsed.oneOffJobs = parsed.oneOffJobs || [];
+  parsed.oneOffJobs.forEach(j=>{
+    if(!j.photos) j.photos = [];
+    if(j.remind24h == null) j.remind24h = false;
+  });
+  parsed.settings = parsed.settings || {};
+  if(!parsed.settings.cleanTemplate) parsed.settings.cleanTemplate = DEFAULT_CLEAN_TEMPLATE;
+  if(!parsed.settings.payTemplate) parsed.settings.payTemplate = DEFAULT_PAY_TEMPLATE;
+  if(parsed.settings.companyName == null) parsed.settings.companyName = '';
+  parsed.customers.forEach(c=>{
+    if(c.frequencyWeeks == null){
+      c.frequencyWeeks = c.frequencyDays ? Math.max(1, Math.round(c.frequencyDays/7)) : 4;
+    }
+    if(!c.priceHistory){
+      c.priceHistory = c.price != null ? [{date: todayISO(), price: c.price}] : [];
+    }
+    if(!c.photos){
+      c.photos = [];
+    }
+    if(!c.cleanHistory){
+      c.cleanHistory = [];
+    } else if(c.cleanHistory.length && typeof c.cleanHistory[0] === 'string'){
+      c.cleanHistory = c.cleanHistory.map(d => ({date: d, amount: c.price || 0}));
+    }
+    if(!c.paymentHistory) c.paymentHistory = [];
+    if(c.paymentReminderSent == null) c.paymentReminderSent = false;
+  });
+  return parsed;
+}
+function loadData(){
+  try{
+    const raw = localStorage.getItem(STORE_KEY);
+    if(raw) return migrateData(JSON.parse(raw));
+  }catch(e){}
+  return migrateData({ customers: [] });
+}
+function saveData(){
+  try{
+    localStorage.setItem(STORE_KEY, JSON.stringify(data));
+    return true;
+  }catch(e){
+    toast('Storage is full — try removing an old photo, then save again');
+    return false;
+  }
+}
+let data = loadData();
+
+/* ---------- helpers ---------- */
+function uid(){ return 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+function todayISO(){ const d=new Date(); return d.toISOString().slice(0,10); }
+function fmtDate(iso){
+  if(!iso) return '—';
+  const d = new Date(iso+'T00:00:00');
+  return d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+}
+function daysBetween(a,b){
+  const d1=new Date(a+'T00:00:00'), d2=new Date(b+'T00:00:00');
+  return Math.round((d2-d1)/86400000);
+}
+function lastOf(arr){ if(!arr||!arr.length) return null; return [...arr].sort().slice(-1)[0]; }
+function lastDateOf(arr){ if(!arr||!arr.length) return null; return [...arr.map(e=>e.date)].sort().slice(-1)[0]; }
+function money(n){ const v=Number(n||0); return '£'+v.toFixed(v%1?2:0); }
+let pendingToastAction = null;
+function toast(msg, actionLabel, actionFn){
+  const t=document.getElementById('toast');
+  clearTimeout(toast._t);
+  pendingToastAction = actionFn || null;
+  if(actionLabel && actionFn){
+    t.innerHTML = `${escapeHtml(msg)}<button class="toast-undo-btn" onclick="runToastAction()">${escapeHtml(actionLabel)}</button>`;
+    t.classList.add('show');
+    toast._t = setTimeout(()=>{ t.classList.remove('show'); pendingToastAction=null; }, 5000);
+  } else {
+    t.textContent = msg;
+    t.classList.add('show');
+    toast._t = setTimeout(()=>t.classList.remove('show'), 1600);
+  }
+}
+function runToastAction(){
+  const fn = pendingToastAction;
+  pendingToastAction = null;
+  const t = document.getElementById('toast');
+  clearTimeout(toast._t);
+  t.classList.remove('show');
+  if(fn) fn();
+}
+
+function freqDays(c){ return (c.frequencyWeeks || 4) * 7; }
+function nextDueISO(c){
+  const lastClean = lastDateOf(c.cleanHistory);
+  if(!lastClean) return null;
+  const d = new Date(lastClean+'T00:00:00');
+  d.setDate(d.getDate() + freqDays(c));
+  return d.toISOString().slice(0,10);
+}
+function custStatus(c){
+  const lastClean = lastDateOf(c.cleanHistory);
+  const lastPaid = lastOf((c.paymentHistory||[]).map(p=>p.date));
+  const freq = freqDays(c);
+  let cleanBadge = null;
+  if(c.paused){
+    cleanBadge = {type:'paused', text:'Paused'};
+  } else if(lastClean){
+    const due = daysBetween(lastClean, todayISO());
+    if(due >= freq) cleanBadge = {type: due >= freq+7 ? 'overdue' : 'due', text: due >= freq+7 ? `${due}d overdue` : `Due (${due}d)`};
+  } else {
+    cleanBadge = {type:'due', text:'Never cleaned'};
+  }
+  const totalCharged = (c.cleanHistory||[]).reduce((s,e)=>s+Number(e.amount||0), 0);
+  const totalPaid = (c.paymentHistory||[]).reduce((s,p)=>s+Number(p.amount||0), 0);
+  const balance = Math.round((totalCharged - totalPaid) * 100) / 100;
+  const owed = balance > 0.005;
+  const credit = balance < -0.005;
+  return {cleanBadge, owed, credit, balance, lastClean, lastPaid};
+}
+
+/* ---------- state ---------- */
+let currentTab = 'rounds';
+let currentRound = null;
+let searchQuery = '';
+let roundsViewMode = 'overview';
+let reorderMode = false;
+let roundOwedOnly = false;
+let darkMode = localStorage.getItem('roundBookDark') === '1';
+let textSize = localStorage.getItem('roundBookTextSize') || 'medium';
+let bannerDismissed = false;
+let jobReminderDismissed = false;
+const BACKUP_REMINDER_DAYS = 7;
+
+function daysSinceBackup(){
+  const last = localStorage.getItem('roundBookLastBackup');
+  if(!last) return Infinity;
+  return daysBetween(last, todayISO());
+}
+function dismissBackupBanner(){ bannerDismissed = true; renderBackupBanner(); }
+function renderBackupBanner(){
+  const el = document.getElementById('backupBanner');
+  if(!el) return;
+  if(bannerDismissed || !data.customers.length){ el.innerHTML = ''; return; }
+  const days = daysSinceBackup();
+  if(days < BACKUP_REMINDER_DAYS){ el.innerHTML = ''; return; }
+  const lastText = days === Infinity ? "You haven't backed up yet" : `It's been ${days} days since your last backup`;
+  el.innerHTML = `<div style="background:var(--amber-dim); color:var(--amber); border-radius:12px; padding:11px 14px; margin:0 14px 14px; display:flex; align-items:center; justify-content:space-between; gap:10px; font-size:0.8125rem; font-weight:700;">
+    <span>📦 ${lastText}</span>
+    <span style="display:flex; gap:8px; flex-shrink:0; align-items:center;">
+      <button onclick="openBackup()" style="background:var(--amber); color:#fff; border:none; border-radius:8px; padding:6px 10px; font-weight:800; font-size:0.7812rem;">Back up</button>
+      <button onclick="dismissBackupBanner()" style="background:none; border:none; color:var(--amber); font-weight:800; font-size:1rem; line-height:1; padding:0 2px;">✕</button>
+    </span>
+  </div>`;
+}
+
+function upcomingJobReminders(){
+  const today = todayISO();
+  const tomorrow = (()=>{ const d=new Date(); d.setDate(d.getDate()+1); return d.toISOString().slice(0,10); })();
+  return (data.oneOffJobs||[]).filter(j => j.remind24h && !j.done && (j.date===today || j.date===tomorrow));
+}
+function dismissJobReminder(){ jobReminderDismissed = true; renderJobReminderBanner(); }
+function renderJobReminderBanner(){
+  const el = document.getElementById('jobReminderBanner');
+  if(!el) return;
+  if(jobReminderDismissed){ el.innerHTML = ''; return; }
+  const jobs = upcomingJobReminders();
+  if(!jobs.length){ el.innerHTML = ''; return; }
+  const first = jobs[0];
+  const label = jobs.length === 1
+    ? `📅 Reminder: ${first.address||first.name||'Job'} — ${fmtDate(first.date)}`
+    : `📅 ${jobs.length} scheduled jobs coming up within a day`;
+  el.innerHTML = `<div style="background:var(--blue-dim); color:#1c6fa3; border-radius:12px; padding:11px 14px; margin:0 14px 14px; display:flex; align-items:center; justify-content:space-between; gap:10px; font-size:0.8125rem; font-weight:700;">
+    <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(label)}</span>
+    <span style="display:flex; gap:8px; flex-shrink:0; align-items:center;">
+      <button onclick="setTab('jobs'); dismissJobReminder();" style="background:#1c6fa3; color:#fff; border:none; border-radius:8px; padding:6px 10px; font-weight:800; font-size:0.7812rem;">View</button>
+      <button onclick="dismissJobReminder()" style="background:none; border:none; color:#1c6fa3; font-weight:800; font-size:1rem; line-height:1; padding:0 2px;">✕</button>
+    </span>
+  </div>`;
+}
+
+function sortByRoute(custs){
+  return custs.slice().sort((a,b)=>{
+    const oa = a.order!=null ? a.order : 9999;
+    const ob = b.order!=null ? b.order : 9999;
+    return oa-ob || (a.address||'').localeCompare(b.address||'');
+  });
+}
+
+function setTab(tab){
+  currentTab = tab; currentRound = null; reorderMode = false; roundOwedOnly = false;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===tab));
+  render();
+}
+function goToRound(rn){
+  currentTab = 'rounds'; currentRound = rn; reorderMode = false; roundOwedOnly = false;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab==='rounds'));
+  render();
+}
+function setRoundsView(v){ roundsViewMode = v; render(); }
+function toggleReorder(){ reorderMode = !reorderMode; render(); }
+function moveInRound(id, direction){
+  const rn = currentRound;
+  const custs = sortByRoute(data.customers.filter(c=>(c.round||'Unassigned')===rn));
+  const idx = custs.findIndex(c=>c.id===id);
+  const swapIdx = direction==='up' ? idx-1 : idx+1;
+  if(swapIdx<0 || swapIdx>=custs.length) return;
+  const tmp = custs[idx]; custs[idx] = custs[swapIdx]; custs[swapIdx] = tmp;
+  custs.forEach((c,i)=>{ c.order = i; });
+  saveData(); render();
+}
+
+/* ---------- rendering ---------- */
+function render(){
+  renderBackupBanner();
+  renderJobReminderBanner();
+  const main = document.getElementById('main');
+  main.innerHTML = '';
+
+  if(currentTab === 'rounds' && !currentRound){
+    renderRoundsList(main);
+  } else if(currentTab === 'rounds' && currentRound){
+    renderRoundDetail(main, currentRound);
+  } else if(currentTab === 'summary'){
+    renderSummary(main);
+  } else if(currentTab === 'jobs'){
+    renderJobs(main);
+  }
+}
+
+function customersMatching(list){
+  if(!searchQuery) return list;
+  const q = searchQuery.toLowerCase();
+  return list.filter(c =>
+    (c.name||'').toLowerCase().includes(q) ||
+    (c.address||'').toLowerCase().includes(q) ||
+    (c.phone||'').toLowerCase().includes(q) ||
+    (c.email||'').toLowerCase().includes(q)
+  );
+}
+
+function searchBar(){
+  return `<div class="search-wrap">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+    <input type="text" id="searchInput" placeholder="Search customers or addresses" value="${escapeAttr(searchQuery)}">
+  </div>`;
+}
+function wireSearch(){
+  const el = document.getElementById('searchInput');
+  if(el) el.oninput = (e)=>{ searchQuery = e.target.value; render(); const f=document.getElementById('searchInput'); if(f){f.focus(); f.setSelectionRange(f.value.length,f.value.length);} };
+}
+
+function renderRoundsList(main){
+  const rounds = groupByRound(data.customers);
+  const roundNames = Object.keys(rounds).sort((a,b)=>a.localeCompare(b));
+
+  let html = searchBar();
+  html += `<div class="seg-row">
+    <button class="seg-btn ${roundsViewMode==='overview'?'active':''}" onclick="setRoundsView('overview')">Rounds</button>
+    <button class="seg-btn ${roundsViewMode==='due'?'active':''}" onclick="setRoundsView('due')">Due</button>
+    <button class="seg-btn ${roundsViewMode==='owed'?'active':''}" onclick="setRoundsView('owed')">Owed</button>
+  </div>`;
+
+  if(!roundNames.length){
+    main.innerHTML = html + emptyState('rounds');
+    wireSearch();
+    return;
+  }
+
+  if(roundsViewMode === 'overview'){
+    html += `<div class="section-label">Your rounds</div>`;
+    let anyShown = false;
+    roundNames.forEach(rn=>{
+      const custs = customersMatching(rounds[rn]);
+      if(searchQuery && !custs.length) return;
+      anyShown = true;
+      const all = rounds[rn];
+      let overdue=0, due=0, owed=0, paused=0;
+      all.forEach(c=>{
+        const s = custStatus(c);
+        if(c.paused) paused++;
+        else if(s.cleanBadge && s.cleanBadge.type==='overdue') overdue++;
+        else if(s.cleanBadge && s.cleanBadge.type==='due') due++;
+        if(s.owed) owed++;
+      });
+      html += `<div class="round-card" onclick="openRound('${escapeAttr(rn)}')">
+        <div>
+          <div class="rname">${escapeHtml(rn)}</div>
+          <div class="rcount">${all.length} customer${all.length===1?'':'s'}</div>
+        </div>
+        <div class="badges">
+          ${overdue?`<span class="badge overdue">${overdue} overdue</span>`:''}
+          ${due?`<span class="badge due">${due} due</span>`:''}
+          ${owed?`<span class="badge owed">${owed} owe</span>`:''}
+          ${paused?`<span class="badge paused">${paused} paused</span>`:''}
+          ${(!overdue&&!due&&!owed)?`<span class="badge ok">All clear</span>`:''}
+          <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 6l6 6-6 6"/></svg>
+        </div>
+      </div>`;
+    });
+    if(!anyShown && searchQuery){
+      html += emptyState('search');
+    }
+  } else if(roundsViewMode === 'due'){
+    html += `<div class="swipe-hint">👉 Swipe a card right to mark cleaned, left to mark paid</div>`;
+    let anyDue = false;
+    roundNames.forEach(rn=>{
+      const dueCusts = customersMatching(rounds[rn].filter(c=>{
+        const s = custStatus(c);
+        return !c.paused && s.cleanBadge && (s.cleanBadge.type==='due' || s.cleanBadge.type==='overdue');
+      })).sort((a,b)=>{
+        const sa=custStatus(a), sb=custStatus(b);
+        const rank = x => x.cleanBadge.type==='overdue' ? 0 : 1;
+        return rank(sa)-rank(sb);
+      });
+      if(!dueCusts.length) return;
+      anyDue = true;
+      const anyPhone = dueCusts.some(c=>c.phone);
+      html += `<div style="display:flex; align-items:center; justify-content:space-between; margin:18px 2px 8px;">
+        <div class="section-label" style="margin:0;">${escapeHtml(rn)} <span style="font-weight:600; color:var(--ink-muted); text-transform:none; letter-spacing:0;">(${dueCusts.length})</span></div>
+        ${anyPhone ? `<button onclick="openBulkReminders('due','${escapeAttr(rn)}')" style="background:none; border:none; color:var(--blue); font-size:0.75rem; font-weight:800;">✉️ Remind all</button>` : ''}
+      </div>`;
+      html += dueCusts.map(custCardHtml).join('');
+    });
+    if(!anyDue){
+      html += `<div class="empty">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#66798A" stroke-width="1.6"><path d="M20 6L9 17l-5-5"/></svg>
+        <b>Nobody's due</b>
+        <p>Everyone's cleaned on schedule.</p>
+      </div>`;
+    }
+  } else if(roundsViewMode === 'owed'){
+    html += `<div class="swipe-hint">👉 Swipe a card right to mark cleaned, left to mark paid</div>`;
+    let anyOwed = false;
+    let grandTotal = 0;
+    roundNames.forEach(rn=>{
+      const owedCusts = customersMatching(rounds[rn].filter(c=>custStatus(c).owed))
+        .sort((a,b)=>custStatus(b).balance-custStatus(a).balance);
+      if(!owedCusts.length) return;
+      anyOwed = true;
+      const roundTotal = owedCusts.reduce((s,c)=>s+custStatus(c).balance,0);
+      grandTotal += roundTotal;
+      const anyPhone = owedCusts.some(c=>c.phone);
+      html += `<div style="display:flex; align-items:center; justify-content:space-between; margin:18px 2px 8px;">
+        <div class="section-label" style="margin:0;">${escapeHtml(rn)} <span style="font-weight:600; color:var(--ink-muted); text-transform:none; letter-spacing:0;">(owing ${money(roundTotal)})</span></div>
+        ${anyPhone ? `<button onclick="openBulkReminders('owed','${escapeAttr(rn)}')" style="background:none; border:none; color:var(--blue); font-size:0.75rem; font-weight:800;">✉️ Remind all</button>` : ''}
+      </div>`;
+      html += owedCusts.map(custCardHtml).join('');
+    });
+    if(!anyOwed){
+      html += `<div class="empty">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#66798A" stroke-width="1.6"><path d="M20 6L9 17l-5-5"/></svg>
+        <b>Nobody owes anything</b>
+        <p>Everyone's paid up.</p>
+      </div>`;
+    } else {
+      html += `<div style="text-align:right; font-weight:800; font-size:0.9375rem; color:var(--emphasis); padding:10px 4px 4px;">Total owed: ${money(grandTotal)}</div>`;
+    }
+  }
+
+  main.innerHTML = html;
+  wireSearch();
+}
+
+function openRound(rn){ currentRound = rn; reorderMode = false; roundOwedOnly = false; render(); }
+function backToRounds(){ currentRound = null; reorderMode = false; roundOwedOnly = false; render(); }
+function setRoundOwedOnly(v){ roundOwedOnly = v; render(); }
+
+function renderRoundDetail(main, rn){
+  const allInRound = sortByRoute(data.customers.filter(c=>(c.round||'Unassigned')===rn));
+
+  let shellHtml = `
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; gap:8px;">
+      <button class="btn-open" style="width:auto; padding:8px 14px; display:inline-flex; gap:6px; align-items:center;" onclick="backToRounds()">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 6l-6 6 6 6"/></svg> All rounds
+      </button>
+      <button class="btn-open" style="width:auto; padding:8px 14px; font-size:0.7812rem; font-weight:800;" onclick="toggleReorder()">${reorderMode?'Done':'↕ Reorder route'}</button>
+    </div>
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:12px;">
+      <h2 style="font-size:1.25rem;">${escapeHtml(rn)}</h2>
+      <button class="btn-open" style="width:38px; height:38px; padding:0; flex-shrink:0;" onclick="printSingleRound('${escapeAttr(rn)}')" aria-label="Print this round">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
+      </button>
+    </div>
+  `;
+
+  if(reorderMode){
+    shellHtml += `<p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 14px;">Use the arrows to set the order you actually visit these customers in.</p>`;
+    if(!allInRound.length){ main.innerHTML = shellHtml + emptyState('customers'); return; }
+    shellHtml += allInRound.map((c,i)=>`
+      <div class="cust-card" style="display:flex; align-items:center; gap:10px;">
+        <div style="flex:1; min-width:0;">
+          <div class="cust-addr" style="font-size:0.9375rem; font-weight:800;">${i+1}. ${escapeHtml(c.address||'No address')}</div>
+          ${c.name?`<div class="cust-name" style="font-size:0.8125rem; color:var(--ink-muted); margin-top:2px;">${escapeHtml(c.name)}</div>`:''}
+        </div>
+        <div style="display:flex; flex-direction:column; gap:6px;">
+          <button class="btn-open" style="width:38px; height:32px; padding:0; opacity:${i===0?'0.3':'1'};" onclick="moveInRound('${c.id}','up')">▲</button>
+          <button class="btn-open" style="width:38px; height:32px; padding:0; opacity:${i===allInRound.length-1?'0.3':'1'};" onclick="moveInRound('${c.id}','down')">▼</button>
+        </div>
+      </div>
+    `).join('');
+    main.innerHTML = shellHtml;
+    return;
+  }
+
+  shellHtml += `<div class="seg-row">
+    <button class="seg-btn ${!roundOwedOnly?'active':''}" onclick="setRoundOwedOnly(false)">All customers</button>
+    <button class="seg-btn ${roundOwedOnly?'active':''}" onclick="setRoundOwedOnly(true)">💷 Owed only</button>
+  </div>`;
+  shellHtml += searchBar();
+  shellHtml += `<div class="swipe-hint">👉 Swipe a card right to mark cleaned, left to mark paid</div>`;
+
+  const baseList = roundOwedOnly ? allInRound.filter(c=>custStatus(c).owed) : allInRound;
+  const custs = customersMatching(baseList);
+  if(!custs.length){
+    main.innerHTML = shellHtml + emptyState(roundOwedOnly ? 'search' : 'customers');
+    wireSearch();
+    return;
+  }
+  shellHtml += custs.map(custCardHtml).join('');
+  main.innerHTML = shellHtml;
+  wireSearch();
+}
+
+function renderSummary(main){
+  const rounds = groupByRound(data.customers);
+  const roundNames = Object.keys(rounds).sort((a,b)=>a.localeCompare(b));
+
+  const totalCustomers = data.customers.length;
+  const totalValue = data.customers.reduce((sum,c)=>sum+Number(c.price||0),0);
+  const overallAvg = totalCustomers ? totalValue/totalCustomers : 0;
+
+  main.innerHTML = `<div class="summary-overall">
+    <div class="stat"><div class="num">${totalCustomers}</div><div class="lbl">Customers</div></div>
+    <div class="stat"><div class="num">${money(totalValue)}</div><div class="lbl">Round value</div></div>
+    <div class="stat"><div class="num">${money(overallAvg)}</div><div class="lbl">Avg / customer</div></div>
+  </div>`;
+
+  if(!roundNames.length){
+    main.innerHTML += emptyState('rounds');
+    return;
+  }
+  main.innerHTML += `<div class="section-label">By round</div>`;
+  roundNames.forEach(rn=>{
+    const custs = rounds[rn];
+    const total = custs.reduce((sum,c)=>sum+Number(c.price||0),0);
+    const avg = custs.length ? total/custs.length : 0;
+    main.innerHTML += `<div class="summary-round" onclick="goToRound('${escapeAttr(rn)}')">
+      <div>
+        <div class="rname">${escapeHtml(rn)}</div>
+        <div class="rcount">${custs.length} customer${custs.length===1?'':'s'}</div>
+      </div>
+      <div>
+        <div class="rtotal">${money(total)}</div>
+        <div class="ravg">avg ${money(avg)} / customer</div>
+      </div>
+    </div>`;
+  });
+}
+
+function emptyState(kind){
+  if(kind==='rounds'){
+    return `<div class="empty">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#66798A" stroke-width="1.6"><path d="M4 4h16v12H4z"/><path d="M4 10h16M10 4v12"/></svg>
+      <b>No customers yet</b>
+      <p>Tap the blue + button to add your first customer and give them a round.</p>
+    </div>`;
+  }
+  return `<div class="empty">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#66798A" stroke-width="1.6"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+    <b>No matches</b>
+    <p>Try a different search.</p>
+  </div>`;
+}
+
+function custCardHtml(c){
+  const s = custStatus(c);
+  return `<div class="swipe-wrap">
+    <div class="swipe-bg swipe-bg-left">✓ Cleaned</div>
+    <div class="swipe-bg swipe-bg-right">💷 Paid</div>
+    <div class="cust-card" data-id="${c.id}" data-kind="customer">
+      <div class="cust-top" onclick="openCustomerDetail('${c.id}')">
+        <div>
+          <div class="cust-addr" style="font-size:1rem; font-weight:800; color:var(--ink);">${escapeHtml(c.address||'No address')}</div>
+          ${(c.name||c.phone) ? `<div class="cust-name" style="font-size:0.8125rem; font-weight:600; color:var(--ink-muted); margin-top:2px;">${[escapeHtml(c.name||''), c.phone?escapeHtml(c.phone):''].filter(Boolean).join(' · ')}</div>` : ''}
+        </div>
+        <div class="cust-price">${money(c.price)}</div>
+      </div>
+      <div class="cust-meta">
+        ${s.cleanBadge ? `<span class="badge ${s.cleanBadge.type}">${s.cleanBadge.text}</span>` : `<span class="badge ok">Cleaned ${fmtDate(s.lastClean)}</span>`}
+        ${s.owed ? `<span class="badge owed">Owes ${money(s.balance)}</span>` : s.credit ? `<span class="badge ok">Credit ${money(Math.abs(s.balance))}</span>` : `<span class="badge ok">Paid up</span>`}
+        ${(s.owed && c.paymentReminderSent) ? `<span class="badge paused">🔔 Reminded</span>` : ''}
+      </div>
+    </div>
+  </div>`;
+}
+
+function quickClean(id){
+  const c = data.customers.find(x=>x.id===id);
+  c.cleanHistory = c.cleanHistory || [];
+  c.cleanHistory.push({date: todayISO(), amount: c.price||0});
+  saveData(); render(); toast(`Marked ${c.name||c.address||'customer'} as cleaned today`);
+}
+function quickPaid(id){
+  const c = data.customers.find(x=>x.id===id);
+  c.paymentHistory = c.paymentHistory || [];
+  c.paymentHistory.push({date: todayISO(), amount: c.price||0});
+  c.paymentReminderSent = false;
+  saveData(); render(); toast(`Marked ${c.name||c.address||'customer'} as paid`);
+}
+
+function useCurrentLocation(){
+  if(!navigator.geolocation){ toast('Location not available on this device'); return; }
+  toast('Getting your location…');
+  navigator.geolocation.getCurrentPosition(async (pos)=>{
+    const {latitude, longitude} = pos.coords;
+    const field = document.getElementById('f_address');
+    if(!field) return;
+    try{
+      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&addressdetails=1&lat=${latitude}&lon=${longitude}`);
+      if(!res.ok) throw new Error('bad response');
+      const json = await res.json();
+      const a = (json && json.address) || {};
+      const road = [a.house_number, (a.road || a.pedestrian || a.footway || '')].filter(Boolean).join(' ');
+      const town = a.town || a.city || a.village || a.suburb || a.hamlet || '';
+      const postcode = a.postcode || '';
+      const shortAddress = [road, town, postcode].filter(Boolean).join(', ');
+      if(shortAddress){
+        field.value = shortAddress;
+        toast('Address filled from your location');
+      } else if(json && json.display_name){
+        field.value = json.display_name;
+        toast('Address filled from your location');
+      } else {
+        throw new Error('no address found');
+      }
+    }catch(e){
+      field.value = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+      toast('Got your coordinates — no signal to look up the address');
+    }
+  }, ()=>{
+    toast('Could not get your location — check location permission');
+  }, {enableHighAccuracy:true, timeout:12000});
+}
+
+/* ---------- sheets ---------- */
+function openSheet(html){
+  document.getElementById('sheet').innerHTML = `<div class="sheet-handle"></div>` + html;
+  document.getElementById('overlay').classList.add('show');
+}
+function closeSheet(){ document.getElementById('overlay').classList.remove('show'); }
+
+function openCustomerForm(existing){
+  const c = existing || {};
+  const rounds = [...new Set(data.customers.map(x=>x.round).filter(Boolean))];
+  openSheet(`
+    <div class="sheet-head">
+      <h2>${existing?'Edit customer':'Add customer'}</h2>
+      <button class="sheet-close" onclick="closeSheet()">✕</button>
+    </div>
+    <div style="display:flex; align-items:center; justify-content:space-between; margin:0 2px 6px;">
+      <label style="margin:0;">Address</label>
+      <button type="button" onclick="useCurrentLocation()" style="background:none; border:none; color:var(--blue); font-size:0.7812rem; font-weight:700; padding:2px;">📍 Use my location</button>
+    </div>
+    <input type="text" id="f_address" value="${escapeAttr(c.address||'')}" placeholder="e.g. 12 Elm Grove">
+    <label>Name <span style="text-transform:none; font-weight:500; opacity:0.7;">(optional)</span></label>
+    <input type="text" id="f_name" value="${escapeAttr(c.name||'')}" placeholder="e.g. Mrs Patterson">
+    <div class="row2">
+      <div>
+        <label>Telephone (optional)</label>
+        <input type="text" id="f_phone" value="${escapeAttr(c.phone||'')}" placeholder="07..." inputmode="tel">
+      </div>
+      <div>
+        <label>Email (optional)</label>
+        <input type="text" id="f_email" value="${escapeAttr(c.email||'')}" placeholder="name@email.com" inputmode="email">
+      </div>
+    </div>
+    <label>Round</label>
+    <input type="text" id="f_round" value="${escapeAttr(c.round||'')}" placeholder="e.g. Tuesday Round" list="roundOptions">
+    <datalist id="roundOptions">${rounds.map(r=>`<option value="${escapeAttr(r)}">`).join('')}</datalist>
+    <div class="row2">
+      <div>
+        <label>Price per clean</label>
+        <input type="number" id="f_price" value="${c.price!=null?c.price:''}" placeholder="£" min="0" step="0.5">
+      </div>
+      <div>
+        <label>Clean every (weeks)</label>
+        <input type="number" id="f_freq" value="${c.frequencyWeeks||4}" min="1">
+      </div>
+    </div>
+    <label>Notes</label>
+    <textarea id="f_notes" rows="2" placeholder="Gate code, dog, access notes...">${escapeHtml(c.notes||'')}</textarea>
+    <div class="form-actions">
+      <button class="btn-primary" onclick="saveCustomerForm('${existing?existing.id:''}')">${existing?'Save changes':'Add customer'}</button>
+    </div>
+    ${existing?`<button class="btn-danger-text" onclick="deleteCustomer('${existing.id}')">Delete customer</button>`:''}
+  `);
+}
+
+function saveCustomerForm(id){
+  const name = document.getElementById('f_name').value.trim();
+  const address = document.getElementById('f_address').value.trim();
+  if(!name && !address){ toast('Please enter at least a name or an address'); return; }
+  if(address){
+    const normalized = address.toLowerCase();
+    const dupe = data.customers.find(x=> x.id!==id && (x.address||'').trim().toLowerCase()===normalized);
+    if(dupe){
+      const proceed = confirm(`This address is already saved for ${dupe.name || 'another customer'} (${dupe.round||'Unassigned'} round). Add it again anyway?`);
+      if(!proceed) return;
+    }
+  }
+  const payload = {
+    name,
+    address,
+    phone: document.getElementById('f_phone').value.trim(),
+    email: document.getElementById('f_email').value.trim(),
+    round: document.getElementById('f_round').value.trim() || 'Unassigned',
+    price: parseFloat(document.getElementById('f_price').value) || 0,
+    frequencyWeeks: parseInt(document.getElementById('f_freq').value) || 4,
+    notes: document.getElementById('f_notes').value.trim()
+  };
+  if(id){
+    const c = data.customers.find(x=>x.id===id);
+    const oldPrice = c.price;
+    const oldRound = c.round || 'Unassigned';
+    Object.assign(c, payload);
+    if(oldPrice !== payload.price){
+      c.priceHistory = c.priceHistory || [];
+      c.priceHistory.push({date: todayISO(), price: payload.price});
+    }
+    if(oldRound !== (payload.round || 'Unassigned')){
+      const roundCusts = data.customers.filter(x=>x.id!==id && (x.round||'Unassigned')===(payload.round||'Unassigned'));
+      const maxOrder = roundCusts.reduce((m,x)=>Math.max(m, x.order!=null?x.order:-1), -1);
+      c.order = maxOrder + 1;
+    }
+    toast('Customer updated');
+  } else {
+    const roundCusts = data.customers.filter(x=>(x.round||'Unassigned')===(payload.round||'Unassigned'));
+    const maxOrder = roundCusts.reduce((m,x)=>Math.max(m, x.order!=null?x.order:-1), -1);
+    data.customers.push(Object.assign({
+      id: uid(), cleanHistory: [], paymentHistory: [],
+      priceHistory: [{date: todayISO(), price: payload.price}],
+      order: maxOrder + 1
+    }, payload));
+    toast('Customer added');
+  }
+  saveData(); closeSheet(); render();
+}
+
+function deleteCustomer(id){
+  const idx = data.customers.findIndex(x=>x.id===id);
+  if(idx===-1) return;
+  const removed = data.customers[idx];
+  data.customers.splice(idx,1);
+  saveData(); closeSheet(); render();
+  toast(`Deleted ${removed.address||removed.name||'customer'}`, 'Undo', ()=>{
+    data.customers.splice(idx,0,removed);
+    saveData(); render();
+    toast('Customer restored');
+  });
+}
+
+function openCustomerDetail(id){
+  const c = data.customers.find(x=>x.id===id);
+  const s = custStatus(c);
+  const cleanRows = (c.cleanHistory||[]).slice().sort((a,b)=>a.date<b.date?1:-1)
+    .map(e=>`<li>${fmtDate(e.date)} — ${money(e.amount)}<span style="display:flex; gap:4px;"><button class="hist-del" onclick="editHistAmount('${id}','clean','${e.date}')">Edit</button><button class="hist-del" onclick="removeHist('${id}','clean','${e.date}')">Remove</button></span></li>`).join('') || '<li style="color:var(--ink-muted)">No cleans logged yet</li>';
+  const payRows = (c.paymentHistory||[]).slice().sort((a,b)=>a.date<b.date?1:-1)
+    .map(p=>`<li>${fmtDate(p.date)} — ${money(p.amount)}<span style="display:flex; gap:4px;"><button class="hist-del" onclick="editHistAmount('${id}','pay','${p.date}')">Edit</button><button class="hist-del" onclick="removeHist('${id}','pay','${p.date}')">Remove</button></span></li>`).join('') || '<li style="color:var(--ink-muted)">No payments logged yet</li>';
+  const priceRows = (c.priceHistory||[]).slice().sort((a,b)=>a.date<b.date?1:-1)
+    .map((p,i)=>`<li>${fmtDate(p.date)} — ${money(p.price)}${i===0?' <span style="color:var(--ink-muted); font-weight:500;">(current)</span>':''}</li>`).join('') || '<li style="color:var(--ink-muted)">No price changes recorded</li>';
+  const suggestedPayment = s.owed ? s.balance : (c.price||0);
+
+  openSheet(`
+    <div class="sheet-head">
+      <h2 style="flex:1; min-width:0;">${escapeHtml(c.address || c.name || 'Customer')}</h2>
+      <button class="sheet-close" style="flex-shrink:0; margin-right:6px;" onclick="printCustomerRecord('${id}')" aria-label="Print this customer">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
+      </button>
+      <button class="sheet-close" style="flex-shrink:0;" onclick="closeSheet()">✕</button>
+    </div>
+    ${(c.name && c.address) ? `<div style="color:var(--ink); font-size:0.9375rem; font-weight:700; margin-bottom:2px;">${escapeHtml(c.name)}</div>` : ''}
+    <div style="color:var(--ink-muted); font-size:0.8125rem; margin-bottom:10px;">${escapeHtml(c.round||'Unassigned')} · ${money(c.price)} standard · every ${c.frequencyWeeks||4} week${(c.frequencyWeeks||4)===1?'':'s'}${c.paused?' · <span style="color:var(--ink-muted); font-weight:700;">Paused</span>':''}</div>
+    ${(c.phone||c.email)?`<div style="display:flex; gap:8px; margin-bottom:10px;">
+      ${c.phone?`<a href="tel:${escapeAttr(c.phone.replace(/\\s+/g,''))}" style="flex:1; text-decoration:none; background:var(--blue-dim); color:#1c6fa3; border-radius:10px; padding:9px; font-size:0.8125rem; font-weight:700; text-align:center;">📞 ${escapeHtml(c.phone)}</a>`:''}
+      ${c.email?`<button onclick="emailCustomer('${id}')" style="flex:1; min-width:0; background:var(--bg); color:var(--ink); border:1px solid var(--line); border-radius:10px; padding:9px; font-size:0.8125rem; font-weight:700; text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">✉️ ${escapeHtml(c.email)}</button>`:''}
+    </div>`:''}
+    ${c.phone?`<div class="row2" style="margin-bottom:14px;">
+      <button class="btn" style="background:var(--blue-dim); color:#1c6fa3;" onclick="sendTemplate('${id}','clean')">💬 Cleaning reminder</button>
+      <button class="btn" style="background:var(--amber-dim); color:var(--amber);" onclick="sendTemplate('${id}','pay'); openCustomerDetail('${id}');">💬 Payment reminder</button>
+    </div>`:''}
+    ${c.notes?`<div style="background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:10px 12px; font-size:0.8438rem; margin-bottom:14px;">${escapeHtml(c.notes)}</div>`:''}
+
+    <div style="background:${s.owed?'var(--red-dim)':s.credit?'var(--green-dim)':'var(--green-dim)'}; color:${s.owed?'var(--red)':'var(--green)'}; border-radius:10px; padding:12px; font-weight:800; text-align:center; margin-bottom:14px;">
+      ${s.owed ? `Owes ${money(s.balance)}` : s.credit ? `In credit: ${money(Math.abs(s.balance))} (carries onto next bill)` : 'Fully paid up'}
+      ${(s.owed && c.paymentReminderSent) ? `<div style="font-size:0.75rem; font-weight:700; margin-top:4px; opacity:0.85;">🔔 Payment reminder already sent</div>` : ''}
+    </div>
+
+    <div class="stat-row">
+      <div class="stat"><div class="num">${fmtDate(s.lastClean).split(' ').slice(0,2).join(' ')}</div><div class="lbl">Last cleaned</div></div>
+      <div class="stat"><div class="num">${fmtDate(s.lastPaid).split(' ').slice(0,2).join(' ')}</div><div class="lbl">Last paid</div></div>
+    </div>
+
+    <div class="cust-actions" style="margin-bottom:12px;">
+      <button class="btn btn-clean" onclick="quickClean('${id}'); openCustomerDetail('${id}');">Mark cleaned today</button>
+      <button class="btn btn-paid" onclick="quickPaid('${id}'); openCustomerDetail('${id}');">Mark paid today</button>
+    </div>
+    <button class="btn" style="width:100%; background:${c.paused?'var(--green-dim)':'var(--line)'}; color:${c.paused?'var(--green)':'var(--ink-muted)'}; margin-bottom:10px;" onclick="togglePause('${id}')">
+      ${c.paused ? '▶ Resume this customer' : '⏸ Pause this customer (skip due reminders)'}
+    </button>
+    <button class="btn" style="width:100%; background:var(--blue-dim); color:#1c6fa3; margin-bottom:20px;" onclick="scheduleJobForCustomer('${id}')">
+      📋 Schedule a one-off job for this customer
+    </button>
+    <label style="margin-top:0">Add clean on date</label>
+    <input type="date" id="d_clean" value="${todayISO()}">
+    <label>Amount charged</label>
+    <input type="number" id="d_clean_amount" value="${c.price||0}" step="0.5" min="0">
+    <button class="btn btn-clean" style="width:100%; margin-top:10px; margin-bottom:8px;" onclick="addHistDate('${id}','clean')">Add clean</button>
+    <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 16px;">Adjust the amount for extras (e.g. garage door) or reductions (e.g. fronts only).</p>
+    <label style="margin-top:0">Add payment on date</label>
+    <input type="date" id="d_pay" value="${todayISO()}">
+    <label>Amount paid</label>
+    <input type="number" id="d_pay_amount" value="${suggestedPayment}" step="0.5" min="0">
+    <button class="btn btn-paid" style="width:100%; margin-top:10px; margin-bottom:8px;" onclick="addHistDate('${id}','pay')">Add payment</button>
+    <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 20px;">Pay less than the balance and the rest rolls onto next bill. Pay more and they'll show in credit.</p>
+
+    <div class="section-label" style="margin-top:0">Clean history</div>
+    <ul class="hist-list">${cleanRows}</ul>
+    <div class="section-label">Payment history</div>
+    <ul class="hist-list">${payRows}</ul>
+    <div class="section-label">Price history</div>
+    <ul class="hist-list">${priceRows}</ul>
+    <div class="section-label">Photos</div>
+    <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px;">
+      ${(c.photos||[]).map(p=>`<img src="${p.dataUrl}" onclick="viewPhoto('${id}','${p.id}')" style="width:72px; height:72px; object-fit:cover; border-radius:10px; border:1px solid var(--line); cursor:pointer;">`).join('')}
+      <button onclick="document.getElementById('photoInput_${id}').click()" style="width:72px; height:72px; border-radius:10px; border:2px dashed var(--line); background:none; color:var(--ink-muted); font-size:1.625rem; display:flex; align-items:center; justify-content:center;">+</button>
+      <input type="file" accept="image/*" id="photoInput_${id}" style="display:none;" onchange="handlePhotoSelected('${id}', this)">
+    </div>
+
+    <div class="form-actions">
+      <button class="btn-primary" style="background:var(--navy);" onclick="openCustomerForm(data.customers.find(x=>x.id==='${id}'))">Edit customer</button>
+    </div>
+  `);
+}
+
+function compressImage(file, maxDim, quality){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onload = (e)=>{
+      const img = new Image();
+      img.onload = ()=>{
+        let w = img.width, h = img.height;
+        if(w > h && w > maxDim){ h = Math.round(h * maxDim / w); w = maxDim; }
+        else if(h >= w && h > maxDim){ w = Math.round(w * maxDim / h); h = maxDim; }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = reject;
+      img.src = e.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function handlePhotoSelected(id, inputEl){
+  const file = inputEl.files[0];
+  if(!file) return;
+  toast('Adding photo…');
+  try{
+    const dataUrl = await compressImage(file, 900, 0.7);
+    const c = data.customers.find(x=>x.id===id);
+    c.photos = c.photos || [];
+    c.photos.push({id: uid(), dataUrl, date: todayISO()});
+    if(saveData()){
+      openCustomerDetail(id);
+      render();
+      toast('Photo added');
+    }
+  }catch(e){
+    toast('Could not add that photo — try again');
+  }
+  inputEl.value = '';
+}
+
+function viewPhoto(id, photoId){
+  const c = data.customers.find(x=>x.id===id);
+  const p = (c.photos||[]).find(x=>x.id===photoId);
+  if(!p) return;
+  openSheet(`
+    <div class="sheet-head">
+      <h2>Photo</h2>
+      <button class="sheet-close" onclick="closeSheet()">✕</button>
+    </div>
+    <img src="${p.dataUrl}" style="width:100%; border-radius:12px; margin-bottom:6px;">
+    <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 16px;">Added ${fmtDate(p.date)}</p>
+    <div class="row2" style="margin-bottom:8px;">
+      <button class="btn btn-clean" onclick="sharePhoto('${id}','${photoId}')">📤 Share</button>
+      <button class="btn" style="background:var(--red-dim); color:var(--red);" onclick="deletePhoto('${id}','${photoId}')">Delete</button>
+    </div>
+    <p style="color:var(--ink-muted); font-size:0.7188rem; margin:0 2px; text-align:center;">Tip: you can also press and hold the photo to save or share it directly.</p>
+  `);
+}
+
+async function sharePhoto(id, photoId){
+  const c = data.customers.find(x=>x.id===id);
+  const p = (c.photos||[]).find(x=>x.id===photoId);
+  if(!p) return;
+  try{
+    const res = await fetch(p.dataUrl);
+    const blob = await res.blob();
+    const safeName = (c.address || c.name || 'photo').replace(/[^a-z0-9]+/gi, '-').toLowerCase();
+    const file = new File([blob], `${safeName}-${p.date}.jpg`, { type: blob.type || 'image/jpeg' });
+    if(navigator.canShare && navigator.canShare({ files: [file] })){
+      await navigator.share({ files: [file], title: 'Round Book photo', text: c.address || c.name || '' });
+    } else {
+      toast('Sharing not supported here — press and hold the photo instead');
+    }
+  }catch(e){
+    if(e && e.name === 'AbortError') return;
+    toast('Could not share that photo — press and hold it instead');
+  }
+}
+
+function deletePhoto(id, photoId){
+  const c = data.customers.find(x=>x.id===id);
+  c.photos = (c.photos||[]).filter(p=>p.id!==photoId);
+  saveData();
+  openCustomerDetail(id);
+  render();
+}
+
+function editHistAmount(id, kind, dateKey){
+  const c = data.customers.find(x=>x.id===id);
+  const list = kind==='clean' ? c.cleanHistory : c.paymentHistory;
+  const entry = list.find(e=>e.date===dateKey);
+  if(!entry) return;
+  const val = prompt(`${kind==='clean'?'Amount charged':'Amount paid'} for ${fmtDate(dateKey)}`, entry.amount);
+  if(val===null) return;
+  const num = parseFloat(val);
+  if(isNaN(num) || num<0){ toast('Enter a valid amount'); return; }
+  entry.amount = num;
+  saveData(); openCustomerDetail(id); render();
+}
+
+function emailCustomer(id){
+  const c = data.customers.find(x=>x.id===id);
+  if(!c || !c.email) return;
+  window.location.href = 'mailto:' + c.email;
+}
+
+function togglePause(id){
+  const c = data.customers.find(x=>x.id===id);
+  c.paused = !c.paused;
+  saveData(); openCustomerDetail(id); render();
+  toast(c.paused ? 'Customer paused — hidden from due reminders' : 'Customer resumed');
+}
+
+function applyTemplate(tpl, tokens){
+  return (tpl||'')
+    .replace(/\{name\}/g, tokens.name || 'there')
+    .replace(/\{amount\}/g, tokens.amount != null ? money(tokens.amount) : '')
+    .replace(/\{company\}/g, tokens.company || '');
+}
+
+function sendTemplate(id, kind){
+  const c = data.customers.find(x=>x.id===id);
+  if(!c.phone){ toast('No phone number saved for this customer'); return; }
+  const firstName = c.name ? c.name.trim().split(' ')[0] : '';
+  const company = data.settings.companyName || '';
+  let msg;
+  if(kind === 'clean'){
+    msg = applyTemplate(data.settings.cleanTemplate, {name: firstName, company});
+  } else {
+    const s = custStatus(c);
+    const amt = s.owed ? s.balance : c.price;
+    msg = applyTemplate(data.settings.payTemplate, {name: firstName, amount: amt, company});
+    c.paymentReminderSent = true;
+    saveData();
+    render();
+  }
+  const phone = c.phone.replace(/\s+/g,'');
+  const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const separator = isIOS ? '&' : '?';
+  window.location.href = `sms:${phone}${separator}body=${encodeURIComponent(msg)}`;
+}
+
+function openBulkReminders(kind, roundName){
+  const rounds = groupByRound(data.customers);
+  const roundCusts = rounds[roundName] || [];
+  let list;
+  if(kind === 'due'){
+    list = roundCusts.filter(c=>{
+      const s = custStatus(c);
+      return !c.paused && s.cleanBadge && (s.cleanBadge.type==='due' || s.cleanBadge.type==='overdue') && c.phone;
+    });
+  } else {
+    list = roundCusts.filter(c=> custStatus(c).owed && c.phone);
+  }
+  if(!list.length){ toast('No one with a phone number to remind'); return; }
+
+  openSheet(`
+    <div class="sheet-head">
+      <h2>Remind — ${escapeHtml(roundName)}</h2>
+      <button class="sheet-close" onclick="closeSheet()">✕</button>
+    </div>
+    <p style="color:var(--ink-muted); font-size:0.7812rem; margin:0 2px 14px; line-height:1.5;">
+      Tap Send for each customer — it opens Messages pre-filled and ready to go. Come back here for the next one.
+    </p>
+    ${list.map(c=>{
+      const s = custStatus(c);
+      const alreadySent = kind === 'owed' && c.paymentReminderSent;
+      return `<div class="cust-card" id="bulkrow-${c.id}" style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+        <div style="min-width:0;">
+          <div class="cust-addr" style="font-weight:800; font-size:0.9062rem;">${escapeHtml(c.address||c.name||'Customer')}</div>
+          <div style="font-size:0.75rem; color:var(--ink-muted); margin-top:2px;">${escapeHtml(c.phone)}${kind==='owed'?` · Owes ${money(s.balance)}`:''}${alreadySent?' · 🔔 Already reminded':''}</div>
+        </div>
+        <button class="btn btn-clean" style="flex:0 0 auto; padding:9px 16px;" onclick="sendTemplate('${c.id}','${kind==='due'?'clean':'pay'}'); markReminderSent('${c.id}')">${alreadySent?'Send again':'Send'}</button>
+      </div>`;
+    }).join('')}
+  `);
+}
+
+function markReminderSent(id){
+  const row = document.getElementById('bulkrow-'+id);
+  if(!row) return;
+  row.style.opacity = '0.45';
+  const btn = row.querySelector('button');
+  if(btn){
+    btn.textContent = 'Sent ✓';
+    btn.disabled = true;
+    btn.style.background = 'var(--line)';
+    btn.style.color = 'var(--ink-muted)';
+  }
+}
+
+function addHistDate(id, kind){
+  const c = data.customers.find(x=>x.id===id);
+  if(kind==='clean'){
+    const v = document.getElementById('d_clean').value;
+    if(!v) return;
+    const amtRaw = document.getElementById('d_clean_amount').value;
+    const amt = amtRaw!=='' ? parseFloat(amtRaw) : (c.price||0);
+    c.cleanHistory = c.cleanHistory||[]; c.cleanHistory.push({date:v, amount: isNaN(amt)?0:amt});
+  } else {
+    const v = document.getElementById('d_pay').value;
+    if(!v) return;
+    const amtRaw = document.getElementById('d_pay_amount').value;
+    const amt = amtRaw!=='' ? parseFloat(amtRaw) : (c.price||0);
+    c.paymentHistory = c.paymentHistory||[]; c.paymentHistory.push({date:v, amount: isNaN(amt)?0:amt});
+    c.paymentReminderSent = false;
+  }
+  saveData(); openCustomerDetail(id); render();
+}
+function removeHist(id, kind, dateVal){
+  const c = data.customers.find(x=>x.id===id);
+  if(kind==='clean'){
+    const idx = c.cleanHistory.findIndex(e=>e.date===dateVal);
+    if(idx>-1) c.cleanHistory.splice(idx,1);
+  } else {
+    const idx = c.paymentHistory.findIndex(p=>p.date===dateVal);
+    if(idx>-1) c.paymentHistory.splice(idx,1);
+  }
+  saveData(); openCustomerDetail(id); render();
+}
+
+function handleFabClick(){
+  if(currentTab === 'jobs') openJobForm();
+  else openCustomerForm();
+}
+
+/* ---------- one-off jobs ---------- */
+function renderJobs(main){
+  let html = searchBar();
+  const today = todayISO();
+  const jobs = customersMatching(data.oneOffJobs || [])
+    .slice()
+    .sort((a,b)=>{
+      if(!!a.done !== !!b.done) return a.done ? 1 : -1;
+      if(!a.done) return (a.date||'').localeCompare(b.date||'');
+      return (b.date||'').localeCompare(a.date||'');
+    });
+  if(!jobs.length){
+    html += `<div class="empty">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#66798A" stroke-width="1.6"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      <b>No one-off jobs yet</b>
+      <p>Tap the blue + button to add a gutter clean, one-time job, or anything outside your regular rounds — you can schedule it for any future date.</p>
+    </div>`;
+    main.innerHTML = html;
+    wireSearch();
+    return;
+  }
+  html += `<div class="section-label">${jobs.length} one-off job${jobs.length===1?'':'s'}</div>`;
+  html += `<div class="swipe-hint">👉 Swipe a card right to mark done, left to mark paid</div>`;
+  html += jobs.map(j=>jobCardHtml(j, today)).join('');
+  main.innerHTML = html;
+  wireSearch();
+}
+
+function jobCardHtml(j, today){
+  today = today || todayISO();
+  const isFuture = !j.done && j.date && j.date > today;
+  const statusBadge = j.done
+    ? `<span class="badge ok">Done</span>`
+    : isFuture
+      ? `<span class="badge due">Scheduled</span>`
+      : `<span class="badge overdue">Not done</span>`;
+  return `<div class="swipe-wrap">
+    <div class="swipe-bg swipe-bg-left">✓ Done</div>
+    <div class="swipe-bg swipe-bg-right">💷 Paid</div>
+    <div class="cust-card" data-id="${j.id}" data-kind="job">
+      <div class="cust-top" onclick="openJobForm(data.oneOffJobs.find(x=>x.id==='${j.id}'))">
+        <div>
+          <div class="cust-addr" style="font-size:1rem; font-weight:800; color:var(--ink);">${escapeHtml(j.address||'No address')}</div>
+          ${(j.name||j.phone) ? `<div class="cust-name" style="font-size:0.8125rem; font-weight:600; color:var(--ink-muted); margin-top:2px;">${[escapeHtml(j.name||''), j.phone?escapeHtml(j.phone):''].filter(Boolean).join(' · ')}</div>` : ''}
+          <div style="font-size:0.75rem; color:var(--ink-muted); margin-top:2px;">${fmtDate(j.date)}${j.remind24h?' · 🔔 Reminder set':''}</div>
+        </div>
+        <div class="cust-price">${money(j.price)}</div>
+      </div>
+      <div class="cust-meta">
+        ${statusBadge}
+        <span class="badge ${j.paid?'ok':'owed'}">${j.paid?'Paid':'Unpaid'}</span>
+      </div>
+    </div>
+  </div>`;
+}
+
+function toggleJobDone(id){
+  const j = data.oneOffJobs.find(x=>x.id===id);
+  j.done = !j.done;
+  saveData(); render();
+}
+function toggleJobPaid(id){
+  const j = data.oneOffJobs.find(x=>x.id===id);
+  j.paid = !j.paid;
+  if(j.paid) j.paidDate = todayISO();
+  saveData(); render();
+}
+
+function scheduleJobForCustomer(id){
+  const c = data.customers.find(x=>x.id===id);
+  if(!c) return;
+  openJobForm(null, { address: c.address||'', name: c.name||'', phone: c.phone||'', price: c.price||0 });
+}
+
+function fillJobFromCustomer(id){
+  if(!id) return;
+  const c = data.customers.find(x=>x.id===id);
+  if(!c) return;
+  document.getElementById('j_address').value = c.address||'';
+  document.getElementById('j_name').value = c.name||'';
+  document.getElementById('j_phone').value = c.phone||'';
+  if(c.price!=null) document.getElementById('j_price').value = c.price;
+}
+
+function openJobForm(existing, prefill){
+  const j = existing || prefill || {};
+  const customerOptions = data.customers.slice()
+    .sort((a,b)=>(a.address||a.name||'').localeCompare(b.address||b.name||''))
+    .map(c=>`<option value="${c.id}">${escapeHtml(c.address||c.name||'Customer')}</option>`).join('');
+  openSheet(`
+    <div class="sheet-head">
+      <h2 style="flex:1; min-width:0;">${existing?'Edit job':'Add one-off job'}</h2>
+      ${existing?`<button class="sheet-close" style="flex-shrink:0; margin-right:6px;" onclick="printJobRecord('${existing.id}')" aria-label="Print this job">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
+      </button>`:''}
+      <button class="sheet-close" style="flex-shrink:0;" onclick="closeSheet()">✕</button>
+    </div>
+    ${(!existing)?`
+      <label style="margin-top:0">Fill from existing customer <span style="text-transform:none; font-weight:500; opacity:0.7;">(optional)</span></label>
+      <select id="j_customer_picker" onchange="fillJobFromCustomer(this.value)">
+        <option value="">— Select a customer —</option>
+        ${customerOptions}
+      </select>
+    `:''}
+    <label ${existing?'style="margin-top:0"':''}>Address</label>
+    <input type="text" id="j_address" value="${escapeAttr(j.address||'')}" placeholder="e.g. 5 Oak Close">
+    <label>Name <span style="text-transform:none; font-weight:500; opacity:0.7;">(optional)</span></label>
+    <input type="text" id="j_name" value="${escapeAttr(j.name||'')}" placeholder="e.g. Mr Ahmed">
+    <label>Phone (optional)</label>
+    <input type="text" id="j_phone" value="${escapeAttr(j.phone||'')}" placeholder="07..." inputmode="tel">
+    <label>Date</label>
+    <input type="date" id="j_date" value="${j.date||todayISO()}">
+    <label>Price</label>
+    <input type="number" id="j_price" value="${j.price!=null?j.price:''}" placeholder="£" min="0" step="0.5">
+    <label>Notes</label>
+    <textarea id="j_notes" rows="2" placeholder="What's the job...">${escapeHtml(j.notes||'')}</textarea>
+    <label style="display:flex; align-items:center; gap:8px; margin-top:16px; cursor:pointer;">
+      <input type="checkbox" id="j_remind" ${j.remind24h?'checked':''} style="width:18px; height:18px; flex-shrink:0;">
+      <span style="font-size:0.8125rem; font-weight:600; color:var(--ink); text-transform:none; letter-spacing:0;">Remind me the day before this job</span>
+    </label>
+    <div class="form-actions">
+      <button class="btn-primary" onclick="saveJobForm('${existing?existing.id:''}')">${existing?'Save changes':'Add job'}</button>
+    </div>
+    ${existing?`<button class="btn-danger-text" onclick="deleteJob('${existing.id}')">Delete job</button>`:''}
+    ${existing?`
+      <div class="section-label">Photos</div>
+      <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
+        ${(j.photos||[]).map(p=>`<img src="${p.dataUrl}" onclick="viewJobPhoto('${existing.id}','${p.id}')" style="width:72px; height:72px; object-fit:cover; border-radius:10px; border:1px solid var(--line); cursor:pointer;">`).join('')}
+        <button onclick="document.getElementById('jobPhotoInput_${existing.id}').click()" style="width:72px; height:72px; border-radius:10px; border:2px dashed var(--line); background:none; color:var(--ink-muted); font-size:1.625rem; display:flex; align-items:center; justify-content:center;">+</button>
+        <input type="file" accept="image/*" id="jobPhotoInput_${existing.id}" style="display:none;" onchange="handleJobPhotoSelected('${existing.id}', this)">
+      </div>
+    `:`<div class="section-label">Photos</div><p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 8px;">Save this job first, then reopen it to add photos.</p>`}
+  `);
+}
+
+function viewJobPhoto(id, photoId){
+  const j = data.oneOffJobs.find(x=>x.id===id);
+  const p = (j.photos||[]).find(x=>x.id===photoId);
+  if(!p) return;
+  openSheet(`
+    <div class="sheet-head">
+      <h2>Photo</h2>
+      <button class="sheet-close" onclick="closeSheet()">✕</button>
+    </div>
+    <img src="${p.dataUrl}" style="width:100%; border-radius:12px; margin-bottom:6px;">
+    <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 16px;">Added ${fmtDate(p.date)}</p>
+    <div class="row2" style="margin-bottom:8px;">
+      <button class="btn btn-clean" onclick="shareJobPhoto('${id}','${photoId}')">📤 Share</button>
+      <button class="btn" style="background:var(--red-dim); color:var(--red);" onclick="deleteJobPhoto('${id}','${photoId}')">Delete</button>
+    </div>
+    <p style="color:var(--ink-muted); font-size:0.7188rem; margin:0 2px; text-align:center;">Tip: you can also press and hold the photo to save or share it directly.</p>
+  `);
+}
+
+async function handleJobPhotoSelected(id, inputEl){
+  const file = inputEl.files[0];
+  if(!file) return;
+  toast('Adding photo…');
+  try{
+    const dataUrl = await compressImage(file, 900, 0.7);
+    const j = data.oneOffJobs.find(x=>x.id===id);
+    j.photos = j.photos || [];
+    j.photos.push({id: uid(), dataUrl, date: todayISO()});
+    if(saveData()){
+      openJobForm(j);
+      toast('Photo added');
+    }
+  }catch(e){
+    toast('Could not add that photo — try again');
+  }
+  inputEl.value = '';
+}
+
+async function shareJobPhoto(id, photoId){
+  const j = data.oneOffJobs.find(x=>x.id===id);
+  const p = (j.photos||[]).find(x=>x.id===photoId);
+  if(!p) return;
+  try{
+    const res = await fetch(p.dataUrl);
+    const blob = await res.blob();
+    const safeName = (j.address || j.name || 'photo').replace(/[^a-z0-9]+/gi, '-').toLowerCase();
+    const file = new File([blob], `${safeName}-${p.date}.jpg`, { type: blob.type || 'image/jpeg' });
+    if(navigator.canShare && navigator.canShare({ files: [file] })){
+      await navigator.share({ files: [file], title: 'Round Book photo', text: j.address || j.name || '' });
+    } else {
+      toast('Sharing not supported here — press and hold the photo instead');
+    }
+  }catch(e){
+    if(e && e.name === 'AbortError') return;
+    toast('Could not share that photo — press and hold it instead');
+  }
+}
+
+function deleteJobPhoto(id, photoId){
+  const j = data.oneOffJobs.find(x=>x.id===id);
+  j.photos = (j.photos||[]).filter(p=>p.id!==photoId);
+  saveData();
+  openJobForm(j);
+}
+
+function saveJobForm(id){
+  const address = document.getElementById('j_address').value.trim();
+  const name = document.getElementById('j_name').value.trim();
+  if(!address && !name){ toast('Please enter at least an address or a name'); return; }
+  const payload = {
+    address, name,
+    phone: document.getElementById('j_phone').value.trim(),
+    date: document.getElementById('j_date').value || todayISO(),
+    price: parseFloat(document.getElementById('j_price').value) || 0,
+    notes: document.getElementById('j_notes').value.trim(),
+    remind24h: document.getElementById('j_remind').checked
+  };
+  if(id){
+    const j = data.oneOffJobs.find(x=>x.id===id);
+    Object.assign(j, payload);
+    toast('Job updated');
+  } else {
+    data.oneOffJobs.push(Object.assign({id: uid(), done:false, paid:false}, payload));
+    toast('Job added');
+  }
+  saveData(); closeSheet(); render();
+}
+
+function deleteJob(id){
+  const idx = data.oneOffJobs.findIndex(x=>x.id===id);
+  if(idx===-1) return;
+  const removed = data.oneOffJobs[idx];
+  data.oneOffJobs.splice(idx,1);
+  saveData(); closeSheet(); render();
+  toast(`Deleted job at ${removed.address||removed.name||'job'}`, 'Undo', ()=>{
+    data.oneOffJobs.splice(idx,0,removed);
+    saveData(); render();
+    toast('Job restored');
+  });
+}
+
+/* ---------- settings / dark mode / colour scheme ---------- */
+const THEMES = {
+  ocean: {name:'Ocean',  navy:'#10344C', blue:'#2F9BDE'},
+  slate: {name:'Slate',  navy:'#333F4D', blue:'#8A99AC'},
+  teal:  {name:'Teal',   navy:'#0F3D3E', blue:'#2FB6A6'},
+  plum:  {name:'Plum',   navy:'#3A2359', blue:'#9B6BE0'},
+  rust:  {name:'Rust',   navy:'#4A2A1B', blue:'#E08A4C'},
+  berry: {name:'Berry',  navy:'#4A1942', blue:'#E0568C'}
+};
+let themeName = localStorage.getItem('roundBookTheme') || 'ocean';
+
+function applyDarkMode(){
+  document.body.classList.toggle('dark', darkMode);
+}
+function setDarkMode(v){
+  darkMode = v;
+  localStorage.setItem('roundBookDark', v?'1':'0');
+  applyDarkMode();
+  openSettings();
+}
+function applyTextSize(){
+  document.documentElement.classList.remove('text-small','text-large');
+  if(textSize === 'small') document.documentElement.classList.add('text-small');
+  else if(textSize === 'large') document.documentElement.classList.add('text-large');
+}
+function setTextSize(v){
+  textSize = v;
+  localStorage.setItem('roundBookTextSize', v);
+  applyTextSize();
+  openSettings();
+}
+function applyTheme(){
+  const t = THEMES[themeName] || THEMES.ocean;
+  document.documentElement.style.setProperty('--navy', t.navy);
+  document.documentElement.style.setProperty('--blue', t.blue);
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if(meta) meta.setAttribute('content', t.navy);
+}
+function setTheme(name){
+  if(!THEMES[name]) return;
+  themeName = name;
+  localStorage.setItem('roundBookTheme', name);
+  applyTheme();
+  openSettings();
+}
+function openSettings(){
+  openSheet(`
+    <div class="sheet-head">
+      <h2>Settings</h2>
+      <button class="sheet-close" onclick="closeSheet()">✕</button>
+    </div>
+    <div class="section-label" style="margin-top:0;">Appearance</div>
+    <div class="seg-row">
+      <button class="seg-btn ${!darkMode?'active':''}" onclick="setDarkMode(false)">☀️ Light</button>
+      <button class="seg-btn ${darkMode?'active':''}" onclick="setDarkMode(true)">🌙 Dark</button>
+    </div>
+    <div class="section-label">Text size</div>
+    <div class="seg-row">
+      <button class="seg-btn ${textSize==='small'?'active':''}" onclick="setTextSize('small')" style="font-size:0.75rem;">Small</button>
+      <button class="seg-btn ${textSize==='medium'?'active':''}" onclick="setTextSize('medium')" style="font-size:0.875rem;">Medium</button>
+      <button class="seg-btn ${textSize==='large'?'active':''}" onclick="setTextSize('large')" style="font-size:1rem;">Large</button>
+    </div>
+    <div class="section-label">Colour scheme</div>
+    <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:16px;">
+      ${Object.keys(THEMES).map(key=>{
+        const t = THEMES[key];
+        const active = themeName===key;
+        return `<button onclick="setTheme('${key}')" style="display:flex; flex-direction:column; align-items:center; gap:6px; padding:10px 4px; border-radius:12px; border:2px solid ${active?t.blue:'var(--line)'}; background:var(--surface);">
+          <span style="width:26px; height:26px; border-radius:50%; background:${t.navy}; box-shadow: inset 0 0 0 4px ${t.blue};"></span>
+          <span style="font-size:0.7188rem; font-weight:700; color:var(--ink);">${t.name}</span>
+        </button>`;
+      }).join('')}
+    </div>
+    <div class="section-label">Company name</div>
+    <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 10px; line-height:1.5;">Shown on printed reports, and available as the <b>{company}</b> token in text messages.</p>
+    <input type="text" id="companyNameInput" value="${escapeAttr(data.settings.companyName||'')}" placeholder="e.g. Darren's Window Cleaning">
+    <div class="section-label">Text message templates</div>
+    <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 12px; line-height:1.5;">Use <b>{name}</b> for the customer's first name, <b>{amount}</b> for the amount owed (payment reminder only), and <b>{company}</b> for your company name.</p>
+    <label style="margin-top:0;">Cleaning reminder</label>
+    <textarea id="tpl_clean" rows="3">${escapeHtml(data.settings.cleanTemplate)}</textarea>
+    <label>Payment reminder</label>
+    <textarea id="tpl_pay" rows="3">${escapeHtml(data.settings.payTemplate)}</textarea>
+    <div class="form-actions">
+      <button class="btn-primary" onclick="saveTemplates()">Save settings</button>
+    </div>
+    <button class="btn-danger-text" onclick="resetTemplates()">Reset message wording to default</button>
+  `);
+}
+function saveTemplates(){
+  data.settings.cleanTemplate = document.getElementById('tpl_clean').value.trim() || DEFAULT_CLEAN_TEMPLATE;
+  data.settings.payTemplate = document.getElementById('tpl_pay').value.trim() || DEFAULT_PAY_TEMPLATE;
+  data.settings.companyName = document.getElementById('companyNameInput').value.trim();
+  saveData();
+  toast('Settings saved');
+  closeSheet();
+}
+function resetTemplates(){
+  data.settings.cleanTemplate = DEFAULT_CLEAN_TEMPLATE;
+  data.settings.payTemplate = DEFAULT_PAY_TEMPLATE;
+  saveData();
+  openSettings();
+  toast('Reset to default wording');
+}
+
+/* ---------- reports ---------- */
+function openReports(){
+  openSheet(`
+    <div class="sheet-head">
+      <h2>Print reports</h2>
+      <button class="sheet-close" onclick="closeSheet()">✕</button>
+    </div>
+    <p style="color:var(--ink-muted); font-size:0.8438rem; line-height:1.5; margin:0 2px 16px;">
+      Generates a printer-friendly page. Use your phone's print option (Share → Print) to print it or save it as a PDF — works offline too.
+    </p>
+    <button class="backup-btn" onclick="printWindowsDue()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+      <div><div class="t1">Windows due, by round</div><div class="t2">Who's due or overdue a clean right now</div></div>
+    </button>
+    <button class="backup-btn" onclick="printMoneyOwed()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M9 10h6M9 14h5"/></svg>
+      <div><div class="t1">Money owed</div><div class="t2">Everyone cleaned but not yet paid</div></div>
+    </button>
+    <button class="backup-btn" onclick="printFullRounds()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v16H4z"/><path d="M4 10h16M10 4v16"/></svg>
+      <div><div class="t1">Full round lists</div><div class="t2">Every customer, grouped by round</div></div>
+    </button>
+    <button class="backup-btn" onclick="printRoundsLastCleaned()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4M16 2v4M3 10h18"/><rect x="3" y="4" width="18" height="18" rx="2"/></svg>
+      <div><div class="t1">Round cleaning dates — list</div><div class="t2">Every date each round was cleaned in the last month</div></div>
+    </button>
+    <button class="backup-btn" onclick="printRoundsLastCleanedCalendar()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18M8 2v4M16 2v4"/></svg>
+      <div><div class="t1">Round cleaning dates — calendar</div><div class="t2">Same, laid out as a calendar of the last month</div></div>
+    </button>
+    <button class="backup-btn" onclick="printEarnings()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M9 10h6M9 14h5"/></svg>
+      <div><div class="t1">Earnings report</div><div class="t2">Totals by week, month and year</div></div>
+    </button>
+    <button class="backup-btn" onclick="printDailyWork()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18M8 2v4M16 2v4"/><path d="M8 15l2 2 4-5"/></svg>
+      <div><div class="t1">Daily work done</div><div class="t2">Value of cleans and jobs completed, day by day</div></div>
+    </button>
+    <button class="backup-btn" onclick="printSchedule()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18M8 2v4M16 2v4"/></svg>
+      <div><div class="t1">Monthly schedule</div><div class="t2">Calendar view of which rounds are due, day by day</div></div>
+    </button>
+    <button class="backup-btn" onclick="printAllJobs()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      <div><div class="t1">One-off jobs</div><div class="t2">Every one-off job, with status and total value</div></div>
+    </button>
+  `);
+}
+
+function groupByRound(list){
+  const rounds = {};
+  list.forEach(c=>{
+    const r = c.round || 'Unassigned';
+    if(!rounds[r]) rounds[r] = [];
+    rounds[r].push(c);
+  });
+  return rounds;
+}
+function reportDate(){
+  return new Date().toLocaleDateString('en-GB',{weekday:'long', day:'numeric', month:'long', year:'numeric'});
+}
+function runPrint(titleHtml, bodyHtml){
+  const company = data.settings.companyName || '';
+  document.getElementById('printArea').innerHTML = `
+    <div class="rpt-header">
+      <div>
+        <h1>${titleHtml}</h1>
+        ${company ? `<div style="font-size:13px; color:#66798A; font-weight:700; margin-top:2px;">${escapeHtml(company)}</div>` : ''}
+      </div>
+      <div class="rpt-date">${reportDate()}</div>
+    </div>
+    ${bodyHtml}
+  `;
+  closeSheet();
+  window.print();
+}
+
+function printRoundsLastCleaned(){
+  const rounds = groupByRound(data.customers);
+  const roundNames = Object.keys(rounds).sort((a,b)=>a.localeCompare(b));
+  if(!roundNames.length){
+    runPrint('Round Cleaning Dates', '<div class="rpt-empty-note">No rounds yet.</div>');
+    return;
+  }
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 30);
+  const cutoffISO = cutoff.toISOString().slice(0,10);
+
+  const rows = roundNames.map(rn=>{
+    const custs = rounds[rn];
+    const dateSet = new Set();
+    let latestOverall = null;
+    custs.forEach(c=>{
+      (c.cleanHistory||[]).forEach(e=>{
+        if(!e.date) return;
+        if(e.date >= cutoffISO) dateSet.add(e.date);
+        if(!latestOverall || e.date > latestOverall) latestOverall = e.date;
+      });
+    });
+    const sortedDates = Array.from(dateSet).sort().reverse();
+    const datesCell = sortedDates.length
+      ? sortedDates.map(d=>fmtDate(d)).join(', ')
+      : `<span style="color:#66798A;">None in the last 30 days${latestOverall ? ' · last cleaned ' + fmtDate(latestOverall) : ' · never cleaned'}</span>`;
+    return `<tr>
+      <td>${escapeHtml(rn)}</td>
+      <td>${datesCell}</td>
+      <td>${custs.length} customer${custs.length===1?'':'s'}</td>
+    </tr>`;
+  }).join('');
+  const body = `<table class="rpt-table"><thead><tr><th>Round</th><th>Dates cleaned (last 30 days)</th><th>Customers</th></tr></thead><tbody>${rows}</tbody></table>`;
+  runPrint('Round Cleaning Dates', body);
+}
+
+function printRoundsLastCleanedCalendar(){
+  if(!data.customers.length){
+    runPrint('Round Cleaning Dates — Calendar', '<div class="rpt-empty-note">No rounds yet.</div>');
+    return;
+  }
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  const rangeStart = new Date(today);
+  rangeStart.setDate(rangeStart.getDate() - 29);
+
+  const dow = today.getDay();
+  const diffToMonday = (dow === 0) ? 6 : dow - 1;
+  const gridStart = new Date(today);
+  gridStart.setDate(gridStart.getDate() - diffToMonday - 28);
+
+  const cleanedByDate = {};
+  data.customers.forEach(c=>{
+    (c.cleanHistory||[]).forEach(e=>{
+      if(!e.date) return;
+      if(!cleanedByDate[e.date]) cleanedByDate[e.date] = new Set();
+      cleanedByDate[e.date].add(c.round || 'Unassigned');
+    });
+  });
+
+  const totalWeeks = Math.ceil((Math.round((today - gridStart) / 86400000) + 1) / 7);
+  let bodyRows = '';
+  for(let w=0; w<totalWeeks; w++){
+    bodyRows += '<tr>';
+    for(let d=0; d<7; d++){
+      const cellDate = new Date(gridStart);
+      cellDate.setDate(cellDate.getDate() + w*7 + d);
+      const iso = cellDate.toISOString().slice(0,10);
+      const outside = cellDate < rangeStart || cellDate > today;
+      const roundsCleaned = cleanedByDate[iso] ? Array.from(cleanedByDate[iso]).sort((a,b)=>a.localeCompare(b)) : [];
+      const dayNum = cellDate.getDate();
+      const monthLabel = (dayNum === 1) ? cellDate.toLocaleDateString('en-GB',{month:'short'}) + ' ' : '';
+      bodyRows += `<td class="${outside?'outside':''}">
+        <div class="daynum">${monthLabel}${dayNum}</div>
+        ${roundsCleaned.map(rn=>`<span class="round-chip" style="background:#E2F5EA; color:#1F7A46;">${escapeHtml(rn)}</span>`).join('')}
+      </td>`;
+    }
+    bodyRows += '</tr>';
+  }
+
+  const body = `
+    <table class="rpt-calendar">
+      <thead><tr><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th></tr></thead>
+      <tbody>${bodyRows}</tbody>
+    </table>
+    <p style="font-size:11px; color:#66798A; margin-top:12px;">Shows any round with a customer cleaned on that day. Greyed-out days fall outside the last 30 days.</p>
+  `;
+  runPrint('Round Cleaning Dates — Calendar', body);
+}
+
+function printWindowsDue(){
+  const rounds = groupByRound(data.customers);
+  const roundNames = Object.keys(rounds).sort((a,b)=>a.localeCompare(b));
+  let body = '';
+  let anyRoundShown = false;
+  roundNames.forEach((rn)=>{
+    const custs = rounds[rn].filter(c=>{
+      const s = custStatus(c);
+      return !c.paused && s.cleanBadge && (s.cleanBadge.type==='due' || s.cleanBadge.type==='overdue');
+    }).sort((a,b)=>{
+      const sa=custStatus(a), sb=custStatus(b);
+      const rank = x => x.cleanBadge.type==='overdue' ? 0 : 1;
+      return rank(sa)-rank(sb);
+    });
+    if(!custs.length) return;
+    body += `<div class="rpt-round-title${anyRoundShown?' rpt-page-break':''}">${escapeHtml(rn)}</div>`;
+    anyRoundShown = true;
+    const rows = custs.map(c=>{
+      const s = custStatus(c);
+      const flagClass = s.cleanBadge.type;
+      const flagText = s.cleanBadge.type==='overdue' ? 'Overdue' : 'Due';
+      return `<tr>
+        <td>${escapeHtml(c.address||'')}${c.name?`<br><span style="color:#66798A">${escapeHtml(c.name)}</span>`:''}</td>
+        <td>${fmtDate(s.lastClean)}</td>
+        <td>${fmtDate(nextDueISO(c))}</td>
+        <td class="rpt-flag ${flagClass}">${flagText}</td>
+      </tr>`;
+    }).join('');
+    body += `<table class="rpt-table"><thead><tr><th>Customer</th><th>Last cleaned</th><th>Next due</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>`;
+  });
+  if(!anyRoundShown) body = '<div class="rpt-empty-note">Nobody\'s due or overdue a clean right now.</div>';
+  runPrint('Windows Due, by Round', body);
+}
+
+function printMoneyOwed(){
+  const owedCusts = data.customers.filter(c=>custStatus(c).owed);
+  const rounds = groupByRound(owedCusts);
+  const roundNames = Object.keys(rounds).sort((a,b)=>a.localeCompare(b));
+  let total = 0;
+  let rows = '';
+  roundNames.forEach(rn=>{
+    const custs = rounds[rn].slice().sort((a,b)=>custStatus(b).balance-custStatus(a).balance);
+    custs.forEach(c=>{
+      const s = custStatus(c);
+      total += s.balance;
+      rows += `<tr>
+        <td style="font-weight:700;">${escapeHtml(rn)}</td>
+        <td>${escapeHtml(c.address||'')}${(c.name||c.phone)?`<br><span style="color:#66798A">${[escapeHtml(c.name||''), c.phone?escapeHtml(c.phone):''].filter(Boolean).join(' · ')}</span>`:''}</td>
+        <td>${fmtDate(s.lastPaid)}</td>
+        <td class="rpt-flag overdue" style="text-align:right;">${money(s.balance)}</td>
+      </tr>`;
+    });
+  });
+  let body;
+  if(!rows){
+    body = '<div class="rpt-empty-note">Nobody currently owes money — everyone is paid up.</div>';
+  } else {
+    body = `<table class="rpt-table"><thead><tr><th>Round</th><th>Customer</th><th>Last paid</th><th style="text-align:right;">Owed</th></tr></thead><tbody>${rows}</tbody></table>
+    <div class="rpt-total" style="border-top:2px solid #10344C; padding-top:10px; margin-top:12px; font-size:16px;">Total outstanding: ${money(total)}</div>`;
+  }
+  runPrint('Money Owed', body);
+}
+
+function printFullRounds(){
+  const rounds = groupByRound(data.customers);
+  const roundNames = Object.keys(rounds).sort((a,b)=>a.localeCompare(b));
+  let body = '';
+  let grandTotal = 0;
+  roundNames.forEach((rn, idx)=>{
+    body += `<div class="rpt-round-title${idx>0?' rpt-page-break':''}">${escapeHtml(rn)}</div>`;
+    const custs = sortByRoute(rounds[rn]);
+    let roundTotal = 0;
+    const rows = custs.map(c=>{
+      roundTotal += Number(c.price||0);
+      return `<tr>
+        <td>${escapeHtml(c.address||'')}${c.name?`<br><span style="color:#66798A">${escapeHtml(c.name)}</span>`:''}</td>
+        <td>${escapeHtml(c.phone||'')}${c.phone&&c.email?'<br>':''}${escapeHtml(c.email||'')}</td>
+        <td>${money(c.price)}</td>
+        <td>Every ${c.frequencyWeeks||4}wk</td>
+      </tr>`;
+    }).join('');
+    grandTotal += roundTotal;
+    body += `<table class="rpt-table"><thead><tr><th>Customer</th><th>Contact</th><th>Price</th><th>Frequency</th></tr></thead><tbody>${rows}</tbody></table>`;
+    body += `<div class="rpt-total">Round total: ${money(roundTotal)}</div>`;
+  });
+  if(!roundNames.length){
+    body = '<div class="rpt-empty-note">No customers added yet.</div>';
+  } else {
+    body += `<div class="rpt-total" style="border-top:2px solid #10344C; padding-top:10px; margin-top:16px; font-size:16px;">Grand total (all rounds): ${money(grandTotal)}</div>`;
+  }
+  runPrint('Full Round Lists', body);
+}
+
+function printSingleRound(roundName){
+  const rounds = groupByRound(data.customers);
+  const custs = sortByRoute(rounds[roundName] || []);
+  if(!custs.length){ toast('No customers in this round yet'); return; }
+  let roundTotal = 0;
+  const rows = custs.map(c=>{
+    roundTotal += Number(c.price||0);
+    const s = custStatus(c);
+    return `<tr>
+      <td>${escapeHtml(c.address||'')}${c.name?`<br><span style="color:#66798A">${escapeHtml(c.name)}</span>`:''}</td>
+      <td>${escapeHtml(c.phone||'')}${c.phone&&c.email?'<br>':''}${escapeHtml(c.email||'')}</td>
+      <td>${money(c.price)}</td>
+      <td>Every ${c.frequencyWeeks||4}wk</td>
+      <td>${c.paused ? 'Paused' : (s.owed ? 'Owes '+money(s.balance) : 'OK')}</td>
+    </tr>`;
+  }).join('');
+  const body = `
+    <table class="rpt-table"><thead><tr><th>Customer</th><th>Contact</th><th>Price</th><th>Frequency</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>
+    <div class="rpt-total" style="border-top:2px solid #10344C; padding-top:10px; margin-top:16px; font-size:16px;">Round total: ${money(roundTotal)}</div>
+  `;
+  runPrint(roundName, body);
+}
+
+function printCustomerRecord(id){
+  const c = data.customers.find(x=>x.id===id);
+  if(!c) return;
+  const s = custStatus(c);
+
+  const infoRows = [
+    c.name ? ['Name', escapeHtml(c.name)] : null,
+    ['Round', escapeHtml(c.round||'Unassigned')],
+    ['Price', `${money(c.price)} · every ${c.frequencyWeeks||4} week${(c.frequencyWeeks||4)===1?'':'s'}`],
+    c.phone ? ['Phone', escapeHtml(c.phone)] : null,
+    c.email ? ['Email', escapeHtml(c.email)] : null,
+    ['Status', c.paused ? 'Paused' : 'Active']
+  ].filter(Boolean).map(([label,val])=>`<tr><td style="font-weight:700; width:110px;">${label}</td><td>${val}</td></tr>`).join('');
+
+  const cleanRows = (c.cleanHistory||[]).slice().sort((a,b)=>a.date<b.date?1:-1)
+    .map(e=>`<tr><td>${fmtDate(e.date)}</td><td style="text-align:right;">${money(e.amount)}</td></tr>`).join('')
+    || '<tr><td colspan="2" style="color:#66798A;">No cleans logged yet</td></tr>';
+  const payRows = (c.paymentHistory||[]).slice().sort((a,b)=>a.date<b.date?1:-1)
+    .map(p=>`<tr><td>${fmtDate(p.date)}</td><td style="text-align:right;">${money(p.amount)}</td></tr>`).join('')
+    || '<tr><td colspan="2" style="color:#66798A;">No payments logged yet</td></tr>';
+
+  const balanceText = s.owed ? `Owes ${money(s.balance)}` : s.credit ? `In credit: ${money(Math.abs(s.balance))}` : 'Fully paid up';
+
+  const body = `
+    <table class="rpt-table" style="margin-bottom:16px;"><tbody>${infoRows}</tbody></table>
+    ${c.notes ? `<div style="background:#F5F7F8; border:1px solid #E3E9EC; border-radius:8px; padding:10px 12px; font-size:13px; margin-bottom:16px;">${escapeHtml(c.notes)}</div>` : ''}
+    <div class="rpt-total" style="text-align:left; font-size:15px; margin-bottom:16px;">Balance: ${balanceText}</div>
+    <div class="rpt-round-title" style="margin-top:0;">Clean history</div>
+    <table class="rpt-table"><thead><tr><th>Date</th><th style="text-align:right;">Amount</th></tr></thead><tbody>${cleanRows}</tbody></table>
+    <div class="rpt-round-title">Payment history</div>
+    <table class="rpt-table"><thead><tr><th>Date</th><th style="text-align:right;">Amount</th></tr></thead><tbody>${payRows}</tbody></table>
+  `;
+  runPrint(c.address || c.name || 'Customer Record', body);
+}
+
+function printJobRecord(id){
+  const j = data.oneOffJobs.find(x=>x.id===id);
+  if(!j) return;
+  const infoRows = [
+    ['Date', fmtDate(j.date)],
+    j.name ? ['Name', escapeHtml(j.name)] : null,
+    j.phone ? ['Phone', escapeHtml(j.phone)] : null,
+    ['Price', money(j.price)],
+    ['Done', j.done ? 'Yes' : 'No'],
+    ['Paid', j.paid ? 'Yes' : 'No']
+  ].filter(Boolean).map(([label,val])=>`<tr><td style="font-weight:700; width:110px;">${label}</td><td>${val}</td></tr>`).join('');
+  const body = `
+    <table class="rpt-table" style="margin-bottom:16px;"><tbody>${infoRows}</tbody></table>
+    ${j.notes ? `<div style="background:#F5F7F8; border:1px solid #E3E9EC; border-radius:8px; padding:10px 12px; font-size:13px;">${escapeHtml(j.notes)}</div>` : ''}
+  `;
+  runPrint(j.address || j.name || 'One-off Job', body);
+}
+
+function printAllJobs(){
+  const jobs = (data.oneOffJobs||[]).slice().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  if(!jobs.length){
+    runPrint('One-off Jobs', '<div class="rpt-empty-note">No one-off jobs added yet.</div>');
+    return;
+  }
+  let total = 0;
+  const rows = jobs.map(j=>{
+    total += Number(j.price||0);
+    return `<tr>
+      <td>${fmtDate(j.date)}</td>
+      <td>${escapeHtml(j.address||'')}${(j.name||j.phone)?`<br><span style="color:#66798A">${[escapeHtml(j.name||''), j.phone?escapeHtml(j.phone):''].filter(Boolean).join(' · ')}</span>`:''}</td>
+      <td style="text-align:right;">${money(j.price)}</td>
+      <td class="rpt-flag ${j.done?'':'due'}">${j.done?'Done':'Not done'}</td>
+      <td class="rpt-flag ${j.paid?'':'overdue'}">${j.paid?'Paid':'Unpaid'}</td>
+    </tr>`;
+  }).join('');
+  const body = `
+    <table class="rpt-table"><thead><tr><th>Date</th><th>Job</th><th style="text-align:right;">Price</th><th>Status</th><th>Payment</th></tr></thead><tbody>${rows}</tbody></table>
+    <div class="rpt-total" style="border-top:2px solid #10344C; padding-top:10px; margin-top:12px; font-size:16px;">Total value: ${money(total)}</div>
+  `;
+  runPrint('One-off Jobs', body);
+}
+
+function printEarnings(){
+  const payments = [];
+  data.customers.forEach(c=>{
+    (c.paymentHistory||[]).forEach(p=>{
+      payments.push({date: p.date, amount: Number(p.amount||0)});
+    });
+  });
+  (data.oneOffJobs||[]).forEach(j=>{
+    if(j.paid){
+      payments.push({date: j.paidDate || j.date, amount: Number(j.price||0)});
+    }
+  });
+
+  if(!payments.length){
+    runPrint('Earnings Report', '<div class="rpt-empty-note">No payments recorded yet.</div>');
+    return;
+  }
+
+  const now = new Date();
+  const weekAgo = new Date(now); weekAgo.setDate(weekAgo.getDate()-7);
+  const monthAgo = new Date(now); monthAgo.setMonth(monthAgo.getMonth()-1);
+  const yearAgo = new Date(now); yearAgo.setFullYear(yearAgo.getFullYear()-1);
+  const sumSince = (from) => payments.filter(p=>new Date(p.date+'T00:00:00') >= from).reduce((s,p)=>s+p.amount,0);
+  const allTime = payments.reduce((s,p)=>s+p.amount,0);
+
+  const byMonth = {};
+  payments.forEach(p=>{
+    const key = (p.date||'').slice(0,7);
+    if(!key) return;
+    byMonth[key] = (byMonth[key]||0) + p.amount;
+  });
+  const monthKeys = Object.keys(byMonth).sort().reverse().slice(0,12);
+
+  const body = `
+    <table class="rpt-table" style="margin-bottom:20px;">
+      <tbody>
+        <tr><td>Last 7 days</td><td style="text-align:right; font-weight:800;">${money(sumSince(weekAgo))}</td></tr>
+        <tr><td>Last 30 days</td><td style="text-align:right; font-weight:800;">${money(sumSince(monthAgo))}</td></tr>
+        <tr><td>Last 12 months</td><td style="text-align:right; font-weight:800;">${money(sumSince(yearAgo))}</td></tr>
+        <tr><td>All time</td><td style="text-align:right; font-weight:800;">${money(allTime)}</td></tr>
+      </tbody>
+    </table>
+    <div class="rpt-round-title" style="margin-top:0;">By month</div>
+    <table class="rpt-table">
+      <thead><tr><th>Month</th><th style="text-align:right;">Total</th></tr></thead>
+      <tbody>
+        ${monthKeys.map(k=>{
+          const d = new Date(k+'-01T00:00:00');
+          const label = d.toLocaleDateString('en-GB',{month:'long', year:'numeric'});
+          return `<tr><td>${label}</td><td style="text-align:right;">${money(byMonth[k])}</td></tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+  `;
+  runPrint('Earnings Report', body);
+}
+
+function printDailyWork(){
+  const dailyTotals = {};
+  function addToDay(dateISO, amount){
+    if(!dateISO) return;
+    if(!dailyTotals[dateISO]) dailyTotals[dateISO] = { total: 0, count: 0 };
+    dailyTotals[dateISO].total += Number(amount || 0);
+    dailyTotals[dateISO].count += 1;
+  }
+
+  data.customers.forEach(c=>{
+    (c.cleanHistory||[]).forEach(e=> addToDay(e.date, e.amount));
+  });
+  (data.oneOffJobs||[]).forEach(j=>{
+    if(j.done) addToDay(j.date, j.price);
+  });
+
+  const today = new Date();
+  const rows = [];
+  let grandTotal = 0;
+  let grandCount = 0;
+  for(let i=29; i>=0; i--){
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const iso = d.toISOString().slice(0,10);
+    const info = dailyTotals[iso] || { total: 0, count: 0 };
+    grandTotal += info.total;
+    grandCount += info.count;
+    rows.push(`<tr>
+      <td>${fmtDate(iso)}</td>
+      <td>${info.count || ''}</td>
+      <td style="text-align:right; ${info.total ? 'font-weight:700;' : 'color:#66798A;'}">${info.total ? money(info.total) : '—'}</td>
+    </tr>`);
+  }
+
+  const body = `
+    <table class="rpt-table">
+      <thead><tr><th>Date</th><th>Cleans / jobs</th><th style="text-align:right;">Value</th></tr></thead>
+      <tbody>${rows.join('')}</tbody>
+    </table>
+    <div class="rpt-total" style="border-top:2px solid #10344C; padding-top:10px; margin-top:16px; font-size:16px;">
+      30-day total: ${money(grandTotal)} across ${grandCount} clean${grandCount===1?'':'s'}/job${grandCount===1?'':'s'}
+    </div>
+  `;
+  runPrint('Daily Work Done — Last 30 Days', body);
+}
+
+function printSchedule(){
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  const rangeEnd = new Date(today);
+  rangeEnd.setDate(rangeEnd.getDate() + 30);
+
+  // Find the Monday on/before today so the calendar always shows full weeks
+  const dow = today.getDay(); // 0=Sun..6=Sat
+  const diffToMonday = (dow === 0) ? 6 : dow - 1;
+  const gridStart = new Date(today);
+  gridStart.setDate(gridStart.getDate() - diffToMonday);
+
+  // Which rounds have a customer next due on each date, within the next 30 days
+  const dueByDate = {};
+  data.customers.forEach(c=>{
+    if(c.paused) return;
+    const next = nextDueISO(c);
+    if(!next) return;
+    if(!dueByDate[next]) dueByDate[next] = new Set();
+    dueByDate[next].add(c.round || 'Unassigned');
+  });
+
+  let bodyRows = '';
+  for(let w=0; w<5; w++){
+    bodyRows += '<tr>';
+    for(let d=0; d<7; d++){
+      const cellDate = new Date(gridStart);
+      cellDate.setDate(cellDate.getDate() + w*7 + d);
+      const iso = cellDate.toISOString().slice(0,10);
+      const outside = cellDate < today || cellDate > rangeEnd;
+      const roundsDue = dueByDate[iso] ? Array.from(dueByDate[iso]).sort((a,b)=>a.localeCompare(b)) : [];
+      const dayNum = cellDate.getDate();
+      const monthLabel = (dayNum === 1) ? cellDate.toLocaleDateString('en-GB',{month:'short'}) + ' ' : '';
+      bodyRows += `<td class="${outside?'outside':''}">
+        <div class="daynum">${monthLabel}${dayNum}</div>
+        ${roundsDue.map(rn=>`<span class="round-chip">${escapeHtml(rn)}</span>`).join('')}
+      </td>`;
+    }
+    bodyRows += '</tr>';
+  }
+
+  const body = `
+    <table class="rpt-calendar">
+      <thead><tr><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th></tr></thead>
+      <tbody>${bodyRows}</tbody>
+    </table>
+    <p style="font-size:11px; color:#66798A; margin-top:12px;">Shows any round with a customer due for cleaning on that day, based on their last clean date and frequency. Greyed-out days fall outside the next 30 days. Customers not yet cleaned at all aren't included, since there's no date to schedule from.</p>
+  `;
+  runPrint('Monthly Schedule', body);
+}
+
+/* ---------- backup ---------- */
+function openInfo(){
+  openSheet(`
+    <div class="sheet-head">
+      <h2>About Round Book</h2>
+      <button class="sheet-close" onclick="closeSheet()">✕</button>
+    </div>
+    <p style="color:var(--ink); font-size:0.875rem; line-height:1.6; margin:0 2px 16px;">
+      Round Book is a simple, offline window cleaning round tracker — built to keep on top of customers, rounds, cleaning and payment dates, all stored privately on your own phone.
+    </p>
+    <p style="color:var(--ink-muted); font-size:0.8125rem; line-height:1.6; margin:0 2px 18px;">
+      Created by <b style="color:var(--ink);">Darren Bennison</b>.
+    </p>
+    <p style="color:var(--ink-muted); font-size:0.7812rem; line-height:1.6; margin:0 2px 10px;">
+      Spotted a problem, got an idea for an improvement, or just want to say something about the app? Get in touch — feedback's always welcome.
+    </p>
+    <a href="mailto:dmbennison@gmail.com?subject=Round%20Book%20feedback" style="display:block; text-decoration:none; background:var(--blue-dim); color:#1c6fa3; border-radius:12px; padding:12px; text-align:center; font-weight:800; font-size:0.875rem;">✉️ dmbennison@gmail.com</a>
+  `);
+}
+
+function openBackup(){
+  const count = data.customers.length;
+  const days = daysSinceBackup();
+  const lastText = days === Infinity ? "You haven't backed up yet" : days === 0 ? "Backed up today" : `Last backup: ${days} day${days===1?'':'s'} ago`;
+  openSheet(`
+    <div class="sheet-head">
+      <h2>Backup &amp; restore</h2>
+      <button class="sheet-close" onclick="closeSheet()">✕</button>
+    </div>
+    <p style="color:var(--ink-muted); font-size:0.8438rem; line-height:1.5; margin:0 2px 4px;">
+      Everything is stored only on this phone, in this browser. Nothing is sent anywhere. Export a backup regularly in case the app data is ever cleared.
+    </p>
+    <p style="color:${days>=BACKUP_REMINDER_DAYS?'var(--amber)':'var(--ink-muted)'}; font-size:0.7812rem; font-weight:700; margin:0 2px 16px;">${lastText}</p>
+    <button class="backup-btn" onclick="exportData()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+      <div><div class="t1">Export backup</div><div class="t2">${count} customer${count===1?'':'s'} · saves a .json file</div></div>
+    </button>
+    <button class="backup-btn" onclick="exportExcel()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v16H4z"/><path d="M4 10h16M10 4v16"/></svg>
+      <div><div class="t1">Export as Excel</div><div class="t2">One sheet per round · .xlsx file</div></div>
+    </button>
+    <button class="backup-btn" onclick="document.getElementById('importFile').click()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>
+      <div><div class="t1">Restore from backup</div><div class="t2">Replaces current data with a backup file</div></div>
+    </button>
+  `);
+}
+async function exportData(){
+  const jsonStr = JSON.stringify(data, null, 2);
+  const filename = `round-book-backup-${todayISO()}.json`;
+
+  const markBackedUp = ()=>{
+    localStorage.setItem('roundBookLastBackup', todayISO());
+    bannerDismissed = false;
+    renderBackupBanner();
+  };
+
+  if(navigator.canShare){
+    try{
+      const file = new File([jsonStr], filename, {type:'application/json'});
+      if(navigator.canShare({files:[file]})){
+        await navigator.share({files:[file], title:'Round Book Backup'});
+        markBackedUp();
+        toast('Backup shared');
+        return;
+      }
+    }catch(e){
+      if(e && e.name === 'AbortError') return;
+      // fall through to classic download on any other failure
+    }
+  }
+
+  const blob = new Blob([jsonStr], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url), 2000);
+  markBackedUp();
+  toast('Backup saved');
+}
+document.getElementById('importFile').addEventListener('change', function(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(evt){
+    try{
+      const parsed = JSON.parse(evt.target.result);
+      if(!parsed.customers || !Array.isArray(parsed.customers)) throw new Error('bad format');
+      if(confirm(`Import ${parsed.customers.length} customers? This will replace all data currently on this phone.`)){
+        data = migrateData(parsed);
+        saveData();
+        closeSheet();
+        render();
+        toast('Backup restored');
+      }
+    }catch(err){
+      alert('That file could not be read as a Round Book backup.');
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+});
+
+async function exportExcel(){
+  if(typeof XLSX === 'undefined'){
+    toast('Still loading — try again in a moment, or once you have signal');
+    return;
+  }
+  const rounds = groupByRound(data.customers);
+  const roundNames = Object.keys(rounds).sort((a,b)=>a.localeCompare(b));
+  if(!roundNames.length){ toast('No customers to export yet'); return; }
+
+  const wb = XLSX.utils.book_new();
+  const usedNames = {};
+  function safeSheetName(name){
+    let base = (name||'Round').replace(/[\\\/:\*\?\[\]]/g,'').trim().slice(0,31) || 'Round';
+    let final = base, i = 2;
+    while(usedNames[final]){
+      const suffix = ` (${i})`;
+      final = base.slice(0, 31-suffix.length) + suffix;
+      i++;
+    }
+    usedNames[final] = true;
+    return final;
+  }
+
+  roundNames.forEach(rn=>{
+    const custs = sortByRoute(rounds[rn]);
+    const rows = custs.map(c=>{
+      const s = custStatus(c);
+      return {
+        'Address': c.address || '',
+        'Name': c.name || '',
+        'Phone': c.phone || '',
+        'Email': c.email || '',
+        'Price': Number(c.price || 0),
+        'Frequency (weeks)': c.frequencyWeeks || 4,
+        'Last Cleaned': s.lastClean ? fmtDate(s.lastClean) : '',
+        'Next Due': (()=>{ const d=nextDueISO(c); return d ? fmtDate(d) : ''; })(),
+        'Last Paid': s.lastPaid ? fmtDate(s.lastPaid) : '',
+        'Amount Owed': s.owed ? s.balance : 0,
+        'Notes': c.notes || ''
+      };
+    });
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws['!cols'] = [{wch:26},{wch:18},{wch:14},{wch:22},{wch:8},{wch:14},{wch:12},{wch:12},{wch:12},{wch:12},{wch:24}];
+    XLSX.utils.book_append_sheet(wb, ws, safeSheetName(rn));
+  });
+
+  if((data.oneOffJobs||[]).length){
+    const jobRows = data.oneOffJobs.map(j=>({
+      'Date': j.date ? fmtDate(j.date) : '',
+      'Address': j.address || '',
+      'Name': j.name || '',
+      'Phone': j.phone || '',
+      'Price': Number(j.price || 0),
+      'Done': j.done ? 'Yes' : 'No',
+      'Paid': j.paid ? 'Yes' : 'No',
+      'Notes': j.notes || ''
+    }));
+    const jobsWs = XLSX.utils.json_to_sheet(jobRows);
+    jobsWs['!cols'] = [{wch:12},{wch:26},{wch:18},{wch:14},{wch:8},{wch:8},{wch:8},{wch:24}];
+    XLSX.utils.book_append_sheet(wb, jobsWs, safeSheetName('One-off Jobs'));
+  }
+
+  const filename = `round-book-${todayISO()}.xlsx`;
+
+  if(navigator.canShare){
+    try{
+      const wbout = XLSX.write(wb, {bookType:'xlsx', type:'array'});
+      const file = new File([wbout], filename, {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+      if(navigator.canShare({files:[file]})){
+        await navigator.share({files:[file], title:'Round Book Export'});
+        toast('Excel file shared');
+        return;
+      }
+    }catch(e){
+      if(e && e.name === 'AbortError') return;
+      // fall through to classic download on any other failure
+    }
+  }
+
+  XLSX.writeFile(wb, filename);
+  toast('Excel file saved');
+}
+
+/* ---------- util ---------- */
+function escapeHtml(str){
+  return String(str||'').replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+}
+function escapeAttr(str){ return escapeHtml(str); }
+
+/* ---------- init ---------- */
+applyDarkMode();
+applyTheme();
+applyTextSize();
+/* ---------- swipe actions ---------- */
+let swipeState = null;
+function initSwipeHandlers(){
+  const main = document.getElementById('main');
+  main.addEventListener('touchstart', onSwipeStart, {passive:true});
+  main.addEventListener('touchmove', onSwipeMove, {passive:false});
+  main.addEventListener('touchend', onSwipeEnd, {passive:true});
+  main.addEventListener('touchcancel', onSwipeCancel, {passive:true});
+}
+function onSwipeStart(e){
+  const card = e.target.closest('.cust-card[data-id]');
+  if(!card) return;
+  const touch = e.touches[0];
+  swipeState = { card, startX: touch.clientX, startY: touch.clientY, currentX: 0, decided:false, horizontal:false };
+}
+function onSwipeMove(e){
+  if(!swipeState) return;
+  const touch = e.touches[0];
+  const dx = touch.clientX - swipeState.startX;
+  const dy = touch.clientY - swipeState.startY;
+  if(!swipeState.decided){
+    if(Math.abs(dx) > 8 || Math.abs(dy) > 8){
+      swipeState.decided = true;
+      swipeState.horizontal = Math.abs(dx) > Math.abs(dy);
+      if(!swipeState.horizontal){ swipeState = null; return; }
+    } else {
+      return;
+    }
+  }
+  if(!swipeState) return;
+  e.preventDefault();
+  const maxDrag = 96;
+  const clamped = Math.max(-maxDrag, Math.min(maxDrag, dx));
+  swipeState.currentX = clamped;
+  swipeState.card.style.transition = 'none';
+  swipeState.card.style.transform = `translateX(${clamped}px)`;
+}
+function onSwipeEnd(){
+  if(!swipeState) return;
+  const { card, currentX, decided, horizontal } = swipeState;
+  card.style.transition = 'transform 0.2s ease';
+  card.style.transform = 'translateX(0)';
+  const threshold = 64;
+  if(decided && horizontal && Math.abs(currentX) >= threshold){
+    const id = card.dataset.id;
+    const kind = card.dataset.kind || 'customer';
+    if(currentX > 0){
+      if(kind === 'job') toggleJobDone(id); else quickClean(id);
+    } else {
+      if(kind === 'job') toggleJobPaid(id); else quickPaid(id);
+    }
+  }
+  swipeState = null;
+}
+function onSwipeCancel(){
+  if(!swipeState) return;
+  swipeState.card.style.transition = 'transform 0.2s ease';
+  swipeState.card.style.transform = 'translateX(0)';
+  swipeState = null;
+}
+
+document.getElementById('dateNow').textContent = new Date().toLocaleDateString('en-GB',{weekday:'long', day:'numeric', month:'long'});
+
+/* seed a couple of example customers on very first run so the app isn't blank */
+if(data.customers.length === 0 && !localStorage.getItem('roundBookSeeded')){
+  localStorage.setItem('roundBookSeeded','1');
+}
+
+render();
+initSwipeHandlers();
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  });
+}
+</script>
+</body>
+</html>
