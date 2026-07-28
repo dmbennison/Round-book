@@ -476,7 +476,7 @@ let currentRound = null;
 let searchQuery = '';
 let roundsViewMode = 'overview';
 let reorderMode = false;
-let roundOwedOnly = false;
+let roundFilterMode = 'all';
 let darkMode = localStorage.getItem('roundBookDark') === '1';
 let textSize = localStorage.getItem('roundBookTextSize') || 'medium';
 let bannerDismissed = false;
@@ -539,12 +539,12 @@ function sortByRoute(custs){
 }
 
 function setTab(tab){
-  currentTab = tab; currentRound = null; reorderMode = false; roundOwedOnly = false;
+  currentTab = tab; currentRound = null; reorderMode = false; roundFilterMode = 'all';
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===tab));
   render();
 }
 function goToRound(rn){
-  currentTab = 'rounds'; currentRound = rn; reorderMode = false; roundOwedOnly = false;
+  currentTab = 'rounds'; currentRound = rn; reorderMode = false; roundFilterMode = 'all';
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab==='rounds'));
   render();
 }
@@ -713,9 +713,9 @@ function renderRoundsList(main){
   wireSearch();
 }
 
-function openRound(rn){ currentRound = rn; reorderMode = false; roundOwedOnly = false; render(); }
-function backToRounds(){ currentRound = null; reorderMode = false; roundOwedOnly = false; render(); }
-function setRoundOwedOnly(v){ roundOwedOnly = v; render(); }
+function openRound(rn){ currentRound = rn; reorderMode = false; roundFilterMode = 'all'; render(); }
+function backToRounds(){ currentRound = null; reorderMode = false; roundFilterMode = 'all'; render(); }
+function setRoundFilterMode(v){ roundFilterMode = v; render(); }
 
 function renderRoundDetail(main, rn){
   const allInRound = sortByRoute(data.customers.filter(c=>(c.round||'Unassigned')===rn));
@@ -755,16 +755,25 @@ function renderRoundDetail(main, rn){
   }
 
   shellHtml += `<div class="seg-row">
-    <button class="seg-btn ${!roundOwedOnly?'active':''}" onclick="setRoundOwedOnly(false)">All customers</button>
-    <button class="seg-btn ${roundOwedOnly?'active':''}" onclick="setRoundOwedOnly(true)">💷 Owed only</button>
+    <button class="seg-btn ${roundFilterMode==='all'?'active':''}" onclick="setRoundFilterMode('all')">All</button>
+    <button class="seg-btn ${roundFilterMode==='due'?'active':''}" onclick="setRoundFilterMode('due')">📅 Due only</button>
+    <button class="seg-btn ${roundFilterMode==='owed'?'active':''}" onclick="setRoundFilterMode('owed')">💷 Owed only</button>
   </div>`;
   shellHtml += searchBar();
   shellHtml += `<div class="swipe-hint">👉 Swipe a card right to mark cleaned, left to mark paid</div>`;
 
-  const baseList = roundOwedOnly ? allInRound.filter(c=>custStatus(c).owed) : allInRound;
+  let baseList = allInRound;
+  if(roundFilterMode === 'due'){
+    baseList = allInRound.filter(c=>{
+      const s = custStatus(c);
+      return !c.paused && s.cleanBadge && (s.cleanBadge.type==='due' || s.cleanBadge.type==='overdue');
+    });
+  } else if(roundFilterMode === 'owed'){
+    baseList = allInRound.filter(c=>custStatus(c).owed);
+  }
   const custs = customersMatching(baseList);
   if(!custs.length){
-    main.innerHTML = shellHtml + emptyState(roundOwedOnly ? 'search' : 'customers');
+    main.innerHTML = shellHtml + emptyState(roundFilterMode!=='all' ? 'search' : 'customers');
     wireSearch();
     return;
   }
