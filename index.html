@@ -201,9 +201,10 @@
   .hist-list{list-style:none; margin:0; padding:0;}
   .hist-list li{
     display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid var(--line); font-size:0.875rem;
+    flex-wrap:wrap; gap:4px 0;
   }
   .hist-list li:last-child{border-bottom:none;}
-  .hist-del{background:none; border:none; color:var(--ink-muted); font-size:0.75rem; padding:4px 8px;}
+  .hist-del{background:none; border:none; color:var(--ink-muted); font-size:0.75rem; padding:4px 6px; white-space:nowrap;}
 
   .stat-row{display:flex; gap:8px; margin-bottom:16px;}
   .stat{flex:1; background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:12px; text-align:center;}
@@ -282,7 +283,7 @@
       --ink-muted:#66798A;
       --line:#E3E9EC;
     }
-    header, #backupBanner, main, .fab, .overlay, #importFile, .toast{
+    header, #backupBanner, #jobReminderBanner, main, .fab, .overlay, #importFile, .toast{
       display:none !important;
     }
     .print-area{
@@ -350,6 +351,7 @@
 const STORE_KEY = 'roundBookData_v1';
 const DEFAULT_CLEAN_TEMPLATE = "Hi {name}, just a reminder I'll be round to clean your windows soon. Let me know if that's not convenient. Thanks!";
 const DEFAULT_PAY_TEMPLATE = "Hi {name}, a friendly reminder that your window cleaning payment of {amount} is outstanding. Thanks!";
+const DEFAULT_RECEIPT_TEMPLATE = "Hi {name}, thank you for your payment of {amount} received {date}. {company}";
 function migrateData(parsed){
   parsed.customers = parsed.customers || [];
   parsed.oneOffJobs = parsed.oneOffJobs || [];
@@ -360,6 +362,7 @@ function migrateData(parsed){
   parsed.settings = parsed.settings || {};
   if(!parsed.settings.cleanTemplate) parsed.settings.cleanTemplate = DEFAULT_CLEAN_TEMPLATE;
   if(!parsed.settings.payTemplate) parsed.settings.payTemplate = DEFAULT_PAY_TEMPLATE;
+  if(!parsed.settings.receiptTemplate) parsed.settings.receiptTemplate = DEFAULT_RECEIPT_TEMPLATE;
   if(parsed.settings.companyName == null) parsed.settings.companyName = '';
   parsed.customers.forEach(c=>{
     if(c.frequencyWeeks == null){
@@ -1014,7 +1017,7 @@ function openCustomerDetail(id){
   const cleanRows = (c.cleanHistory||[]).slice().sort((a,b)=>a.date<b.date?1:-1)
     .map(e=>`<li>${fmtDate(e.date)} — ${money(e.amount)}<span style="display:flex; gap:4px;"><button class="hist-del" onclick="editHistAmount('${id}','clean','${e.date}')">Edit</button><button class="hist-del" onclick="removeHist('${id}','clean','${e.date}')">Remove</button></span></li>`).join('') || '<li style="color:var(--ink-muted)">No cleans logged yet</li>';
   const payRows = (c.paymentHistory||[]).slice().sort((a,b)=>a.date<b.date?1:-1)
-    .map(p=>`<li>${fmtDate(p.date)} — ${money(p.amount)}<span style="display:flex; gap:4px;"><button class="hist-del" onclick="editHistAmount('${id}','pay','${p.date}')">Edit</button><button class="hist-del" onclick="removeHist('${id}','pay','${p.date}')">Remove</button></span></li>`).join('') || '<li style="color:var(--ink-muted)">No payments logged yet</li>';
+    .map(p=>`<li>${fmtDate(p.date)} — ${money(p.amount)}<span style="display:flex; gap:4px;">${(c.phone||c.email)?`<button class="hist-del" title="Send receipt" onclick="sendReceipt('${id}','${p.date}',${p.amount})">🧾 Receipt</button>`:''}<button class="hist-del" onclick="editHistAmount('${id}','pay','${p.date}')">Edit</button><button class="hist-del" onclick="removeHist('${id}','pay','${p.date}')">Remove</button></span></li>`).join('') || '<li style="color:var(--ink-muted)">No payments logged yet</li>';
   const priceRows = (c.priceHistory||[]).slice().sort((a,b)=>a.date<b.date?1:-1)
     .map((p,i)=>`<li>${fmtDate(p.date)} — ${money(p.price)}${i===0?' <span style="color:var(--ink-muted); font-weight:500;">(current)</span>':''}</li>`).join('') || '<li style="color:var(--ink-muted)">No price changes recorded</li>';
   const suggestedPayment = s.owed ? s.balance : (c.price||0);
@@ -1210,7 +1213,27 @@ function applyTemplate(tpl, tokens){
   return (tpl||'')
     .replace(/\{name\}/g, tokens.name || 'there')
     .replace(/\{amount\}/g, tokens.amount != null ? money(tokens.amount) : '')
-    .replace(/\{company\}/g, tokens.company || '');
+    .replace(/\{company\}/g, tokens.company || '')
+    .replace(/\{date\}/g, tokens.date || '');
+}
+
+function sendReceipt(id, dateISO, amount){
+  const c = data.customers.find(x=>x.id===id);
+  if(!c) return;
+  if(!c.phone && !c.email){ toast('No phone or email saved for this customer'); return; }
+  const firstName = c.name ? c.name.trim().split(' ')[0] : '';
+  const company = data.settings.companyName || '';
+  const msg = applyTemplate(data.settings.receiptTemplate, {
+    name: firstName, amount: Number(amount), company, date: fmtDate(dateISO)
+  });
+  if(c.phone){
+    const phone = c.phone.replace(/\s+/g,'');
+    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const separator = isIOS ? '&' : '?';
+    window.location.href = `sms:${phone}${separator}body=${encodeURIComponent(msg)}`;
+  } else {
+    window.location.href = `mailto:${c.email}?subject=${encodeURIComponent('Receipt')}&body=${encodeURIComponent(msg)}`;
+  }
 }
 
 function sendTemplate(id, kind){
@@ -1632,11 +1655,13 @@ function openSettings(){
     <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 10px; line-height:1.5;">Shown on printed reports, and available as the <b>{company}</b> token in text messages.</p>
     <input type="text" id="companyNameInput" value="${escapeAttr(data.settings.companyName||'')}" placeholder="e.g. Darren's Window Cleaning">
     <div class="section-label">Text message templates</div>
-    <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 12px; line-height:1.5;">Use <b>{name}</b> for the customer's first name, <b>{amount}</b> for the amount owed (payment reminder only), and <b>{company}</b> for your company name.</p>
+    <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 12px; line-height:1.5;">Use <b>{name}</b> for the customer's first name, <b>{amount}</b> for the amount, <b>{date}</b> for the payment date (receipts only), and <b>{company}</b> for your company name.</p>
     <label style="margin-top:0;">Cleaning reminder</label>
     <textarea id="tpl_clean" rows="3">${escapeHtml(data.settings.cleanTemplate)}</textarea>
     <label>Payment reminder</label>
     <textarea id="tpl_pay" rows="3">${escapeHtml(data.settings.payTemplate)}</textarea>
+    <label>Receipt</label>
+    <textarea id="tpl_receipt" rows="3">${escapeHtml(data.settings.receiptTemplate)}</textarea>
     <div class="form-actions">
       <button class="btn-primary" onclick="saveTemplates()">Save settings</button>
     </div>
@@ -1646,6 +1671,7 @@ function openSettings(){
 function saveTemplates(){
   data.settings.cleanTemplate = document.getElementById('tpl_clean').value.trim() || DEFAULT_CLEAN_TEMPLATE;
   data.settings.payTemplate = document.getElementById('tpl_pay').value.trim() || DEFAULT_PAY_TEMPLATE;
+  data.settings.receiptTemplate = document.getElementById('tpl_receipt').value.trim() || DEFAULT_RECEIPT_TEMPLATE;
   data.settings.companyName = document.getElementById('companyNameInput').value.trim();
   saveData();
   toast('Settings saved');
@@ -1654,6 +1680,7 @@ function saveTemplates(){
 function resetTemplates(){
   data.settings.cleanTemplate = DEFAULT_CLEAN_TEMPLATE;
   data.settings.payTemplate = DEFAULT_PAY_TEMPLATE;
+  data.settings.receiptTemplate = DEFAULT_RECEIPT_TEMPLATE;
   saveData();
   openSettings();
   toast('Reset to default wording');
