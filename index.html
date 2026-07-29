@@ -240,16 +240,6 @@
 
   .summary-overall{display:flex; gap:8px; margin-bottom:18px;}
   .summary-overall .stat{flex:1;}
-  .summary-round{
-    background:var(--surface); border-radius:var(--radius); padding:14px 16px; margin-bottom:10px;
-    border:1px solid var(--line); display:flex; align-items:center; justify-content:space-between; gap:10px;
-    position:relative; overflow:hidden;
-  }
-  .summary-round::before{content:""; position:absolute; left:0; top:0; bottom:0; width:5px; background:var(--green);}
-  .summary-round .rname{font-size:1rem; font-weight:800;}
-  .summary-round .rcount{font-size:0.7812rem; color:var(--ink-muted); margin-top:2px;}
-  .summary-round .rtotal{font-size:1rem; font-weight:800; color:var(--emphasis); text-align:right;}
-  .summary-round .ravg{font-size:0.7188rem; color:var(--ink-muted); text-align:right; margin-top:2px;}
 
   .print-area{display:none;}
   .rpt-round-title{font-size:16px; font-weight:800; margin:20px 0 8px; border-bottom:2px solid #10344C; padding-bottom:4px;}
@@ -325,7 +315,6 @@
   </div>
   <div class="tabs">
     <button class="tab active" data-tab="rounds" onclick="setTab('rounds')">Rounds</button>
-    <button class="tab" data-tab="summary" onclick="setTab('summary')">Summary</button>
     <button class="tab" data-tab="jobs" onclick="setTab('jobs')">One-off jobs</button>
   </div>
 </header>
@@ -543,11 +532,6 @@ function setTab(tab){
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===tab));
   render();
 }
-function goToRound(rn){
-  currentTab = 'rounds'; currentRound = rn; reorderMode = false; roundFilterMode = 'all';
-  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab==='rounds'));
-  render();
-}
 function setRoundsView(v){ roundsViewMode = v; render(); }
 function toggleReorder(){ reorderMode = !reorderMode; render(); }
 function moveInRound(id, direction){
@@ -572,8 +556,6 @@ function render(){
     renderRoundsList(main);
   } else if(currentTab === 'rounds' && currentRound){
     renderRoundDetail(main, currentRound);
-  } else if(currentTab === 'summary'){
-    renderSummary(main);
   } else if(currentTab === 'jobs'){
     renderJobs(main);
   }
@@ -605,7 +587,18 @@ function renderRoundsList(main){
   const rounds = groupByRound(data.customers);
   const roundNames = Object.keys(rounds).sort((a,b)=>a.localeCompare(b));
 
-  let html = searchBar();
+  let html = '';
+  if(data.customers.length){
+    const totalCustomers = data.customers.length;
+    const totalValue = data.customers.reduce((sum,c)=>sum+Number(c.price||0),0);
+    const overallAvg = totalCustomers ? totalValue/totalCustomers : 0;
+    html += `<div class="summary-overall">
+      <div class="stat"><div class="num">${totalCustomers}</div><div class="lbl">Customers</div></div>
+      <div class="stat"><div class="num">${money(totalValue)}</div><div class="lbl">Round value</div></div>
+      <div class="stat"><div class="num">${money(overallAvg)}</div><div class="lbl">Avg / customer</div></div>
+    </div>`;
+  }
+  html += searchBar();
   html += `<div class="seg-row">
     <button class="seg-btn ${roundsViewMode==='overview'?'active':''}" onclick="setRoundsView('overview')">Rounds</button>
     <button class="seg-btn ${roundsViewMode==='due'?'active':''}" onclick="setRoundsView('due')">Due</button>
@@ -754,6 +747,16 @@ function renderRoundDetail(main, rn){
     return;
   }
 
+  if(allInRound.length){
+    const roundTotal = allInRound.reduce((sum,c)=>sum+Number(c.price||0),0);
+    const roundAvg = roundTotal / allInRound.length;
+    shellHtml += `<div class="summary-overall">
+      <div class="stat"><div class="num">${allInRound.length}</div><div class="lbl">Customers</div></div>
+      <div class="stat"><div class="num">${money(roundTotal)}</div><div class="lbl">Round value</div></div>
+      <div class="stat"><div class="num">${money(roundAvg)}</div><div class="lbl">Avg / customer</div></div>
+    </div>`;
+  }
+
   shellHtml += `<div class="seg-row">
     <button class="seg-btn ${roundFilterMode==='all'?'active':''}" onclick="setRoundFilterMode('all')">All</button>
     <button class="seg-btn ${roundFilterMode==='due'?'active':''}" onclick="setRoundFilterMode('due')">📅 Due only</button>
@@ -780,42 +783,6 @@ function renderRoundDetail(main, rn){
   shellHtml += custs.map(custCardHtml).join('');
   main.innerHTML = shellHtml;
   wireSearch();
-}
-
-function renderSummary(main){
-  const rounds = groupByRound(data.customers);
-  const roundNames = Object.keys(rounds).sort((a,b)=>a.localeCompare(b));
-
-  const totalCustomers = data.customers.length;
-  const totalValue = data.customers.reduce((sum,c)=>sum+Number(c.price||0),0);
-  const overallAvg = totalCustomers ? totalValue/totalCustomers : 0;
-
-  main.innerHTML = `<div class="summary-overall">
-    <div class="stat"><div class="num">${totalCustomers}</div><div class="lbl">Customers</div></div>
-    <div class="stat"><div class="num">${money(totalValue)}</div><div class="lbl">Round value</div></div>
-    <div class="stat"><div class="num">${money(overallAvg)}</div><div class="lbl">Avg / customer</div></div>
-  </div>`;
-
-  if(!roundNames.length){
-    main.innerHTML += emptyState('rounds');
-    return;
-  }
-  main.innerHTML += `<div class="section-label">By round</div>`;
-  roundNames.forEach(rn=>{
-    const custs = rounds[rn];
-    const total = custs.reduce((sum,c)=>sum+Number(c.price||0),0);
-    const avg = custs.length ? total/custs.length : 0;
-    main.innerHTML += `<div class="summary-round" onclick="goToRound('${escapeAttr(rn)}')">
-      <div>
-        <div class="rname">${escapeHtml(rn)}</div>
-        <div class="rcount">${custs.length} customer${custs.length===1?'':'s'}</div>
-      </div>
-      <div>
-        <div class="rtotal">${money(total)}</div>
-        <div class="ravg">avg ${money(avg)} / customer</div>
-      </div>
-    </div>`;
-  });
 }
 
 function emptyState(kind){
@@ -1930,6 +1897,7 @@ function printFullRounds(){
   const roundNames = Object.keys(rounds).sort((a,b)=>a.localeCompare(b));
   let body = '';
   let grandTotal = 0;
+  let grandCount = 0;
   roundNames.forEach((rn, idx)=>{
     body += `<div class="rpt-round-title${idx>0?' rpt-page-break':''}">${escapeHtml(rn)}</div>`;
     const custs = sortByRoute(rounds[rn]);
@@ -1944,13 +1912,16 @@ function printFullRounds(){
       </tr>`;
     }).join('');
     grandTotal += roundTotal;
+    grandCount += custs.length;
+    const roundAvg = custs.length ? roundTotal/custs.length : 0;
     body += `<table class="rpt-table"><thead><tr><th>Customer</th><th>Contact</th><th>Price</th><th>Frequency</th></tr></thead><tbody>${rows}</tbody></table>`;
-    body += `<div class="rpt-total">Round total: ${money(roundTotal)}</div>`;
+    body += `<div class="rpt-total">${custs.length} customer${custs.length===1?'':'s'} · Round total: ${money(roundTotal)} · Avg: ${money(roundAvg)}</div>`;
   });
   if(!roundNames.length){
     body = '<div class="rpt-empty-note">No customers added yet.</div>';
   } else {
-    body += `<div class="rpt-total" style="border-top:2px solid #10344C; padding-top:10px; margin-top:16px; font-size:16px;">Grand total (all rounds): ${money(grandTotal)}</div>`;
+    const grandAvg = grandCount ? grandTotal/grandCount : 0;
+    body += `<div class="rpt-total" style="border-top:2px solid #10344C; padding-top:10px; margin-top:16px; font-size:16px;">Grand total (all rounds): ${grandCount} customers · ${money(grandTotal)} · Avg: ${money(grandAvg)}</div>`;
   }
   runPrint('Full Round Lists', body);
 }
@@ -1971,9 +1942,10 @@ function printSingleRound(roundName){
       <td>${c.paused ? 'Paused' : (s.owed ? 'Owes '+money(s.balance) : 'OK')}</td>
     </tr>`;
   }).join('');
+  const roundAvg = roundTotal / custs.length;
   const body = `
     <table class="rpt-table"><thead><tr><th>Customer</th><th>Contact</th><th>Price</th><th>Frequency</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>
-    <div class="rpt-total" style="border-top:2px solid #10344C; padding-top:10px; margin-top:16px; font-size:16px;">Round total: ${money(roundTotal)}</div>
+    <div class="rpt-total" style="border-top:2px solid #10344C; padding-top:10px; margin-top:16px; font-size:16px;">${custs.length} customer${custs.length===1?'':'s'} · Round total: ${money(roundTotal)} · Avg: ${money(roundAvg)}</div>
   `;
   runPrint(roundName, body);
 }
@@ -2338,6 +2310,29 @@ async function exportExcel(){
     usedNames[final] = true;
     return final;
   }
+
+  const summaryRows = roundNames.map(rn=>{
+    const custs = rounds[rn];
+    const total = custs.reduce((sum,c)=>sum+Number(c.price||0),0);
+    const avg = custs.length ? total/custs.length : 0;
+    return {
+      'Round': rn,
+      'Customers': custs.length,
+      'Round Value': total,
+      'Average / Customer': Math.round(avg * 100) / 100
+    };
+  });
+  const overallCustomers = data.customers.length;
+  const overallValue = data.customers.reduce((sum,c)=>sum+Number(c.price||0),0);
+  summaryRows.push({
+    'Round': 'TOTAL (all rounds)',
+    'Customers': overallCustomers,
+    'Round Value': overallValue,
+    'Average / Customer': overallCustomers ? Math.round((overallValue/overallCustomers)*100)/100 : 0
+  });
+  const summaryWs = XLSX.utils.json_to_sheet(summaryRows);
+  summaryWs['!cols'] = [{wch:22},{wch:12},{wch:14},{wch:18}];
+  XLSX.utils.book_append_sheet(wb, summaryWs, safeSheetName('Summary'));
 
   roundNames.forEach(rn=>{
     const custs = sortByRoute(rounds[rn]);
