@@ -77,6 +77,8 @@
   .brand-mark svg{width:19px;height:19px;}
   .brand h1{font-size:1.1875rem; font-weight:800;}
   .brand .sub{font-size:0.6875rem; color:#A9C4D8; font-weight:600; letter-spacing:.04em; text-transform:uppercase; margin-top:1px;}
+  #weatherPill{text-transform:none; margin-left:6px;}
+  #weatherPill:not(:empty)::before{content:"· "; opacity:0.7;}
   .icon-btn{
     width:38px;height:38px;border-radius:10px;border:none;
     background:rgba(255,255,255,0.12); color:#fff; display:flex;align-items:center;justify-content:center;
@@ -188,8 +190,8 @@
   label{display:block; font-size:0.7812rem; font-weight:700; color:var(--ink-muted); margin:14px 2px 6px;}
   label:first-of-type{margin-top:0;}
   input[type=text], input[type=number], input[type=date], select, textarea{
-    width:100%; padding:12px; border-radius:11px; border:1px solid var(--line); background:var(--surface);
-    font-size:0.9688rem; color:var(--ink); font-family:inherit;
+    width:100%; max-width:100%; min-width:0; padding:12px; border-radius:11px; border:1px solid var(--line); background:var(--surface);
+    font-size:0.9688rem; color:var(--ink); font-family:inherit; box-sizing:border-box;
   }
   .row2{display:flex; gap:10px;}
   .row2 > div{flex:1;}
@@ -295,7 +297,7 @@
       </div>
       <div>
         <h1>Round Book</h1>
-        <div class="sub" id="dateNow"></div>
+        <div class="sub"><span id="dateNow"></span><span id="weatherPill"></span></div>
       </div>
     </div>
     <div style="display:flex; gap:6px;">
@@ -338,6 +340,8 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
+const APP_VERSION = 32;
+function formatVersion(v){ return Math.floor(v/10) + '.' + (v%10); }
 const DEFAULT_CLEAN_TEMPLATE = "Hi {name}, just a reminder I'll be round to clean your windows soon. Let me know if that's not convenient. Thanks!";
 const DEFAULT_PAY_TEMPLATE = "Hi {name}, a friendly reminder that your window cleaning payment of {amount} is outstanding. Thanks!";
 const DEFAULT_RECEIPT_TEMPLATE = "Hi {name}, thank you for your payment of {amount} received {date}. {company}";
@@ -2191,8 +2195,11 @@ function openInfo(){
     <p style="color:var(--ink); font-size:0.875rem; line-height:1.6; margin:0 2px 16px;">
       Round Book is a simple, offline window cleaning round tracker — built to keep on top of customers, rounds, cleaning and payment dates, all stored privately on your own phone.
     </p>
-    <p style="color:var(--ink-muted); font-size:0.8125rem; line-height:1.6; margin:0 2px 18px;">
+    <p style="color:var(--ink-muted); font-size:0.8125rem; line-height:1.6; margin:0 2px 6px;">
       Created by <b style="color:var(--ink);">Darren Bennison</b>.
+    </p>
+    <p style="color:var(--ink-muted); font-size:0.75rem; line-height:1.6; margin:0 2px 18px;">
+      Version ${formatVersion(APP_VERSION)}
     </p>
     <p style="color:var(--ink-muted); font-size:0.7812rem; line-height:1.6; margin:0 2px 10px;">
       Spotted a problem, got an idea for an improvement, or just want to say something about the app? Get in touch — feedback's always welcome.
@@ -2466,6 +2473,48 @@ function onSwipeCancel(){
 }
 
 document.getElementById('dateNow').textContent = new Date().toLocaleDateString('en-GB',{weekday:'long', day:'numeric', month:'long'});
+
+/* ---------- weather ---------- */
+const WEATHER_CODES = {
+  0:'☀️', 1:'🌤️', 2:'⛅', 3:'☁️',
+  45:'🌫️', 48:'🌫️',
+  51:'🌦️', 53:'🌦️', 55:'🌦️', 56:'🌦️', 57:'🌦️',
+  61:'🌧️', 63:'🌧️', 65:'🌧️', 66:'🌧️', 67:'🌧️',
+  71:'🌨️', 73:'🌨️', 75:'🌨️', 77:'🌨️',
+  80:'🌦️', 81:'🌧️', 82:'🌧️',
+  85:'🌨️', 86:'🌨️',
+  95:'⛈️', 96:'⛈️', 99:'⛈️'
+};
+function loadWeather(){
+  const el = document.getElementById('weatherPill');
+  if(!el) return;
+  const cacheRaw = localStorage.getItem('roundBookWeatherCache');
+  let cache = null;
+  try{ cache = cacheRaw ? JSON.parse(cacheRaw) : null; }catch(e){}
+  if(cache && cache.text){ el.textContent = cache.text; }
+
+  const cacheAgeMs = cache ? (Date.now() - cache.time) : Infinity;
+  if(cacheAgeMs < 30*60*1000) return; // refresh at most every 30 minutes
+  if(!navigator.geolocation) return;
+
+  navigator.geolocation.getCurrentPosition(async (pos)=>{
+    try{
+      const { latitude, longitude } = pos.coords;
+      const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`);
+      if(!res.ok) throw new Error('bad response');
+      const json = await res.json();
+      const cw = json && json.current_weather;
+      if(!cw) throw new Error('no weather');
+      const icon = WEATHER_CODES[cw.weathercode] || '🌡️';
+      const temp = Math.round(cw.temperature);
+      const text = `${icon} ${temp}°C`;
+      const el2 = document.getElementById('weatherPill');
+      if(el2) el2.textContent = text;
+      localStorage.setItem('roundBookWeatherCache', JSON.stringify({ text, time: Date.now() }));
+    }catch(e){ /* offline or blocked — leave any cached reading showing */ }
+  }, ()=>{ /* permission denied — fail silently, no clutter */ }, { enableHighAccuracy:false, timeout:10000, maximumAge:600000 });
+}
+loadWeather();
 
 /* seed a couple of example customers on very first run so the app isn't blank */
 if(data.customers.length === 0 && !localStorage.getItem('roundBookSeeded')){
