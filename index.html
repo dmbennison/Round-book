@@ -344,7 +344,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 33;
+const APP_VERSION = 34;
 function formatVersion(v){ return Math.floor(v/10) + '.' + (v%10); }
 const DEFAULT_CLEAN_TEMPLATE = "Hi {name}, just a reminder I'll be round to clean your windows soon. Let me know if that's not convenient. Thanks!";
 const DEFAULT_PAY_TEMPLATE = "Hi {name}, a friendly reminder that your window cleaning payment of {amount} is outstanding. Thanks!";
@@ -355,6 +355,7 @@ function migrateData(parsed){
   parsed.oneOffJobs.forEach(j=>{
     if(!j.photos) j.photos = [];
     if(j.remind24h == null) j.remind24h = false;
+    if(j.customerId === undefined) j.customerId = null;
   });
   parsed.settings = parsed.settings || {};
   if(!parsed.settings.cleanTemplate) parsed.settings.cleanTemplate = DEFAULT_CLEAN_TEMPLATE;
@@ -540,6 +541,7 @@ function setTab(tab){
   currentTab = tab; currentRound = null; reorderMode = false; roundFilterMode = 'all';
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===tab));
   render();
+  window.scrollTo(0, 0);
 }
 function setRoundsView(v){ roundsViewMode = v; render(); }
 function toggleReorder(){ reorderMode = !reorderMode; render(); }
@@ -715,8 +717,8 @@ function renderRoundsList(main){
   wireSearch();
 }
 
-function openRound(rn){ currentRound = rn; reorderMode = false; roundFilterMode = 'all'; render(); }
-function backToRounds(){ currentRound = null; reorderMode = false; roundFilterMode = 'all'; render(); }
+function openRound(rn){ currentRound = rn; reorderMode = false; roundFilterMode = 'all'; render(); window.scrollTo(0, 0); }
+function backToRounds(){ currentRound = null; reorderMode = false; roundFilterMode = 'all'; render(); window.scrollTo(0, 0); }
 function setRoundFilterMode(v){ roundFilterMode = v; render(); }
 
 function renderRoundDetail(main, rn){
@@ -1007,6 +1009,9 @@ function openCustomerDetail(id){
     .map(p=>`<li>${fmtDate(p.date)} — ${money(p.amount)}<span style="display:flex; gap:4px;">${(c.phone||c.email)?`<button class="hist-del" title="Send receipt" onclick="sendReceipt('${id}','${p.date}',${p.amount})">🧾 Receipt</button>`:''}<button class="hist-del" onclick="editHistAmount('${id}','pay','${p.date}')">Edit</button><button class="hist-del" onclick="removeHist('${id}','pay','${p.date}')">Remove</button></span></li>`).join('') || '<li style="color:var(--ink-muted)">No payments logged yet</li>';
   const priceRows = (c.priceHistory||[]).slice().sort((a,b)=>a.date<b.date?1:-1)
     .map((p,i)=>`<li>${fmtDate(p.date)} — ${money(p.price)}${i===0?' <span style="color:var(--ink-muted); font-weight:500;">(current)</span>':''}</li>`).join('') || '<li style="color:var(--ink-muted)">No price changes recorded</li>';
+  const linkedJobs = (data.oneOffJobs||[]).filter(j=>j.customerId===id).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  const jobRows = linkedJobs
+    .map(j=>`<li style="cursor:pointer;" onclick="openJobForm(data.oneOffJobs.find(x=>x.id==='${j.id}'))">${fmtDate(j.date)} — ${money(j.price)} <span style="color:var(--ink-muted); font-weight:500;">(${j.done?'done':'not done'}, ${j.paid?'paid':'unpaid'})</span></li>`).join('') || '<li style="color:var(--ink-muted)">No one-off jobs for this customer</li>';
   const suggestedPayment = s.owed ? s.balance : (c.price||0);
 
   openSheet(`
@@ -1068,6 +1073,8 @@ function openCustomerDetail(id){
     <ul class="hist-list">${payRows}</ul>
     <div class="section-label">Price history</div>
     <ul class="hist-list">${priceRows}</ul>
+    <div class="section-label">One-off jobs</div>
+    <ul class="hist-list">${jobRows}</ul>
     <div class="section-label">Photos</div>
     <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px;">
       ${(c.photos||[]).map(p=>`<img src="${p.dataUrl}" onclick="viewPhoto('${id}','${p.id}')" style="width:72px; height:72px; object-fit:cover; border-radius:10px; border:1px solid var(--line); cursor:pointer;">`).join('')}
@@ -1382,6 +1389,7 @@ function jobCardHtml(j, today){
       <div class="cust-meta">
         ${statusBadge}
         <span class="badge ${j.paid?'ok':'owed'}">${j.paid?'Paid':'Unpaid'}</span>
+        ${(j.photos && j.photos.length) ? `<span class="badge paused">📷 ${j.photos.length}</span>` : ''}
       </div>
     </div>
   </div>`;
@@ -1402,24 +1410,28 @@ function toggleJobPaid(id){
 function scheduleJobForCustomer(id){
   const c = data.customers.find(x=>x.id===id);
   if(!c) return;
-  openJobForm(null, { address: c.address||'', name: c.name||'', phone: c.phone||'', price: c.price||0 });
+  openJobForm(null, { address: c.address||'', name: c.name||'', phone: c.phone||'', price: c.price||0, customerId: c.id });
 }
 
 function fillJobFromCustomer(id){
-  if(!id) return;
+  const field = document.getElementById('j_customerId');
+  if(field) field.value = id || '';
+  const linkNote = document.getElementById('j_link_note');
+  if(!id){
+    if(linkNote) linkNote.textContent = '';
+    return;
+  }
   const c = data.customers.find(x=>x.id===id);
   if(!c) return;
   document.getElementById('j_address').value = c.address||'';
   document.getElementById('j_name').value = c.name||'';
   document.getElementById('j_phone').value = c.phone||'';
   if(c.price!=null) document.getElementById('j_price').value = c.price;
+  if(linkNote) linkNote.textContent = `🔗 Linked to ${c.address||c.name||'this customer'} — will show in their history`;
 }
 
 function openJobForm(existing, prefill){
   const j = existing || prefill || {};
-  const customerOptions = data.customers.slice()
-    .sort((a,b)=>(a.address||a.name||'').localeCompare(b.address||b.name||''))
-    .map(c=>`<option value="${c.id}">${escapeHtml(c.address||c.name||'Customer')}</option>`).join('');
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">${existing?'Edit job':'Add one-off job'}</h2>
@@ -1432,9 +1444,14 @@ function openJobForm(existing, prefill){
       <label style="margin-top:0">Fill from existing customer <span style="text-transform:none; font-weight:500; opacity:0.7;">(optional)</span></label>
       <select id="j_customer_picker" onchange="fillJobFromCustomer(this.value)">
         <option value="">— Select a customer —</option>
-        ${customerOptions}
+        ${data.customers.slice()
+          .sort((a,b)=>(a.address||a.name||'').localeCompare(b.address||b.name||''))
+          .map(c=>`<option value="${c.id}" ${prefill&&prefill.customerId===c.id?'selected':''}>${escapeHtml(c.address||c.name||'Customer')}</option>`).join('')}
       </select>
+      <p id="j_link_note" style="color:var(--blue); font-size:0.75rem; font-weight:700; margin:-8px 2px 14px;">${prefill&&prefill.customerId?`🔗 Linked to ${escapeHtml(prefill.address||prefill.name||'this customer')} — will show in their history`:''}</p>
     `:''}
+    <input type="hidden" id="j_customerId" value="${escapeAttr((j.customerId)||'')}">
+    ${existing&&existing.customerId?`<p style="color:var(--blue); font-size:0.75rem; font-weight:700; margin:0 2px 14px;">🔗 Linked to a customer — shows in their history</p>`:''}
     <label ${existing?'style="margin-top:0"':''}>Address</label>
     <input type="text" id="j_address" value="${escapeAttr(j.address||'')}" placeholder="e.g. 5 Oak Close">
     <label>Name <span style="text-transform:none; font-weight:500; opacity:0.7;">(optional)</span></label>
@@ -1535,13 +1552,15 @@ function saveJobForm(id){
   const address = document.getElementById('j_address').value.trim();
   const name = document.getElementById('j_name').value.trim();
   if(!address && !name){ toast('Please enter at least an address or a name'); return; }
+  const customerIdField = document.getElementById('j_customerId');
   const payload = {
     address, name,
     phone: document.getElementById('j_phone').value.trim(),
     date: document.getElementById('j_date').value || todayISO(),
     price: parseFloat(document.getElementById('j_price').value) || 0,
     notes: document.getElementById('j_notes').value.trim(),
-    remind24h: document.getElementById('j_remind').checked
+    remind24h: document.getElementById('j_remind').checked,
+    customerId: (customerIdField && customerIdField.value) ? customerIdField.value : null
   };
   if(id){
     const j = data.oneOffJobs.find(x=>x.id===id);
