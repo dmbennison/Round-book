@@ -322,6 +322,7 @@
   <div class="tabs">
     <button class="tab active" data-tab="rounds" onclick="setTab('rounds')">Rounds</button>
     <button class="tab" data-tab="jobs" onclick="setTab('jobs')">One-off jobs</button>
+    <button class="tab" data-tab="quotes" onclick="setTab('quotes')">Quotes</button>
   </div>
 </header>
 
@@ -344,7 +345,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 34;
+const APP_VERSION = 35;
 function formatVersion(v){ return Math.floor(v/10) + '.' + (v%10); }
 const DEFAULT_CLEAN_TEMPLATE = "Hi {name}, just a reminder I'll be round to clean your windows soon. Let me know if that's not convenient. Thanks!";
 const DEFAULT_PAY_TEMPLATE = "Hi {name}, a friendly reminder that your window cleaning payment of {amount} is outstanding. Thanks!";
@@ -356,6 +357,11 @@ function migrateData(parsed){
     if(!j.photos) j.photos = [];
     if(j.remind24h == null) j.remind24h = false;
     if(j.customerId === undefined) j.customerId = null;
+  });
+  parsed.quotes = parsed.quotes || [];
+  parsed.quotes.forEach(q=>{
+    if(!q.status) q.status = 'pending';
+    if(q.date === undefined) q.date = todayISO();
   });
   parsed.settings = parsed.settings || {};
   if(!parsed.settings.cleanTemplate) parsed.settings.cleanTemplate = DEFAULT_CLEAN_TEMPLATE;
@@ -569,6 +575,8 @@ function render(){
     renderRoundDetail(main, currentRound);
   } else if(currentTab === 'jobs'){
     renderJobs(main);
+  } else if(currentTab === 'quotes'){
+    renderQuotes(main);
   }
 }
 
@@ -792,6 +800,10 @@ function renderRoundDetail(main, rn){
     return;
   }
   shellHtml += custs.map(custCardHtml).join('');
+  if(roundFilterMode === 'owed'){
+    const owedTotal = custs.reduce((sum,c)=>sum+custStatus(c).balance,0);
+    shellHtml += `<div style="text-align:right; font-weight:800; font-size:0.9375rem; color:var(--emphasis); padding:10px 4px 4px;">Total owed: ${money(owedTotal)}</div>`;
+  }
   main.innerHTML = shellHtml;
   wireSearch();
 }
@@ -1335,6 +1347,7 @@ function removeHist(id, kind, dateVal){
 
 function handleFabClick(){
   if(currentTab === 'jobs') openJobForm();
+  else if(currentTab === 'quotes') openQuoteForm();
   else openCustomerForm();
 }
 
@@ -1451,7 +1464,9 @@ function openJobForm(existing, prefill){
       <p id="j_link_note" style="color:var(--blue); font-size:0.75rem; font-weight:700; margin:-8px 2px 14px;">${prefill&&prefill.customerId?`🔗 Linked to ${escapeHtml(prefill.address||prefill.name||'this customer')} — will show in their history`:''}</p>
     `:''}
     <input type="hidden" id="j_customerId" value="${escapeAttr((j.customerId)||'')}">
+    <input type="hidden" id="j_fromQuoteId" value="${escapeAttr((prefill&&prefill.fromQuoteId)||'')}">
     ${existing&&existing.customerId?`<p style="color:var(--blue); font-size:0.75rem; font-weight:700; margin:0 2px 14px;">🔗 Linked to a customer — shows in their history</p>`:''}
+    ${prefill&&prefill.fromQuoteId?`<p style="color:var(--green); font-size:0.75rem; font-weight:700; margin:0 2px 14px;">✅ Converting from a quote — it'll be marked converted once saved</p>`:''}
     <label ${existing?'style="margin-top:0"':''}>Address</label>
     <input type="text" id="j_address" value="${escapeAttr(j.address||'')}" placeholder="e.g. 5 Oak Close">
     <label>Name <span style="text-transform:none; font-weight:500; opacity:0.7;">(optional)</span></label>
@@ -1553,6 +1568,7 @@ function saveJobForm(id){
   const name = document.getElementById('j_name').value.trim();
   if(!address && !name){ toast('Please enter at least an address or a name'); return; }
   const customerIdField = document.getElementById('j_customerId');
+  const fromQuoteField = document.getElementById('j_fromQuoteId');
   const payload = {
     address, name,
     phone: document.getElementById('j_phone').value.trim(),
@@ -1567,7 +1583,12 @@ function saveJobForm(id){
     Object.assign(j, payload);
     toast('Job updated');
   } else {
-    data.oneOffJobs.push(Object.assign({id: uid(), done:false, paid:false}, payload));
+    const newJob = Object.assign({id: uid(), done:false, paid:false}, payload);
+    data.oneOffJobs.push(newJob);
+    if(fromQuoteField && fromQuoteField.value){
+      const q = data.quotes.find(x=>x.id===fromQuoteField.value);
+      if(q){ q.status = 'converted'; q.convertedToJobId = newJob.id; }
+    }
     toast('Job added');
   }
   saveData(); closeSheet(); render();
@@ -1584,6 +1605,228 @@ function deleteJob(id){
     saveData(); render();
     toast('Job restored');
   });
+}
+
+/* ---------- quotes ---------- */
+function renderQuotes(main){
+  let html = searchBar();
+  const quotes = customersMatching(data.quotes || [])
+    .slice()
+    .sort((a,b)=>{
+      const rank = q => q.status==='pending' ? 0 : 1;
+      const ra = rank(a), rb = rank(b);
+      if(ra !== rb) return ra - rb;
+      if(ra === 0) return (a.date||'').localeCompare(b.date||'');
+      return (b.date||'').localeCompare(a.date||'');
+    });
+  if(!quotes.length){
+    html += `<div class="empty">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#66798A" stroke-width="1.6"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+      <b>No quotes yet</b>
+      <p>Tap the blue + button to note down a quote — you can turn it into a customer or a one-off job later.</p>
+    </div>`;
+    main.innerHTML = html;
+    wireSearch();
+    return;
+  }
+  html += `<div class="section-label">${quotes.length} quote${quotes.length===1?'':'s'}</div>`;
+  html += `<div class="swipe-hint">👉 Swipe a card right to accept, left to decline</div>`;
+  html += quotes.map(quoteCardHtml).join('');
+  main.innerHTML = html;
+  wireSearch();
+}
+
+function quoteStatusBadge(q){
+  if(q.status === 'accepted') return `<span class="badge ok">Accepted</span>`;
+  if(q.status === 'declined') return `<span class="badge overdue">Declined</span>`;
+  if(q.status === 'converted') return `<span class="badge ok">✅ Converted</span>`;
+  return `<span class="badge due">Pending</span>`;
+}
+
+function quoteCardHtml(q){
+  return `<div class="swipe-wrap">
+    <div class="swipe-bg swipe-bg-left">✓ Accept</div>
+    <div class="swipe-bg swipe-bg-right">✕ Decline</div>
+    <div class="cust-card" data-id="${q.id}" data-kind="quote">
+      <div class="cust-top" onclick="openQuoteForm(data.quotes.find(x=>x.id==='${q.id}'))">
+        <div>
+          <div class="cust-addr" style="font-size:1rem; font-weight:800; color:var(--ink);">${escapeHtml(q.address||'No address')}</div>
+          ${(q.name||q.phone) ? `<div class="cust-name" style="font-size:0.8125rem; font-weight:600; color:var(--ink-muted); margin-top:2px;">${[escapeHtml(q.name||''), q.phone?escapeHtml(q.phone):''].filter(Boolean).join(' · ')}</div>` : ''}
+          <div style="font-size:0.75rem; color:var(--ink-muted); margin-top:2px;">${fmtDate(q.date)}</div>
+        </div>
+        <div class="cust-price">${money(q.price)}</div>
+      </div>
+      <div class="cust-meta">
+        ${quoteStatusBadge(q)}
+      </div>
+    </div>
+  </div>`;
+}
+
+function markQuoteAccepted(id){
+  const q = data.quotes.find(x=>x.id===id);
+  if(!q) return;
+  q.status = 'accepted';
+  saveData(); render();
+  toast('Quote marked accepted');
+}
+function markQuoteDeclined(id){
+  const q = data.quotes.find(x=>x.id===id);
+  if(!q) return;
+  q.status = 'declined';
+  saveData(); render();
+  toast('Quote marked declined');
+}
+
+function openQuoteForm(existing){
+  const q = existing || {};
+  openSheet(`
+    <div class="sheet-head">
+      <h2 style="flex:1; min-width:0;">${existing?'Edit quote':'Add quote'}</h2>
+      <button class="sheet-close" onclick="closeSheet()">✕</button>
+    </div>
+    <label style="margin-top:0">Address</label>
+    <input type="text" id="q_address" value="${escapeAttr(q.address||'')}" placeholder="e.g. 5 Oak Close">
+    <label>Name <span style="text-transform:none; font-weight:500; opacity:0.7;">(optional)</span></label>
+    <input type="text" id="q_name" value="${escapeAttr(q.name||'')}" placeholder="e.g. Mr Ahmed">
+    <div class="row2">
+      <div>
+        <label>Phone (optional)</label>
+        <input type="text" id="q_phone" value="${escapeAttr(q.phone||'')}" placeholder="07..." inputmode="tel">
+      </div>
+      <div>
+        <label>Email (optional)</label>
+        <input type="text" id="q_email" value="${escapeAttr(q.email||'')}" placeholder="name@email.com" inputmode="email">
+      </div>
+    </div>
+    <label>Date</label>
+    <input type="date" id="q_date" value="${q.date||todayISO()}">
+    <label>Quoted price</label>
+    <input type="number" id="q_price" value="${q.price!=null?q.price:''}" placeholder="£" min="0" step="0.5">
+    <label>Notes</label>
+    <textarea id="q_notes" rows="2" placeholder="Access notes, size of job...">${escapeHtml(q.notes||'')}</textarea>
+    <label style="margin-top:0;">Status</label>
+    <div class="seg-row">
+      <button class="seg-btn ${(!q.status||q.status==='pending')?'active':''}" onclick="setQuoteStatusField('pending', this)">Pending</button>
+      <button class="seg-btn ${q.status==='accepted'?'active':''}" onclick="setQuoteStatusField('accepted', this)">Accepted</button>
+      <button class="seg-btn ${q.status==='declined'?'active':''}" onclick="setQuoteStatusField('declined', this)">Declined</button>
+    </div>
+    <input type="hidden" id="q_status" value="${q.status||'pending'}">
+    <div class="form-actions">
+      <button class="btn-primary" onclick="saveQuoteForm('${existing?existing.id:''}')">${existing?'Save changes':'Add quote'}</button>
+    </div>
+    ${existing?`<button class="btn-danger-text" onclick="deleteQuote('${existing.id}')">Delete quote</button>`:''}
+    ${existing && existing.status!=='converted' ? `
+      <div class="section-label">Convert this quote</div>
+      <button class="btn" style="width:100%; background:var(--blue-dim); color:#1c6fa3; margin-bottom:8px;" onclick="openConvertQuoteToCustomer('${existing.id}')">👤 Convert to a customer in a round</button>
+      <button class="btn" style="width:100%; background:var(--green-dim); color:var(--green); margin-bottom:8px;" onclick="convertQuoteToJob('${existing.id}')">📋 Convert to a one-off job</button>
+    ` : ''}
+    ${existing && existing.status==='converted' ? `<p style="color:var(--ink-muted); font-size:0.75rem; margin:14px 2px 0;">✅ This quote has already been converted.</p>` : ''}
+  `);
+}
+function setQuoteStatusField(status, btn){
+  const el = document.getElementById('q_status');
+  if(el) el.value = status;
+  if(btn && btn.parentElement){
+    btn.parentElement.querySelectorAll('.seg-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+  }
+}
+
+function saveQuoteForm(id){
+  const address = document.getElementById('q_address').value.trim();
+  const name = document.getElementById('q_name').value.trim();
+  if(!address && !name){ toast('Please enter at least an address or a name'); return; }
+  const payload = {
+    address, name,
+    phone: document.getElementById('q_phone').value.trim(),
+    email: document.getElementById('q_email').value.trim(),
+    date: document.getElementById('q_date').value || todayISO(),
+    price: parseFloat(document.getElementById('q_price').value) || 0,
+    notes: document.getElementById('q_notes').value.trim(),
+    status: document.getElementById('q_status').value || 'pending'
+  };
+  if(id){
+    const q = data.quotes.find(x=>x.id===id);
+    Object.assign(q, payload);
+    toast('Quote updated');
+  } else {
+    data.quotes.push(Object.assign({id: uid()}, payload));
+    toast('Quote added');
+  }
+  saveData(); closeSheet(); render();
+}
+
+function deleteQuote(id){
+  const idx = data.quotes.findIndex(x=>x.id===id);
+  if(idx===-1) return;
+  const removed = data.quotes[idx];
+  data.quotes.splice(idx,1);
+  saveData(); closeSheet(); render();
+  toast(`Deleted quote for ${removed.address||removed.name||'quote'}`, 'Undo', ()=>{
+    data.quotes.splice(idx,0,removed);
+    saveData(); render();
+    toast('Quote restored');
+  });
+}
+
+function convertQuoteToJob(quoteId){
+  const q = data.quotes.find(x=>x.id===quoteId);
+  if(!q) return;
+  openJobForm(null, { address:q.address||'', name:q.name||'', phone:q.phone||'', price:q.price||0, fromQuoteId:q.id });
+}
+
+function openConvertQuoteToCustomer(quoteId){
+  const q = data.quotes.find(x=>x.id===quoteId);
+  if(!q) return;
+  const roundOptions = [...new Set(data.customers.map(c=>c.round).filter(Boolean))];
+  openSheet(`
+    <div class="sheet-head">
+      <h2>Convert to customer</h2>
+      <button class="sheet-close" onclick="closeSheet()">✕</button>
+    </div>
+    <p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 16px; line-height:1.5;">Creates a new recurring customer from this quote. Pick a round and how often they'll be cleaned.</p>
+    <label style="margin-top:0">Round</label>
+    <input type="text" id="cq_round" placeholder="e.g. Tuesday Round" list="cqRoundOptions">
+    <datalist id="cqRoundOptions">${roundOptions.map(r=>`<option value="${escapeAttr(r)}">`).join('')}</datalist>
+    <div class="row2">
+      <div>
+        <label>Price per clean</label>
+        <input type="number" id="cq_price" value="${q.price!=null?q.price:''}" min="0" step="0.5">
+      </div>
+      <div>
+        <label>Clean every (weeks)</label>
+        <input type="number" id="cq_freq" value="4" min="1">
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn-primary" onclick="confirmConvertQuoteToCustomer('${quoteId}')">Create customer</button>
+    </div>
+  `);
+}
+function confirmConvertQuoteToCustomer(quoteId){
+  const q = data.quotes.find(x=>x.id===quoteId);
+  if(!q) return;
+  const round = document.getElementById('cq_round').value.trim() || 'Unassigned';
+  const price = parseFloat(document.getElementById('cq_price').value) || 0;
+  const frequencyWeeks = parseInt(document.getElementById('cq_freq').value) || 4;
+
+  const roundCusts = data.customers.filter(x=>(x.round||'Unassigned')===round);
+  const maxOrder = roundCusts.reduce((m,x)=>Math.max(m, x.order!=null?x.order:-1), -1);
+  const newCustomer = {
+    id: uid(),
+    address: q.address||'', name: q.name||'', phone: q.phone||'', email: q.email||'',
+    round, price, frequencyWeeks, notes: q.notes||'',
+    cleanHistory: [], paymentHistory: [],
+    priceHistory: [{date: todayISO(), price}],
+    order: maxOrder + 1,
+    photos: [], paused: false
+  };
+  data.customers.push(newCustomer);
+  q.status = 'converted';
+  q.convertedToCustomerId = newCustomer.id;
+  saveData(); closeSheet(); render();
+  toast('Customer created from quote');
 }
 
 /* ---------- settings / dark mode / colour scheme ---------- */
@@ -2486,9 +2729,13 @@ function onSwipeEnd(){
     const id = card.dataset.id;
     const kind = card.dataset.kind || 'customer';
     if(currentX > 0){
-      if(kind === 'job') toggleJobDone(id); else quickClean(id);
+      if(kind === 'job') toggleJobDone(id);
+      else if(kind === 'quote') markQuoteAccepted(id);
+      else quickClean(id);
     } else {
-      if(kind === 'job') toggleJobPaid(id); else quickPaid(id);
+      if(kind === 'job') toggleJobPaid(id);
+      else if(kind === 'quote') markQuoteDeclined(id);
+      else quickPaid(id);
     }
   }
   swipeState = null;
