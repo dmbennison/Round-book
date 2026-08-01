@@ -345,7 +345,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 35;
+const APP_VERSION = 36;
 function formatVersion(v){ return Math.floor(v/10) + '.' + (v%10); }
 const DEFAULT_CLEAN_TEMPLATE = "Hi {name}, just a reminder I'll be round to clean your windows soon. Let me know if that's not convenient. Thanks!";
 const DEFAULT_PAY_TEMPLATE = "Hi {name}, a friendly reminder that your window cleaning payment of {amount} is outstanding. Thanks!";
@@ -1020,7 +1020,7 @@ function openCustomerDetail(id){
   const payRows = (c.paymentHistory||[]).slice().sort((a,b)=>a.date<b.date?1:-1)
     .map(p=>`<li>${fmtDate(p.date)} — ${money(p.amount)}<span style="display:flex; gap:4px;">${(c.phone||c.email)?`<button class="hist-del" title="Send receipt" onclick="sendReceipt('${id}','${p.date}',${p.amount})">🧾 Receipt</button>`:''}<button class="hist-del" onclick="editHistAmount('${id}','pay','${p.date}')">Edit</button><button class="hist-del" onclick="removeHist('${id}','pay','${p.date}')">Remove</button></span></li>`).join('') || '<li style="color:var(--ink-muted)">No payments logged yet</li>';
   const priceRows = (c.priceHistory||[]).slice().sort((a,b)=>a.date<b.date?1:-1)
-    .map((p,i)=>`<li>${fmtDate(p.date)} — ${money(p.price)}${i===0?' <span style="color:var(--ink-muted); font-weight:500;">(current)</span>':''}</li>`).join('') || '<li style="color:var(--ink-muted)">No price changes recorded</li>';
+    .map((p,i)=>`<li>${fmtDate(p.date)} — ${money(p.price)}${i===0?' <span style="color:var(--ink-muted); font-weight:500;">(current)</span>':''}<span style="display:flex; gap:4px;"><button class="hist-del" onclick="editPriceHistoryEntry('${id}','${p.date}')">Edit</button><button class="hist-del" onclick="removePriceHistoryEntry('${id}','${p.date}')">Remove</button></span></li>`).join('') || '<li style="color:var(--ink-muted)">No price changes recorded</li>';
   const linkedJobs = (data.oneOffJobs||[]).filter(j=>j.customerId===id).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   const jobRows = linkedJobs
     .map(j=>`<li style="cursor:pointer;" onclick="openJobForm(data.oneOffJobs.find(x=>x.id==='${j.id}'))">${fmtDate(j.date)} — ${money(j.price)} <span style="color:var(--ink-muted); font-weight:500;">(${j.done?'done':'not done'}, ${j.paid?'paid':'unpaid'})</span></li>`).join('') || '<li style="color:var(--ink-muted)">No one-off jobs for this customer</li>';
@@ -1202,6 +1202,31 @@ function editHistAmount(id, kind, dateKey){
   saveData(); openCustomerDetail(id); render();
 }
 
+function editPriceHistoryEntry(id, dateKey){
+  const c = data.customers.find(x=>x.id===id);
+  const entry = (c.priceHistory||[]).find(p=>p.date===dateKey);
+  if(!entry) return;
+  const val = prompt(`Price on ${fmtDate(dateKey)}`, entry.price);
+  if(val===null) return;
+  const num = parseFloat(val);
+  if(isNaN(num) || num<0){ toast('Enter a valid price'); return; }
+  entry.price = num;
+  const mostRecent = c.priceHistory.slice().sort((a,b)=>a.date<b.date?1:-1)[0];
+  if(mostRecent && mostRecent.date === dateKey){
+    c.price = num;
+    toast('Updated — this is also their current price');
+  }
+  saveData(); openCustomerDetail(id); render();
+}
+
+function removePriceHistoryEntry(id, dateKey){
+  const c = data.customers.find(x=>x.id===id);
+  const idx = (c.priceHistory||[]).findIndex(p=>p.date===dateKey);
+  if(idx===-1) return;
+  c.priceHistory.splice(idx,1);
+  saveData(); openCustomerDetail(id); render();
+}
+
 function emailCustomer(id){
   const c = data.customers.find(x=>x.id===id);
   if(!c || !c.email) return;
@@ -1240,6 +1265,21 @@ function sendReceipt(id, dateISO, amount){
   } else {
     window.location.href = `mailto:${c.email}?subject=${encodeURIComponent('Receipt')}&body=${encodeURIComponent(msg)}`;
   }
+}
+
+function sendJobReceipt(id){
+  const j = data.oneOffJobs.find(x=>x.id===id);
+  if(!j) return;
+  if(!j.phone){ toast('No phone number saved for this job'); return; }
+  const firstName = j.name ? j.name.trim().split(' ')[0] : '';
+  const company = data.settings.companyName || '';
+  const msg = applyTemplate(data.settings.receiptTemplate, {
+    name: firstName, amount: Number(j.price||0), company, date: fmtDate(j.date)
+  });
+  const phone = j.phone.replace(/\s+/g,'');
+  const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const separator = isIOS ? '&' : '?';
+  window.location.href = `sms:${phone}${separator}body=${encodeURIComponent(msg)}`;
 }
 
 function sendTemplate(id, kind){
@@ -1479,6 +1519,7 @@ function openJobForm(existing, prefill){
     <input type="number" id="j_price" value="${j.price!=null?j.price:''}" placeholder="£" min="0" step="0.5">
     <label>Notes</label>
     <textarea id="j_notes" rows="2" placeholder="What's the job...">${escapeHtml(j.notes||'')}</textarea>
+    ${(existing && existing.phone) ? `<button class="btn" style="width:100%; background:var(--amber-dim); color:var(--amber); margin-top:14px;" onclick="sendJobReceipt('${existing.id}')">🧾 Send receipt</button>` : ''}
     <label style="display:flex; align-items:center; gap:8px; margin-top:16px; cursor:pointer;">
       <input type="checkbox" id="j_remind" ${j.remind24h?'checked':''} style="width:18px; height:18px; flex-shrink:0;">
       <span style="font-size:0.8125rem; font-weight:600; color:var(--ink); text-transform:none; letter-spacing:0;">Remind me the day before this job</span>
@@ -1983,6 +2024,10 @@ function openReports(){
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
       <div><div class="t1">One-off jobs</div><div class="t2">Every one-off job, with status and total value</div></div>
     </button>
+    <button class="backup-btn" onclick="printPriceReview()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+      <div><div class="t1">Price review due</div><div class="t2">12+ months since last price increase, by next clean</div></div>
+    </button>
   `);
 }
 
@@ -2300,6 +2345,48 @@ function printAllJobs(){
     <div class="rpt-total" style="border-top:2px solid #10344C; padding-top:10px; margin-top:12px; font-size:16px;">Total value: ${money(total)}</div>
   `;
   runPrint('One-off Jobs', body);
+}
+
+function getLastPriceIncreaseDate(c){
+  const hist = (c.priceHistory||[]).slice().sort((a,b)=>a.date<b.date?1:-1);
+  if(!hist.length) return null;
+  let lastIncrease = hist[0].date;
+  for(let i=1; i<hist.length; i++){
+    if(hist[i].price > hist[i-1].price) lastIncrease = hist[i].date;
+  }
+  return lastIncrease;
+}
+
+function printPriceReview(){
+  const flagged = [];
+  data.customers.forEach(c=>{
+    const lastIncrease = getLastPriceIncreaseDate(c);
+    if(!lastIncrease) return;
+    const target = nextDueISO(c) || todayISO();
+    const days = daysBetween(lastIncrease, target);
+    if(days >= 365){
+      flagged.push({ c, lastIncrease, target, days });
+    }
+  });
+  flagged.sort((a,b)=> b.days - a.days);
+
+  if(!flagged.length){
+    runPrint('Price Review Due', '<div class="rpt-empty-note">Nobody is due a price review right now.</div>');
+    return;
+  }
+
+  const rows = flagged.map(({c, lastIncrease, target})=>`<tr>
+    <td>${escapeHtml(c.address||'')}${c.name?`<br><span style="color:#66798A">${escapeHtml(c.name)}</span>`:''}</td>
+    <td>${escapeHtml(c.round||'Unassigned')}</td>
+    <td style="text-align:right;">${money(c.price)}</td>
+    <td>${fmtDate(lastIncrease)}</td>
+    <td>${fmtDate(target)}</td>
+  </tr>`).join('');
+  const body = `
+    <table class="rpt-table"><thead><tr><th>Customer</th><th>Round</th><th style="text-align:right;">Current price</th><th>Last increase</th><th>Next clean</th></tr></thead><tbody>${rows}</tbody></table>
+    <p style="font-size:11px; color:#66798A; margin-top:12px;">Shows customers where it will have been 12 months or more since their last price increase by their next scheduled clean. Customers with no price history are not included.</p>
+  `;
+  runPrint('Price Review Due', body);
 }
 
 function printEarnings(){
