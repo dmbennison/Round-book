@@ -345,7 +345,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 36;
+const APP_VERSION = 37;
 function formatVersion(v){ return Math.floor(v/10) + '.' + (v%10); }
 const DEFAULT_CLEAN_TEMPLATE = "Hi {name}, just a reminder I'll be round to clean your windows soon. Let me know if that's not convenient. Thanks!";
 const DEFAULT_PAY_TEMPLATE = "Hi {name}, a friendly reminder that your window cleaning payment of {amount} is outstanding. Thanks!";
@@ -1206,17 +1206,40 @@ function editPriceHistoryEntry(id, dateKey){
   const c = data.customers.find(x=>x.id===id);
   const entry = (c.priceHistory||[]).find(p=>p.date===dateKey);
   if(!entry) return;
-  const val = prompt(`Price on ${fmtDate(dateKey)}`, entry.price);
-  if(val===null) return;
-  const num = parseFloat(val);
-  if(isNaN(num) || num<0){ toast('Enter a valid price'); return; }
-  entry.price = num;
-  const mostRecent = c.priceHistory.slice().sort((a,b)=>a.date<b.date?1:-1)[0];
-  if(mostRecent && mostRecent.date === dateKey){
-    c.price = num;
-    toast('Updated — this is also their current price');
+  openSheet(`
+    <div class="sheet-head">
+      <h2>Edit price entry</h2>
+      <button class="sheet-close" onclick="openCustomerDetail('${id}')">✕</button>
+    </div>
+    <label style="margin-top:0">Date</label>
+    <input type="date" id="ph_date" value="${entry.date}">
+    <label>Price</label>
+    <input type="number" id="ph_price" value="${entry.price}" min="0" step="0.5">
+    <div class="form-actions">
+      <button class="btn-primary" onclick="savePriceHistoryEdit('${id}','${dateKey}')">Save</button>
+    </div>
+  `);
+}
+
+function savePriceHistoryEdit(id, oldDateKey){
+  const c = data.customers.find(x=>x.id===id);
+  const entry = (c.priceHistory||[]).find(p=>p.date===oldDateKey);
+  if(!entry) return;
+  const newDate = document.getElementById('ph_date').value;
+  const newPrice = parseFloat(document.getElementById('ph_price').value);
+  if(!newDate){ toast('Please choose a date'); return; }
+  if(isNaN(newPrice) || newPrice<0){ toast('Enter a valid price'); return; }
+
+  entry.date = newDate;
+  entry.price = newPrice;
+
+  const sortedAfter = c.priceHistory.slice().sort((a,b)=>a.date<b.date?1:-1);
+  if(sortedAfter[0] === entry){
+    c.price = newPrice;
   }
+
   saveData(); openCustomerDetail(id); render();
+  toast('Price entry updated');
 }
 
 function removePriceHistoryEntry(id, dateKey){
@@ -2293,6 +2316,13 @@ function printCustomerRecord(id){
 
   const balanceText = s.owed ? `Owes ${money(s.balance)}` : s.credit ? `In credit: ${money(Math.abs(s.balance))}` : 'Fully paid up';
 
+  const photosHtml = (c.photos && c.photos.length) ? `
+    <div class="rpt-round-title">Photos</div>
+    <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:16px;">
+      ${c.photos.map(p=>`<img src="${p.dataUrl}" style="width:160px; height:160px; object-fit:cover; border-radius:6px; border:1px solid #E3E9EC;">`).join('')}
+    </div>
+  ` : '';
+
   const body = `
     <table class="rpt-table" style="margin-bottom:16px;"><tbody>${infoRows}</tbody></table>
     ${c.notes ? `<div style="background:#F5F7F8; border:1px solid #E3E9EC; border-radius:8px; padding:10px 12px; font-size:13px; margin-bottom:16px;">${escapeHtml(c.notes)}</div>` : ''}
@@ -2301,6 +2331,7 @@ function printCustomerRecord(id){
     <table class="rpt-table"><thead><tr><th>Date</th><th style="text-align:right;">Amount</th></tr></thead><tbody>${cleanRows}</tbody></table>
     <div class="rpt-round-title">Payment history</div>
     <table class="rpt-table"><thead><tr><th>Date</th><th style="text-align:right;">Amount</th></tr></thead><tbody>${payRows}</tbody></table>
+    ${photosHtml}
   `;
   runPrint(c.address || c.name || 'Customer Record', body);
 }
@@ -2316,9 +2347,16 @@ function printJobRecord(id){
     ['Done', j.done ? 'Yes' : 'No'],
     ['Paid', j.paid ? 'Yes' : 'No']
   ].filter(Boolean).map(([label,val])=>`<tr><td style="font-weight:700; width:110px;">${label}</td><td>${val}</td></tr>`).join('');
+  const photosHtml = (j.photos && j.photos.length) ? `
+    <div class="rpt-round-title">Photos</div>
+    <div style="display:flex; flex-wrap:wrap; gap:10px;">
+      ${j.photos.map(p=>`<img src="${p.dataUrl}" style="width:160px; height:160px; object-fit:cover; border-radius:6px; border:1px solid #E3E9EC;">`).join('')}
+    </div>
+  ` : '';
   const body = `
     <table class="rpt-table" style="margin-bottom:16px;"><tbody>${infoRows}</tbody></table>
-    ${j.notes ? `<div style="background:#F5F7F8; border:1px solid #E3E9EC; border-radius:8px; padding:10px 12px; font-size:13px;">${escapeHtml(j.notes)}</div>` : ''}
+    ${j.notes ? `<div style="background:#F5F7F8; border:1px solid #E3E9EC; border-radius:8px; padding:10px 12px; font-size:13px; margin-bottom:16px;">${escapeHtml(j.notes)}</div>` : ''}
+    ${photosHtml}
   `;
   runPrint(j.address || j.name || 'One-off Job', body);
 }
@@ -2554,7 +2592,7 @@ function openInfo(){
       Round Book is a simple, offline window cleaning round tracker — built to keep on top of customers, rounds, cleaning and payment dates, all stored privately on your own phone.
     </p>
     <p style="color:var(--ink-muted); font-size:0.8125rem; line-height:1.6; margin:0 2px 6px;">
-      Created by <b style="color:var(--ink);">Darren Bennison</b>.
+      Created by <b style="color:var(--ink);">D M Bennison using Claude</b>.
     </p>
     <p style="color:var(--ink-muted); font-size:0.75rem; line-height:1.6; margin:0 2px 18px;">
       Version ${formatVersion(APP_VERSION)}
