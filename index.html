@@ -10,6 +10,7 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="manifest" href="manifest.json">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/docx@8.2.4/build/index.umd.js" defer></script>
 <title>Round Book</title>
 <style>
   :root{
@@ -345,7 +346,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 37;
+const APP_VERSION = 38;
 function formatVersion(v){ return Math.floor(v/10) + '.' + (v%10); }
 const DEFAULT_CLEAN_TEMPLATE = "Hi {name}, just a reminder I'll be round to clean your windows soon. Let me know if that's not convenient. Thanks!";
 const DEFAULT_PAY_TEMPLATE = "Hi {name}, a friendly reminder that your window cleaning payment of {amount} is outstanding. Thanks!";
@@ -2066,20 +2067,146 @@ function groupByRound(list){
 function reportDate(){
   return new Date().toLocaleDateString('en-GB',{weekday:'long', day:'numeric', month:'long', year:'numeric'});
 }
+let pendingReportTitle = '';
+let pendingReportBody = '';
+
 function runPrint(titleHtml, bodyHtml){
+  pendingReportTitle = titleHtml;
+  pendingReportBody = bodyHtml;
+  openSheet(`
+    <div class="sheet-head">
+      <h2 style="flex:1; min-width:0;">${titleHtml}</h2>
+      <button class="sheet-close" onclick="closeSheet()">✕</button>
+    </div>
+    <p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 16px; line-height:1.5;">How would you like this report?</p>
+    <button class="backup-btn" onclick="printPendingReport()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
+      <div><div class="t1">Print</div><div class="t2">Opens your printer dialog</div></div>
+    </button>
+    <button class="backup-btn" onclick="exportPendingReportDocx()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+      <div><div class="t1">Save as Word document</div><div class="t2">Downloads a .docx file</div></div>
+    </button>
+  `);
+}
+
+function printPendingReport(){
   const company = data.settings.companyName || '';
   document.getElementById('printArea').innerHTML = `
     <div class="rpt-header">
       <div>
-        <h1>${titleHtml}</h1>
+        <h1>${pendingReportTitle}</h1>
         ${company ? `<div style="font-size:13px; color:#66798A; font-weight:700; margin-top:2px;">${escapeHtml(company)}</div>` : ''}
       </div>
       <div class="rpt-date">${reportDate()}</div>
     </div>
-    ${bodyHtml}
+    ${pendingReportBody}
   `;
   closeSheet();
   window.print();
+}
+
+function htmlToDocxElements(bodyHtml){
+  const { Paragraph, TextRun, Table, TableRow, TableCell, WidthType, HeadingLevel, ImageRun } = docx;
+  const parsed = new DOMParser().parseFromString(`<div>${bodyHtml}</div>`, 'text/html');
+  const root = parsed.body.firstElementChild;
+  const elements = [];
+  const textOf = (node) => (node.textContent||'').replace(/\s+/g,' ').trim();
+
+  Array.from(root.children).forEach(node=>{
+    const tag = node.tagName;
+    const imgs = node.querySelectorAll ? node.querySelectorAll('img') : [];
+    if(tag === 'TABLE'){
+      const trs = node.querySelectorAll('tr');
+      const rows = [];
+      trs.forEach(tr=>{
+        const cellNodes = Array.from(tr.children);
+        if(!cellNodes.length) return;
+        const cells = cellNodes.map(td => new TableCell({
+          children: [new Paragraph({ children: [new TextRun({ text: textOf(td), bold: td.tagName==='TH' })] })],
+          width: { size: Math.floor(100/cellNodes.length), type: WidthType.PERCENTAGE }
+        }));
+        rows.push(new TableRow({ children: cells }));
+      });
+      if(rows.length){
+        elements.push(new Table({ rows, width: { size: 100, type: WidthType.PERCENTAGE } }));
+        elements.push(new Paragraph({ text: '' }));
+      }
+    } else if(imgs.length){
+      imgs.forEach(img=>{
+        const src = img.getAttribute('src') || '';
+        if(!src.startsWith('data:image')) return;
+        try{
+          const base64 = src.split(',')[1];
+          const binary = atob(base64);
+          const bytes = new Uint8Array(binary.length);
+          for(let i=0;i<binary.length;i++) bytes[i] = binary.charCodeAt(i);
+          elements.push(new Paragraph({ children: [ new ImageRun({ data: bytes, transformation: { width: 160, height: 160 } }) ] }));
+        }catch(e){ /* skip a photo that fails to embed rather than aborting the whole export */ }
+      });
+    } else if(tag === 'DIV' && node.classList.contains('rpt-round-title')){
+      const t = textOf(node);
+      if(t) elements.push(new Paragraph({ text: t, heading: HeadingLevel.HEADING_2, spacing:{ before:200, after:100 } }));
+    } else if(tag === 'DIV' && node.classList.contains('rpt-total')){
+      const t = textOf(node);
+      if(t) elements.push(new Paragraph({ children:[new TextRun({ text: t, bold:true })], spacing:{ before:100, after:200 } }));
+    } else if(tag === 'DIV' && node.classList.contains('rpt-empty-note')){
+      const t = textOf(node);
+      if(t) elements.push(new Paragraph({ children:[new TextRun({ text: t, italics:true })] }));
+    } else {
+      const t = textOf(node);
+      if(t) elements.push(new Paragraph({ children:[new TextRun({ text: t })], spacing:{ after:120 } }));
+    }
+  });
+  return elements;
+}
+
+async function exportPendingReportDocx(){
+  if(typeof docx === 'undefined'){
+    toast('Still loading — try again in a moment, or once you have signal');
+    return;
+  }
+  try{
+    const { Document, Packer, Paragraph, TextRun, HeadingLevel } = docx;
+    const plainTitle = pendingReportTitle.replace(/<[^>]+>/g,'');
+    const company = data.settings.companyName || '';
+
+    const headerChildren = [ new Paragraph({ text: plainTitle, heading: HeadingLevel.HEADING_1 }) ];
+    if(company) headerChildren.push(new Paragraph({ children:[new TextRun({ text: company, italics:true })] }));
+    headerChildren.push(new Paragraph({ children:[new TextRun({ text: reportDate(), color:'666666' })], spacing:{ after:300 } }));
+
+    const bodyChildren = htmlToDocxElements(pendingReportBody);
+
+    const wordDoc = new Document({
+      sections: [{ children: [...headerChildren, ...bodyChildren] }]
+    });
+
+    const blob = await Packer.toBlob(wordDoc);
+    const filename = `${plainTitle.replace(/[^a-z0-9]+/gi,'-').toLowerCase()}-${todayISO()}.docx`;
+
+    if(navigator.canShare){
+      try{
+        const file = new File([blob], filename, { type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+        if(navigator.canShare({files:[file]})){
+          await navigator.share({ files:[file], title: plainTitle });
+          closeSheet();
+          toast('Word document shared');
+          return;
+        }
+      }catch(e){
+        if(e && e.name === 'AbortError'){ closeSheet(); return; }
+      }
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url), 2000);
+    closeSheet();
+    toast('Word document saved');
+  }catch(e){
+    toast('Could not create the Word document — try Print instead');
+  }
 }
 
 function printRoundsLastCleaned(){
