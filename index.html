@@ -346,7 +346,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 39;
+const APP_VERSION = 40;
 function formatVersion(v){ return Math.floor(v/10) + '.' + (v%10); }
 const DEFAULT_CLEAN_TEMPLATE = "Hi {name}, just a reminder I'll be round to clean your windows soon. Let me know if that's not convenient. Thanks!";
 const DEFAULT_PAY_TEMPLATE = "Hi {name}, a friendly reminder that your window cleaning payment of {amount} is outstanding. Thanks!";
@@ -2118,25 +2118,33 @@ function htmlToDocxElements(bodyHtml){
     const tag = node.tagName;
     const imgs = node.querySelectorAll ? node.querySelectorAll('img') : [];
     if(tag === 'TABLE'){
-      const trs = node.querySelectorAll('tr');
-      const rows = [];
-      trs.forEach(tr=>{
-        const cellNodes = Array.from(tr.children);
-        if(!cellNodes.length) return;
-        const colWidth = Math.floor(PAGE_WIDTH_DXA / cellNodes.length);
-        const cells = cellNodes.map(td => new TableCell({
-          children: [new Paragraph({ children: [new TextRun({ text: textOf(td), bold: td.tagName==='TH' })] })],
-          width: { size: colWidth, type: WidthType.DXA }
-        }));
-        rows.push(new TableRow({ children: cells }));
-      });
-      if(rows.length){
-        elements.push(new Table({
-          rows,
-          layout: TableLayoutType.FIXED,
-          width: { size: PAGE_WIDTH_DXA, type: WidthType.DXA }
-        }));
-        elements.push(new Paragraph({ text: '' }));
+      const trs = Array.from(node.querySelectorAll('tr'));
+      let numCols = 0;
+      trs.forEach(tr => { numCols = Math.max(numCols, tr.children.length); });
+
+      if(numCols > 0){
+        const colWidth = Math.floor(PAGE_WIDTH_DXA / numCols);
+        const columnWidths = Array(numCols).fill(colWidth);
+        const rows = [];
+        trs.forEach(tr=>{
+          const cellNodes = Array.from(tr.children);
+          if(!cellNodes.length) return;
+          const cells = cellNodes.map(td => new TableCell({
+            children: [new Paragraph({ children: [new TextRun({ text: textOf(td), bold: td.tagName==='TH' })] })],
+            width: { size: colWidth, type: WidthType.DXA }
+          }));
+          rows.push(new TableRow({ children: cells }));
+        });
+        if(rows.length){
+          const tableConfig = {
+            rows,
+            columnWidths,
+            width: { size: PAGE_WIDTH_DXA, type: WidthType.DXA }
+          };
+          if(TableLayoutType && TableLayoutType.FIXED){ tableConfig.layout = TableLayoutType.FIXED; }
+          elements.push(new Table(tableConfig));
+          elements.push(new Paragraph({ text: '' }));
+        }
       }
     } else if(imgs.length){
       imgs.forEach(img=>{
