@@ -46,9 +46,9 @@
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color: transparent;}
   html,body{height:100%;}
-  html{font-size:17px;}
-  html.text-small{font-size:15px;}
-  html.text-large{font-size:20px;}
+  html{font-size:18px;}
+  html.text-small{font-size:16px;}
+  html.text-large{font-size:22px;}
   body{
     margin:0;
     background:var(--bg);
@@ -71,7 +71,7 @@
   .brand{display:flex; align-items:center; gap:10px;}
   .brand-mark{
     width:34px;height:34px;border-radius:9px;
-    background:linear-gradient(160deg, var(--blue), #1c6fa3);
+    background:linear-gradient(160deg, var(--blue), var(--blue-deep));
     display:flex;align-items:center;justify-content:center;
     box-shadow: inset 0 0 0 1px rgba(255,255,255,0.25);
   }
@@ -143,7 +143,7 @@
     display:flex; align-items:center; justify-content:center; gap:6px;
   }
   .btn svg{width:15px;height:15px;}
-  .btn-clean{background:var(--blue-dim); color:#1c6fa3;}
+  .btn-clean{background:var(--blue-dim); color:var(--blue-deep);}
   .btn-clean:active{background:#c8e6f8;}
   .btn-paid{background:var(--green-dim); color:var(--green);}
   .btn-paid:active{background:#cdefdc;}
@@ -340,7 +340,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 42;
+const APP_VERSION = 43;
 function formatVersion(v){ return Math.floor(v/10) + '.' + (v%10); }
 const DEFAULT_CLEAN_TEMPLATE = "Hi {name}, just a reminder I'll be round to clean your windows soon. Let me know if that's not convenient. Thanks!";
 const DEFAULT_PAY_TEMPLATE = "Hi {name}, a friendly reminder that your window cleaning payment of {amount} is outstanding. Thanks!";
@@ -521,11 +521,11 @@ function renderJobReminderBanner(){
   const label = jobs.length === 1
     ? `📅 Reminder: ${first.address||first.name||'Job'} — ${fmtDate(first.date)}`
     : `📅 ${jobs.length} scheduled jobs coming up within a day`;
-  el.innerHTML = `<div style="background:var(--blue-dim); color:#1c6fa3; border-radius:12px; padding:11px 14px; margin:0 14px 14px; display:flex; align-items:center; justify-content:space-between; gap:10px; font-size:0.8125rem; font-weight:700;">
+  el.innerHTML = `<div style="background:var(--blue-dim); color:var(--blue-deep); border-radius:12px; padding:11px 14px; margin:0 14px 14px; display:flex; align-items:center; justify-content:space-between; gap:10px; font-size:0.8125rem; font-weight:700;">
     <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(label)}</span>
     <span style="display:flex; gap:8px; flex-shrink:0; align-items:center;">
-      <button onclick="setTab('jobs'); dismissJobReminder();" style="background:#1c6fa3; color:#fff; border:none; border-radius:8px; padding:6px 10px; font-weight:800; font-size:0.7812rem;">View</button>
-      <button onclick="dismissJobReminder()" style="background:none; border:none; color:#1c6fa3; font-weight:800; font-size:1rem; line-height:1; padding:0 2px;">✕</button>
+      <button onclick="setTab('jobs'); dismissJobReminder();" style="background:var(--blue-deep); color:#fff; border:none; border-radius:8px; padding:6px 10px; font-weight:800; font-size:0.7812rem;">View</button>
+      <button onclick="dismissJobReminder()" style="background:none; border:none; color:var(--blue-deep); font-weight:800; font-size:1rem; line-height:1; padding:0 2px;">✕</button>
     </span>
   </div>`;
 }
@@ -1006,11 +1006,11 @@ function openCustomerDetail(id){
     <div style="color:var(--ink-muted); font-size:0.8125rem; margin-bottom:10px;">${escapeHtml(c.round||'Unassigned')} · ${money(c.price)} standard · every ${c.frequencyWeeks||4} week${(c.frequencyWeeks||4)===1?'':'s'}${c.paused?' · <span style="color:var(--ink-muted); font-weight:700;">Paused</span>':''}</div>
     ${needsPriceReview(c) ? `<div style="color:var(--amber); font-size:0.75rem; font-weight:700; margin:-6px 2px 10px;">📈 12+ months since last price increase</div>` : ''}
     ${(c.phone||c.email)?`<div style="display:flex; gap:8px; margin-bottom:10px;">
-      ${c.phone?`<a href="tel:${escapeAttr(c.phone.replace(/\\s+/g,''))}" style="flex:1; text-decoration:none; background:var(--blue-dim); color:#1c6fa3; border-radius:10px; padding:9px; font-size:0.8125rem; font-weight:700; text-align:center;">📞 ${escapeHtml(c.phone)}</a>`:''}
+      ${c.phone?`<a href="tel:${escapeAttr(c.phone.replace(/\\s+/g,''))}" style="flex:1; text-decoration:none; background:var(--blue-dim); color:var(--blue-deep); border-radius:10px; padding:9px; font-size:0.8125rem; font-weight:700; text-align:center;">📞 ${escapeHtml(c.phone)}</a>`:''}
       ${c.email?`<button onclick="emailCustomer('${id}')" style="flex:1; min-width:0; background:var(--bg); color:var(--ink); border:1px solid var(--line); border-radius:10px; padding:9px; font-size:0.8125rem; font-weight:700; text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">✉️ ${escapeHtml(c.email)}</button>`:''}
     </div>`:''}
     ${c.phone?`<div class="row2" style="margin-bottom:14px;">
-      <button class="btn" style="background:var(--blue-dim); color:#1c6fa3;" onclick="sendTemplate('${id}','clean')">💬 Cleaning reminder</button>
+      <button class="btn" style="background:var(--blue-dim); color:var(--blue-deep);" onclick="sendTemplate('${id}','clean')">💬 Cleaning reminder</button>
       <button class="btn" style="background:var(--amber-dim); color:var(--amber);" onclick="sendTemplate('${id}','pay'); openCustomerDetail('${id}');">💬 Payment reminder</button>
     </div>`:''}
     ${c.notes?`<div style="background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:10px 12px; font-size:0.8438rem; margin-bottom:14px;">${escapeHtml(c.notes)}</div>`:''}
@@ -1032,7 +1032,7 @@ function openCustomerDetail(id){
     <button class="btn" style="width:100%; background:${c.paused?'var(--green-dim)':'var(--line)'}; color:${c.paused?'var(--green)':'var(--ink-muted)'}; margin-bottom:10px;" onclick="togglePause('${id}')">
       ${c.paused ? '▶ Resume this customer' : '⏸ Pause this customer (skip due reminders)'}
     </button>
-    <button class="btn" style="width:100%; background:var(--blue-dim); color:#1c6fa3; margin-bottom:20px;" onclick="scheduleJobForCustomer('${id}')">
+    <button class="btn" style="width:100%; background:var(--blue-dim); color:var(--blue-deep); margin-bottom:20px;" onclick="scheduleJobForCustomer('${id}')">
       📋 Schedule a one-off job for this customer
     </button>
     <label style="margin-top:0">Add clean on date</label>
@@ -1747,7 +1747,7 @@ function openQuoteForm(existing){
     ${existing?`<button class="btn-danger-text" onclick="deleteQuote('${existing.id}')">Delete quote</button>`:''}
     ${existing && existing.status!=='converted' ? `
       <div class="section-label">Convert this quote</div>
-      <button class="btn" style="width:100%; background:var(--blue-dim); color:#1c6fa3; margin-bottom:8px;" onclick="openConvertQuoteToCustomer('${existing.id}')">👤 Convert to a customer in a round</button>
+      <button class="btn" style="width:100%; background:var(--blue-dim); color:var(--blue-deep); margin-bottom:8px;" onclick="openConvertQuoteToCustomer('${existing.id}')">👤 Convert to a customer in a round</button>
       <button class="btn" style="width:100%; background:var(--green-dim); color:var(--green); margin-bottom:8px;" onclick="convertQuoteToJob('${existing.id}')">📋 Convert to a one-off job</button>
     ` : ''}
     ${existing && existing.status==='converted' ? `<p style="color:var(--ink-muted); font-size:0.75rem; margin:14px 2px 0;">✅ This quote has already been converted.</p>` : ''}
@@ -1869,8 +1869,23 @@ const THEMES = {
 };
 let themeName = localStorage.getItem('roundBookTheme') || 'ocean';
 
+// Small colour-mixing helpers so every tinted surface in the app (not just
+// the header) can be derived from the two colours a scheme actually defines.
+function hexToRgb(hex){
+  hex = hex.replace('#','');
+  if(hex.length===3) hex = hex.split('').map(c=>c+c).join('');
+  const num = parseInt(hex,16);
+  return [(num>>16)&255, (num>>8)&255, num&255];
+}
+function mixHex(hexA, hexB, weight){
+  const a = hexToRgb(hexA), b = hexToRgb(hexB);
+  const mixed = a.map((v,i)=> v + (b[i]-v)*weight);
+  return '#' + mixed.map(v=>Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,'0')).join('');
+}
+
 function applyDarkMode(){
   document.body.classList.toggle('dark', darkMode);
+  applyTheme();
 }
 function setDarkMode(v){
   darkMode = v;
@@ -1891,8 +1906,17 @@ function setTextSize(v){
 }
 function applyTheme(){
   const t = THEMES[themeName] || THEMES.ocean;
-  document.documentElement.style.setProperty('--navy', t.navy);
-  document.documentElement.style.setProperty('--blue', t.blue);
+  const root = document.documentElement.style;
+  root.setProperty('--navy', t.navy);
+  root.setProperty('--blue', t.blue);
+  // A darker shade of the scheme's navy, used for toasts and other high-emphasis chrome.
+  root.setProperty('--navy-dark', mixHex(t.navy, '#000000', 0.28));
+  // A deepened version of the accent colour, used as readable text on the pale "dim" chips/buttons below.
+  root.setProperty('--blue-deep', mixHex(t.blue, '#000000', 0.32));
+  // The pale tinted background used for chips, quick-action buttons, and banners — mixed
+  // toward white in light mode and toward the dark surface colour in dark mode, so every
+  // scheme gets its own badge colour instead of everything defaulting to ocean-blue.
+  root.setProperty('--blue-dim', darkMode ? mixHex(t.blue, '#0E1620', 0.82) : mixHex(t.blue, '#FFFFFF', 0.86));
   const meta = document.querySelector('meta[name="theme-color"]');
   if(meta) meta.setAttribute('content', t.navy);
 }
@@ -2761,7 +2785,7 @@ function openInfo(){
     <p style="color:var(--ink-muted); font-size:0.7812rem; line-height:1.6; margin:0 2px 10px;">
       Spotted a problem, got an idea for an improvement, or just want to say something about the app? Get in touch — feedback's always welcome.
     </p>
-    <a href="mailto:dmbennison@gmail.com?subject=Round%20Book%20feedback" style="display:block; text-decoration:none; background:var(--blue-dim); color:#1c6fa3; border-radius:12px; padding:12px; text-align:center; font-weight:800; font-size:0.875rem;">✉️ dmbennison@gmail.com</a>
+    <a href="mailto:dmbennison@gmail.com?subject=Round%20Book%20feedback" style="display:block; text-decoration:none; background:var(--blue-dim); color:var(--blue-deep); border-radius:12px; padding:12px; text-align:center; font-weight:800; font-size:0.875rem;">✉️ dmbennison@gmail.com</a>
   `);
 }
 
