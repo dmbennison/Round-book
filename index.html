@@ -95,12 +95,6 @@
   .tab.active{background:rgba(255,255,255,0.14); color:#fff;}
 
   main{padding:14px 14px 100px;}
-  .search-wrap{position:relative; margin-bottom:14px;}
-  .search-wrap svg{position:absolute; left:12px; top:50%; transform:translateY(-50%); width:16px; height:16px; opacity:0.45;}
-  .search-wrap input{
-    width:100%; padding:11px 12px 11px 36px; border-radius:12px; border:1px solid var(--line);
-    background:var(--surface); font-size:0.9375rem; color:var(--ink);
-  }
 
   .section-label{
     font-size:0.6875rem; font-weight:800; text-transform:uppercase; letter-spacing:.06em;
@@ -346,7 +340,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 41;
+const APP_VERSION = 42;
 function formatVersion(v){ return Math.floor(v/10) + '.' + (v%10); }
 const DEFAULT_CLEAN_TEMPLATE = "Hi {name}, just a reminder I'll be round to clean your windows soon. Let me know if that's not convenient. Thanks!";
 const DEFAULT_PAY_TEMPLATE = "Hi {name}, a friendly reminder that your window cleaning payment of {amount} is outstanding. Thanks!";
@@ -479,7 +473,7 @@ function custStatus(c){
 /* ---------- state ---------- */
 let currentTab = 'rounds';
 let currentRound = null;
-let searchQuery = '';
+
 let roundsViewMode = 'overview';
 let reorderMode = false;
 let roundFilterMode = 'all';
@@ -581,28 +575,6 @@ function render(){
   }
 }
 
-function customersMatching(list){
-  if(!searchQuery) return list;
-  const q = searchQuery.toLowerCase();
-  return list.filter(c =>
-    (c.name||'').toLowerCase().includes(q) ||
-    (c.address||'').toLowerCase().includes(q) ||
-    (c.phone||'').toLowerCase().includes(q) ||
-    (c.email||'').toLowerCase().includes(q)
-  );
-}
-
-function searchBar(){
-  return `<div class="search-wrap">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-    <input type="text" id="searchInput" placeholder="Search customers or addresses" value="${escapeAttr(searchQuery)}">
-  </div>`;
-}
-function wireSearch(){
-  const el = document.getElementById('searchInput');
-  if(el) el.oninput = (e)=>{ searchQuery = e.target.value; render(); const f=document.getElementById('searchInput'); if(f){f.focus(); f.setSelectionRange(f.value.length,f.value.length);} };
-}
-
 function renderRoundsList(main){
   const rounds = groupByRound(data.customers);
   const roundNames = Object.keys(rounds).sort((a,b)=>a.localeCompare(b));
@@ -618,7 +590,6 @@ function renderRoundsList(main){
       <div class="stat"><div class="num">${money(overallAvg)}</div><div class="lbl">Avg / customer</div></div>
     </div>`;
   }
-  html += searchBar();
   html += `<div class="seg-row">
     <button class="seg-btn ${roundsViewMode==='overview'?'active':''}" onclick="setRoundsView('overview')">Rounds</button>
     <button class="seg-btn ${roundsViewMode==='due'?'active':''}" onclick="setRoundsView('due')">Due</button>
@@ -627,17 +598,12 @@ function renderRoundsList(main){
 
   if(!roundNames.length){
     main.innerHTML = html + emptyState('rounds');
-    wireSearch();
     return;
   }
 
   if(roundsViewMode === 'overview'){
     html += `<div class="section-label">Your rounds</div>`;
-    let anyShown = false;
     roundNames.forEach(rn=>{
-      const custs = customersMatching(rounds[rn]);
-      if(searchQuery && !custs.length) return;
-      anyShown = true;
       const all = rounds[rn];
       let overdue=0, due=0, owed=0, paused=0;
       all.forEach(c=>{
@@ -662,17 +628,14 @@ function renderRoundsList(main){
         </div>
       </div>`;
     });
-    if(!anyShown && searchQuery){
-      html += emptyState('search');
-    }
   } else if(roundsViewMode === 'due'){
     html += `<div class="swipe-hint">👉 Swipe a card right to mark cleaned, left to mark paid</div>`;
     let anyDue = false;
     roundNames.forEach(rn=>{
-      const dueCusts = customersMatching(rounds[rn].filter(c=>{
+      const dueCusts = rounds[rn].filter(c=>{
         const s = custStatus(c);
         return !c.paused && s.cleanBadge && (s.cleanBadge.type==='due' || s.cleanBadge.type==='overdue');
-      })).sort((a,b)=>{
+      }).sort((a,b)=>{
         const sa=custStatus(a), sb=custStatus(b);
         const rank = x => x.cleanBadge.type==='overdue' ? 0 : 1;
         return rank(sa)-rank(sb);
@@ -698,7 +661,7 @@ function renderRoundsList(main){
     let anyOwed = false;
     let grandTotal = 0;
     roundNames.forEach(rn=>{
-      const owedCusts = customersMatching(rounds[rn].filter(c=>custStatus(c).owed))
+      const owedCusts = rounds[rn].filter(c=>custStatus(c).owed)
         .sort((a,b)=>custStatus(b).balance-custStatus(a).balance);
       if(!owedCusts.length) return;
       anyOwed = true;
@@ -723,7 +686,6 @@ function renderRoundsList(main){
   }
 
   main.innerHTML = html;
-  wireSearch();
 }
 
 function openRound(rn){ currentRound = rn; reorderMode = false; roundFilterMode = 'all'; render(); window.scrollTo(0, 0); }
@@ -782,7 +744,6 @@ function renderRoundDetail(main, rn){
     <button class="seg-btn ${roundFilterMode==='due'?'active':''}" onclick="setRoundFilterMode('due')">📅 Due only</button>
     <button class="seg-btn ${roundFilterMode==='owed'?'active':''}" onclick="setRoundFilterMode('owed')">💷 Owed only</button>
   </div>`;
-  shellHtml += searchBar();
   shellHtml += `<div class="swipe-hint">👉 Swipe a card right to mark cleaned, left to mark paid</div>`;
 
   let baseList = allInRound;
@@ -794,10 +755,9 @@ function renderRoundDetail(main, rn){
   } else if(roundFilterMode === 'owed'){
     baseList = allInRound.filter(c=>custStatus(c).owed);
   }
-  const custs = customersMatching(baseList);
+  const custs = baseList;
   if(!custs.length){
-    main.innerHTML = shellHtml + emptyState(roundFilterMode!=='all' ? 'search' : 'customers');
-    wireSearch();
+    main.innerHTML = shellHtml + emptyState(roundFilterMode!=='all' ? 'filter' : 'customers');
     return;
   }
   shellHtml += custs.map(custCardHtml).join('');
@@ -806,7 +766,6 @@ function renderRoundDetail(main, rn){
     shellHtml += `<div style="text-align:right; font-weight:800; font-size:0.9375rem; color:var(--emphasis); padding:10px 4px 4px;">Total owed: ${money(owedTotal)}</div>`;
   }
   main.innerHTML = shellHtml;
-  wireSearch();
 }
 
 function emptyState(kind){
@@ -820,7 +779,7 @@ function emptyState(kind){
   return `<div class="empty">
     <svg viewBox="0 0 24 24" fill="none" stroke="#66798A" stroke-width="1.6"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
     <b>No matches</b>
-    <p>Try a different search.</p>
+    <p>Try a different filter.</p>
   </div>`;
 }
 
@@ -1426,9 +1385,9 @@ function handleFabClick(){
 
 /* ---------- one-off jobs ---------- */
 function renderJobs(main){
-  let html = searchBar();
+  let html = '';
   const today = todayISO();
-  const jobs = customersMatching(data.oneOffJobs || [])
+  const jobs = (data.oneOffJobs || [])
     .slice()
     .sort((a,b)=>{
       if(!!a.done !== !!b.done) return a.done ? 1 : -1;
@@ -1442,14 +1401,12 @@ function renderJobs(main){
       <p>Tap the blue + button to add a gutter clean, one-time job, or anything outside your regular rounds — you can schedule it for any future date.</p>
     </div>`;
     main.innerHTML = html;
-    wireSearch();
     return;
   }
   html += `<div class="section-label">${jobs.length} one-off job${jobs.length===1?'':'s'}</div>`;
   html += `<div class="swipe-hint">👉 Swipe a card right to mark done, left to mark paid</div>`;
   html += jobs.map(j=>jobCardHtml(j, today)).join('');
   main.innerHTML = html;
-  wireSearch();
 }
 
 function jobCardHtml(j, today){
@@ -1683,8 +1640,8 @@ function deleteJob(id){
 
 /* ---------- quotes ---------- */
 function renderQuotes(main){
-  let html = searchBar();
-  const quotes = customersMatching(data.quotes || [])
+  let html = '';
+  const quotes = (data.quotes || [])
     .slice()
     .sort((a,b)=>{
       const rank = q => q.status==='pending' ? 0 : 1;
@@ -1700,14 +1657,12 @@ function renderQuotes(main){
       <p>Tap the blue + button to note down a quote — you can turn it into a customer or a one-off job later.</p>
     </div>`;
     main.innerHTML = html;
-    wireSearch();
     return;
   }
   html += `<div class="section-label">${quotes.length} quote${quotes.length===1?'':'s'}</div>`;
   html += `<div class="swipe-hint">👉 Swipe a card right to accept, left to decline</div>`;
   html += quotes.map(quoteCardHtml).join('');
   main.innerHTML = html;
-  wireSearch();
 }
 
 function quoteStatusBadge(q){
@@ -2116,12 +2071,37 @@ function printPendingReport(){
 }
 
 function htmlToDocxElements(bodyHtml){
-  const { Paragraph, TextRun, Table, TableRow, TableCell, WidthType, HeadingLevel, ImageRun, TableLayoutType } = docx;
+  const { Paragraph, TextRun, Table, TableRow, TableCell, WidthType, HeadingLevel, ImageRun, TableLayoutType, AlignmentType, BorderStyle } = docx;
   const parsed = new DOMParser().parseFromString(`<div>${bodyHtml}</div>`, 'text/html');
   const root = parsed.body.firstElementChild;
   const elements = [];
-  const textOf = (node) => (node.textContent||'').replace(/\s+/g,' ').trim();
-  const PAGE_WIDTH_DXA = 9026; // usable width for a standard page with normal margins
+  const PAGE_WIDTH_DXA = 9026; // usable width for an A4 page with 1440-twip margins (must match the Document's page setup below)
+
+  // Recursively pulls text out of a cell, inserting a separator wherever the
+  // source HTML has a line break (e.g. "<td>123 Main St<br>John Smith</td>")
+  // or a boundary between child elements/text nodes, so values don't get
+  // smashed together the way plain textContent would.
+  const textOf = (node) => {
+    const parts = [];
+    node.childNodes.forEach(child=>{
+      if(child.nodeType === 3){
+        const t = child.textContent;
+        if(t && t.trim()) parts.push(t.trim());
+      } else if(child.nodeType === 1){
+        if(child.tagName === 'BR'){ parts.push('·'); return; }
+        const t = textOf(child);
+        if(t) parts.push(t);
+      }
+    });
+    return parts.join(' ').replace(/\s+/g,' ').trim();
+  };
+
+  const cellBorder = { style: BorderStyle.SINGLE, size: 4, color: 'D5DBDF' };
+  const tableBorders = {
+    top: cellBorder, bottom: cellBorder, left: cellBorder, right: cellBorder,
+    insideHorizontal: cellBorder, insideVertical: cellBorder
+  };
+  const cellMargins = { top: 60, bottom: 60, left: 100, right: 100 };
 
   Array.from(root.children).forEach(node=>{
     const tag = node.tagName;
@@ -2129,26 +2109,49 @@ function htmlToDocxElements(bodyHtml){
     if(tag === 'TABLE'){
       const trs = Array.from(node.querySelectorAll('tr'));
       let numCols = 0;
-      trs.forEach(tr => { numCols = Math.max(numCols, tr.children.length); });
+      trs.forEach(tr => {
+        let span = 0;
+        Array.from(tr.children).forEach(td => { span += Math.max(1, parseInt(td.getAttribute('colspan')||'1',10)); });
+        numCols = Math.max(numCols, span);
+      });
 
       if(numCols > 0){
-        const colWidth = Math.floor(PAGE_WIDTH_DXA / numCols);
-        const columnWidths = Array(numCols).fill(colWidth);
+        const baseWidth = Math.floor(PAGE_WIDTH_DXA / numCols);
+        const columnWidths = Array(numCols).fill(baseWidth);
+        columnWidths[numCols-1] += PAGE_WIDTH_DXA - (baseWidth * numCols); // give rounding remainder to the last column
         const rows = [];
         trs.forEach(tr=>{
           const cellNodes = Array.from(tr.children);
           if(!cellNodes.length) return;
-          const cells = cellNodes.map(td => new TableCell({
-            children: [new Paragraph({ children: [new TextRun({ text: textOf(td), bold: td.tagName==='TH' })] })],
-            width: { size: colWidth, type: WidthType.DXA }
-          }));
-          rows.push(new TableRow({ children: cells }));
+          const isHeaderRow = cellNodes.some(td => td.tagName === 'TH');
+          let colIndex = 0;
+          const cells = cellNodes.map(td=>{
+            const span = Math.max(1, parseInt(td.getAttribute('colspan')||'1',10));
+            const widthDxa = columnWidths.slice(colIndex, colIndex+span).reduce((a,b)=>a+b,0);
+            colIndex += span;
+            const styleAttr = td.getAttribute('style') || '';
+            const alignRight = /text-align\s*:\s*right/i.test(styleAttr);
+            const isBold = td.tagName==='TH' || /font-weight\s*:\s*(bold|[7-9]00)/i.test(styleAttr);
+            const cellConfig = {
+              children: [new Paragraph({
+                alignment: alignRight ? AlignmentType.RIGHT : undefined,
+                children: [new TextRun({ text: textOf(td), bold: isBold })]
+              })],
+              width: { size: widthDxa, type: WidthType.DXA },
+              margins: cellMargins
+            };
+            if(span > 1) cellConfig.columnSpan = span;
+            if(isHeaderRow) cellConfig.shading = { fill: 'EFF3F5' };
+            return new TableCell(cellConfig);
+          });
+          rows.push(new TableRow({ children: cells, cantSplit: true }));
         });
         if(rows.length){
           const tableConfig = {
             rows,
             columnWidths,
-            width: { size: PAGE_WIDTH_DXA, type: WidthType.DXA }
+            width: { size: PAGE_WIDTH_DXA, type: WidthType.DXA },
+            borders: tableBorders
           };
           if(TableLayoutType && TableLayoutType.FIXED){ tableConfig.layout = TableLayoutType.FIXED; }
           elements.push(new Table(tableConfig));
@@ -2201,7 +2204,15 @@ async function exportPendingReportDocx(){
     const bodyChildren = htmlToDocxElements(pendingReportBody);
 
     const wordDoc = new Document({
-      sections: [{ children: [...headerChildren, ...bodyChildren] }]
+      sections: [{
+        properties: {
+          page: {
+            size: { width: 11906, height: 16838 }, // A4, in twips (DXA)
+            margin: { top: 1440, bottom: 1440, left: 1440, right: 1440 }
+          }
+        },
+        children: [...headerChildren, ...bodyChildren]
+      }]
     });
 
     const blob = await Packer.toBlob(wordDoc);
@@ -3082,3 +3093,4 @@ if ('serviceWorker' in navigator) {
 </script>
 </body>
 </html>
+
