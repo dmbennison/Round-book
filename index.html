@@ -343,7 +343,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 45;
+const APP_VERSION = 46;
 function formatVersion(v){ return Math.floor(v/10) + '.' + (v%10); }
 const DEFAULT_CLEAN_TEMPLATE = "Hi {name}, just a reminder I'll be round to clean your windows soon. Let me know if that's not convenient. Thanks!";
 const DEFAULT_PAY_TEMPLATE = "Hi {name}, a friendly reminder that your window cleaning payment of {amount} is outstanding. Thanks!";
@@ -584,7 +584,7 @@ function renderJobAnniversaryBanner(){
   const yrLabel = y => `${y} year${y===1?'':'s'}`;
   const label = jobs.length === 1
     ? `🎉 ${yrLabel(first.anniversaryYears)} since the job at ${first.address||first.name||'this address'} — worth a follow-up?`
-    : `🎉 ${jobs.length} one-off jobs have their anniversary today — worth a follow-up?`;
+    : `🎉 ${jobs.length} one-off jobs are now 365+ days old — worth a follow-up?`;
   el.innerHTML = `<div style="background:var(--blue-dim); color:var(--blue-deep); border-radius:12px; padding:11px 14px; margin:0 14px 14px; display:flex; align-items:center; justify-content:space-between; gap:10px; font-size:0.8125rem; font-weight:700;">
     <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(label)}</span>
     <span style="display:flex; gap:8px; flex-shrink:0; align-items:center;">
@@ -1500,7 +1500,7 @@ function jobCardHtml(j, today){
         ${statusBadge}
         <span class="badge ${j.paid?'ok':'owed'}">${j.paid?'Paid':'Unpaid'}</span>
         ${(j.photos && j.photos.length) ? `<span class="badge paused">📷 ${j.photos.length}</span>` : ''}
-        ${anniv ? `<span class="badge anniversary">🎉 ${anniv} year${anniv===1?'':'s'} ago today</span>` : ''}
+        ${anniv ? `<span class="badge anniversary">🎉 ${anniv}-year anniversary</span>` : ''}
       </div>
     </div>
   </div>`;
@@ -1508,11 +1508,11 @@ function jobCardHtml(j, today){
 function jobAnniversaryInfo(j, today){
   today = today || todayISO();
   if(!j.done || !j.date) return null;
-  const jd = new Date(j.date+'T00:00:00');
-  const todayD = new Date(today+'T00:00:00');
-  const years = todayD.getFullYear() - jd.getFullYear();
-  if(years >= 1 && jd.getMonth() === todayD.getMonth() && jd.getDate() === todayD.getDate()) return years;
-  return null;
+  const daysSince = daysBetween(j.date, today);
+  if(daysSince < 365) return null;
+  // Calculate which year anniversary this is (1st = 365+, 2nd = 730+, 3rd = 1095+, etc.)
+  const anniversaryYear = Math.floor(daysSince / 365);
+  return anniversaryYear;
 }
 
 function toggleJobDone(id){
@@ -2936,7 +2936,7 @@ function openHelp(){
 
     ${helpH('One-off jobs')}
     ${helpP('For anything outside your regular rounds — a gutter clean, a one-time job, a job from a quote — use the Jobs tab. Swipe a job card right to mark it done, or left to mark it paid. Set a reminder for the day before or the day of the job.')}
-    ${helpNew('Job anniversaries are flagged automatically. When a completed one-off job reaches its one-year anniversary (or two, three...), the job card shows a "X years ago today" badge, and a banner suggests it might be worth a follow-up call.')}
+    ${helpNew('Job anniversaries are flagged automatically. Once a completed one-off job reaches 365+ days old, the job card shows its anniversary badge, and a banner suggests it might be worth a follow-up call — useful for repeat work like annual gutter cleans.')}
 
     ${helpH('Quotes')}
     ${helpP('Log a quote with an address, contact details, price, and notes. Swipe right to accept, left to decline. An accepted quote converts straight into a one-off job or a full customer, without re-typing anything.')}
@@ -2948,7 +2948,7 @@ function openHelp(){
       'Backup reminder — once it\'s been 7+ days since your last backup.',
       'Job reminder — the day before or the day of a job flagged with 🔔.',
       '<b>Quote follow-up</b> — when a pending quote has passed its follow-up window.',
-      '<b>Job anniversary</b> — when a completed one-off job hits a yearly anniversary today.'
+      '<b>Job anniversary</b> — when a completed one-off job reaches 365+ days old.'
     ])}
 
     ${helpH('Reports, printing and Word exports')}
