@@ -121,6 +121,7 @@
   .badge.owed{background:var(--red-dim); color:var(--red);}
   .badge.ok{background:var(--green-dim); color:var(--green);}
   .badge.paused{background:var(--line); color:var(--ink-muted);}
+  .badge.anniversary{background:var(--blue-dim); color:var(--blue-deep);}
   .chev{opacity:0.35;}
 
   .swipe-wrap{position:relative; border-radius:var(--radius); margin-bottom:10px; overflow:hidden;}
@@ -273,7 +274,7 @@
       --ink-muted:#66798A;
       --line:#E3E9EC;
     }
-    header, #backupBanner, #jobReminderBanner, main, .fab, .overlay, #importFile, .toast{
+    header, #backupBanner, #jobReminderBanner, #quoteFollowUpBanner, #jobAnniversaryBanner, main, .fab, .overlay, #importFile, .toast{
       display:none !important;
     }
     .print-area{
@@ -323,6 +324,8 @@
 
 <div id="backupBanner"></div>
 <div id="jobReminderBanner"></div>
+<div id="quoteFollowUpBanner"></div>
+<div id="jobAnniversaryBanner"></div>
 <main id="main"></main>
 
 <button class="fab" onclick="handleFabClick()" aria-label="Add">
@@ -340,7 +343,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 43;
+const APP_VERSION = 44;
 function formatVersion(v){ return Math.floor(v/10) + '.' + (v%10); }
 const DEFAULT_CLEAN_TEMPLATE = "Hi {name}, just a reminder I'll be round to clean your windows soon. Let me know if that's not convenient. Thanks!";
 const DEFAULT_PAY_TEMPLATE = "Hi {name}, a friendly reminder that your window cleaning payment of {amount} is outstanding. Thanks!";
@@ -357,6 +360,7 @@ function migrateData(parsed){
   parsed.quotes.forEach(q=>{
     if(!q.status) q.status = 'pending';
     if(q.date === undefined) q.date = todayISO();
+    if(q.followUpDays == null) q.followUpDays = 7;
   });
   parsed.settings = parsed.settings || {};
   if(!parsed.settings.cleanTemplate) parsed.settings.cleanTemplate = DEFAULT_CLEAN_TEMPLATE;
@@ -481,6 +485,8 @@ let darkMode = localStorage.getItem('roundBookDark') === '1';
 let textSize = localStorage.getItem('roundBookTextSize') || 'medium';
 let bannerDismissed = false;
 let jobReminderDismissed = false;
+let quoteFollowUpDismissed = false;
+let jobAnniversaryDismissed = false;
 const BACKUP_REMINDER_DAYS = 7;
 
 function daysSinceBackup(){
@@ -530,6 +536,64 @@ function renderJobReminderBanner(){
   </div>`;
 }
 
+function quoteNeedsFollowUp(q, today){
+  today = today || todayISO();
+  if(!q || q.status !== 'pending' || !q.date) return false;
+  const followUpDays = q.followUpDays != null ? q.followUpDays : 7;
+  return daysBetween(q.date, today) >= followUpDays;
+}
+function quotesNeedingFollowUp(){
+  const today = todayISO();
+  return (data.quotes||[]).filter(q => quoteNeedsFollowUp(q, today));
+}
+function dismissQuoteFollowUp(){ quoteFollowUpDismissed = true; renderQuoteFollowUpBanner(); }
+function renderQuoteFollowUpBanner(){
+  const el = document.getElementById('quoteFollowUpBanner');
+  if(!el) return;
+  if(quoteFollowUpDismissed){ el.innerHTML = ''; return; }
+  const quotes = quotesNeedingFollowUp();
+  if(!quotes.length){ el.innerHTML = ''; return; }
+  const first = quotes[0];
+  const label = quotes.length === 1
+    ? `🕐 Still pending: ${first.address||first.name||'Quote'} — follow up now`
+    : `🕐 ${quotes.length} quotes are overdue for a follow-up`;
+  el.innerHTML = `<div style="background:var(--amber-dim); color:var(--amber); border-radius:12px; padding:11px 14px; margin:0 14px 14px; display:flex; align-items:center; justify-content:space-between; gap:10px; font-size:0.8125rem; font-weight:700;">
+    <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(label)}</span>
+    <span style="display:flex; gap:8px; flex-shrink:0; align-items:center;">
+      <button onclick="setTab('quotes'); dismissQuoteFollowUp();" style="background:var(--amber); color:#fff; border:none; border-radius:8px; padding:6px 10px; font-weight:800; font-size:0.7812rem;">View</button>
+      <button onclick="dismissQuoteFollowUp()" style="background:none; border:none; color:var(--amber); font-weight:800; font-size:1rem; line-height:1; padding:0 2px;">✕</button>
+    </span>
+  </div>`;
+}
+
+function jobAnniversariesToday(){
+  const today = todayISO();
+  return (data.oneOffJobs||[]).map(j=>{
+    const years = jobAnniversaryInfo(j, today);
+    return years ? Object.assign({}, j, { anniversaryYears: years }) : null;
+  }).filter(Boolean);
+}
+function dismissJobAnniversary(){ jobAnniversaryDismissed = true; renderJobAnniversaryBanner(); }
+function renderJobAnniversaryBanner(){
+  const el = document.getElementById('jobAnniversaryBanner');
+  if(!el) return;
+  if(jobAnniversaryDismissed){ el.innerHTML = ''; return; }
+  const jobs = jobAnniversariesToday();
+  if(!jobs.length){ el.innerHTML = ''; return; }
+  const first = jobs[0];
+  const yrLabel = y => `${y} year${y===1?'':'s'}`;
+  const label = jobs.length === 1
+    ? `🎉 ${yrLabel(first.anniversaryYears)} since the job at ${first.address||first.name||'this address'} — worth a follow-up?`
+    : `🎉 ${jobs.length} one-off jobs have their anniversary today — worth a follow-up?`;
+  el.innerHTML = `<div style="background:var(--blue-dim); color:var(--blue-deep); border-radius:12px; padding:11px 14px; margin:0 14px 14px; display:flex; align-items:center; justify-content:space-between; gap:10px; font-size:0.8125rem; font-weight:700;">
+    <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(label)}</span>
+    <span style="display:flex; gap:8px; flex-shrink:0; align-items:center;">
+      <button onclick="setTab('jobs'); dismissJobAnniversary();" style="background:var(--blue-deep); color:#fff; border:none; border-radius:8px; padding:6px 10px; font-weight:800; font-size:0.7812rem;">View</button>
+      <button onclick="dismissJobAnniversary()" style="background:none; border:none; color:var(--blue-deep); font-weight:800; font-size:1rem; line-height:1; padding:0 2px;">✕</button>
+    </span>
+  </div>`;
+}
+
 function sortByRoute(custs){
   return custs.slice().sort((a,b)=>{
     const oa = a.order!=null ? a.order : 9999;
@@ -561,6 +625,8 @@ function moveInRound(id, direction){
 function render(){
   renderBackupBanner();
   renderJobReminderBanner();
+  renderQuoteFollowUpBanner();
+  renderJobAnniversaryBanner();
   const main = document.getElementById('main');
   main.innerHTML = '';
 
@@ -1417,6 +1483,7 @@ function jobCardHtml(j, today){
     : isFuture
       ? `<span class="badge due">Scheduled</span>`
       : `<span class="badge overdue">Not done</span>`;
+  const anniv = jobAnniversaryInfo(j, today);
   return `<div class="swipe-wrap">
     <div class="swipe-bg swipe-bg-left">✓ Done</div>
     <div class="swipe-bg swipe-bg-right">💷 Paid</div>
@@ -1433,9 +1500,19 @@ function jobCardHtml(j, today){
         ${statusBadge}
         <span class="badge ${j.paid?'ok':'owed'}">${j.paid?'Paid':'Unpaid'}</span>
         ${(j.photos && j.photos.length) ? `<span class="badge paused">📷 ${j.photos.length}</span>` : ''}
+        ${anniv ? `<span class="badge anniversary">🎉 ${anniv} year${anniv===1?'':'s'} ago today</span>` : ''}
       </div>
     </div>
   </div>`;
+}
+function jobAnniversaryInfo(j, today){
+  today = today || todayISO();
+  if(!j.done || !j.date) return null;
+  const jd = new Date(j.date+'T00:00:00');
+  const todayD = new Date(today+'T00:00:00');
+  const years = todayD.getFullYear() - jd.getFullYear();
+  if(years >= 1 && jd.getMonth() === todayD.getMonth() && jd.getDate() === todayD.getDate()) return years;
+  return null;
 }
 
 function toggleJobDone(id){
@@ -1641,13 +1718,14 @@ function deleteJob(id){
 /* ---------- quotes ---------- */
 function renderQuotes(main){
   let html = '';
+  const todayForSort = todayISO();
   const quotes = (data.quotes || [])
     .slice()
     .sort((a,b)=>{
-      const rank = q => q.status==='pending' ? 0 : 1;
+      const rank = q => q.status!=='pending' ? 2 : (quoteNeedsFollowUp(q, todayForSort) ? 0 : 1);
       const ra = rank(a), rb = rank(b);
       if(ra !== rb) return ra - rb;
-      if(ra === 0) return (a.date||'').localeCompare(b.date||'');
+      if(ra <= 1) return (a.date||'').localeCompare(b.date||'');
       return (b.date||'').localeCompare(a.date||'');
     });
   if(!quotes.length){
@@ -1673,6 +1751,8 @@ function quoteStatusBadge(q){
 }
 
 function quoteCardHtml(q){
+  const today = todayISO();
+  const needsFollowUp = quoteNeedsFollowUp(q, today);
   return `<div class="swipe-wrap">
     <div class="swipe-bg swipe-bg-left">✓ Accept</div>
     <div class="swipe-bg swipe-bg-right">✕ Decline</div>
@@ -1687,6 +1767,7 @@ function quoteCardHtml(q){
       </div>
       <div class="cust-meta">
         ${quoteStatusBadge(q)}
+        ${needsFollowUp ? `<span class="badge overdue">⏰ Follow up — ${daysBetween(q.date, today)}d since quoted</span>` : ''}
       </div>
     </div>
   </div>`;
@@ -1732,6 +1813,8 @@ function openQuoteForm(existing){
     <input type="date" id="q_date" value="${q.date||todayISO()}">
     <label>Quoted price</label>
     <input type="number" id="q_price" value="${q.price!=null?q.price:''}" placeholder="£" min="0" step="0.5">
+    <label>Follow up after <span style="text-transform:none; font-weight:500; opacity:0.7;">(days, if still pending)</span></label>
+    <input type="number" id="q_followup" value="${q.followUpDays!=null?q.followUpDays:7}" min="0" step="1">
     <label>Notes</label>
     <textarea id="q_notes" rows="2" placeholder="Access notes, size of job...">${escapeHtml(q.notes||'')}</textarea>
     <label style="margin-top:0;">Status</label>
@@ -1772,6 +1855,7 @@ function saveQuoteForm(id){
     email: document.getElementById('q_email').value.trim(),
     date: document.getElementById('q_date').value || todayISO(),
     price: parseFloat(document.getElementById('q_price').value) || 0,
+    followUpDays: (()=>{ const v = parseInt(document.getElementById('q_followup').value,10); return Number.isFinite(v) && v>=0 ? v : 7; })(),
     notes: document.getElementById('q_notes').value.trim(),
     status: document.getElementById('q_status').value || 'pending'
   };
