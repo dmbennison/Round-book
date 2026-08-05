@@ -47,8 +47,6 @@
   *{box-sizing:border-box; -webkit-tap-highlight-color: transparent;}
   html,body{height:100%;}
   html{font-size:18px;}
-  html.text-small{font-size:16px;}
-  html.text-large{font-size:22px;}
   body{
     margin:0;
     background:var(--bg);
@@ -343,7 +341,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 46;
+const APP_VERSION = 47;
 function formatVersion(v){ return Math.floor(v/10) + '.' + (v%10); }
 const DEFAULT_CLEAN_TEMPLATE = "Hi {name}, just a reminder I'll be round to clean your windows soon. Let me know if that's not convenient. Thanks!";
 const DEFAULT_PAY_TEMPLATE = "Hi {name}, a friendly reminder that your window cleaning payment of {amount} is outstanding. Thanks!";
@@ -482,7 +480,7 @@ let roundsViewMode = 'overview';
 let reorderMode = false;
 let roundFilterMode = 'all';
 let darkMode = localStorage.getItem('roundBookDark') === '1';
-let textSize = localStorage.getItem('roundBookTextSize') || 'medium';
+let textSize = (()=>{ const v = parseInt(localStorage.getItem('roundBookTextSize'),10); return (Number.isFinite(v) && v>=15 && v<=24) ? v : 18; })();
 let bannerDismissed = false;
 let jobReminderDismissed = false;
 let quoteFollowUpDismissed = false;
@@ -1978,13 +1976,18 @@ function setDarkMode(v){
   openSettings();
 }
 function applyTextSize(){
-  document.documentElement.classList.remove('text-small','text-large');
-  if(textSize === 'small') document.documentElement.classList.add('text-small');
-  else if(textSize === 'large') document.documentElement.classList.add('text-large');
+  document.documentElement.style.fontSize = textSize + 'px';
+}
+function previewTextSize(v){
+  const n = Math.max(15, Math.min(24, parseInt(v,10) || 18));
+  document.documentElement.style.fontSize = n + 'px';
+  const label = document.getElementById('textSizeLabel');
+  if(label) label.textContent = n + 'px';
 }
 function setTextSize(v){
-  textSize = v;
-  localStorage.setItem('roundBookTextSize', v);
+  const n = Math.max(15, Math.min(24, parseInt(v,10) || 18));
+  textSize = n;
+  localStorage.setItem('roundBookTextSize', String(n));
   applyTextSize();
   openSettings();
 }
@@ -2023,10 +2026,11 @@ function openSettings(){
       <button class="seg-btn ${darkMode?'active':''}" onclick="setDarkMode(true)">🌙 Dark</button>
     </div>
     <div class="section-label">Text size</div>
-    <div class="seg-row">
-      <button class="seg-btn ${textSize==='small'?'active':''}" onclick="setTextSize('small')" style="font-size:0.75rem;">Small</button>
-      <button class="seg-btn ${textSize==='medium'?'active':''}" onclick="setTextSize('medium')" style="font-size:0.875rem;">Medium</button>
-      <button class="seg-btn ${textSize==='large'?'active':''}" onclick="setTextSize('large')" style="font-size:1rem;">Large</button>
+    <div style="display:flex; align-items:center; gap:10px; margin:4px 2px 16px;">
+      <span style="font-size:0.75rem; color:var(--ink-muted); flex-shrink:0;">A</span>
+      <input type="range" min="15" max="24" step="1" value="${textSize}" oninput="previewTextSize(this.value)" onchange="setTextSize(this.value)" style="flex:1; accent-color:var(--blue);">
+      <span style="font-size:1.375rem; color:var(--ink-muted); flex-shrink:0; line-height:1;">A</span>
+      <span id="textSizeLabel" style="font-size:0.75rem; font-weight:800; color:var(--ink); min-width:34px; text-align:right; flex-shrink:0;">${textSize}px</span>
     </div>
     <div class="section-label">Colour scheme</div>
     <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:16px;">
@@ -2892,12 +2896,6 @@ function helpList(items){
     `<li style="display:flex; gap:8px; color:var(--ink); font-size:0.8438rem; line-height:1.55; margin:0 2px 8px;"><span style="color:var(--blue); flex-shrink:0;">•</span><span>${it}</span></li>`
   ).join('')}</ul>`;
 }
-function helpNew(text){
-  return `<div style="display:flex; gap:10px; align-items:flex-start; background:var(--blue-dim); color:var(--blue-deep); border-radius:12px; padding:12px 14px; margin:0 2px 16px; font-size:0.8281rem; line-height:1.55;">
-    <span style="background:var(--blue-deep); color:#fff; font-size:0.625rem; font-weight:800; letter-spacing:0.04em; border-radius:6px; padding:2px 6px; flex-shrink:0; margin-top:2px;">NEW</span>
-    <span>${text}</span>
-  </div>`;
-}
 function helpRow(left, right){
   return `<div style="display:flex; justify-content:space-between; gap:12px; align-items:center; padding:10px 2px; border-bottom:1px solid var(--line);">
     <span style="font-size:0.8125rem; font-weight:700; color:var(--ink);">${left}</span>
@@ -2936,11 +2934,11 @@ function openHelp(){
 
     ${helpH('One-off jobs')}
     ${helpP('For anything outside your regular rounds — a gutter clean, a one-time job, a job from a quote — use the Jobs tab. Swipe a job card right to mark it done, or left to mark it paid. Set a reminder for the day before or the day of the job.')}
-    ${helpNew('Job anniversaries are flagged automatically. Once a completed one-off job reaches 365+ days old, the job card shows its anniversary badge, and a banner suggests it might be worth a follow-up call — useful for repeat work like annual gutter cleans.')}
+    ${helpP('Job anniversaries are flagged automatically. Once a completed one-off job reaches 365+ days old, the job card shows its anniversary badge, and a banner suggests it might be worth a follow-up call — useful for repeat work like annual gutter cleans.')}
 
     ${helpH('Quotes')}
     ${helpP('Log a quote with an address, contact details, price, and notes. Swipe right to accept, left to decline. An accepted quote converts straight into a one-off job or a full customer, without re-typing anything.')}
-    ${helpNew('Every quote has a "follow up after" field, in days, defaulting to 7. A quote still Pending once that many days have passed gets an amber "Follow up" badge, sorts to the top of the list, and triggers a banner. Change the number of days per quote if some jobs need a longer or shorter chase-up window.')}
+    ${helpP('Every quote has a "follow up after" field, in days, defaulting to 7. A quote still Pending once that many days have passed gets an amber "Follow up" badge, sorts to the top of the list, and triggers a banner. Change the number of days per quote if some jobs need a longer or shorter chase-up window.')}
 
     ${helpH('Reminders and banners')}
     ${helpP('A few things are surfaced proactively as a coloured banner across the top of the app, each with a "View" button and a dismiss (✕). Dismissing hides it for the rest of the visit; it reappears next time you open the app if still true.')}
@@ -2976,7 +2974,7 @@ function openHelp(){
     ${helpH('Settings')}
     ${helpList([
       '<b>Appearance</b> — Light or Dark.',
-      '<b>Text size</b> — Small, Medium or Large.',
+      '<b>Text size</b> — a slider from small to large, so you can pick exactly the size that suits you.',
       '<b>Colour scheme</b> — six schemes (Ocean, Slate, Teal, Plum, Rust, Berry) recolour the whole app, not just the header.',
       '<b>Company name</b> — shown on printed reports and available as the {company} token in messages.',
       '<b>Text message templates</b> — wording for cleaning reminders, payment reminders and receipts, using {name}, {amount}, {date} and {company} tokens.'
