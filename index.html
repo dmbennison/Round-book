@@ -341,13 +341,13 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 49;
+const APP_VERSION = 50;
 function formatVersion(v){ return Math.floor(v/10) + '.' + (v%10); }
-const DEFAULT_CLEAN_TEMPLATE = "Hi {name}, just a reminder I'll be round to clean your windows soon. Let me know if that's not convenient. Thanks!";
-const DEFAULT_PAY_TEMPLATE = "Hi {name}, a friendly reminder that your window cleaning payment of {amount} is outstanding. Thanks!";
-const DEFAULT_RECEIPT_TEMPLATE = "Hi {name}, thank you for your payment of {amount} received {date}. {company}";
-const DEFAULT_QUOTE_TEMPLATE = "Hi {name}, thanks for asking about window cleaning. I'd quote {amount} for this job — let me know if you'd like to go ahead. Thanks, {yourname}";
-const DEFAULT_REPEAT_QUOTE_TEMPLATE = "Hi {name}, great to clean for you again. For regular cleans I'd quote {amount} — let me know if you'd like to set up a round. Thanks, {yourname}";
+const DEFAULT_CLEAN_TEMPLATE = "Hi {name}, just a reminder I'll be round to clean your windows soon. Let me know if that's not convenient.\n\nThanks,\n{yourname}\n{company}";
+const DEFAULT_PAY_TEMPLATE = "Hi {name}, a friendly reminder that your window cleaning payment of {amount} is outstanding.\n\nThanks,\n{yourname}\n{company}";
+const DEFAULT_RECEIPT_TEMPLATE = "Hi {name}, thank you for your payment of {amount} received {date}.\n\nThanks,\n{yourname}\n{company}";
+const DEFAULT_QUOTE_TEMPLATE = "Hi {name}, thanks for asking about window cleaning. I'd quote {amount} for this job — let me know if you'd like to go ahead.\n\nThanks,\n{yourname}\n{company}";
+const DEFAULT_REPEAT_QUOTE_TEMPLATE = "Hi {name}, hope you're well! I cleaned your windows for you before and wondered if you'd like the same job done again? I'd quote {amount}, same as last time — just let me know and I'll get you booked back in.\n\nThanks,\n{yourname}\n{company}";
 function migrateData(parsed){
   parsed.customers = parsed.customers || [];
   parsed.oneOffJobs = parsed.oneOffJobs || [];
@@ -363,11 +363,22 @@ function migrateData(parsed){
     if(q.followUpDays == null) q.followUpDays = 7;
   });
   parsed.settings = parsed.settings || {};
-  if(!parsed.settings.cleanTemplate) parsed.settings.cleanTemplate = DEFAULT_CLEAN_TEMPLATE;
-  if(!parsed.settings.payTemplate) parsed.settings.payTemplate = DEFAULT_PAY_TEMPLATE;
-  if(!parsed.settings.receiptTemplate) parsed.settings.receiptTemplate = DEFAULT_RECEIPT_TEMPLATE;
-  if(!parsed.settings.quoteTemplate) parsed.settings.quoteTemplate = DEFAULT_QUOTE_TEMPLATE;
-  if(!parsed.settings.repeatQuoteTemplate) parsed.settings.repeatQuoteTemplate = DEFAULT_REPEAT_QUOTE_TEMPLATE;
+  // Auto-upgrade template wording that still matches an earlier built-in default (i.e. the user
+  // never customised it) so improvements to the default wording reach existing installs too.
+  // Anything that doesn't match a known-old default is a real customisation and is left alone.
+  const OLD_CLEAN_TEMPLATES = ["Hi {name}, just a reminder I'll be round to clean your windows soon. Let me know if that's not convenient. Thanks!"];
+  const OLD_PAY_TEMPLATES = ["Hi {name}, a friendly reminder that your window cleaning payment of {amount} is outstanding. Thanks!"];
+  const OLD_RECEIPT_TEMPLATES = ["Hi {name}, thank you for your payment of {amount} received {date}. {company}"];
+  const OLD_QUOTE_TEMPLATES = [
+    "Hi {name}, thanks for asking about window cleaning. I'd quote {amount} for this job — let me know if you'd like to go ahead. {company}",
+    "Hi {name}, thanks for asking about window cleaning. I'd quote {amount} for this job — let me know if you'd like to go ahead. Thanks, {yourname}"
+  ];
+  const OLD_REPEAT_QUOTE_TEMPLATES = ["Hi {name}, great to clean for you again. For regular cleans I'd quote {amount} — let me know if you'd like to set up a round. Thanks, {yourname}"];
+  if(!parsed.settings.cleanTemplate || OLD_CLEAN_TEMPLATES.includes(parsed.settings.cleanTemplate)) parsed.settings.cleanTemplate = DEFAULT_CLEAN_TEMPLATE;
+  if(!parsed.settings.payTemplate || OLD_PAY_TEMPLATES.includes(parsed.settings.payTemplate)) parsed.settings.payTemplate = DEFAULT_PAY_TEMPLATE;
+  if(!parsed.settings.receiptTemplate || OLD_RECEIPT_TEMPLATES.includes(parsed.settings.receiptTemplate)) parsed.settings.receiptTemplate = DEFAULT_RECEIPT_TEMPLATE;
+  if(!parsed.settings.quoteTemplate || OLD_QUOTE_TEMPLATES.includes(parsed.settings.quoteTemplate)) parsed.settings.quoteTemplate = DEFAULT_QUOTE_TEMPLATE;
+  if(!parsed.settings.repeatQuoteTemplate || OLD_REPEAT_QUOTE_TEMPLATES.includes(parsed.settings.repeatQuoteTemplate)) parsed.settings.repeatQuoteTemplate = DEFAULT_REPEAT_QUOTE_TEMPLATE;
   if(parsed.settings.companyName == null) parsed.settings.companyName = '';
   parsed.customers.forEach(c=>{
     if(c.frequencyWeeks == null){
