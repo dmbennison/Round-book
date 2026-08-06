@@ -341,12 +341,13 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 48;
+const APP_VERSION = 49;
 function formatVersion(v){ return Math.floor(v/10) + '.' + (v%10); }
 const DEFAULT_CLEAN_TEMPLATE = "Hi {name}, just a reminder I'll be round to clean your windows soon. Let me know if that's not convenient. Thanks!";
 const DEFAULT_PAY_TEMPLATE = "Hi {name}, a friendly reminder that your window cleaning payment of {amount} is outstanding. Thanks!";
 const DEFAULT_RECEIPT_TEMPLATE = "Hi {name}, thank you for your payment of {amount} received {date}. {company}";
-const DEFAULT_QUOTE_TEMPLATE = "Hi {name}, thanks for asking about window cleaning. I'd quote {amount} for this job — let me know if you'd like to go ahead. {company}";
+const DEFAULT_QUOTE_TEMPLATE = "Hi {name}, thanks for asking about window cleaning. I'd quote {amount} for this job — let me know if you'd like to go ahead. Thanks, {yourname}";
+const DEFAULT_REPEAT_QUOTE_TEMPLATE = "Hi {name}, great to clean for you again. For regular cleans I'd quote {amount} — let me know if you'd like to set up a round. Thanks, {yourname}";
 function migrateData(parsed){
   parsed.customers = parsed.customers || [];
   parsed.oneOffJobs = parsed.oneOffJobs || [];
@@ -366,6 +367,7 @@ function migrateData(parsed){
   if(!parsed.settings.payTemplate) parsed.settings.payTemplate = DEFAULT_PAY_TEMPLATE;
   if(!parsed.settings.receiptTemplate) parsed.settings.receiptTemplate = DEFAULT_RECEIPT_TEMPLATE;
   if(!parsed.settings.quoteTemplate) parsed.settings.quoteTemplate = DEFAULT_QUOTE_TEMPLATE;
+  if(!parsed.settings.repeatQuoteTemplate) parsed.settings.repeatQuoteTemplate = DEFAULT_REPEAT_QUOTE_TEMPLATE;
   if(parsed.settings.companyName == null) parsed.settings.companyName = '';
   parsed.customers.forEach(c=>{
     if(c.frequencyWeeks == null){
@@ -1303,7 +1305,8 @@ function applyTemplate(tpl, tokens){
     .replace(/\{name\}/g, tokens.name || 'there')
     .replace(/\{amount\}/g, tokens.amount != null ? money(tokens.amount) : '')
     .replace(/\{company\}/g, tokens.company || '')
-    .replace(/\{date\}/g, tokens.date || '');
+    .replace(/\{date\}/g, tokens.date || '')
+    .replace(/\{yourname\}/g, tokens.yourname || '');
 }
 
 function sendReceipt(id, dateISO, amount){
@@ -1312,8 +1315,9 @@ function sendReceipt(id, dateISO, amount){
   if(!c.phone && !c.email){ toast('No phone or email saved for this customer'); return; }
   const firstName = c.name ? c.name.trim().split(' ')[0] : '';
   const company = data.settings.companyName || '';
+  const yourname = data.settings.yourName || '';
   const msg = applyTemplate(data.settings.receiptTemplate, {
-    name: firstName, amount: Number(amount), company, date: fmtDate(dateISO)
+    name: firstName, amount: Number(amount), company, date: fmtDate(dateISO), yourname
   });
   if(c.phone){
     const phone = c.phone.replace(/\s+/g,'');
@@ -1331,8 +1335,9 @@ function sendJobReceipt(id){
   if(!j.phone){ toast('No phone number saved for this job'); return; }
   const firstName = j.name ? j.name.trim().split(' ')[0] : '';
   const company = data.settings.companyName || '';
+  const yourname = data.settings.yourName || '';
   const msg = applyTemplate(data.settings.receiptTemplate, {
-    name: firstName, amount: Number(j.price||0), company, date: fmtDate(j.date)
+    name: firstName, amount: Number(j.price||0), company, date: fmtDate(j.date), yourname
   });
   const phone = j.phone.replace(/\s+/g,'');
   const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
@@ -1346,8 +1351,10 @@ function sendQuoteText(id){
   if(!q.phone && !q.email){ toast('No phone or email saved for this quote'); return; }
   const firstName = q.name ? q.name.trim().split(' ')[0] : '';
   const company = data.settings.companyName || '';
-  const msg = applyTemplate(data.settings.quoteTemplate, {
-    name: firstName, amount: Number(q.price||0), company, date: fmtDate(q.date)
+  const yourname = data.settings.yourName || '';
+  const tpl = q.fromJobId ? data.settings.repeatQuoteTemplate : data.settings.quoteTemplate;
+  const msg = applyTemplate(tpl, {
+    name: firstName, amount: Number(q.price||0), company, date: fmtDate(q.date), yourname
   });
   if(q.phone){
     const phone = q.phone.replace(/\s+/g,'');
@@ -1364,13 +1371,14 @@ function sendTemplate(id, kind){
   if(!c.phone){ toast('No phone number saved for this customer'); return; }
   const firstName = c.name ? c.name.trim().split(' ')[0] : '';
   const company = data.settings.companyName || '';
+  const yourname = data.settings.yourName || '';
   let msg;
   if(kind === 'clean'){
-    msg = applyTemplate(data.settings.cleanTemplate, {name: firstName, company});
+    msg = applyTemplate(data.settings.cleanTemplate, {name: firstName, company, yourname});
   } else {
     const s = custStatus(c);
     const amt = s.owed ? s.balance : c.price;
-    msg = applyTemplate(data.settings.payTemplate, {name: firstName, amount: amt, company});
+    msg = applyTemplate(data.settings.payTemplate, {name: firstName, amount: amt, company, yourname});
     c.paymentReminderSent = true;
     c.paymentReminderSentDate = todayISO();
     saveData();
@@ -1790,6 +1798,7 @@ function quoteCardHtml(q){
       </div>
       <div class="cust-meta">
         ${quoteStatusBadge(q)}
+        ${q.fromJobId ? `<span class="badge anniversary">🔁 Repeat work</span>` : ''}
         ${needsFollowUp ? `<span class="badge overdue">⏰ Follow up — ${daysBetween(q.date, today)}d since quoted</span>` : ''}
       </div>
     </div>
@@ -1849,7 +1858,7 @@ function openQuoteForm(existing, prefill){
       <button class="seg-btn ${q.status==='declined'?'active':''}" onclick="setQuoteStatusField('declined', this)">Declined</button>
     </div>
     <input type="hidden" id="q_status" value="${q.status||'pending'}">
-    ${existing && (existing.phone || existing.email) ? `<button class="btn" style="width:100%; background:var(--amber-dim); color:var(--amber); margin-top:14px;" onclick="sendQuoteText('${existing.id}')">💬 ${existing.phone?'Send quote by text':'Send quote by email'}</button>` : ''}
+    ${existing && (existing.phone || existing.email) ? `<button class="btn" style="width:100%; background:var(--amber-dim); color:var(--amber); margin-top:14px;" onclick="sendQuoteText('${existing.id}')">💬 ${existing.phone?'Send quote by text':'Send quote by email'}${existing.fromJobId?' (repeat work)':''}</button>` : ''}
     <div class="form-actions">
       <button class="btn-primary" onclick="saveQuoteForm('${existing?existing.id:''}')">${existing?'Save changes':'Add quote'}</button>
     </div>
@@ -2082,16 +2091,21 @@ function openSettings(){
     <div class="section-label">Company name</div>
     <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 10px; line-height:1.5;">Shown on printed reports, and available as the <b>{company}</b> token in text messages.</p>
     <input type="text" id="companyNameInput" value="${escapeAttr(data.settings.companyName||'')}" placeholder="e.g. Darren's Window Cleaning">
+    <div class="section-label">Your name</div>
+    <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 10px; line-height:1.5;">Used to sign off texts more personally — available as the <b>{yourname}</b> token.</p>
+    <input type="text" id="yourNameInput" value="${escapeAttr(data.settings.yourName||'')}" placeholder="e.g. Dave">
     <div class="section-label">Text message templates</div>
-    <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 12px; line-height:1.5;">Use <b>{name}</b> for the customer's first name, <b>{amount}</b> for the amount, <b>{date}</b> for the payment date (receipts only), and <b>{company}</b> for your company name.</p>
+    <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 12px; line-height:1.5;">Use <b>{name}</b> for the customer's first name, <b>{amount}</b> for the amount, <b>{date}</b> for the payment date (receipts only), <b>{company}</b> for your company name, and <b>{yourname}</b> for your own name.</p>
     <label style="margin-top:0;">Cleaning reminder</label>
     <textarea id="tpl_clean" rows="3">${escapeHtml(data.settings.cleanTemplate)}</textarea>
     <label>Payment reminder</label>
     <textarea id="tpl_pay" rows="3">${escapeHtml(data.settings.payTemplate)}</textarea>
     <label>Receipt</label>
     <textarea id="tpl_receipt" rows="3">${escapeHtml(data.settings.receiptTemplate)}</textarea>
-    <label>Quote</label>
+    <label>Quote <span style="text-transform:none; font-weight:500; opacity:0.7;">(new enquiry)</span></label>
     <textarea id="tpl_quote" rows="3">${escapeHtml(data.settings.quoteTemplate)}</textarea>
+    <label>Quote <span style="text-transform:none; font-weight:500; opacity:0.7;">(repeat work)</span></label>
+    <textarea id="tpl_repeat_quote" rows="3">${escapeHtml(data.settings.repeatQuoteTemplate)}</textarea>
     <div class="form-actions">
       <button class="btn-primary" onclick="saveTemplates()">Save settings</button>
     </div>
@@ -2103,7 +2117,9 @@ function saveTemplates(){
   data.settings.payTemplate = document.getElementById('tpl_pay').value.trim() || DEFAULT_PAY_TEMPLATE;
   data.settings.receiptTemplate = document.getElementById('tpl_receipt').value.trim() || DEFAULT_RECEIPT_TEMPLATE;
   data.settings.quoteTemplate = document.getElementById('tpl_quote').value.trim() || DEFAULT_QUOTE_TEMPLATE;
+  data.settings.repeatQuoteTemplate = document.getElementById('tpl_repeat_quote').value.trim() || DEFAULT_REPEAT_QUOTE_TEMPLATE;
   data.settings.companyName = document.getElementById('companyNameInput').value.trim();
+  data.settings.yourName = document.getElementById('yourNameInput').value.trim();
   saveData();
   toast('Settings saved');
   closeSheet();
@@ -2113,6 +2129,7 @@ function resetTemplates(){
   data.settings.payTemplate = DEFAULT_PAY_TEMPLATE;
   data.settings.receiptTemplate = DEFAULT_RECEIPT_TEMPLATE;
   data.settings.quoteTemplate = DEFAULT_QUOTE_TEMPLATE;
+  data.settings.repeatQuoteTemplate = DEFAULT_REPEAT_QUOTE_TEMPLATE;
   saveData();
   openSettings();
   toast('Reset to default wording');
@@ -2980,7 +2997,7 @@ function openHelp(){
     ${helpH('Quotes')}
     ${helpP('Log a quote with an address, contact details, price, and notes. Swipe right to accept, left to decline. An accepted quote converts straight into a one-off job or a full customer, without re-typing anything.')}
     ${helpP('Every quote has a "follow up after" field, in days, defaulting to 7. A quote still Pending once that many days have passed gets an amber "Follow up" badge, sorts to the top of the list, and triggers a banner. Change the number of days per quote if some jobs need a longer or shorter chase-up window.')}
-    ${helpP('Open an existing quote with a phone number or email saved and tap "Send quote by text" (or "by email") to send it straight to the customer, using the Quote message template from Settings.')}
+    ${helpP('Open an existing quote with a phone number or email saved and tap "Send quote by text" (or "by email") to send it straight to the customer. Quotes converted from a one-off job automatically use the separate "repeat work" template, so the wording can reflect that they\'re already a customer.')}
 
     ${helpH('Reminders and banners')}
     ${helpP('A few things are surfaced proactively as a coloured banner across the top of the app, each with a "View" button and a dismiss (✕). Dismissing hides it for the rest of the visit; it reappears next time you open the app if still true.')}
@@ -3019,7 +3036,8 @@ function openHelp(){
       '<b>Text size</b> — a slider from small to large, so you can pick exactly the size that suits you.',
       '<b>Colour scheme</b> — six schemes (Ocean, Slate, Teal, Plum, Rust, Berry) recolour the whole app, not just the header.',
       '<b>Company name</b> — shown on printed reports and available as the {company} token in messages.',
-      '<b>Text message templates</b> — wording for cleaning reminders, payment reminders, receipts and quotes, using {name}, {amount}, {date} and {company} tokens.'
+      '<b>Your name</b> — used to sign off texts personally, as the {yourname} token.',
+      '<b>Text message templates</b> — wording for cleaning reminders, payment reminders, receipts, and new-enquiry and repeat-work quotes, using {name}, {amount}, {date}, {company} and {yourname} tokens.'
     ])}
 
     ${helpH('Quick reference')}
