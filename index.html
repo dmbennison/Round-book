@@ -217,7 +217,7 @@
   .backup-btn svg{width:20px;height:20px; color:var(--blue); flex-shrink:0;}
   .backup-btn .t1{font-size:0.9062rem; font-weight:700;}
   .backup-btn .t2{font-size:0.75rem; color:var(--ink-muted); margin-top:1px;}
-  #importFile{display:none;}
+  #importFile, #importSpreadsheetFile{display:none;}
   .toast{
     position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:var(--navy-dark); color:#fff;
     padding:11px 18px; border-radius:24px; font-size:0.8438rem; font-weight:700; z-index:60; opacity:0; transition:opacity .2s;
@@ -343,8 +343,8 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 52;
-function formatVersion(v){ return Math.floor(v/10) + '.' + (v%10); }
+const APP_VERSION = 53;
+function formatVersion(v){ return '1.' + v; }
 const DEFAULT_CLEAN_TEMPLATE = "Hi {name}, just a reminder I'll be round to clean your windows soon. Let me know if that's not convenient.\n\nThanks,\n{yourname}\n{company}";
 const DEFAULT_PAY_TEMPLATE = "Hi {name}, a friendly reminder that your window cleaning payment of {amount} is outstanding.\n\nThanks,\n{yourname}\n{company}";
 const DEFAULT_RECEIPT_TEMPLATE = "Hi {name}, thank you for your payment of {amount} received {date}.\n\nThanks,\n{yourname}\n{company}";
@@ -1567,6 +1567,7 @@ function jobCardHtml(j, today){
 function jobAnniversaryInfo(j, today){
   today = today || todayISO();
   if(!j.done || !j.date) return null;
+  if(j.anniversaryReminder === false) return null;
   const daysSince = daysBetween(j.date, today);
   if(daysSince < 365) return null;
   // Calculate which year anniversary this is (1st = 365+, 2nd = 730+, 3rd = 1095+, etc.)
@@ -1649,6 +1650,10 @@ function openJobForm(existing, prefill){
     <label style="display:flex; align-items:center; gap:8px; margin-top:16px; cursor:pointer;">
       <input type="checkbox" id="j_remind" ${j.remind24h?'checked':''} style="width:18px; height:18px; flex-shrink:0;">
       <span style="font-size:0.8125rem; font-weight:600; color:var(--ink); text-transform:none; letter-spacing:0;">Remind me the day before this job</span>
+    </label>
+    <label style="display:flex; align-items:center; gap:8px; margin-top:10px; cursor:pointer;">
+      <input type="checkbox" id="j_anniversary" ${j.anniversaryReminder===false?'':'checked'} style="width:18px; height:18px; flex-shrink:0;">
+      <span style="font-size:0.8125rem; font-weight:600; color:var(--ink); text-transform:none; letter-spacing:0;">Flag the anniversary of this job (once it's marked done)</span>
     </label>
     <div class="form-actions">
       <button class="btn-primary" onclick="saveJobForm('${existing?existing.id:''}')">${existing?'Save changes':'Add job'}</button>
@@ -1747,6 +1752,7 @@ function saveJobForm(id){
     price: parseFloat(document.getElementById('j_price').value) || 0,
     notes: document.getElementById('j_notes').value.trim(),
     remind24h: document.getElementById('j_remind').checked,
+    anniversaryReminder: document.getElementById('j_anniversary').checked,
     customerId: (customerIdField && customerIdField.value) ? customerIdField.value : null
   };
   if(id){
@@ -3031,7 +3037,7 @@ function openHelp(){
 
     ${helpH('One-off jobs')}
     ${helpP('For anything outside your regular rounds — a gutter clean, a one-time job, a job from a quote — use the Jobs tab. Swipe a job card right to mark it done, or left to mark it paid. Set a reminder for the day before or the day of the job.')}
-    ${helpP('Job anniversaries are flagged automatically. Once a completed one-off job reaches 365+ days old, the job card shows its anniversary badge, and a banner suggests it might be worth a follow-up call — useful for repeat work like annual gutter cleans.')}
+    ${helpP('Job anniversaries are flagged automatically. Once a completed one-off job reaches 365+ days old, the job card shows its anniversary badge, and a banner suggests it might be worth a follow-up call — useful for repeat work like annual gutter cleans. This is on by default for every job, but can be switched off per job from its edit screen.')}
     ${helpP('Open an existing job and tap "Turn into a quote for repeat work" to prefill a new quote with that job\'s address, contact details and price — handy for turning a one-off into an ongoing arrangement.')}
 
     ${helpH('Quotes')}
