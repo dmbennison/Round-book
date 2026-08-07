@@ -272,7 +272,7 @@
       --ink-muted:#66798A;
       --line:#E3E9EC;
     }
-    header, #backupBanner, #jobReminderBanner, #quoteFollowUpBanner, #jobAnniversaryBanner, main, .fab, .overlay, #importFile, .toast{
+    header, #backupBanner, #jobReminderBanner, #quoteFollowUpBanner, #jobAnniversaryBanner, #importReviewBanner, main, .fab, .overlay, #importFile, #importSpreadsheetFile, .toast{
       display:none !important;
     }
     .print-area{
@@ -324,6 +324,7 @@
 <div id="jobReminderBanner"></div>
 <div id="quoteFollowUpBanner"></div>
 <div id="jobAnniversaryBanner"></div>
+<div id="importReviewBanner"></div>
 <main id="main"></main>
 
 <button class="fab" onclick="handleFabClick()" aria-label="Add">
@@ -335,13 +336,14 @@
 </div>
 
 <input type="file" id="importFile" accept="application/json">
+<input type="file" id="importSpreadsheetFile" accept=".csv,.xlsx,.xls,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
 <div class="toast" id="toast"></div>
 <div class="print-area" id="printArea"></div>
 
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 50;
+const APP_VERSION = 51;
 function formatVersion(v){ return Math.floor(v/10) + '.' + (v%10); }
 const DEFAULT_CLEAN_TEMPLATE = "Hi {name}, just a reminder I'll be round to clean your windows soon. Let me know if that's not convenient.\n\nThanks,\n{yourname}\n{company}";
 const DEFAULT_PAY_TEMPLATE = "Hi {name}, a friendly reminder that your window cleaning payment of {amount} is outstanding.\n\nThanks,\n{yourname}\n{company}";
@@ -500,6 +502,8 @@ let bannerDismissed = false;
 let jobReminderDismissed = false;
 let quoteFollowUpDismissed = false;
 let jobAnniversaryDismissed = false;
+let importReviewDismissed = false;
+const IMPORT_HOLDING_ROUND = 'Needs review (imported)';
 const BACKUP_REMINDER_DAYS = 7;
 
 function daysSinceBackup(){
@@ -606,6 +610,22 @@ function renderJobAnniversaryBanner(){
     </span>
   </div>`;
 }
+function renderImportReviewBanner(){
+  const el = document.getElementById('importReviewBanner');
+  if(!el) return;
+  if(importReviewDismissed){ el.innerHTML = ''; return; }
+  const count = data.customers.filter(c => (c.round||'Unassigned') === IMPORT_HOLDING_ROUND).length;
+  if(!count){ el.innerHTML = ''; return; }
+  const label = `📥 ${count} imported customer${count===1?'':'s'} waiting to be checked and assigned to a round`;
+  el.innerHTML = `<div style="background:var(--blue-dim); color:var(--blue-deep); border-radius:12px; padding:11px 14px; margin:0 14px 14px; display:flex; align-items:center; justify-content:space-between; gap:10px; font-size:0.8125rem; font-weight:700;">
+    <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(label)}</span>
+    <span style="display:flex; gap:8px; flex-shrink:0; align-items:center;">
+      <button onclick="setTab('rounds'); openRound(IMPORT_HOLDING_ROUND); dismissImportReview();" style="background:var(--blue-deep); color:#fff; border:none; border-radius:8px; padding:6px 10px; font-weight:800; font-size:0.7812rem;">Review</button>
+      <button onclick="dismissImportReview()" style="background:none; border:none; color:var(--blue-deep); font-weight:800; font-size:1rem; line-height:1; padding:0 2px;">✕</button>
+    </span>
+  </div>`;
+}
+function dismissImportReview(){ importReviewDismissed = true; renderImportReviewBanner(); }
 
 function sortByRoute(custs){
   return custs.slice().sort((a,b)=>{
@@ -640,6 +660,7 @@ function render(){
   renderJobReminderBanner();
   renderQuoteFollowUpBanner();
   renderJobAnniversaryBanner();
+  renderImportReviewBanner();
   const main = document.getElementById('main');
   main.innerHTML = '';
 
@@ -3016,7 +3037,8 @@ function openHelp(){
       'Backup reminder — once it\'s been 7+ days since your last backup.',
       'Job reminder — the day before or the day of a job flagged with 🔔.',
       '<b>Quote follow-up</b> — when a pending quote has passed its follow-up window.',
-      '<b>Job anniversary</b> — when a completed one-off job reaches 365+ days old.'
+      '<b>Job anniversary</b> — when a completed one-off job reaches 365+ days old.',
+      '<b>Import review</b> — while any imported customers are still sitting in the "Needs review" round.'
     ])}
 
     ${helpH('Reports, printing and Word exports')}
@@ -3038,7 +3060,8 @@ function openHelp(){
     ${helpList([
       '<b>Export backup</b> — a .json file with everything: customers, rounds, jobs, quotes, settings. Use this to restore.',
       '<b>Export as Excel</b> — a .xlsx workbook, one sheet per round, plus a summary and jobs sheet.',
-      '<b>Restore from backup</b> — replaces everything on the phone with a backup file\'s contents. This is a full replace, not a merge.'
+      '<b>Restore from backup</b> — replaces everything on the phone with a backup file\'s contents. This is a full replace, not a merge.',
+      '<b>Import customers from spreadsheet</b> — bring in customers from a .csv or .xlsx file (from another app, or a spreadsheet you\'ve been using). Columns are matched automatically by their header names (e.g. "Address", "Name", "Phone", "Price"). Imported customers land in a "Needs review" round rather than their real one, so nothing gets scheduled until you\'ve checked each one and assigned it properly. A banner reminds you while any are still waiting.'
     ])}
 
     ${helpH('Settings')}
@@ -3097,6 +3120,10 @@ function openBackup(){
     <button class="backup-btn" onclick="document.getElementById('importFile').click()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>
       <div><div class="t1">Restore from backup</div><div class="t2">Replaces current data with a backup file</div></div>
+    </button>
+    <button class="backup-btn" onclick="document.getElementById('importSpreadsheetFile').click()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v16H4z"/><path d="M4 10h16M10 4v16"/><path d="M14 14l3 3 3-3" transform="translate(0,-2)"/></svg>
+      <div><div class="t1">Import customers from spreadsheet</div><div class="t2">.csv or .xlsx — added to a "needs review" round to check over</div></div>
     </button>
   `);
 }
@@ -3157,6 +3184,128 @@ document.getElementById('importFile').addEventListener('change', function(e){
     }
   };
   reader.readAsText(file);
+  e.target.value = '';
+});
+
+/* ---------- import customers from spreadsheet ---------- */
+const IMPORT_COLUMN_SYNONYMS = {
+  address:   ['address','addr','street','street address','property','location'],
+  name:      ['name','customer','customer name','client','clientname','contact name'],
+  phone:     ['phone','mobile','tel','telephone','contact','contact number','phone number'],
+  email:     ['email','email address','e-mail'],
+  round:     ['round','route','area','zone','round name'],
+  price:     ['price','amount','cost','fee','value','rate','clean price'],
+  frequency: ['frequency','freq','weeks','cycle','interval','frequency (weeks)']
+};
+function normalizeHeader(h){
+  return String(h||'').toLowerCase().replace(/[_\-]+/g,' ').replace(/\s+/g,' ').trim();
+}
+function guessColumnMap(headers){
+  const norm = headers.map(normalizeHeader);
+  const map = {};
+  Object.keys(IMPORT_COLUMN_SYNONYMS).forEach(field=>{
+    const synonyms = IMPORT_COLUMN_SYNONYMS[field];
+    let found = null;
+    // exact match first, then "contains"
+    for(const syn of synonyms){
+      const idx = norm.indexOf(syn);
+      if(idx !== -1){ found = headers[idx]; break; }
+    }
+    if(!found){
+      for(let i=0;i<norm.length;i++){
+        if(synonyms.some(syn => norm[i].includes(syn))){ found = headers[i]; break; }
+      }
+    }
+    map[field] = found;
+  });
+  return map;
+}
+document.getElementById('importSpreadsheetFile').addEventListener('change', function(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  if(typeof XLSX === 'undefined'){
+    toast('Still loading — try again in a moment, or once you have signal');
+    e.target.value = '';
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = function(evt){
+    try{
+      const wb = XLSX.read(evt.target.result, {type:'array'});
+      const firstSheetName = wb.SheetNames[0];
+      const ws = wb.Sheets[firstSheetName];
+      const rows = XLSX.utils.sheet_to_json(ws, {defval:''});
+      if(!rows.length){ alert('That spreadsheet looks empty — no rows found on the first sheet.'); e.target.value=''; return; }
+      const headers = Object.keys(rows[0]);
+      const map = guessColumnMap(headers);
+      if(!map.address && !map.name){
+        alert("Couldn't find an address or name column in that spreadsheet. Make sure the first row has column headers like \"Address\" and \"Name\".");
+        e.target.value = '';
+        return;
+      }
+
+      const existingAddresses = new Set(data.customers.map(c => (c.address||'').trim().toLowerCase()).filter(Boolean));
+      let imported = 0, skipped = 0;
+      const roundCusts = data.customers.filter(x=>(x.round||'Unassigned')===IMPORT_HOLDING_ROUND);
+      let nextOrder = roundCusts.reduce((m,x)=>Math.max(m, x.order!=null?x.order:-1), -1) + 1;
+
+      rows.forEach(row=>{
+        const address = map.address ? String(row[map.address]||'').trim() : '';
+        const name = map.name ? String(row[map.name]||'').trim() : '';
+        if(!address && !name) return; // blank row
+
+        const normalized = address.toLowerCase();
+        if(address && existingAddresses.has(normalized)){ skipped++; return; }
+
+        const suggestedRound = map.round ? String(row[map.round]||'').trim() : '';
+        const priceRaw = map.price ? parseFloat(String(row[map.price]).replace(/[^0-9.]/g,'')) : NaN;
+        const freqRaw = map.frequency ? parseInt(String(row[map.frequency]).replace(/[^0-9]/g,''),10) : NaN;
+
+        const notesParts = [];
+        if(suggestedRound) notesParts.push(`Imported — suggested round: ${suggestedRound}`);
+        else notesParts.push('Imported from spreadsheet');
+
+        data.customers.push({
+          id: uid(),
+          name, address,
+          phone: map.phone ? String(row[map.phone]||'').trim() : '',
+          email: map.email ? String(row[map.email]||'').trim() : '',
+          round: IMPORT_HOLDING_ROUND,
+          order: nextOrder++,
+          price: Number.isFinite(priceRaw) ? priceRaw : 0,
+          frequencyWeeks: Number.isFinite(freqRaw) && freqRaw>0 ? freqRaw : 4,
+          notes: notesParts.join(' · '),
+          cleanHistory: [], paymentHistory: [], priceHistory: []
+        });
+        if(address) existingAddresses.add(normalized);
+        imported++;
+      });
+
+      saveData();
+      closeSheet();
+      render();
+
+      const summary = skipped
+        ? `Imported ${imported} customer${imported===1?'':'s'} — ${skipped} skipped as likely duplicates`
+        : `Imported ${imported} customer${imported===1?'':'s'}`;
+      if(imported){
+        openSheet(`
+          <div class="sheet-head">
+            <h2>Import complete</h2>
+            <button class="sheet-close" onclick="closeSheet()">✕</button>
+          </div>
+          <p style="color:var(--ink); font-size:0.875rem; line-height:1.6; margin:0 2px 10px;">${escapeHtml(summary)}.</p>
+          <p style="color:var(--ink-muted); font-size:0.8125rem; line-height:1.6; margin:0 2px 18px;">They've been placed in a <b>"${escapeHtml(IMPORT_HOLDING_ROUND)}"</b> round rather than their real round, since columns were matched automatically and might not be perfect. Open each one to check the details and assign it to the right round.</p>
+          <button class="btn-primary" style="width:100%;" onclick="closeSheet(); setTab('rounds'); openRound(IMPORT_HOLDING_ROUND);">Review imported customers</button>
+        `);
+      } else {
+        toast(skipped ? `All ${skipped} rows already exist — nothing imported` : 'Nothing to import');
+      }
+    }catch(err){
+      alert('That file could not be read. Make sure it\'s a .csv or .xlsx spreadsheet with a header row.');
+    }
+  };
+  reader.readAsArrayBuffer(file);
   e.target.value = '';
 });
 
