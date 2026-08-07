@@ -266,7 +266,7 @@
 
   @media print{
     body, body.dark{
-      --bg:#ffffff;
+      --bg:#ffffff !important;
       --surface:#ffffff;
       --ink:#1C2B36;
       --ink-muted:#66798A;
@@ -343,7 +343,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 51;
+const APP_VERSION = 52;
 function formatVersion(v){ return Math.floor(v/10) + '.' + (v%10); }
 const DEFAULT_CLEAN_TEMPLATE = "Hi {name}, just a reminder I'll be round to clean your windows soon. Let me know if that's not convenient.\n\nThanks,\n{yourname}\n{company}";
 const DEFAULT_PAY_TEMPLATE = "Hi {name}, a friendly reminder that your window cleaning payment of {amount} is outstanding.\n\nThanks,\n{yourname}\n{company}";
@@ -2070,7 +2070,11 @@ function setTextSize(v){
 }
 function applyTheme(){
   const t = THEMES[themeName] || THEMES.ocean;
-  const root = document.documentElement.style;
+  // Set on the body element itself (not html/:root) so these inline values take
+  // precedence over the static light/dark-mode CSS blocks, which declare --blue-dim,
+  // --bg etc. directly on body/body.dark and would otherwise win over anything
+  // inherited from an ancestor regardless of dark mode state.
+  const root = document.body.style;
   root.setProperty('--navy', t.navy);
   root.setProperty('--blue', t.blue);
   // A darker shade of the scheme's navy, used for toasts and other high-emphasis chrome.
@@ -2081,6 +2085,10 @@ function applyTheme(){
   // toward white in light mode and toward the dark surface colour in dark mode, so every
   // scheme gets its own badge colour instead of everything defaulting to ocean-blue.
   root.setProperty('--blue-dim', darkMode ? mixHex(t.blue, '#0E1620', 0.82) : mixHex(t.blue, '#FFFFFF', 0.86));
+  // A soft tint of the main screen background, so the page itself carries a hint of the
+  // chosen scheme rather than staying neutral grey — card surfaces (--surface) stay
+  // untinted so content still stands out clearly on top.
+  root.setProperty('--bg', darkMode ? mixHex(t.blue, '#0E1620', 0.90) : mixHex(t.blue, '#F5F7F8', 0.92));
   const meta = document.querySelector('meta[name="theme-color"]');
   if(meta) meta.setAttribute('content', t.navy);
 }
@@ -2191,11 +2199,11 @@ function openReports(){
     </button>
     <button class="backup-btn" onclick="printRoundsLastCleaned()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4M16 2v4M3 10h18"/><rect x="3" y="4" width="18" height="18" rx="2"/></svg>
-      <div><div class="t1">Round cleaning dates — list</div><div class="t2">Every date each round was cleaned in the last month</div></div>
+      <div><div class="t1">Round cleaning dates — list</div><div class="t2">Every date each round was cleaned in the last 5 weeks</div></div>
     </button>
     <button class="backup-btn" onclick="printRoundsLastCleanedCalendar()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18M8 2v4M16 2v4"/></svg>
-      <div><div class="t1">Round cleaning dates — calendar</div><div class="t2">Same, laid out as a calendar of the last month</div></div>
+      <div><div class="t1">Round cleaning dates — calendar</div><div class="t2">Same, laid out as a calendar of the last 5 weeks</div></div>
     </button>
     <button class="backup-btn" onclick="printEarnings()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M9 10h6M9 14h5"/></svg>
@@ -2452,7 +2460,7 @@ function printRoundsLastCleaned(){
     return;
   }
   const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - 30);
+  cutoff.setDate(cutoff.getDate() - 35);
   const cutoffISO = cutoff.toISOString().slice(0,10);
 
   const rows = roundNames.map(rn=>{
@@ -2469,14 +2477,14 @@ function printRoundsLastCleaned(){
     const sortedDates = Array.from(dateSet).sort().reverse();
     const datesCell = sortedDates.length
       ? sortedDates.map(d=>fmtDate(d)).join(', ')
-      : `<span style="color:#66798A;">None in the last 30 days${latestOverall ? ' · last cleaned ' + fmtDate(latestOverall) : ' · never cleaned'}</span>`;
+      : `<span style="color:#66798A;">None in the last 5 weeks${latestOverall ? ' · last cleaned ' + fmtDate(latestOverall) : ' · never cleaned'}</span>`;
     return `<tr>
       <td>${escapeHtml(rn)}</td>
       <td>${datesCell}</td>
       <td>${custs.length} customer${custs.length===1?'':'s'}</td>
     </tr>`;
   }).join('');
-  const body = `<table class="rpt-table"><thead><tr><th>Round</th><th>Dates cleaned (last 30 days)</th><th>Customers</th></tr></thead><tbody>${rows}</tbody></table>`;
+  const body = `<table class="rpt-table"><thead><tr><th>Round</th><th>Dates cleaned (last 5 weeks)</th><th>Customers</th></tr></thead><tbody>${rows}</tbody></table>`;
   runPrint('Round Cleaning Dates', body);
 }
 
@@ -2488,12 +2496,12 @@ function printRoundsLastCleanedCalendar(){
   const today = new Date();
   today.setHours(0,0,0,0);
   const rangeStart = new Date(today);
-  rangeStart.setDate(rangeStart.getDate() - 29);
+  rangeStart.setDate(rangeStart.getDate() - 34); // 35-day (5-week) window including today
 
-  const dow = today.getDay();
-  const diffToMonday = (dow === 0) ? 6 : dow - 1;
-  const gridStart = new Date(today);
-  gridStart.setDate(gridStart.getDate() - diffToMonday - 28);
+  const rsDow = rangeStart.getDay();
+  const rsDiffToMonday = (rsDow === 0) ? 6 : rsDow - 1;
+  const gridStart = new Date(rangeStart);
+  gridStart.setDate(gridStart.getDate() - rsDiffToMonday);
 
   const cleanedByDate = {};
   data.customers.forEach(c=>{
@@ -2529,7 +2537,7 @@ function printRoundsLastCleanedCalendar(){
       <thead><tr><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th></tr></thead>
       <tbody>${bodyRows}</tbody>
     </table>
-    <p style="font-size:11px; color:#66798A; margin-top:12px;">Shows any round with a customer cleaned on that day. Greyed-out days fall outside the last 30 days.</p>
+    <p style="font-size:11px; color:#66798A; margin-top:12px;">Shows any round with a customer cleaned on that day. Greyed-out days fall outside the last 5 weeks.</p>
   `;
   runPrint('Round Cleaning Dates — Calendar', body);
 }
@@ -3046,7 +3054,7 @@ function openHelp(){
     ${helpRow('Windows due, by round', "Who's due/overdue right now")}
     ${helpRow('Money owed', 'Cleaned but not yet paid')}
     ${helpRow('Full round lists', 'Every customer, by round')}
-    ${helpRow('Round cleaning dates — list', 'Dates cleaned in the last month')}
+    ${helpRow('Round cleaning dates — list', 'Dates cleaned in the last 5 weeks')}
     ${helpRow('Round cleaning dates — calendar', 'Same, as a calendar')}
     ${helpRow('Earnings report', 'Totals by week/month/year')}
     ${helpRow('Daily work done', 'Value completed, day by day')}
@@ -3068,7 +3076,7 @@ function openHelp(){
     ${helpList([
       '<b>Appearance</b> — Light or Dark.',
       '<b>Text size</b> — a slider from small to large, so you can pick exactly the size that suits you.',
-      '<b>Colour scheme</b> — six schemes (Ocean, Slate, Teal, Plum, Rust, Berry) recolour the whole app, not just the header.',
+      '<b>Colour scheme</b> — six schemes (Ocean, Slate, Teal, Plum, Rust, Berry) recolour the whole app, including a soft tint on the main background, not just the header.',
       '<b>Company name</b> — shown on printed reports and available as the {company} token in messages.',
       '<b>Your name</b> — used to sign off texts personally, as the {yourname} token.',
       '<b>Text message templates</b> — wording for cleaning reminders, payment reminders, receipts, and new-enquiry and repeat-work quotes, using {name}, {amount}, {date}, {company} and {yourname} tokens.'
@@ -3518,14 +3526,16 @@ function loadWeather(){
   navigator.geolocation.getCurrentPosition(async (pos)=>{
     try{
       const { latitude, longitude } = pos.coords;
-      const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`);
+      const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true&daily=precipitation_probability_max&forecast_days=1&timezone=auto`);
       if(!res.ok) throw new Error('bad response');
       const json = await res.json();
       const cw = json && json.current_weather;
       if(!cw) throw new Error('no weather');
       const icon = WEATHER_CODES[cw.weathercode] || '🌡️';
       const temp = Math.round(cw.temperature);
-      const text = `${icon} ${temp}°C`;
+      const rainChance = json.daily && json.daily.precipitation_probability_max ? json.daily.precipitation_probability_max[0] : null;
+      const rainPart = (rainChance != null) ? ` · 🌧️ ${rainChance}%` : '';
+      const text = `${icon} ${temp}°C${rainPart}`;
       const el2 = document.getElementById('weatherPill');
       if(el2) el2.textContent = text;
       localStorage.setItem('roundBookWeatherCache', JSON.stringify({ text, time: Date.now() }));
