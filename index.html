@@ -100,6 +100,12 @@
   }
   .section-label:first-child{margin-top:0;}
 
+  .day-divider{
+    font-size:0.75rem; font-weight:800; color:var(--blue-deep); background:var(--blue-dim);
+    padding:7px 12px; border-radius:8px; margin:16px 0 8px;
+  }
+  .day-divider:first-child{margin-top:0;}
+
   .round-card{
     background:var(--surface); border-radius:var(--radius); padding:14px 16px; margin-bottom:10px;
     border:1px solid var(--line); display:flex; align-items:center; justify-content:space-between; gap:10px;
@@ -353,7 +359,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 57;
+const APP_VERSION = 58;
 function formatVersion(v){ return '1.' + v; }
 const DEFAULT_CLEAN_TEMPLATE = "Hi {name}, just a reminder I'll be round to clean your windows soon. Let me know if that's not convenient.\n\nThanks,\n{yourname}\n{company}";
 const DEFAULT_PAY_TEMPLATE = "Hi {name}, a friendly reminder that your window cleaning payment of {amount} is outstanding.\n\nThanks,\n{yourname}\n{company}";
@@ -734,6 +740,7 @@ function renderRoundsList(main){
     html += `<div class="section-label">Your rounds</div>`;
     roundNames.forEach(rn=>{
       const all = rounds[rn];
+      const daysUsed = roundDaysUsed(all);
       let overdue=0, due=0, owed=0, paused=0;
       all.forEach(c=>{
         const s = custStatus(c);
@@ -745,7 +752,7 @@ function renderRoundsList(main){
       html += `<div class="round-card" onclick="openRound('${escapeAttr(rn)}')">
         <div>
           <div class="rname">${escapeHtml(rn)}</div>
-          <div class="rcount">${all.length} customer${all.length===1?'':'s'}</div>
+          <div class="rcount">${all.length} customer${all.length===1?'':'s'}${daysUsed.length>1?` · ${daysUsed.length} days`:''}</div>
         </div>
         <div class="badges">
           ${overdue?`<span class="badge overdue">${overdue} overdue</span>`:''}
@@ -903,7 +910,21 @@ function renderRoundDetail(main, rn){
     main.innerHTML = shellHtml + emptyState((roundFilterMode!=='all' || roundDayFilter!=='all') ? 'filter' : 'customers');
     return;
   }
-  shellHtml += custs.map(custCardHtml).join('');
+  if(spansMultipleDays && roundDayFilter === 'all'){
+    // Insert a divider wherever the visit day changes, so it's clear where one day's
+    // work ends and the next begins when viewing the whole round in route order.
+    let lastDay = null;
+    custs.forEach(c=>{
+      const d = c.visitDay || 1;
+      if(d !== lastDay){
+        shellHtml += `<div class="day-divider">Day ${d}</div>`;
+        lastDay = d;
+      }
+      shellHtml += custCardHtml(c);
+    });
+  } else {
+    shellHtml += custs.map(custCardHtml).join('');
+  }
   if(roundFilterMode === 'owed'){
     const owedTotal = custs.reduce((sum,c)=>sum+custStatus(c).balance,0);
     shellHtml += `<div style="text-align:right; font-weight:800; font-size:0.9375rem; color:var(--emphasis); padding:10px 4px 4px;">Total owed: ${money(owedTotal)}</div>`;
@@ -3259,7 +3280,7 @@ function openHelp(){
     ${helpP('The Rounds tab opens on a summary of every round. A <b>Rounds / Due / Owed</b> switch changes what the cards below show: every round, everyone due or overdue a clean across all rounds, or everyone who owes money.')}
     ${helpSub('Inside a round')}
     ${helpP('Tapping a round opens its customer list, with the same All / Due / Owed switch, plus a reorder toggle to drag customers into the order you actually walk the round.')}
-    ${helpP('If a round takes more than one day, use reorder mode to tap each customer\'s day badge and assign them to Day 1 up to Day 5. Once a round has customers on more than one day, a day switcher appears above the customer list so you can filter down to just that day\'s work, and a "Day N" badge shows on cards wherever they appear.')}
+    ${helpP('If a round takes more than one day, use reorder mode to tap each customer\'s day badge and assign them to Day 1 up to Day 5. The round\'s card shows how many days it spans, and once a round has customers on more than one day, a day switcher appears above the customer list so you can filter down to just that day\'s work — or, with "All days" selected, the list shows a divider between each day so it\'s clear where one day\'s work ends and the next begins. A "Day N" badge also shows on cards wherever they appear.')}
     ${helpSub('Customer cards')}
     ${helpP('Swipe a card right to mark it cleaned today, or left to mark it paid in full. Tap a card to open the customer\'s detail screen: clean history, payment history, price history, linked one-off jobs, and photos — plus options to pause the customer or send a text reminder, chase, or receipt.')}
     ${helpSub('Adding or editing a customer')}
