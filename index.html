@@ -258,11 +258,12 @@
   .rpt-page-break{page-break-before:always; break-before:page;}
   .rpt-calendar{width:100%; border-collapse:collapse; table-layout:fixed;}
   .rpt-calendar th{background:#10344C; color:#fff; font-size:11px; padding:6px; text-align:center; font-weight:700;}
-  .rpt-calendar td{border:1px solid #E3E9EC; vertical-align:top; padding:5px; height:74px; font-size:10px; overflow:hidden;}
+  .rpt-calendar td{border:1px solid #E3E9EC; vertical-align:top; padding:5px; height:88px; font-size:10px; overflow:hidden;}
   .rpt-calendar td.outside{background:#F7F9FA; color:#B7C2CA;}
   .rpt-calendar .daynum{font-weight:800; font-size:11.5px; margin-bottom:3px; color:#1C2B36;}
   .rpt-calendar td.outside .daynum{color:#B7C2CA;}
   .rpt-calendar .round-chip{display:block; background:#DCEFFA; color:#1c6fa3; border-radius:5px; padding:1px 4px; margin-bottom:2px; font-weight:700; font-size:9px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .rpt-calendar .round-chip.job-chip{background:#FBEBD2; color:#8A5A15;}
 
   .inv-meta-table td{padding:4px 8px;}
   .inv-billto{background:#F5F7F8; border-radius:8px; padding:12px 14px; margin-bottom:18px; font-size:13px; line-height:1.7; color:#1C2B36;}
@@ -352,7 +353,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 56;
+const APP_VERSION = 57;
 function formatVersion(v){ return '1.' + v; }
 const DEFAULT_CLEAN_TEMPLATE = "Hi {name}, just a reminder I'll be round to clean your windows soon. Let me know if that's not convenient.\n\nThanks,\n{yourname}\n{company}";
 const DEFAULT_PAY_TEMPLATE = "Hi {name}, a friendly reminder that your window cleaning payment of {amount} is outstanding.\n\nThanks,\n{yourname}\n{company}";
@@ -397,6 +398,9 @@ function migrateData(parsed){
   parsed.customers.forEach(c=>{
     if(c.frequencyWeeks == null){
       c.frequencyWeeks = c.frequencyDays ? Math.max(1, Math.round(c.frequencyDays/7)) : 4;
+    }
+    if(c.visitDay == null || c.visitDay < 1 || c.visitDay > 5){
+      c.visitDay = 1;
     }
     if(!c.priceHistory){
       c.priceHistory = c.price != null ? [{date: todayISO(), price: c.price}] : [];
@@ -508,6 +512,7 @@ let currentRound = null;
 let roundsViewMode = 'overview';
 let reorderMode = false;
 let roundFilterMode = 'all';
+let roundDayFilter = 'all';
 let darkMode = localStorage.getItem('roundBookDark') === '1';
 let textSize = (()=>{ const v = parseInt(localStorage.getItem('roundBookTextSize'),10); return (Number.isFinite(v) && v>=15 && v<=24) ? v : 18; })();
 let bannerDismissed = false;
@@ -646,9 +651,21 @@ function sortByRoute(custs){
     return oa-ob || (a.address||'').localeCompare(b.address||'');
   });
 }
+function roundDaysUsed(custs){
+  return Array.from(new Set(custs.map(c=>c.visitDay||1))).sort((a,b)=>a-b);
+}
+function cycleVisitDay(id){
+  const c = data.customers.find(x=>x.id===id);
+  if(!c) return;
+  const cur = c.visitDay || 1;
+  c.visitDay = cur >= 5 ? 1 : cur + 1;
+  saveData();
+  render();
+}
+function setRoundDayFilter(day){ roundDayFilter = day; render(); }
 
 function setTab(tab){
-  currentTab = tab; currentRound = null; reorderMode = false; roundFilterMode = 'all';
+  currentTab = tab; currentRound = null; reorderMode = false; roundFilterMode = 'all'; roundDayFilter = 'all';
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===tab));
   render();
   window.scrollTo(0, 0);
@@ -800,12 +817,14 @@ function renderRoundsList(main){
   main.innerHTML = html;
 }
 
-function openRound(rn){ currentRound = rn; reorderMode = false; roundFilterMode = 'all'; render(); window.scrollTo(0, 0); }
-function backToRounds(){ currentRound = null; reorderMode = false; roundFilterMode = 'all'; render(); window.scrollTo(0, 0); }
+function openRound(rn){ currentRound = rn; reorderMode = false; roundFilterMode = 'all'; roundDayFilter = 'all'; render(); window.scrollTo(0, 0); }
+function backToRounds(){ currentRound = null; reorderMode = false; roundFilterMode = 'all'; roundDayFilter = 'all'; render(); window.scrollTo(0, 0); }
 function setRoundFilterMode(v){ roundFilterMode = v; render(); }
 
 function renderRoundDetail(main, rn){
   const allInRound = sortByRoute(data.customers.filter(c=>(c.round||'Unassigned')===rn));
+  const daysUsed = roundDaysUsed(allInRound);
+  const spansMultipleDays = daysUsed.length > 1;
 
   let shellHtml = `
     <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; gap:8px;">
@@ -823,7 +842,8 @@ function renderRoundDetail(main, rn){
   `;
 
   if(reorderMode){
-    shellHtml += `<p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 14px;">Use the arrows to set the order you actually visit these customers in.</p>`;
+    shellHtml += `<p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 6px;">Use the arrows to set the order you actually visit these customers in.</p>`;
+    shellHtml += `<p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 14px;">If this round takes more than one day, tap the day badge to say which day each customer is visited on (up to 5).</p>`;
     if(!allInRound.length){ main.innerHTML = shellHtml + emptyState('customers'); return; }
     shellHtml += allInRound.map((c,i)=>`
       <div class="cust-card" style="display:flex; align-items:center; gap:10px;">
@@ -831,6 +851,7 @@ function renderRoundDetail(main, rn){
           <div class="cust-addr" style="font-size:0.9375rem; font-weight:800;">${i+1}. ${escapeHtml(c.address||'No address')}</div>
           ${c.name?`<div class="cust-name" style="font-size:0.8125rem; color:var(--ink-muted); margin-top:2px;">${escapeHtml(c.name)}</div>`:''}
         </div>
+        <button class="btn-open" style="width:auto; padding:6px 10px; font-size:0.75rem; font-weight:800; background:var(--blue-dim); color:var(--blue-deep); flex-shrink:0;" onclick="cycleVisitDay('${c.id}')">Day ${c.visitDay||1}</button>
         <div style="display:flex; flex-direction:column; gap:6px;">
           <button class="btn-open" style="width:38px; height:32px; padding:0; opacity:${i===0?'0.3':'1'};" onclick="moveInRound('${c.id}','up')">▲</button>
           <button class="btn-open" style="width:38px; height:32px; padding:0; opacity:${i===allInRound.length-1?'0.3':'1'};" onclick="moveInRound('${c.id}','down')">▼</button>
@@ -851,6 +872,13 @@ function renderRoundDetail(main, rn){
     </div>`;
   }
 
+  if(spansMultipleDays){
+    shellHtml += `<div class="seg-row">
+      <button class="seg-btn ${roundDayFilter==='all'?'active':''}" onclick="setRoundDayFilter('all')">All days</button>
+      ${daysUsed.map(d=>`<button class="seg-btn ${roundDayFilter===d?'active':''}" onclick="setRoundDayFilter(${d})">Day ${d}</button>`).join('')}
+    </div>`;
+  }
+
   shellHtml += `<div class="seg-row">
     <button class="seg-btn ${roundFilterMode==='all'?'active':''}" onclick="setRoundFilterMode('all')">All</button>
     <button class="seg-btn ${roundFilterMode==='due'?'active':''}" onclick="setRoundFilterMode('due')">📅 Due only</button>
@@ -859,17 +887,20 @@ function renderRoundDetail(main, rn){
   shellHtml += `<div class="swipe-hint">👉 Swipe a card right to mark cleaned, left to mark paid</div>`;
 
   let baseList = allInRound;
+  if(spansMultipleDays && roundDayFilter !== 'all'){
+    baseList = baseList.filter(c=>(c.visitDay||1) === roundDayFilter);
+  }
   if(roundFilterMode === 'due'){
-    baseList = allInRound.filter(c=>{
+    baseList = baseList.filter(c=>{
       const s = custStatus(c);
       return !c.paused && s.cleanBadge && (s.cleanBadge.type==='due' || s.cleanBadge.type==='overdue');
     });
   } else if(roundFilterMode === 'owed'){
-    baseList = allInRound.filter(c=>custStatus(c).owed);
+    baseList = baseList.filter(c=>custStatus(c).owed);
   }
   const custs = baseList;
   if(!custs.length){
-    main.innerHTML = shellHtml + emptyState(roundFilterMode!=='all' ? 'filter' : 'customers');
+    main.innerHTML = shellHtml + emptyState((roundFilterMode!=='all' || roundDayFilter!=='all') ? 'filter' : 'customers');
     return;
   }
   shellHtml += custs.map(custCardHtml).join('');
@@ -904,6 +935,8 @@ function needsPriceReview(c){
 
 function custCardHtml(c){
   const s = custStatus(c);
+  const roundCustomers = data.customers.filter(x=>(x.round||'Unassigned')===(c.round||'Unassigned'));
+  const showDayBadge = roundDaysUsed(roundCustomers).length > 1;
   return `<div class="swipe-wrap">
     <div class="swipe-bg swipe-bg-left">✓ Cleaned</div>
     <div class="swipe-bg swipe-bg-right">💷 Paid</div>
@@ -921,6 +954,7 @@ function custCardHtml(c){
         ${(s.owed && c.paymentReminderSent) ? `<span class="badge paused">🔔 ${fmtDate(c.paymentReminderSentDate).split(' ').slice(0,2).join(' ')}</span>` : ''}
         ${(c.photos && c.photos.length) ? `<span class="badge paused">📷 ${c.photos.length}</span>` : ''}
         ${needsPriceReview(c) ? `<span class="badge due" title="12+ months since last price increase">📈 Review</span>` : ''}
+        ${showDayBadge ? `<span class="badge anniversary">Day ${c.visitDay||1}</span>` : ''}
       </div>
     </div>
   </div>`;
@@ -2305,7 +2339,7 @@ function openReports(){
     </button>
     <button class="backup-btn" onclick="printSchedule()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18M8 2v4M16 2v4"/></svg>
-      <div><div class="t1">Monthly schedule</div><div class="t2">Calendar view of which rounds are due, day by day</div></div>
+      <div><div class="t1">Monthly schedule</div><div class="t2">Calendar of rounds and one-off jobs due, day by day</div></div>
     </button>
     <button class="backup-btn" onclick="printAllJobs()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
@@ -2719,11 +2753,13 @@ function printFullRounds(){
   roundNames.forEach((rn, idx)=>{
     body += `<div class="rpt-round-title${idx>0?' rpt-page-break':''}">${escapeHtml(rn)}</div>`;
     const custs = sortByRoute(rounds[rn]);
+    const spansMultipleDays = roundDaysUsed(custs).length > 1;
     let roundTotal = 0;
     const rows = custs.map(c=>{
       roundTotal += Number(c.price||0);
       return `<tr>
         <td>${escapeHtml(c.address||'')}${c.name?`<br><span style="color:#66798A">${escapeHtml(c.name)}</span>`:''}</td>
+        ${spansMultipleDays ? `<td>Day ${c.visitDay||1}</td>` : ''}
         <td>${escapeHtml(c.phone||'')}${c.phone&&c.email?'<br>':''}${escapeHtml(c.email||'')}</td>
         <td>${money(c.price)}</td>
         <td>Every ${c.frequencyWeeks||4}wk</td>
@@ -2732,7 +2768,7 @@ function printFullRounds(){
     grandTotal += roundTotal;
     grandCount += custs.length;
     const roundAvg = custs.length ? roundTotal/custs.length : 0;
-    body += `<table class="rpt-table"><thead><tr><th>Customer</th><th>Contact</th><th>Price</th><th>Frequency</th></tr></thead><tbody>${rows}</tbody></table>`;
+    body += `<table class="rpt-table"><thead><tr><th>Customer</th>${spansMultipleDays ? '<th>Day</th>' : ''}<th>Contact</th><th>Price</th><th>Frequency</th></tr></thead><tbody>${rows}</tbody></table>`;
     body += `<div class="rpt-total">${custs.length} customer${custs.length===1?'':'s'} · Round total: ${money(roundTotal)} · Avg: ${money(roundAvg)}</div>`;
   });
   if(!roundNames.length){
@@ -2748,12 +2784,14 @@ function printSingleRound(roundName){
   const rounds = groupByRound(data.customers);
   const custs = sortByRoute(rounds[roundName] || []);
   if(!custs.length){ toast('No customers in this round yet'); return; }
+  const spansMultipleDays = roundDaysUsed(custs).length > 1;
   let roundTotal = 0;
   const rows = custs.map(c=>{
     roundTotal += Number(c.price||0);
     const s = custStatus(c);
     return `<tr>
       <td>${escapeHtml(c.address||'')}${c.name?`<br><span style="color:#66798A">${escapeHtml(c.name)}</span>`:''}</td>
+      ${spansMultipleDays ? `<td>Day ${c.visitDay||1}</td>` : ''}
       <td>${escapeHtml(c.phone||'')}${c.phone&&c.email?'<br>':''}${escapeHtml(c.email||'')}</td>
       <td>${money(c.price)}</td>
       <td>Every ${c.frequencyWeeks||4}wk</td>
@@ -2762,7 +2800,7 @@ function printSingleRound(roundName){
   }).join('');
   const roundAvg = roundTotal / custs.length;
   const body = `
-    <table class="rpt-table"><thead><tr><th>Customer</th><th>Contact</th><th>Price</th><th>Frequency</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>
+    <table class="rpt-table"><thead><tr><th>Customer</th>${spansMultipleDays ? '<th>Day</th>' : ''}<th>Contact</th><th>Price</th><th>Frequency</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>
     <div class="rpt-total" style="border-top:2px solid #10344C; padding-top:10px; margin-top:16px; font-size:16px;">${custs.length} customer${custs.length===1?'':'s'} · Round total: ${money(roundTotal)} · Avg: ${money(roundAvg)}</div>
   `;
   runPrint(roundName, body);
@@ -3092,6 +3130,12 @@ function printSchedule(){
   const gridStart = new Date(today);
   gridStart.setDate(gridStart.getDate() - diffToMonday);
 
+  // Rounds that actually span more than one visit day get a "(Day N)" suffix on their chip,
+  // so a round split across several days shows up correctly on each of those days rather
+  // than as one ambiguous chip. Single-day rounds are shown exactly as before.
+  const roundsAll = groupByRound(data.customers);
+  const multiDayRounds = new Set(Object.keys(roundsAll).filter(rn => roundDaysUsed(roundsAll[rn]).length > 1));
+
   // Which rounds have a customer next due on each date, within the next 30 days
   const dueByDate = {};
   data.customers.forEach(c=>{
@@ -3099,7 +3143,16 @@ function printSchedule(){
     const next = nextDueISO(c);
     if(!next) return;
     if(!dueByDate[next]) dueByDate[next] = new Set();
-    dueByDate[next].add(c.round || 'Unassigned');
+    const rn = c.round || 'Unassigned';
+    dueByDate[next].add(multiDayRounds.has(rn) ? `${rn} (Day ${c.visitDay||1})` : rn);
+  });
+
+  // One-off jobs scheduled on each date, within the next 30 days
+  const jobsByDate = {};
+  (data.oneOffJobs||[]).forEach(j=>{
+    if(j.done || !j.date) return;
+    if(!jobsByDate[j.date]) jobsByDate[j.date] = [];
+    jobsByDate[j.date].push(j);
   });
 
   let bodyRows = '';
@@ -3111,11 +3164,13 @@ function printSchedule(){
       const iso = cellDate.toISOString().slice(0,10);
       const outside = cellDate < today || cellDate > rangeEnd;
       const roundsDue = dueByDate[iso] ? Array.from(dueByDate[iso]).sort((a,b)=>a.localeCompare(b)) : [];
+      const jobsDue = jobsByDate[iso] || [];
       const dayNum = cellDate.getDate();
       const monthLabel = (dayNum === 1) ? cellDate.toLocaleDateString('en-GB',{month:'short'}) + ' ' : '';
       bodyRows += `<td class="${outside?'outside':''}">
         <div class="daynum">${monthLabel}${dayNum}</div>
         ${roundsDue.map(rn=>`<span class="round-chip">${escapeHtml(rn)}</span>`).join('')}
+        ${jobsDue.map(j=>`<span class="round-chip job-chip">🔧 ${escapeHtml(j.address||j.name||'Job')}</span>`).join('')}
       </td>`;
     }
     bodyRows += '</tr>';
@@ -3126,7 +3181,7 @@ function printSchedule(){
       <thead><tr><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th></tr></thead>
       <tbody>${bodyRows}</tbody>
     </table>
-    <p style="font-size:11px; color:#66798A; margin-top:12px;">Shows any round with a customer due for cleaning on that day, based on their last clean date and frequency. Greyed-out days fall outside the next 30 days. Customers not yet cleaned at all aren't included, since there's no date to schedule from.</p>
+    <p style="font-size:11px; color:#66798A; margin-top:12px;">Blue chips show any round with a customer due for cleaning that day, based on their last clean date and frequency — rounds split across several visit days show which day is due. Amber chips (🔧) show one-off jobs scheduled that day. Greyed-out days fall outside the next 30 days. Customers not yet cleaned at all aren't included, since there's no date to schedule from.</p>
   `;
   runPrint('Monthly Schedule', body);
 }
@@ -3204,6 +3259,7 @@ function openHelp(){
     ${helpP('The Rounds tab opens on a summary of every round. A <b>Rounds / Due / Owed</b> switch changes what the cards below show: every round, everyone due or overdue a clean across all rounds, or everyone who owes money.')}
     ${helpSub('Inside a round')}
     ${helpP('Tapping a round opens its customer list, with the same All / Due / Owed switch, plus a reorder toggle to drag customers into the order you actually walk the round.')}
+    ${helpP('If a round takes more than one day, use reorder mode to tap each customer\'s day badge and assign them to Day 1 up to Day 5. Once a round has customers on more than one day, a day switcher appears above the customer list so you can filter down to just that day\'s work, and a "Day N" badge shows on cards wherever they appear.')}
     ${helpSub('Customer cards')}
     ${helpP('Swipe a card right to mark it cleaned today, or left to mark it paid in full. Tap a card to open the customer\'s detail screen: clean history, payment history, price history, linked one-off jobs, and photos — plus options to pause the customer or send a text reminder, chase, or receipt.')}
     ${helpSub('Adding or editing a customer')}
@@ -3239,7 +3295,7 @@ function openHelp(){
     ${helpRow('Round cleaning dates — calendar', 'Same, as a calendar')}
     ${helpRow('Earnings report', 'Totals by week/month/year')}
     ${helpRow('Daily work done', 'Value completed, day by day')}
-    ${helpRow('Monthly schedule', 'Calendar of rounds due')}
+    ${helpRow('Monthly schedule', 'Calendar of rounds and jobs due')}
     ${helpRow('One-off jobs', 'Every job, status and value')}
     ${helpRow('Price review due', "12+ months since last increase")}
     ${helpP('<span style="color:var(--ink-muted); font-style:italic;">Printed and exported reports always use the same neutral navy styling, regardless of your chosen colour scheme, so they look consistent whoever opens them.</span>')}
