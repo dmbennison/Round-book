@@ -76,11 +76,6 @@
   .brand-mark svg{width:19px;height:19px;}
   .brand h1{font-size:1.1875rem; font-weight:800;}
   .brand .sub{font-size:0.6875rem; color:#A9C4D8; font-weight:600; letter-spacing:.04em; text-transform:uppercase; margin-top:1px;}
-  .company-name-header{
-    text-align:center; color:#fff; font-weight:800; font-size:0.8125rem; letter-spacing:.02em;
-    margin-top:12px; opacity:0.95; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
-  }
-  .company-name-header:empty{display:none; margin-top:0;}
   #weatherPill{text-transform:none;}
   .icon-btn{
     width:38px;height:38px;border-radius:10px;border:none;
@@ -327,7 +322,6 @@
       </button>
     </div>
   </div>
-  <div id="companyNameHeader" class="company-name-header"></div>
   <div class="tabs">
     <button class="tab active" data-tab="rounds" onclick="setTab('rounds')">Rounds</button>
     <button class="tab" data-tab="jobs" onclick="setTab('jobs')">One-off jobs</button>
@@ -358,7 +352,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 55;
+const APP_VERSION = 56;
 function formatVersion(v){ return '1.' + v; }
 const DEFAULT_CLEAN_TEMPLATE = "Hi {name}, just a reminder I'll be round to clean your windows soon. Let me know if that's not convenient.\n\nThanks,\n{yourname}\n{company}";
 const DEFAULT_PAY_TEMPLATE = "Hi {name}, a friendly reminder that your window cleaning payment of {amount} is outstanding.\n\nThanks,\n{yourname}\n{company}";
@@ -397,6 +391,8 @@ function migrateData(parsed){
   if(!parsed.settings.quoteTemplate || OLD_QUOTE_TEMPLATES.includes(parsed.settings.quoteTemplate)) parsed.settings.quoteTemplate = DEFAULT_QUOTE_TEMPLATE;
   if(!parsed.settings.repeatQuoteTemplate || OLD_REPEAT_QUOTE_TEMPLATES.includes(parsed.settings.repeatQuoteTemplate)) parsed.settings.repeatQuoteTemplate = DEFAULT_REPEAT_QUOTE_TEMPLATE;
   if(parsed.settings.companyName == null) parsed.settings.companyName = '';
+  if(parsed.settings.companyAddress == null) parsed.settings.companyAddress = '';
+  if(parsed.settings.companyPhone == null) parsed.settings.companyPhone = '';
   if(parsed.settings.logo == null) parsed.settings.logo = '';
   parsed.customers.forEach(c=>{
     if(c.frequencyWeeks == null){
@@ -2139,11 +2135,6 @@ function setTextSize(v){
   applyTextSize();
   openSettings();
 }
-function renderCompanyNameHeader(){
-  const el = document.getElementById('companyNameHeader');
-  if(!el) return;
-  el.textContent = (data.settings.companyName || '').trim();
-}
 function applyTheme(){
   const t = THEMES[themeName] || THEMES.ocean;
   // Set on the body element itself (not html/:root) so these inline values take
@@ -2205,10 +2196,16 @@ function openSettings(){
       }).join('')}
     </div>
     <div class="section-label">Company name</div>
-    <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 10px; line-height:1.5;">Shown on printed reports, and available as the <b>{company}</b> token in text messages.</p>
+    <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 10px; line-height:1.5;">Shown on printed reports and invoices, and available as the <b>{company}</b> token in text messages.</p>
     <input type="text" id="companyNameInput" value="${escapeAttr(data.settings.companyName||'')}" placeholder="e.g. Darren's Window Cleaning">
+    <div class="section-label">Company address <span style="text-transform:none; font-weight:500; opacity:0.7;">(optional)</span></div>
+    <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 10px; line-height:1.5;">Shown under the logo on printed invoices.</p>
+    <textarea id="companyAddressInput" rows="2" placeholder="e.g. 12 High Street, Manchester, M1 2AB">${escapeHtml(data.settings.companyAddress||'')}</textarea>
+    <div class="section-label">Company phone <span style="text-transform:none; font-weight:500; opacity:0.7;">(optional)</span></div>
+    <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 10px; line-height:1.5;">Also shown on printed invoices.</p>
+    <input type="text" id="companyPhoneInput" value="${escapeAttr(data.settings.companyPhone||'')}" placeholder="e.g. 07700 900123" inputmode="tel">
     <div class="section-label">Company logo</div>
-    <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 10px; line-height:1.5;">Shown at the top of printed invoices.</p>
+    <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 10px; line-height:1.5;">Shown at the top of printed invoices, in place of the company name.</p>
     ${data.settings.logo ? `
       <div style="display:flex; align-items:center; gap:12px; margin-bottom:10px;">
         <div style="background:#fff; border:1px solid var(--line); border-radius:10px; padding:6px; flex-shrink:0;">
@@ -2250,9 +2247,10 @@ function saveTemplates(){
   data.settings.quoteTemplate = document.getElementById('tpl_quote').value.trim() || DEFAULT_QUOTE_TEMPLATE;
   data.settings.repeatQuoteTemplate = document.getElementById('tpl_repeat_quote').value.trim() || DEFAULT_REPEAT_QUOTE_TEMPLATE;
   data.settings.companyName = document.getElementById('companyNameInput').value.trim();
+  data.settings.companyAddress = document.getElementById('companyAddressInput').value.trim();
+  data.settings.companyPhone = document.getElementById('companyPhoneInput').value.trim();
   data.settings.yourName = document.getElementById('yourNameInput').value.trim();
   saveData();
-  renderCompanyNameHeader();
   toast('Settings saved');
   closeSheet();
 }
@@ -2334,10 +2332,12 @@ function reportDate(){
 }
 let pendingReportTitle = '';
 let pendingReportBody = '';
+let pendingReportHideCompany = false;
 
-function runPrint(titleHtml, bodyHtml){
+function runPrint(titleHtml, bodyHtml, hideCompanyHeader){
   pendingReportTitle = titleHtml;
   pendingReportBody = bodyHtml;
+  pendingReportHideCompany = !!hideCompanyHeader;
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">${titleHtml}</h2>
@@ -2356,7 +2356,7 @@ function runPrint(titleHtml, bodyHtml){
 }
 
 function printPendingReport(){
-  const company = data.settings.companyName || '';
+  const company = pendingReportHideCompany ? '' : (data.settings.companyName || '');
   document.getElementById('printArea').innerHTML = `
     <div class="rpt-header">
       <div>
@@ -2509,7 +2509,7 @@ async function exportPendingReportDocx(){
   try{
     const { Document, Packer, Paragraph, TextRun, HeadingLevel } = docx;
     const plainTitle = pendingReportTitle.replace(/<[^>]+>/g,'');
-    const company = data.settings.companyName || '';
+    const company = pendingReportHideCompany ? '' : (data.settings.companyName || '');
 
     const headerChildren = [ new Paragraph({ text: plainTitle, heading: HeadingLevel.HEADING_1 }) ];
     if(company) headerChildren.push(new Paragraph({ children:[new TextRun({ text: company, italics:true })] }));
@@ -2816,7 +2816,10 @@ function printJobInvoice(id){
   if(!j) return;
   const invoiceNumber = 'INV-' + (j.date||todayISO()).replace(/-/g,'') + '-' + j.id.slice(-4).toUpperCase();
   const company = data.settings.companyName || '';
+  const companyAddress = data.settings.companyAddress || '';
+  const companyPhone = data.settings.companyPhone || '';
   const yourName = data.settings.yourName || '';
+  const hasLogo = !!data.settings.logo;
   const fromLine = [yourName, company].filter(Boolean).join(' · ');
 
   const metaRows = [
@@ -2834,8 +2837,28 @@ function printJobInvoice(id){
 
   const description = j.notes ? escapeHtml(j.notes) : 'Window cleaning — one-off job';
 
+  // Logo (its own top-level block, so the docx exporter's image branch picks it up cleanly)
+  // and the company name / address / phone (separate top-level blocks, left-aligned, so they
+  // fall through to the exporter's plain-paragraph handling) are kept as siblings rather than
+  // nested inside one div — a div mixing an <img> with text would have its text silently
+  // dropped by the exporter, which only pulls images out of an image-bearing node.
+  const logoBlock = hasLogo
+    ? `<div style="text-align:left; margin-bottom:4px;"><img class="inv-logo" src="${data.settings.logo}" style="display:block; max-height:60px; max-width:200px; object-fit:contain;"></div>`
+    : '';
+  const nameBlock = (!hasLogo && company)
+    ? `<div style="text-align:left; font-size:15px; font-weight:800; color:#10344C; margin-bottom:2px;">${escapeHtml(company)}</div>`
+    : '';
+  const addressBlock = companyAddress
+    ? `<div style="text-align:left; font-size:11px; color:#66798A; line-height:1.5;">${escapeHtml(companyAddress).replace(/\n/g,'<br>')}</div>`
+    : '';
+  const phoneBlock = companyPhone
+    ? `<div style="text-align:left; font-size:11px; color:#66798A; line-height:1.5;">${escapeHtml(companyPhone)}</div>`
+    : '';
+  const letterheadSpacer = (logoBlock || nameBlock || addressBlock || phoneBlock)
+    ? `<div style="margin-bottom:16px;"></div>` : '';
+
   const body = `
-    ${data.settings.logo ? `<div style="text-align:center; margin-bottom:16px;"><img class="inv-logo" src="${data.settings.logo}" style="max-height:70px; max-width:220px; object-fit:contain;"></div>` : ''}
+    ${logoBlock}${nameBlock}${addressBlock}${phoneBlock}${letterheadSpacer}
     <div class="rpt-round-title" style="margin-top:0;">Invoice</div>
     <table class="rpt-table inv-meta-table" style="margin-bottom:20px;"><tbody>${metaRows}</tbody></table>
 
@@ -2857,7 +2880,10 @@ function printJobInvoice(id){
       Thank you for your business.${fromLine ? '<br>' + escapeHtml(fromLine) : ''}
     </div>
   `;
-  runPrint(`Invoice — ${j.address || j.name || invoiceNumber}`, body);
+  // Always suppress the generic report header's company-name subtitle for invoices — the
+  // letterhead block above already covers name/logo/address/phone, so showing both would
+  // duplicate the company name under itself when there's no logo.
+  runPrint(`Invoice — ${j.address || j.name || invoiceNumber}`, body, true);
 }
 
 function printJobRecord(id){
@@ -3232,8 +3258,9 @@ function openHelp(){
       '<b>Appearance</b> — Light or Dark.',
       '<b>Text size</b> — a slider from small to large, so you can pick exactly the size that suits you.',
       '<b>Colour scheme</b> — six schemes (Ocean, Slate, Teal, Plum, Rust, Berry) recolour the whole app, including a soft tint on the main background, not just the header.',
-      '<b>Company name</b> — shown on printed reports and available as the {company} token in messages. Also shown centred at the top of the app, under the header icons.',
-      '<b>Company logo</b> — upload an image to show at the top of printed invoices.',
+      '<b>Company name</b> — shown on printed reports and invoices, and available as the {company} token in messages.',
+      '<b>Company address and phone</b> — optional, shown under the logo (or name) on printed invoices.',
+      '<b>Company logo</b> — upload an image to show at the top of printed invoices, in place of the company name.',
       '<b>Your name</b> — used to sign off texts personally, as the {yourname} token.',
       '<b>Text message templates</b> — wording for cleaning reminders, payment reminders, receipts, and new-enquiry and repeat-work quotes, using {name}, {amount}, {date}, {company} and {yourname} tokens.'
     ])}
@@ -3341,7 +3368,6 @@ document.getElementById('importFile').addEventListener('change', function(e){
         saveData();
         closeSheet();
         render();
-        renderCompanyNameHeader();
         toast('Backup restored');
       }
     }catch(err){
@@ -3590,7 +3616,6 @@ function escapeAttr(str){ return escapeHtml(str); }
 applyDarkMode();
 applyTheme();
 applyTextSize();
-renderCompanyNameHeader();
 /* ---------- swipe actions ---------- */
 let swipeState = null;
 function initSwipeHandlers(){
