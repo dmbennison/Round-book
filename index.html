@@ -364,7 +364,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 59;
+const APP_VERSION = 6;
 function formatVersion(v){ return '1.' + v; }
 const DEFAULT_CLEAN_TEMPLATE = "Hi {name}, just a reminder I'll be round to clean your windows soon. Let me know if that's not convenient.\n\nThanks,\n{yourname}\n{company}";
 const DEFAULT_PAY_TEMPLATE = "Hi {name}, a friendly reminder that your window cleaning payment of {amount} is outstanding.\n\nThanks,\n{yourname}\n{company}";
@@ -845,9 +845,14 @@ function renderRoundDetail(main, rn){
     </div>
     <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:12px;">
       <h2 style="font-size:1.25rem;">${escapeHtml(rn)}</h2>
-      <button class="btn-open" style="width:38px; height:38px; padding:0; flex-shrink:0;" onclick="printSingleRound('${escapeAttr(rn)}')" aria-label="Print this round">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
-      </button>
+      <div style="display:flex; gap:8px; flex-shrink:0;">
+        <button class="btn-open" style="width:38px; height:38px; padding:0;" onclick="openFocusedHelp('rounds')" aria-label="Help for rounds">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        </button>
+        <button class="btn-open" style="width:38px; height:38px; padding:0;" onclick="printSingleRound('${escapeAttr(rn)}')" aria-label="Print this round">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
+        </button>
+      </div>
     </div>
   `;
 
@@ -1166,6 +1171,7 @@ function openCustomerDetail(id){
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">${escapeHtml(c.address || c.name || 'Customer')}</h2>
+      ${helpIconBtn('customer')}
       <button class="sheet-close" style="flex-shrink:0; margin-right:6px;" onclick="printCustomerRecord('${id}')" aria-label="Print this customer">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
       </button>
@@ -1732,6 +1738,7 @@ function openJobForm(existing, prefill){
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">${existing?'Edit job':'Add one-off job'}</h2>
+      ${helpIconBtn('jobs')}
       ${existing?`<button class="sheet-close" style="flex-shrink:0; margin-right:6px;" onclick="printJobRecord('${existing.id}')" aria-label="Print this job">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
       </button>`:''}
@@ -1981,6 +1988,7 @@ function openQuoteForm(existing, prefill){
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">${existing?'Edit quote':'Add quote'}</h2>
+      ${helpIconBtn('quotes')}
       <button class="sheet-close" onclick="closeSheet()">✕</button>
     </div>
     <input type="hidden" id="q_fromJobId" value="${escapeAttr((prefill&&prefill.fromJobId)||'')}">
@@ -2143,14 +2151,12 @@ function confirmConvertQuoteToCustomer(quoteId){
 
 /* ---------- settings / dark mode / colour scheme ---------- */
 const THEMES = {
-  ocean:  {name:'Ocean',     navy:'#1B3A4B', blue:'#5B9BB5'},
-  slate:  {name:'Slate',     navy:'#3A434D', blue:'#8E9AA6'},
-  teal:   {name:'Teal',      navy:'#1F3D3A', blue:'#5FA69A'},
-  plum:   {name:'Plum',      navy:'#3A2C47', blue:'#9078A6'},
-  rust:   {name:'Rust',      navy:'#42302A', blue:'#B98362'},
-  berry:  {name:'Berry',     navy:'#3F2433', blue:'#B06B85'},
-  green:  {name:'Green',     navy:'#233B2E', blue:'#6FA37F'},
-  paleblue:{name:'Pale Blue',navy:'#3D5566', blue:'#A8C5D6'}
+  ocean:  {name:'Ocean',  navy:'#1D3944', blue:'#6C93A3'},
+  slate:  {name:'Slate',  navy:'#3A414A', blue:'#8B95A0'},
+  teal:   {name:'Teal',   navy:'#1F3A3B', blue:'#4E8B8A'},
+  plum:   {name:'Plum',   navy:'#332B3B', blue:'#8B7B93'},
+  forest: {name:'Forest', navy:'#233329', blue:'#6E8F72'},
+  ice:    {name:'Ice',    navy:'#33475A', blue:'#9AB4C3'}
 };
 let themeName = localStorage.getItem('roundBookTheme') || 'ocean';
 
@@ -2229,6 +2235,7 @@ function openSettings(){
   openSheet(`
     <div class="sheet-head">
       <h2>Settings</h2>
+      ${helpIconBtn('settings')}
       <button class="sheet-close" onclick="closeSheet()">✕</button>
     </div>
     <div class="section-label" style="margin-top:0;">Appearance</div>
@@ -2326,23 +2333,7 @@ function resetTemplates(){
 
 /* ---------- reports ---------- */
 function openReportsHelp(){
-  openSheet(`
-    <div class="sheet-head">
-      <h2>About reports</h2>
-      <button class="sheet-close" onclick="closeSheet()">✕</button>
-    </div>
-    ${helpP('Tap the printer icon for a list of reports — each one generates a clean, printer-friendly page. Choose <b>Print</b> (good for saving as a PDF too) or <b>Save as Word document</b> for an editable .docx. Both work offline.')}
-    ${helpRow('Windows due, by round', "Who's due/overdue right now")}
-    ${helpRow('Money owed', 'Cleaned but not yet paid')}
-    ${helpRow('Full round lists', 'Every customer, by round')}
-    ${helpRow('Round cleaning dates', 'List or calendar, last 5 weeks')}
-    ${helpRow('Earnings report', 'Totals by week/month/year')}
-    ${helpRow('Daily work done', 'Value completed, day by day')}
-    ${helpRow('Monthly schedule', 'Calendar of rounds and jobs due')}
-    ${helpRow('One-off jobs', 'Every job, status and value')}
-    ${helpRow('Price review due', '12+ months since last increase')}
-    ${helpP('<span style="color:var(--ink-muted); font-style:italic;">Reports always use the same neutral styling regardless of your chosen colour scheme, so they look consistent whoever opens them.</span>')}
-  `);
+  openFocusedHelp('reports');
 }
 
 function openReports(){
@@ -3273,12 +3264,102 @@ function helpList(items){
     `<li style="display:flex; gap:8px; color:var(--ink); font-size:0.8438rem; line-height:1.55; margin:0 2px 8px;"><span style="color:var(--blue); flex-shrink:0;">•</span><span>${it}</span></li>`
   ).join('')}</ul>`;
 }
+function helpIconBtn(topic){
+  return `<button class="sheet-close" style="flex-shrink:0; margin-right:6px;" onclick="openFocusedHelp('${topic}')" aria-label="Help for this screen">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+  </button>`;
+}
 function helpRow(left, right){
   return `<div style="display:flex; justify-content:space-between; gap:12px; align-items:center; padding:10px 2px; border-bottom:1px solid var(--line);">
     <span style="font-size:0.8125rem; font-weight:700; color:var(--ink);">${left}</span>
     <span style="font-size:0.8125rem; color:var(--ink-muted); text-align:right;">${right}</span>
   </div>`;
 }
+
+// Single source of truth for help content — the full User Guide is these sections one after
+// another, and the "?" icon dotted around the app opens just the one relevant section plus a
+// link through to the full guide, so the two never drift out of sync with each other.
+const FOCUSED_HELP = {
+  rounds: {
+    title: 'Rounds',
+    body: () => [
+      helpP('The Rounds tab shows every round, with a Rounds / Due / Owed switch. Open a round to see its customers, swipe a card right to mark cleaned or left to mark paid, and use Reorder to set your walking order.'),
+      helpP('If a round takes more than one day, tap each customer\'s day badge in reorder mode to assign Day 1–5. A day switcher then appears above the customer list, and cards get a "Day N" badge.')
+    ]
+  },
+  jobs: {
+    title: 'One-off jobs',
+    body: () => [
+      helpP('For anything outside your regular rounds. Swipe right for done, left for paid. Completed jobs get an anniversary flag after a year (switchable off per job), can be turned into a repeat-work quote, and can have a professional invoice printed or emailed — with your logo if you\'ve added one.')
+    ]
+  },
+  customer: {
+    title: 'Customers',
+    body: () => [
+      helpP('A customer\'s screen shows their clean history, payment history, price history, and any one-off jobs or photos linked to them. Use it to log a clean or payment by hand, pause them, or send a text reminder or receipt.'),
+      helpP('The printer icon prints or emails a record of everything on this screen — handy for a customer who asks for a summary.')
+    ]
+  },
+  quotes: {
+    title: 'Quotes',
+    body: () => [
+      helpP('Swipe right to accept, left to decline. Accepted quotes convert straight into a job or customer. Send a quote by text or email from its edit screen. Quotes left Pending past their follow-up window (7 days by default) get flagged automatically.')
+    ]
+  },
+  reports: {
+    title: 'Reports',
+    body: () => [
+      helpP('Tap the printer icon for a list of reports — each one generates a clean, printer-friendly page. Choose <b>Print</b> (good for saving as a PDF too) or <b>Save as Word document</b> for an editable .docx. Both work offline.'),
+      helpRow('Windows due, by round', "Who's due/overdue right now"),
+      helpRow('Money owed', 'Cleaned but not yet paid'),
+      helpRow('Full round lists', 'Every customer, by round'),
+      helpRow('Round cleaning dates', 'List or calendar, last 5 weeks'),
+      helpRow('Earnings report', 'Totals by week/month/year'),
+      helpRow('Daily work done', 'Value completed, day by day'),
+      helpRow('Monthly schedule', 'Calendar of rounds and jobs due'),
+      helpRow('One-off jobs', 'Every job, status and value'),
+      helpRow('Price review due', '12+ months since last increase'),
+      helpP('<span style="color:var(--ink-muted); font-style:italic;">Reports always use the same neutral styling regardless of your chosen colour scheme, so they look consistent whoever opens them.</span>')
+    ]
+  },
+  backup: {
+    title: 'Backup and restore',
+    body: () => [
+      helpP('Everything lives only on this phone. Back up regularly from the Backup icon — export a full backup, export to Excel, restore from a backup file, or import customers from a spreadsheet (they land in a "Needs review" round until you check them over).')
+    ]
+  },
+  settings: {
+    title: 'Settings',
+    body: () => [
+      helpP('Appearance, text size, colour scheme, company details and logo (for invoices), your name, and the wording of every text message template.')
+    ]
+  },
+  reminders: {
+    title: 'Reminders and banners',
+    body: () => [
+      helpP('Backups, job reminders, quote follow-ups, job anniversaries, and imported customers awaiting review all surface as a dismissible banner across the top of the app when relevant.')
+    ]
+  }
+};
+const FOCUSED_HELP_ORDER = ['rounds','jobs','quotes','customer','reminders','backup','reports','settings'];
+
+function openFocusedHelp(topic){
+  const h = FOCUSED_HELP[topic];
+  if(!h){ openHelp(); return; }
+  openSheet(`
+    <div class="sheet-head">
+      <h2>${escapeHtml(h.title)}</h2>
+      <button class="sheet-close" onclick="closeSheet()">✕</button>
+    </div>
+    ${h.body().join('')}
+    <button onclick="openHelp()" style="display:flex; align-items:center; gap:10px; width:100%; text-align:left; background:var(--blue-dim); color:var(--blue-deep); border:none; border-radius:12px; padding:12px 14px; font-weight:800; font-size:0.8438rem; margin-top:6px;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px; height:18px; flex-shrink:0;"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      <span style="flex:1;">Full user guide</span>
+      <span style="opacity:0.6;">›</span>
+    </button>
+  `);
+}
+
 function openHelp(){
   openSheet(`
     <div class="sheet-head">
@@ -3290,26 +3371,12 @@ function openHelp(){
     ${helpP('Round Book is a simple, offline window cleaning round tracker. It keeps track of customers, rounds, cleaning and payment dates, one-off jobs, and quotes — all stored privately on your own phone.')}
 
     ${helpH('Getting around')}
-    ${helpP('Three tabs: <b>Rounds</b>, <b>One-off jobs</b>, <b>Quotes</b>. The blue + button adds something to whichever tab you\'re on. Header icons: <b>About</b>, <b>Reports</b> (with its own ? for help), <b>Backup</b>, <b>Settings</b>.')}
+    ${helpP('Three tabs: <b>Rounds</b>, <b>One-off jobs</b>, <b>Quotes</b>. The blue + button adds something to whichever tab you\'re on. Header icons: <b>About</b>, <b>Reports</b>, <b>Backup</b>, <b>Settings</b>. Look for a <b>?</b> next to a screen\'s print icon for help on just that screen.')}
 
-    ${helpH('Rounds')}
-    ${helpP('The Rounds tab shows every round, with a Rounds / Due / Owed switch. Open a round to see its customers, swipe a card right to mark cleaned or left to mark paid, and use Reorder to set your walking order.')}
-    ${helpP('If a round takes more than one day, tap each customer\'s day badge in reorder mode to assign Day 1–5. A day switcher then appears above the customer list, and cards get a "Day N" badge.')}
-
-    ${helpH('One-off jobs')}
-    ${helpP('For anything outside your regular rounds. Swipe right for done, left for paid. Completed jobs get an anniversary flag after a year (switchable off per job), can be turned into a repeat-work quote, and can have a professional invoice printed or emailed — with your logo if you\'ve added one.')}
-
-    ${helpH('Quotes')}
-    ${helpP('Swipe right to accept, left to decline. Accepted quotes convert straight into a job or customer. Send a quote by text or email from its edit screen. Quotes left Pending past their follow-up window (7 days by default) get flagged automatically.')}
-
-    ${helpH('Reminders and banners')}
-    ${helpP('Backups, job reminders, quote follow-ups, job anniversaries, and imported customers awaiting review all surface as a dismissible banner across the top of the app when relevant.')}
-
-    ${helpH('Backup and restore')}
-    ${helpP('Everything lives only on this phone. Back up regularly from the Backup icon — export a full backup, export to Excel, restore from a backup file, or import customers from a spreadsheet (they land in a "Needs review" round until you check them over).')}
-
-    ${helpH('Settings')}
-    ${helpP('Appearance, text size, colour scheme, company details and logo (for invoices), your name, and the wording of every text message template.')}
+    ${FOCUSED_HELP_ORDER.map(key=>{
+      const h = FOCUSED_HELP[key];
+      return helpH(h.title) + h.body().join('');
+    }).join('')}
 
     ${helpH('Feedback')}
     ${helpP('Spotted a problem or got an idea? Get in touch — feedback\'s always welcome.')}
@@ -3324,6 +3391,7 @@ function openBackup(){
   openSheet(`
     <div class="sheet-head">
       <h2>Backup &amp; restore</h2>
+      ${helpIconBtn('backup')}
       <button class="sheet-close" onclick="closeSheet()">✕</button>
     </div>
     <p style="color:var(--ink-muted); font-size:0.8438rem; line-height:1.5; margin:0 2px 4px;">
