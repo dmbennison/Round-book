@@ -323,9 +323,6 @@
       <button class="icon-btn" onclick="openReports()" aria-label="Reports">
         <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
       </button>
-      <button class="icon-btn" onclick="openReportsHelp()" aria-label="Help with reports">
-        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-      </button>
       <button class="icon-btn" onclick="openBackup()" aria-label="Backup">
         <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
       </button>
@@ -364,7 +361,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 6;
+const APP_VERSION = 7;
 function formatVersion(v){ return '1.' + v; }
 const DEFAULT_CLEAN_TEMPLATE = "Hi {name}, just a reminder I'll be round to clean your windows soon. Let me know if that's not convenient.\n\nThanks,\n{yourname}\n{company}";
 const DEFAULT_PAY_TEMPLATE = "Hi {name}, a friendly reminder that your window cleaning payment of {amount} is outstanding.\n\nThanks,\n{yourname}\n{company}";
@@ -1652,7 +1649,6 @@ function renderJobs(main){
     return;
   }
   html += `<div class="section-label">${jobs.length} one-off job${jobs.length===1?'':'s'}</div>`;
-  html += `<div class="swipe-hint">👉 Swipe a card right to mark done, left to mark paid</div>`;
   html += jobs.map(j=>jobCardHtml(j, today)).join('');
   main.innerHTML = html;
 }
@@ -1932,7 +1928,6 @@ function renderQuotes(main){
     return;
   }
   html += `<div class="section-label">${quotes.length} quote${quotes.length===1?'':'s'}</div>`;
-  html += `<div class="swipe-hint">👉 Swipe a card right to accept, left to decline</div>`;
   html += quotes.map(quoteCardHtml).join('');
   main.innerHTML = html;
 }
@@ -2151,12 +2146,12 @@ function confirmConvertQuoteToCustomer(quoteId){
 
 /* ---------- settings / dark mode / colour scheme ---------- */
 const THEMES = {
-  ocean:  {name:'Ocean',  navy:'#1D3944', blue:'#6C93A3'},
-  slate:  {name:'Slate',  navy:'#3A414A', blue:'#8B95A0'},
-  teal:   {name:'Teal',   navy:'#1F3A3B', blue:'#4E8B8A'},
-  plum:   {name:'Plum',   navy:'#332B3B', blue:'#8B7B93'},
-  forest: {name:'Forest', navy:'#233329', blue:'#6E8F72'},
-  ice:    {name:'Ice',    navy:'#33475A', blue:'#9AB4C3'}
+  ocean:  {name:'Ocean',  navy:'#164559', blue:'#3FA9D6'},
+  slate:  {name:'Slate',  navy:'#3A424C', blue:'#A6B4C2'},
+  teal:   {name:'Teal',   navy:'#0F4A48', blue:'#2BB5A8'},
+  plum:   {name:'Plum',   navy:'#4A1F52', blue:'#C15FC0'},
+  forest: {name:'Forest', navy:'#1E4A2E', blue:'#4FAE64'},
+  ice:    {name:'Ice',    navy:'#1B4E63', blue:'#3DD6E0'}
 };
 let themeName = localStorage.getItem('roundBookTheme') || 'ocean';
 
@@ -2332,14 +2327,11 @@ function resetTemplates(){
 }
 
 /* ---------- reports ---------- */
-function openReportsHelp(){
-  openFocusedHelp('reports');
-}
-
 function openReports(){
   openSheet(`
     <div class="sheet-head">
       <h2>Print reports</h2>
+      ${helpIconBtn('reports')}
       <button class="sheet-close" onclick="closeSheet()">✕</button>
     </div>
     <p style="color:var(--ink-muted); font-size:0.8438rem; line-height:1.5; margin:0 2px 16px;">
