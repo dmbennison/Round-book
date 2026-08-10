@@ -66,22 +66,24 @@
     position:sticky; top:0; z-index:20;
   }
   .header-row{display:flex; align-items:center; justify-content:space-between; gap:10px;}
-  .brand{display:flex; align-items:center; gap:10px;}
+  .brand{display:flex; align-items:center; gap:10px; min-width:0;}
   .brand-mark{
     width:34px;height:34px;border-radius:9px;
     background:linear-gradient(160deg, var(--blue), var(--blue-deep));
     display:flex;align-items:center;justify-content:center;
     box-shadow: inset 0 0 0 1px rgba(255,255,255,0.25);
+    flex-shrink:0;
   }
   .brand-mark svg{width:19px;height:19px;}
-  .brand h1{font-size:1.1875rem; font-weight:800;}
-  .brand .sub{font-size:0.6875rem; color:#A9C4D8; font-weight:600; letter-spacing:.04em; text-transform:uppercase; margin-top:1px;}
+  .brand-text{min-width:0;}
+  .brand h1{font-size:1.1875rem; font-weight:800; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .brand .sub{font-size:0.6875rem; color:#A9C4D8; font-weight:600; letter-spacing:.04em; text-transform:uppercase; margin-top:1px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
   #weatherPill{text-transform:none;}
   .icon-btn{
-    width:38px;height:38px;border-radius:10px;border:none;
+    width:34px;height:34px;border-radius:9px;border:none; flex-shrink:0;
     background:rgba(255,255,255,0.12); color:#fff; display:flex;align-items:center;justify-content:center;
   }
-  .icon-btn svg{width:19px;height:19px;}
+  .icon-btn svg{width:17px;height:17px;}
   .icon-btn:active{background:rgba(255,255,255,0.22);}
 
   .tabs{display:flex; gap:6px; margin-top:14px; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none;}
@@ -308,18 +310,21 @@
       <div class="brand-mark">
         <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M4 4h16v12H4z"/><path d="M4 10h16M10 4v12"/><path d="M14 20l3-3M18 20l1-1"/></svg>
       </div>
-      <div>
+      <div class="brand-text">
         <h1>Round Book</h1>
         <div class="sub" id="dateNow"></div>
         <div class="sub" id="weatherPill"></div>
       </div>
     </div>
-    <div style="display:flex; gap:6px;">
+    <div style="display:flex; gap:5px;">
       <button class="icon-btn" onclick="openInfo()" aria-label="About">
         <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
       </button>
       <button class="icon-btn" onclick="openReports()" aria-label="Reports">
         <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
+      </button>
+      <button class="icon-btn" onclick="openReportsHelp()" aria-label="Help with reports">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
       </button>
       <button class="icon-btn" onclick="openBackup()" aria-label="Backup">
         <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
@@ -359,7 +364,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 58;
+const APP_VERSION = 59;
 function formatVersion(v){ return '1.' + v; }
 const DEFAULT_CLEAN_TEMPLATE = "Hi {name}, just a reminder I'll be round to clean your windows soon. Let me know if that's not convenient.\n\nThanks,\n{yourname}\n{company}";
 const DEFAULT_PAY_TEMPLATE = "Hi {name}, a friendly reminder that your window cleaning payment of {amount} is outstanding.\n\nThanks,\n{yourname}\n{company}";
@@ -765,7 +770,6 @@ function renderRoundsList(main){
       </div>`;
     });
   } else if(roundsViewMode === 'due'){
-    html += `<div class="swipe-hint">👉 Swipe a card right to mark cleaned, left to mark paid</div>`;
     let anyDue = false;
     roundNames.forEach(rn=>{
       const dueCusts = rounds[rn].filter(c=>{
@@ -793,7 +797,6 @@ function renderRoundsList(main){
       </div>`;
     }
   } else if(roundsViewMode === 'owed'){
-    html += `<div class="swipe-hint">👉 Swipe a card right to mark cleaned, left to mark paid</div>`;
     let anyOwed = false;
     let grandTotal = 0;
     roundNames.forEach(rn=>{
@@ -891,7 +894,6 @@ function renderRoundDetail(main, rn){
     <button class="seg-btn ${roundFilterMode==='due'?'active':''}" onclick="setRoundFilterMode('due')">📅 Due only</button>
     <button class="seg-btn ${roundFilterMode==='owed'?'active':''}" onclick="setRoundFilterMode('owed')">💷 Owed only</button>
   </div>`;
-  shellHtml += `<div class="swipe-hint">👉 Swipe a card right to mark cleaned, left to mark paid</div>`;
 
   let baseList = allInRound;
   if(spansMultipleDays && roundDayFilter !== 'all'){
@@ -2141,12 +2143,14 @@ function confirmConvertQuoteToCustomer(quoteId){
 
 /* ---------- settings / dark mode / colour scheme ---------- */
 const THEMES = {
-  ocean: {name:'Ocean',  navy:'#10344C', blue:'#2F9BDE'},
-  slate: {name:'Slate',  navy:'#333F4D', blue:'#8A99AC'},
-  teal:  {name:'Teal',   navy:'#0F3D3E', blue:'#2FB6A6'},
-  plum:  {name:'Plum',   navy:'#3A2359', blue:'#9B6BE0'},
-  rust:  {name:'Rust',   navy:'#4A2A1B', blue:'#E08A4C'},
-  berry: {name:'Berry',  navy:'#4A1942', blue:'#E0568C'}
+  ocean:  {name:'Ocean',     navy:'#1B3A4B', blue:'#5B9BB5'},
+  slate:  {name:'Slate',     navy:'#3A434D', blue:'#8E9AA6'},
+  teal:   {name:'Teal',      navy:'#1F3D3A', blue:'#5FA69A'},
+  plum:   {name:'Plum',      navy:'#3A2C47', blue:'#9078A6'},
+  rust:   {name:'Rust',      navy:'#42302A', blue:'#B98362'},
+  berry:  {name:'Berry',     navy:'#3F2433', blue:'#B06B85'},
+  green:  {name:'Green',     navy:'#233B2E', blue:'#6FA37F'},
+  paleblue:{name:'Pale Blue',navy:'#3D5566', blue:'#A8C5D6'}
 };
 let themeName = localStorage.getItem('roundBookTheme') || 'ocean';
 
@@ -2321,6 +2325,26 @@ function resetTemplates(){
 }
 
 /* ---------- reports ---------- */
+function openReportsHelp(){
+  openSheet(`
+    <div class="sheet-head">
+      <h2>About reports</h2>
+      <button class="sheet-close" onclick="closeSheet()">✕</button>
+    </div>
+    ${helpP('Tap the printer icon for a list of reports — each one generates a clean, printer-friendly page. Choose <b>Print</b> (good for saving as a PDF too) or <b>Save as Word document</b> for an editable .docx. Both work offline.')}
+    ${helpRow('Windows due, by round', "Who's due/overdue right now")}
+    ${helpRow('Money owed', 'Cleaned but not yet paid')}
+    ${helpRow('Full round lists', 'Every customer, by round')}
+    ${helpRow('Round cleaning dates', 'List or calendar, last 5 weeks')}
+    ${helpRow('Earnings report', 'Totals by week/month/year')}
+    ${helpRow('Daily work done', 'Value completed, day by day')}
+    ${helpRow('Monthly schedule', 'Calendar of rounds and jobs due')}
+    ${helpRow('One-off jobs', 'Every job, status and value')}
+    ${helpRow('Price review due', '12+ months since last increase')}
+    ${helpP('<span style="color:var(--ink-muted); font-style:italic;">Reports always use the same neutral styling regardless of your chosen colour scheme, so they look consistent whoever opens them.</span>')}
+  `);
+}
+
 function openReports(){
   openSheet(`
     <div class="sheet-head">
@@ -3261,105 +3285,34 @@ function openHelp(){
       <h2>User guide</h2>
       <button class="sheet-close" onclick="closeSheet()">✕</button>
     </div>
-    <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 4px;">Version ${formatVersion(APP_VERSION)} · Updated 5 August 2026</p>
+    <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 4px;">Version ${formatVersion(APP_VERSION)}</p>
 
-    ${helpP('Round Book is a simple, offline window cleaning round tracker. It keeps track of your customers, rounds, cleaning and payment dates, one-off jobs, and quotes — all stored privately on your own phone. Nothing is sent to a server, so it works with no signal and there\'s nothing to sign up for.')}
+    ${helpP('Round Book is a simple, offline window cleaning round tracker. It keeps track of customers, rounds, cleaning and payment dates, one-off jobs, and quotes — all stored privately on your own phone.')}
 
-    ${helpH('Finding your way around')}
-    ${helpP('The app has three tabs across the top: <b>Rounds</b>, <b>One-off jobs</b>, and <b>Quotes</b>. Four icons in the header give you the other main areas:')}
-    ${helpList([
-      '<b>About (ⓘ)</b> — what Round Book is, the version number, and this guide.',
-      '<b>Reports (🖨)</b> — print or export a range of reports.',
-      '<b>Backup (⬆⬇)</b> — export or restore your data.',
-      '<b>Settings (⚙)</b> — appearance, text size, colour scheme, company name and message wording.'
-    ])}
-    ${helpP('The blue + button in the bottom right always adds something to whichever tab you\'re currently on — a customer on Rounds, a one-off job on Jobs, or a quote on Quotes.')}
+    ${helpH('Getting around')}
+    ${helpP('Three tabs: <b>Rounds</b>, <b>One-off jobs</b>, <b>Quotes</b>. The blue + button adds something to whichever tab you\'re on. Header icons: <b>About</b>, <b>Reports</b> (with its own ? for help), <b>Backup</b>, <b>Settings</b>.')}
 
     ${helpH('Rounds')}
-    ${helpSub('Overview')}
-    ${helpP('The Rounds tab opens on a summary of every round. A <b>Rounds / Due / Owed</b> switch changes what the cards below show: every round, everyone due or overdue a clean across all rounds, or everyone who owes money.')}
-    ${helpSub('Inside a round')}
-    ${helpP('Tapping a round opens its customer list, with the same All / Due / Owed switch, plus a reorder toggle to drag customers into the order you actually walk the round.')}
-    ${helpP('If a round takes more than one day, use reorder mode to tap each customer\'s day badge and assign them to Day 1 up to Day 5. The round\'s card shows how many days it spans, and once a round has customers on more than one day, a day switcher appears above the customer list so you can filter down to just that day\'s work — or, with "All days" selected, the list shows a divider between each day so it\'s clear where one day\'s work ends and the next begins. A "Day N" badge also shows on cards wherever they appear.')}
-    ${helpSub('Customer cards')}
-    ${helpP('Swipe a card right to mark it cleaned today, or left to mark it paid in full. Tap a card to open the customer\'s detail screen: clean history, payment history, price history, linked one-off jobs, and photos — plus options to pause the customer or send a text reminder, chase, or receipt.')}
-    ${helpSub('Adding or editing a customer')}
-    ${helpP('Address (with a "use my location" shortcut), optional name/phone/email, round, price per clean, cleaning frequency in weeks, and free-text notes.')}
+    ${helpP('The Rounds tab shows every round, with a Rounds / Due / Owed switch. Open a round to see its customers, swipe a card right to mark cleaned or left to mark paid, and use Reorder to set your walking order.')}
+    ${helpP('If a round takes more than one day, tap each customer\'s day badge in reorder mode to assign Day 1–5. A day switcher then appears above the customer list, and cards get a "Day N" badge.')}
 
     ${helpH('One-off jobs')}
-    ${helpP('For anything outside your regular rounds — a gutter clean, a one-time job, a job from a quote — use the Jobs tab. Swipe a job card right to mark it done, or left to mark it paid. Set a reminder for the day before or the day of the job.')}
-    ${helpP('Job anniversaries are flagged automatically. Once a completed one-off job reaches 365+ days old, the job card shows its anniversary badge, and a banner suggests it might be worth a follow-up call — useful for repeat work like annual gutter cleans. This is on by default for every job, but can be switched off per job from its edit screen.')}
-    ${helpP('Open an existing job and tap "Turn into a quote for repeat work" to prefill a new quote with that job\'s address, contact details and price — handy for turning a one-off into an ongoing arrangement.')}
-    ${helpP('Open an existing job and tap "Print invoice" for a professional, ready-to-send invoice — your logo (if you\'ve added one in Settings), an invoice number, the job details, a bill-to block, the total, and a paid/payment-due stamp. Print it, save it as a PDF, or use "Save as Word document" from the same screen to get an editable .docx.')}
+    ${helpP('For anything outside your regular rounds. Swipe right for done, left for paid. Completed jobs get an anniversary flag after a year (switchable off per job), can be turned into a repeat-work quote, and can have a professional invoice printed or emailed — with your logo if you\'ve added one.')}
 
     ${helpH('Quotes')}
-    ${helpP('Log a quote with an address, contact details, price, and notes. Swipe right to accept, left to decline. An accepted quote converts straight into a one-off job or a full customer, without re-typing anything.')}
-    ${helpP('Every quote has a "follow up after" field, in days, defaulting to 7. A quote still Pending once that many days have passed gets an amber "Follow up" badge, sorts to the top of the list, and triggers a banner. Change the number of days per quote if some jobs need a longer or shorter chase-up window.')}
-    ${helpP('Open an existing quote with a phone number or email saved and tap "Send quote by text" (or "by email") to send it straight to the customer. Quotes converted from a one-off job automatically use the separate "repeat work" template, so the wording can reflect that they\'re already a customer.')}
+    ${helpP('Swipe right to accept, left to decline. Accepted quotes convert straight into a job or customer. Send a quote by text or email from its edit screen. Quotes left Pending past their follow-up window (7 days by default) get flagged automatically.')}
 
     ${helpH('Reminders and banners')}
-    ${helpP('A few things are surfaced proactively as a coloured banner across the top of the app, each with a "View" button and a dismiss (✕). Dismissing hides it for the rest of the visit; it reappears next time you open the app if still true.')}
-    ${helpList([
-      'Backup reminder — once it\'s been 7+ days since your last backup.',
-      'Job reminder — the day before or the day of a job flagged with 🔔.',
-      '<b>Quote follow-up</b> — when a pending quote has passed its follow-up window.',
-      '<b>Job anniversary</b> — when a completed one-off job reaches 365+ days old.',
-      '<b>Import review</b> — while any imported customers are still sitting in the "Needs review" round.'
-    ])}
-
-    ${helpH('Reports, printing and Word exports')}
-    ${helpP('The Reports icon lists report types, each generating a clean, printer-friendly page. Choose <b>Print</b> (opens your phone\'s print dialog — good for saving as a PDF) or <b>Save as Word document</b> (.docx) — both work offline.')}
-    ${helpRow('Windows due, by round', "Who's due/overdue right now")}
-    ${helpRow('Money owed', 'Cleaned but not yet paid')}
-    ${helpRow('Full round lists', 'Every customer, by round')}
-    ${helpRow('Round cleaning dates — list', 'Dates cleaned in the last 5 weeks')}
-    ${helpRow('Round cleaning dates — calendar', 'Same, as a calendar')}
-    ${helpRow('Earnings report', 'Totals by week/month/year')}
-    ${helpRow('Daily work done', 'Value completed, day by day')}
-    ${helpRow('Monthly schedule', 'Calendar of rounds and jobs due')}
-    ${helpRow('One-off jobs', 'Every job, status and value')}
-    ${helpRow('Price review due', "12+ months since last increase")}
-    ${helpP('<span style="color:var(--ink-muted); font-style:italic;">Printed and exported reports always use the same neutral navy styling, regardless of your chosen colour scheme, so they look consistent whoever opens them.</span>')}
+    ${helpP('Backups, job reminders, quote follow-ups, job anniversaries, and imported customers awaiting review all surface as a dismissible banner across the top of the app when relevant.')}
 
     ${helpH('Backup and restore')}
-    ${helpP('Everything lives only on your phone, in your browser — there\'s no cloud copy. Open the Backup icon for:')}
-    ${helpList([
-      '<b>Export backup</b> — a .json file with everything: customers, rounds, jobs, quotes, settings. Use this to restore.',
-      '<b>Export as Excel</b> — a .xlsx workbook, one sheet per round, plus a summary and jobs sheet.',
-      '<b>Restore from backup</b> — replaces everything on the phone with a backup file\'s contents. This is a full replace, not a merge.',
-      '<b>Import customers from spreadsheet</b> — bring in customers from a .csv or .xlsx file (from another app, or a spreadsheet you\'ve been using). Columns are matched automatically by their header names (e.g. "Address", "Name", "Phone", "Price"). Imported customers land in a "Needs review" round rather than their real one, so nothing gets scheduled until you\'ve checked each one and assigned it properly. A banner reminds you while any are still waiting.'
-    ])}
+    ${helpP('Everything lives only on this phone. Back up regularly from the Backup icon — export a full backup, export to Excel, restore from a backup file, or import customers from a spreadsheet (they land in a "Needs review" round until you check them over).')}
 
     ${helpH('Settings')}
-    ${helpList([
-      '<b>Appearance</b> — Light or Dark.',
-      '<b>Text size</b> — a slider from small to large, so you can pick exactly the size that suits you.',
-      '<b>Colour scheme</b> — six schemes (Ocean, Slate, Teal, Plum, Rust, Berry) recolour the whole app, including a soft tint on the main background, not just the header.',
-      '<b>Company name</b> — shown on printed reports and invoices, and available as the {company} token in messages.',
-      '<b>Company address and phone</b> — optional, shown under the logo (or name) on printed invoices.',
-      '<b>Company logo</b> — upload an image to show at the top of printed invoices, in place of the company name.',
-      '<b>Your name</b> — used to sign off texts personally, as the {yourname} token.',
-      '<b>Text message templates</b> — wording for cleaning reminders, payment reminders, receipts, and new-enquiry and repeat-work quotes, using {name}, {amount}, {date}, {company} and {yourname} tokens.'
-    ])}
-
-    ${helpH('Quick reference')}
-    ${helpSub('Swipe gestures')}
-    ${helpRow('Customers', '→ Cleaned &nbsp;·&nbsp; ← Paid')}
-    ${helpRow('One-off jobs', '→ Done &nbsp;·&nbsp; ← Paid')}
-    ${helpRow('Quotes', '→ Accept &nbsp;·&nbsp; ← Decline')}
-    ${helpSub('Status badges')}
-    <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:20px;">
-      <span class="badge due">Due (Xd)</span>
-      <span class="badge overdue">Xd overdue</span>
-      <span class="badge due">Never cleaned</span>
-      <span class="badge paused">Paused</span>
-      <span class="badge owed">Owed</span>
-      <span class="badge overdue">⏰ Follow up</span>
-      <span class="badge anniversary">🎉 Anniversary</span>
-    </div>
+    ${helpP('Appearance, text size, colour scheme, company details and logo (for invoices), your name, and the wording of every text message template.')}
 
     ${helpH('Feedback')}
-    ${helpP('Spotted a problem, got an idea, or just want to say something about the app? Get in touch — feedback\'s always welcome.')}
+    ${helpP('Spotted a problem or got an idea? Get in touch — feedback\'s always welcome.')}
     <a href="mailto:dmbennison@gmail.com?subject=Round%20Book%20feedback" style="display:block; text-decoration:none; background:var(--blue-dim); color:var(--blue-deep); border-radius:12px; padding:12px; text-align:center; font-weight:800; font-size:0.875rem; margin-bottom:4px;">✉️ dmbennison@gmail.com</a>
   `);
 }
