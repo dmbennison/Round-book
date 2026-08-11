@@ -109,7 +109,8 @@
   .day-divider:first-child{margin-top:0;}
 
   .round-card{
-    background:var(--surface); border-radius:var(--radius); padding:14px 16px; margin-bottom:10px;
+    background:linear-gradient(to bottom, var(--surface), var(--blue-dim));
+    border-radius:var(--radius); padding:14px 16px; margin-bottom:10px;
     border:1px solid var(--line); display:flex; align-items:center; justify-content:space-between; gap:10px;
     position:relative; overflow:hidden;
   }
@@ -135,7 +136,8 @@
   .swipe-bg-left{background:var(--green); justify-content:flex-start;}
   .swipe-bg-right{background:var(--blue); justify-content:flex-end;}
   .cust-card{
-    background:var(--surface); border-radius:var(--radius); padding:14px 16px;
+    background:linear-gradient(to bottom, var(--surface), var(--blue-dim));
+    border-radius:var(--radius); padding:14px 16px;
     border:1px solid var(--line); position:relative; z-index:1; touch-action:pan-y;
   }
   .cust-top{display:flex; justify-content:space-between; align-items:flex-start; gap:10px;}
@@ -361,7 +363,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 7;
+const APP_VERSION = 8;
 function formatVersion(v){ return '1.' + v; }
 const DEFAULT_CLEAN_TEMPLATE = "Hi {name}, just a reminder I'll be round to clean your windows soon. Let me know if that's not convenient.\n\nThanks,\n{yourname}\n{company}";
 const DEFAULT_PAY_TEMPLATE = "Hi {name}, a friendly reminder that your window cleaning payment of {amount} is outstanding.\n\nThanks,\n{yourname}\n{company}";
@@ -740,8 +742,11 @@ function renderRoundsList(main){
 
   if(roundsViewMode === 'overview'){
     html += `<div class="section-label">Your rounds</div>`;
+    let grandCustomers = 0, grandValue = 0;
     roundNames.forEach(rn=>{
       const all = rounds[rn];
+      grandCustomers += all.length;
+      grandValue += all.reduce((sum,c)=>sum+Number(c.price||0),0);
       const daysUsed = roundDaysUsed(all);
       let overdue=0, due=0, owed=0, paused=0;
       all.forEach(c=>{
@@ -766,8 +771,10 @@ function renderRoundsList(main){
         </div>
       </div>`;
     });
+    html += listTotalHtml(`${roundNames.length} round${roundNames.length===1?'':'s'} · ${grandCustomers} customer${grandCustomers===1?'':'s'} · ${money(grandValue)}`);
   } else if(roundsViewMode === 'due'){
     let anyDue = false;
+    let dueGrandCount = 0, dueGrandValue = 0;
     roundNames.forEach(rn=>{
       const dueCusts = rounds[rn].filter(c=>{
         const s = custStatus(c);
@@ -779,6 +786,8 @@ function renderRoundsList(main){
       });
       if(!dueCusts.length) return;
       anyDue = true;
+      dueGrandCount += dueCusts.length;
+      dueGrandValue += dueCusts.reduce((s,c)=>s+Number(c.price||0),0);
       const anyPhone = dueCusts.some(c=>c.phone);
       html += `<div style="display:flex; align-items:center; justify-content:space-between; margin:18px 2px 8px;">
         <div class="section-label" style="margin:0;">${escapeHtml(rn)} <span style="font-weight:600; color:var(--ink-muted); text-transform:none; letter-spacing:0;">(${dueCusts.length})</span></div>
@@ -792,15 +801,19 @@ function renderRoundsList(main){
         <b>Nobody's due</b>
         <p>Everyone's cleaned on schedule.</p>
       </div>`;
+    } else {
+      html += listTotalHtml(`${dueGrandCount} due · ${money(dueGrandValue)}`);
     }
   } else if(roundsViewMode === 'owed'){
     let anyOwed = false;
     let grandTotal = 0;
+    let owedGrandCount = 0;
     roundNames.forEach(rn=>{
       const owedCusts = rounds[rn].filter(c=>custStatus(c).owed)
         .sort((a,b)=>custStatus(b).balance-custStatus(a).balance);
       if(!owedCusts.length) return;
       anyOwed = true;
+      owedGrandCount += owedCusts.length;
       const roundTotal = owedCusts.reduce((s,c)=>s+custStatus(c).balance,0);
       grandTotal += roundTotal;
       const anyPhone = owedCusts.some(c=>c.phone);
@@ -817,7 +830,7 @@ function renderRoundsList(main){
         <p>Everyone's paid up.</p>
       </div>`;
     } else {
-      html += `<div style="text-align:right; font-weight:800; font-size:0.9375rem; color:var(--emphasis); padding:10px 4px 4px;">Total owed: ${money(grandTotal)}</div>`;
+      html += listTotalHtml(`${owedGrandCount} owing · Total owed: ${money(grandTotal)}`);
     }
   }
 
@@ -931,7 +944,10 @@ function renderRoundDetail(main, rn){
   }
   if(roundFilterMode === 'owed'){
     const owedTotal = custs.reduce((sum,c)=>sum+custStatus(c).balance,0);
-    shellHtml += `<div style="text-align:right; font-weight:800; font-size:0.9375rem; color:var(--emphasis); padding:10px 4px 4px;">Total owed: ${money(owedTotal)}</div>`;
+    shellHtml += listTotalHtml(`${custs.length} owing · Total owed: ${money(owedTotal)}`);
+  } else {
+    const listTotal = custs.reduce((sum,c)=>sum+Number(c.price||0),0);
+    shellHtml += listTotalHtml(`${custs.length} customer${custs.length===1?'':'s'} · ${money(listTotal)}`);
   }
   main.innerHTML = shellHtml;
 }
@@ -1650,6 +1666,8 @@ function renderJobs(main){
   }
   html += `<div class="section-label">${jobs.length} one-off job${jobs.length===1?'':'s'}</div>`;
   html += jobs.map(j=>jobCardHtml(j, today)).join('');
+  const jobsTotal = jobs.reduce((sum,j)=>sum+Number(j.price||0),0);
+  html += listTotalHtml(`${jobs.length} job${jobs.length===1?'':'s'} · ${money(jobsTotal)}`);
   main.innerHTML = html;
 }
 
@@ -1929,6 +1947,8 @@ function renderQuotes(main){
   }
   html += `<div class="section-label">${quotes.length} quote${quotes.length===1?'':'s'}</div>`;
   html += quotes.map(quoteCardHtml).join('');
+  const quotesTotal = quotes.reduce((sum,q)=>sum+Number(q.price||0),0);
+  html += listTotalHtml(`${quotes.length} quote${quotes.length===1?'':'s'} · ${money(quotesTotal)}`);
   main.innerHTML = html;
 }
 
@@ -2148,7 +2168,7 @@ function confirmConvertQuoteToCustomer(quoteId){
 const THEMES = {
   ocean:  {name:'Ocean',  navy:'#164559', blue:'#3FA9D6'},
   slate:  {name:'Slate',  navy:'#3A424C', blue:'#A6B4C2'},
-  teal:   {name:'Teal',   navy:'#0F4A48', blue:'#2BB5A8'},
+  rust:   {name:'Rust',   navy:'#5A2A1C', blue:'#E0723A'},
   plum:   {name:'Plum',   navy:'#4A1F52', blue:'#C15FC0'},
   forest: {name:'Forest', navy:'#1E4A2E', blue:'#4FAE64'},
   ice:    {name:'Ice',    navy:'#1B4E63', blue:'#3DD6E0'}
@@ -2380,6 +2400,9 @@ function openReports(){
   `);
 }
 
+function listTotalHtml(text){
+  return `<div style="text-align:right; font-weight:800; font-size:0.9375rem; color:var(--emphasis); padding:10px 4px 4px;">${text}</div>`;
+}
 function groupByRound(list){
   const rounds = {};
   list.forEach(c=>{
