@@ -142,7 +142,10 @@
   .cust-card{
     background:linear-gradient(to bottom, var(--surface), var(--blue-dim));
     border-radius:var(--radius); padding:14px 16px;
-    border:1px solid var(--line); position:relative; z-index:1; touch-action:pan-y;
+    border:1px solid var(--line); position:relative; z-index:1; touch-action:pan-y; overflow:hidden;
+  }
+  .cust-card::before{
+    content:""; position:absolute; left:0; top:0; bottom:0; width:5px; background:var(--blue);
   }
   .cust-top{display:flex; justify-content:space-between; align-items:flex-start; gap:10px;}
   .cust-name{font-size:1rem; font-weight:800;}
@@ -367,7 +370,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 9;
+const APP_VERSION = 10;
 function formatVersion(v){ return '1.' + v; }
 const DEFAULT_CLEAN_TEMPLATE = "Hi {name}, just a reminder I'll be round to clean your windows soon. Let me know if that's not convenient.\n\nThanks,\n{yourname}\n{company}";
 const DEFAULT_PAY_TEMPLATE = "Hi {name}, a friendly reminder that your window cleaning payment of {amount} is outstanding.\n\nThanks,\n{yourname}\n{company}";
@@ -1188,10 +1191,10 @@ function openCustomerDetail(id){
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">${escapeHtml(c.address || c.name || 'Customer')}</h2>
-      ${helpIconBtn('customer')}
       <button class="sheet-close" style="flex-shrink:0; margin-right:6px;" onclick="printCustomerRecord('${id}')" aria-label="Print this customer">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
       </button>
+      ${helpIconBtn('customer')}
       <button class="sheet-close" style="flex-shrink:0;" onclick="closeSheet()">✕</button>
     </div>
     ${(c.name && c.address) ? `<div style="color:var(--ink); font-size:0.9375rem; font-weight:700; margin-bottom:2px;">${escapeHtml(c.name)}</div>` : ''}
@@ -1756,10 +1759,10 @@ function openJobForm(existing, prefill){
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">${existing?'Edit job':'Add one-off job'}</h2>
-      ${helpIconBtn('jobs')}
       ${existing?`<button class="sheet-close" style="flex-shrink:0; margin-right:6px;" onclick="printJobRecord('${existing.id}')" aria-label="Print this job">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
       </button>`:''}
+      ${helpIconBtn('jobs')}
       <button class="sheet-close" style="flex-shrink:0;" onclick="closeSheet()">✕</button>
     </div>
     ${(!existing)?`
