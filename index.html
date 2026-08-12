@@ -370,7 +370,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 10;
+const APP_VERSION = 11;
 function formatVersion(v){ return '1.' + v; }
 const DEFAULT_CLEAN_TEMPLATE = "Hi {name}, just a reminder I'll be round to clean your windows soon. Let me know if that's not convenient.\n\nThanks,\n{yourname}\n{company}";
 const DEFAULT_PAY_TEMPLATE = "Hi {name}, a friendly reminder that your window cleaning payment of {amount} is outstanding.\n\nThanks,\n{yourname}\n{company}";
@@ -460,7 +460,10 @@ function todayISO(){ const d=new Date(); return d.toISOString().slice(0,10); }
 function fmtDate(iso){
   if(!iso) return '—';
   const d = new Date(iso+'T00:00:00');
-  return d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+  const dd = String(d.getDate()).padStart(2,'0');
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  const yy = String(d.getFullYear()).slice(-2);
+  return `${dd}/${mm}/${yy}`;
 }
 function daysBetween(a,b){
   const d1=new Date(a+'T00:00:00'), d2=new Date(b+'T00:00:00');
@@ -2420,7 +2423,7 @@ function groupByRound(list){
   return rounds;
 }
 function reportDate(){
-  return new Date().toLocaleDateString('en-GB',{weekday:'long', day:'numeric', month:'long', year:'numeric'});
+  return fmtDate(todayISO());
 }
 let pendingReportTitle = '';
 let pendingReportBody = '';
@@ -2464,7 +2467,7 @@ function printPendingReport(){
 }
 
 function htmlToDocxElements(bodyHtml){
-  const { Paragraph, TextRun, Table, TableRow, TableCell, WidthType, HeadingLevel, ImageRun, TableLayoutType, AlignmentType, BorderStyle } = docx;
+  const { Paragraph, TextRun, Table, TableRow, TableCell, WidthType, HeadingLevel, ImageRun, TableLayoutType, AlignmentType, BorderStyle, Tab, TabStopType } = docx;
   const parsed = new DOMParser().parseFromString(`<div>${bodyHtml}</div>`, 'text/html');
   const root = parsed.body.firstElementChild;
   const elements = [];
@@ -2501,6 +2504,30 @@ function htmlToDocxElements(bodyHtml){
     const imgs = node.querySelectorAll ? node.querySelectorAll('img') : [];
     if(tag === 'TABLE'){
       const trs = Array.from(node.querySelectorAll('tr'));
+
+      // Some reports (e.g. the round cleaning dates list) ask for tab-separated text in the
+      // Word export instead of a real table object, so the rows are plain, easily-editable
+      // lines rather than table cells. A literal tab character inside run text isn't enough —
+      // Word only treats it as a real tab stop when it's an explicit Tab() between runs.
+      if(node.classList.contains('rpt-table-as-tabs')){
+        trs.forEach(tr=>{
+          const cellNodes = Array.from(tr.children);
+          if(!cellNodes.length) return;
+          const isHeaderRow = cellNodes.some(td => td.tagName === 'TH');
+          const runChildren = [];
+          cellNodes.forEach((td, i)=>{
+            if(i > 0) runChildren.push(new Tab());
+            runChildren.push(textOf(td));
+          });
+          elements.push(new Paragraph({
+            tabStops: [{ type: TabStopType.LEFT, position: 2600 }, { type: TabStopType.LEFT, position: 5200 }],
+            children: [ new TextRun({ children: runChildren, bold: isHeaderRow }) ]
+          }));
+        });
+        elements.push(new Paragraph({ text: '' }));
+        return;
+      }
+
       let numCols = 0;
       trs.forEach(tr => {
         let span = 0;
@@ -2678,10 +2705,9 @@ function printRoundsLastCleaned(){
     return `<tr>
       <td>${escapeHtml(rn)}</td>
       <td>${datesCell}</td>
-      <td>${custs.length} customer${custs.length===1?'':'s'}</td>
     </tr>`;
   }).join('');
-  const body = `<table class="rpt-table"><thead><tr><th>Round</th><th>Dates cleaned (last 5 weeks)</th><th>Customers</th></tr></thead><tbody>${rows}</tbody></table>`;
+  const body = `<table class="rpt-table rpt-table-as-tabs"><thead><tr><th>Round</th><th>Dates cleaned (last 5 weeks)</th></tr></thead><tbody>${rows}</tbody></table>`;
   runPrint('Round Cleaning Dates', body);
 }
 
