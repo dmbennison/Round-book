@@ -117,6 +117,10 @@
   .round-card::before{
     content:""; position:absolute; left:0; top:0; bottom:0; width:5px; background:var(--blue);
   }
+  .round-group-header{position:relative; padding-left:12px;}
+  .round-group-header::before{
+    content:""; position:absolute; left:0; top:1px; bottom:1px; width:4px; background:var(--blue); border-radius:2px;
+  }
   .round-card .rname{font-size:1rem; font-weight:800;}
   .round-card .rcount{font-size:0.7812rem; color:var(--ink-muted); margin-top:2px;}
   .badges{display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end;}
@@ -319,11 +323,11 @@
       </div>
     </div>
     <div style="display:flex; gap:5px;">
-      <button class="icon-btn" onclick="openInfo()" aria-label="About">
-        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-      </button>
       <button class="icon-btn" onclick="openReports()" aria-label="Reports">
         <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
+      </button>
+      <button class="icon-btn" onclick="openInfo()" aria-label="About">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
       </button>
       <button class="icon-btn" onclick="openBackup()" aria-label="Backup">
         <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
@@ -363,7 +367,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 8;
+const APP_VERSION = 9;
 function formatVersion(v){ return '1.' + v; }
 const DEFAULT_CLEAN_TEMPLATE = "Hi {name}, just a reminder I'll be round to clean your windows soon. Let me know if that's not convenient.\n\nThanks,\n{yourname}\n{company}";
 const DEFAULT_PAY_TEMPLATE = "Hi {name}, a friendly reminder that your window cleaning payment of {amount} is outstanding.\n\nThanks,\n{yourname}\n{company}";
@@ -789,7 +793,7 @@ function renderRoundsList(main){
       dueGrandCount += dueCusts.length;
       dueGrandValue += dueCusts.reduce((s,c)=>s+Number(c.price||0),0);
       const anyPhone = dueCusts.some(c=>c.phone);
-      html += `<div style="display:flex; align-items:center; justify-content:space-between; margin:18px 2px 8px;">
+      html += `<div class="round-group-header" style="display:flex; align-items:center; justify-content:space-between; margin:18px 2px 8px;">
         <div class="section-label" style="margin:0;">${escapeHtml(rn)} <span style="font-weight:600; color:var(--ink-muted); text-transform:none; letter-spacing:0;">(${dueCusts.length})</span></div>
         ${anyPhone ? `<button onclick="openBulkReminders('due','${escapeAttr(rn)}')" style="background:none; border:none; color:var(--blue); font-size:0.75rem; font-weight:800;">✉️ Remind all</button>` : ''}
       </div>`;
@@ -817,7 +821,7 @@ function renderRoundsList(main){
       const roundTotal = owedCusts.reduce((s,c)=>s+custStatus(c).balance,0);
       grandTotal += roundTotal;
       const anyPhone = owedCusts.some(c=>c.phone);
-      html += `<div style="display:flex; align-items:center; justify-content:space-between; margin:18px 2px 8px;">
+      html += `<div class="round-group-header" style="display:flex; align-items:center; justify-content:space-between; margin:18px 2px 8px;">
         <div class="section-label" style="margin:0;">${escapeHtml(rn)} <span style="font-weight:600; color:var(--ink-muted); text-transform:none; letter-spacing:0;">(owing ${money(roundTotal)})</span></div>
         ${anyPhone ? `<button onclick="openBulkReminders('owed','${escapeAttr(rn)}')" style="background:none; border:none; color:var(--blue); font-size:0.75rem; font-weight:800;">✉️ Remind all</button>` : ''}
       </div>`;
