@@ -370,13 +370,14 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 12;
+const APP_VERSION = 13;
 function formatVersion(v){ return '1.' + v; }
 const DEFAULT_CLEAN_TEMPLATE = "Hi {name}, just a reminder I'll be round to clean your windows soon. Let me know if that's not convenient.\n\nThanks,\n{yourname}\n{company}";
 const DEFAULT_PAY_TEMPLATE = "Hi {name}, a friendly reminder that your window cleaning payment of {amount} is outstanding.\n\nThanks,\n{yourname}\n{company}";
 const DEFAULT_RECEIPT_TEMPLATE = "Hi {name}, thank you for your payment of {amount} received {date}.\n\nThanks,\n{yourname}\n{company}";
 const DEFAULT_QUOTE_TEMPLATE = "Hi {name}, thanks for asking about window cleaning. I'd quote {amount} for this job — let me know if you'd like to go ahead.\n\nThanks,\n{yourname}\n{company}";
 const DEFAULT_REPEAT_QUOTE_TEMPLATE = "Hi {name}, hope you're well! I cleaned your windows for you before and wondered if you'd like the same job done again? I'd quote {amount}, same as last time — just let me know and I'll get you booked back in.\n\nThanks,\n{yourname}\n{company}";
+const DEFAULT_MARKETING_TEMPLATE = "Hi {name}, just letting you know we also offer gutter clearing alongside your window clean — let me know if you'd like a quote.\n\nThanks,\n{yourname}\n{company}";
 function migrateData(parsed){
   parsed.customers = parsed.customers || [];
   parsed.oneOffJobs = parsed.oneOffJobs || [];
@@ -408,11 +409,13 @@ function migrateData(parsed){
   if(!parsed.settings.receiptTemplate || OLD_RECEIPT_TEMPLATES.includes(parsed.settings.receiptTemplate)) parsed.settings.receiptTemplate = DEFAULT_RECEIPT_TEMPLATE;
   if(!parsed.settings.quoteTemplate || OLD_QUOTE_TEMPLATES.includes(parsed.settings.quoteTemplate)) parsed.settings.quoteTemplate = DEFAULT_QUOTE_TEMPLATE;
   if(!parsed.settings.repeatQuoteTemplate || OLD_REPEAT_QUOTE_TEMPLATES.includes(parsed.settings.repeatQuoteTemplate)) parsed.settings.repeatQuoteTemplate = DEFAULT_REPEAT_QUOTE_TEMPLATE;
+  if(!parsed.settings.marketingTemplate) parsed.settings.marketingTemplate = DEFAULT_MARKETING_TEMPLATE;
   if(parsed.settings.companyName == null) parsed.settings.companyName = '';
   if(parsed.settings.companyAddress == null) parsed.settings.companyAddress = '';
   if(parsed.settings.companyPhone == null) parsed.settings.companyPhone = '';
   if(parsed.settings.logo == null) parsed.settings.logo = '';
   parsed.customers.forEach(c=>{
+    if(c.gutterInterested == null) c.gutterInterested = false;
     if(c.frequencyWeeks == null){
       c.frequencyWeeks = c.frequencyDays ? Math.max(1, Math.round(c.frequencyDays/7)) : 4;
     }
@@ -869,6 +872,9 @@ function renderRoundDetail(main, rn){
         <button class="btn-open" style="width:38px; height:38px; padding:0;" onclick="openFocusedHelp('rounds')" aria-label="Help for rounds">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
         </button>
+        <button class="btn-open" style="width:38px; height:38px; padding:0;" onclick="openMarketingBlast('${escapeAttr(rn)}','all')" aria-label="Send group marketing text">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-5v12L3 13z"/><path d="M11.6 16.8a3 3 0 0 1-5.8-1.6"/></svg>
+        </button>
         <button class="btn-open" style="width:38px; height:38px; padding:0;" onclick="printSingleRound('${escapeAttr(rn)}')" aria-label="Print this round">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
         </button>
@@ -1005,6 +1011,7 @@ function custCardHtml(c){
         ${(s.owed && c.paymentReminderSent) ? `<span class="badge paused">🔔 ${fmtDate(c.paymentReminderSentDate).split(' ').slice(0,2).join(' ')}</span>` : ''}
         ${(c.photos && c.photos.length) ? `<span class="badge paused">📷 ${c.photos.length}</span>` : ''}
         ${needsPriceReview(c) ? `<span class="badge due" title="12+ months since last price increase">📈 Review</span>` : ''}
+        ${c.gutterInterested ? `<span class="badge anniversary" title="Interested in gutter cleaning">🌧️ Gutters</span>` : ''}
         ${showDayBadge ? `<span class="badge anniversary">Day ${c.visitDay||1}</span>` : ''}
       </div>
     </div>
@@ -1107,6 +1114,10 @@ function openCustomerForm(existing){
     </div>
     <label>Notes</label>
     <textarea id="f_notes" rows="2" placeholder="Gate code, dog, access notes...">${escapeHtml(c.notes||'')}</textarea>
+    <label class="check-row" style="display:flex; align-items:center; gap:8px; margin:10px 2px 0; text-transform:none; font-weight:600;">
+      <input type="checkbox" id="f_gutter" ${c.gutterInterested?'checked':''} style="width:18px; height:18px; margin:0;">
+      Interested in gutter cleaning
+    </label>
     <div class="form-actions">
       <button class="btn-primary" onclick="saveCustomerForm('${existing?existing.id:''}')">${existing?'Save changes':'Add customer'}</button>
     </div>
@@ -1134,7 +1145,8 @@ function saveCustomerForm(id){
     round: document.getElementById('f_round').value.trim() || 'Unassigned',
     price: parseFloat(document.getElementById('f_price').value) || 0,
     frequencyWeeks: parseInt(document.getElementById('f_freq').value) || 4,
-    notes: document.getElementById('f_notes').value.trim()
+    notes: document.getElementById('f_notes').value.trim(),
+    gutterInterested: document.getElementById('f_gutter').checked
   };
   if(id){
     const c = data.customers.find(x=>x.id===id);
@@ -1203,6 +1215,10 @@ function openCustomerDetail(id){
     ${(c.name && c.address) ? `<div style="color:var(--ink); font-size:0.9375rem; font-weight:700; margin-bottom:2px;">${escapeHtml(c.name)}</div>` : ''}
     <div style="color:var(--ink-muted); font-size:0.8125rem; margin-bottom:10px;">${escapeHtml(c.round||'Unassigned')} · ${money(c.price)} standard · every ${c.frequencyWeeks||4} week${(c.frequencyWeeks||4)===1?'':'s'}${c.paused?' · <span style="color:var(--ink-muted); font-weight:700;">Paused</span>':''}</div>
     ${needsPriceReview(c) ? `<div style="color:var(--amber); font-size:0.75rem; font-weight:700; margin:-6px 2px 10px;">📈 12+ months since last price increase</div>` : ''}
+    ${c.notes?`<div style="background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:10px 12px; font-size:0.8438rem; margin-bottom:10px;">${escapeHtml(c.notes)}</div>`:''}
+    <button onclick="toggleGutterInterest('${id}')" style="display:flex; align-items:center; gap:6px; background:${c.gutterInterested?'var(--blue-dim)':'var(--bg)'}; color:${c.gutterInterested?'var(--blue-deep)':'var(--ink-muted)'}; border:1px solid ${c.gutterInterested?'transparent':'var(--line)'}; border-radius:20px; padding:6px 12px; font-size:0.75rem; font-weight:700; margin-bottom:14px;">
+      🌧️ ${c.gutterInterested?'Interested in gutter cleaning':'Mark interested in gutter cleaning'}
+    </button>
     ${(c.phone||c.email)?`<div style="display:flex; gap:8px; margin-bottom:10px;">
       ${c.phone?`<a href="tel:${escapeAttr(c.phone.replace(/\\s+/g,''))}" style="flex:1; text-decoration:none; background:var(--blue-dim); color:var(--blue-deep); border-radius:10px; padding:9px; font-size:0.8125rem; font-weight:700; text-align:center;">📞 ${escapeHtml(c.phone)}</a>`:''}
       ${c.email?`<button onclick="emailCustomer('${id}')" style="flex:1; min-width:0; background:var(--bg); color:var(--ink); border:1px solid var(--line); border-radius:10px; padding:9px; font-size:0.8125rem; font-weight:700; text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">✉️ ${escapeHtml(c.email)}</button>`:''}
@@ -1211,7 +1227,6 @@ function openCustomerDetail(id){
       <button class="btn" style="background:var(--blue-dim); color:var(--blue-deep);" onclick="sendTemplate('${id}','clean')">💬 Cleaning reminder</button>
       <button class="btn" style="background:var(--amber-dim); color:var(--amber);" onclick="sendTemplate('${id}','pay'); openCustomerDetail('${id}');">💬 Payment reminder</button>
     </div>`:''}
-    ${c.notes?`<div style="background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:10px 12px; font-size:0.8438rem; margin-bottom:14px;">${escapeHtml(c.notes)}</div>`:''}
 
     <div style="background:${s.owed?'var(--red-dim)':s.credit?'var(--green-dim)':'var(--green-dim)'}; color:${s.owed?'var(--red)':'var(--green)'}; border-radius:10px; padding:12px; font-weight:800; text-align:center; margin-bottom:14px;">
       ${s.owed ? `Owes ${money(s.balance)}` : s.credit ? `In credit: ${money(Math.abs(s.balance))} (carries onto next bill)` : 'Fully paid up'}
@@ -1230,8 +1245,11 @@ function openCustomerDetail(id){
     <button class="btn" style="width:100%; background:${c.paused?'var(--green-dim)':'var(--line)'}; color:${c.paused?'var(--green)':'var(--ink-muted)'}; margin-bottom:10px;" onclick="togglePause('${id}')">
       ${c.paused ? '▶ Resume this customer' : '⏸ Pause this customer (skip due reminders)'}
     </button>
-    <button class="btn" style="width:100%; background:var(--blue-dim); color:var(--blue-deep); margin-bottom:20px;" onclick="scheduleJobForCustomer('${id}')">
+    <button class="btn" style="width:100%; background:var(--blue-dim); color:var(--blue-deep); margin-bottom:10px;" onclick="scheduleJobForCustomer('${id}')">
       📋 Schedule a one-off job for this customer
+    </button>
+    <button class="btn" style="width:100%; background:var(--amber-dim); color:var(--amber); margin-bottom:20px;" onclick="quoteForCustomer('${id}')">
+      💷 Get a quote for this customer
     </button>
     <div class="row2">
       <div>
@@ -1629,6 +1647,54 @@ function markReminderSent(id){
   }
 }
 
+function openMarketingBlast(roundName, filter){
+  filter = filter || 'all';
+  const rounds = groupByRound(data.customers);
+  const roundCusts = (rounds[roundName] || []).filter(c=>c.phone);
+  const list = filter === 'gutter' ? roundCusts.filter(c=>c.gutterInterested) : roundCusts;
+  const tpl = document.getElementById('mkt_msg') ? document.getElementById('mkt_msg').value : (data.settings.marketingTemplate || DEFAULT_MARKETING_TEMPLATE);
+
+  openSheet(`
+    <div class="sheet-head">
+      <h2>Group text — ${escapeHtml(roundName)}</h2>
+      <button class="sheet-close" onclick="closeSheet()">✕</button>
+    </div>
+    <div class="seg-row" style="margin-bottom:14px;">
+      <button class="seg-btn ${filter==='all'?'active':''}" onclick="openMarketingBlast('${escapeAttr(roundName)}','all')">All with phone (${roundCusts.length})</button>
+      <button class="seg-btn ${filter==='gutter'?'active':''}" onclick="openMarketingBlast('${escapeAttr(roundName)}','gutter')">Gutter interested (${roundCusts.filter(c=>c.gutterInterested).length})</button>
+    </div>
+    <label style="margin-top:0;">Message <span style="text-transform:none; font-weight:500; opacity:0.7;">({name}, {company}, {yourname})</span></label>
+    <textarea id="mkt_msg" rows="4">${escapeHtml(tpl)}</textarea>
+    <p style="color:var(--ink-muted); font-size:0.7812rem; margin:10px 2px 14px; line-height:1.5;">
+      Tap Send for each customer — it opens Messages pre-filled and ready to go. Come back here for the next one.
+    </p>
+    ${list.length ? list.map(c=>{
+      return `<div class="cust-card" id="bulkrow-${c.id}" style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+        <div style="min-width:0;">
+          <div class="cust-addr" style="font-weight:800; font-size:0.9062rem;">${escapeHtml(c.address||c.name||'Customer')}</div>
+          <div style="font-size:0.75rem; color:var(--ink-muted); margin-top:2px;">${escapeHtml(c.phone)}${c.gutterInterested?' · 🌧️ Gutters':''}</div>
+        </div>
+        <button class="btn btn-clean" style="flex:0 0 auto; padding:9px 16px;" onclick="sendMarketingText('${c.id}'); markReminderSent('${c.id}')">Send</button>
+      </div>`;
+    }).join('') : `<p style="color:var(--ink-muted); font-size:0.8438rem; margin:0 2px;">No one in this group has a phone number saved.</p>`}
+  `);
+}
+
+function sendMarketingText(id){
+  const c = data.customers.find(x=>x.id===id);
+  if(!c || !c.phone){ toast('No phone number saved for this customer'); return; }
+  const msgField = document.getElementById('mkt_msg');
+  const tpl = msgField ? msgField.value : (data.settings.marketingTemplate || DEFAULT_MARKETING_TEMPLATE);
+  const firstName = c.name ? c.name.trim().split(' ')[0] : '';
+  const company = data.settings.companyName || '';
+  const yourname = data.settings.yourName || '';
+  const msg = applyTemplate(tpl, {name: firstName, company, yourname});
+  const phone = c.phone.replace(/\s+/g,'');
+  const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const separator = isIOS ? '&' : '?';
+  window.location.href = `sms:${phone}${separator}body=${encodeURIComponent(msg)}`;
+}
+
 function addHistDate(id, kind){
   const c = data.customers.find(x=>x.id===id);
   if(kind==='clean'){
@@ -1750,6 +1816,21 @@ function scheduleJobForCustomer(id){
   const c = data.customers.find(x=>x.id===id);
   if(!c) return;
   openJobForm(null, { address: c.address||'', name: c.name||'', phone: c.phone||'', price: c.price||0, customerId: c.id });
+}
+
+function quoteForCustomer(id){
+  const c = data.customers.find(x=>x.id===id);
+  if(!c) return;
+  openQuoteForm(null, { address: c.address||'', name: c.name||'', phone: c.phone||'', email: c.email||'' });
+}
+
+function toggleGutterInterest(id){
+  const c = data.customers.find(x=>x.id===id);
+  if(!c) return;
+  c.gutterInterested = !c.gutterInterested;
+  saveData();
+  openCustomerDetail(id);
+  toast(c.gutterInterested ? 'Marked interested in gutter cleaning' : 'Gutter cleaning interest removed');
 }
 
 function fillJobFromCustomer(id){
@@ -2337,6 +2418,8 @@ function openSettings(){
     <textarea id="tpl_quote" rows="3">${escapeHtml(data.settings.quoteTemplate)}</textarea>
     <label>Quote <span style="text-transform:none; font-weight:500; opacity:0.7;">(repeat work)</span></label>
     <textarea id="tpl_repeat_quote" rows="3">${escapeHtml(data.settings.repeatQuoteTemplate)}</textarea>
+    <label>Marketing text <span style="text-transform:none; font-weight:500; opacity:0.7;">(group texts to a round)</span></label>
+    <textarea id="tpl_marketing" rows="3">${escapeHtml(data.settings.marketingTemplate||DEFAULT_MARKETING_TEMPLATE)}</textarea>
     <div class="form-actions">
       <button class="btn-primary" onclick="saveTemplates()">Save settings</button>
     </div>
@@ -2349,6 +2432,7 @@ function saveTemplates(){
   data.settings.receiptTemplate = document.getElementById('tpl_receipt').value.trim() || DEFAULT_RECEIPT_TEMPLATE;
   data.settings.quoteTemplate = document.getElementById('tpl_quote').value.trim() || DEFAULT_QUOTE_TEMPLATE;
   data.settings.repeatQuoteTemplate = document.getElementById('tpl_repeat_quote').value.trim() || DEFAULT_REPEAT_QUOTE_TEMPLATE;
+  data.settings.marketingTemplate = document.getElementById('tpl_marketing').value.trim() || DEFAULT_MARKETING_TEMPLATE;
   data.settings.companyName = document.getElementById('companyNameInput').value.trim();
   data.settings.companyAddress = document.getElementById('companyAddressInput').value.trim();
   data.settings.companyPhone = document.getElementById('companyPhoneInput').value.trim();
@@ -2363,6 +2447,7 @@ function resetTemplates(){
   data.settings.receiptTemplate = DEFAULT_RECEIPT_TEMPLATE;
   data.settings.quoteTemplate = DEFAULT_QUOTE_TEMPLATE;
   data.settings.repeatQuoteTemplate = DEFAULT_REPEAT_QUOTE_TEMPLATE;
+  data.settings.marketingTemplate = DEFAULT_MARKETING_TEMPLATE;
   saveData();
   openSettings();
   toast('Reset to default wording');
@@ -3344,7 +3429,8 @@ const FOCUSED_HELP = {
     title: 'Rounds',
     body: () => [
       helpP('The Rounds tab shows every round, with a Rounds / Due / Owed switch. Open a round to see its customers, swipe a card right to mark cleaned or left to mark paid, and use Reorder to set your walking order.'),
-      helpP('If a round takes more than one day, tap each customer\'s day badge in reorder mode to assign Day 1–5. A day switcher then appears above the customer list, and cards get a "Day N" badge.')
+      helpP('If a round takes more than one day, tap each customer\'s day badge in reorder mode to assign Day 1–5. A day switcher then appears above the customer list, and cards get a "Day N" badge.'),
+      helpP('The megaphone icon on a round\'s screen opens a group marketing text — send everyone in the round (or just those flagged as interested in gutter cleaning) a text one by one, using the marketing wording set in Settings.')
     ]
   },
   jobs: {
@@ -3356,14 +3442,16 @@ const FOCUSED_HELP = {
   customer: {
     title: 'Customers',
     body: () => [
-      helpP('A customer\'s screen shows their clean history, payment history, price history, and any one-off jobs or photos linked to them. Use it to log a clean or payment by hand, pause them, or send a text reminder or receipt.'),
+      helpP('A customer\'s screen shows their round, standard price, frequency, and any notes right at the top, followed by their clean history, payment history, price history, and any one-off jobs or photos linked to them. Use it to log a clean or payment by hand, pause them, or send a text reminder or receipt.'),
+      helpP('Tap the gutter cleaning chip to flag a customer as interested — they\'ll get a badge on their card and can be targeted with a group marketing text from their round. The "Get a quote for this customer" button opens a new quote pre-filled with their details, handy for quoting extra work like gutter clearing.'),
       helpP('The printer icon prints or emails a record of everything on this screen — handy for a customer who asks for a summary.')
     ]
   },
   quotes: {
     title: 'Quotes',
     body: () => [
-      helpP('Swipe right to accept, left to decline. Accepted quotes convert straight into a job or customer. Send a quote by text or email from its edit screen. Quotes left Pending past their follow-up window (7 days by default) get flagged automatically.')
+      helpP('Swipe right to accept, left to decline. Accepted quotes convert straight into a job or customer. Send a quote by text or email from its edit screen. Quotes left Pending past their follow-up window (7 days by default) get flagged automatically.'),
+      helpP('You can also start a quote straight from an existing customer\'s screen using "Get a quote for this customer" — their name, address, phone and email come pre-filled.')
     ]
   },
   reports: {
@@ -3391,7 +3479,7 @@ const FOCUSED_HELP = {
   settings: {
     title: 'Settings',
     body: () => [
-      helpP('Appearance, text size, colour scheme, company details and logo (for invoices), your name, and the wording of every text message template.')
+      helpP('Appearance, text size, colour scheme, company details and logo (for invoices), your name, and the wording of every text message template, including the group marketing text sent from a round.')
     ]
   },
   reminders: {
