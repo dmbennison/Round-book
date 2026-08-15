@@ -370,14 +370,14 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 13;
+const APP_VERSION = 14;
 function formatVersion(v){ return '1.' + v; }
 const DEFAULT_CLEAN_TEMPLATE = "Hi {name}, just a reminder I'll be round to clean your windows soon. Let me know if that's not convenient.\n\nThanks,\n{yourname}\n{company}";
 const DEFAULT_PAY_TEMPLATE = "Hi {name}, a friendly reminder that your window cleaning payment of {amount} is outstanding.\n\nThanks,\n{yourname}\n{company}";
 const DEFAULT_RECEIPT_TEMPLATE = "Hi {name}, thank you for your payment of {amount} received {date}.\n\nThanks,\n{yourname}\n{company}";
 const DEFAULT_QUOTE_TEMPLATE = "Hi {name}, thanks for asking about window cleaning. I'd quote {amount} for this job — let me know if you'd like to go ahead.\n\nThanks,\n{yourname}\n{company}";
 const DEFAULT_REPEAT_QUOTE_TEMPLATE = "Hi {name}, hope you're well! I cleaned your windows for you before and wondered if you'd like the same job done again? I'd quote {amount}, same as last time — just let me know and I'll get you booked back in.\n\nThanks,\n{yourname}\n{company}";
-const DEFAULT_MARKETING_TEMPLATE = "Hi {name}, just letting you know we also offer gutter clearing alongside your window clean — let me know if you'd like a quote.\n\nThanks,\n{yourname}\n{company}";
+const DEFAULT_MARKETING_TEMPLATE = "Hi {name}, just letting you know we also offer gutter clearing and fascia cleaning alongside your window clean — let me know if you'd like a quote.\n\nThanks,\n{yourname}\n{company}";
 function migrateData(parsed){
   parsed.customers = parsed.customers || [];
   parsed.oneOffJobs = parsed.oneOffJobs || [];
@@ -415,7 +415,6 @@ function migrateData(parsed){
   if(parsed.settings.companyPhone == null) parsed.settings.companyPhone = '';
   if(parsed.settings.logo == null) parsed.settings.logo = '';
   parsed.customers.forEach(c=>{
-    if(c.gutterInterested == null) c.gutterInterested = false;
     if(c.frequencyWeeks == null){
       c.frequencyWeeks = c.frequencyDays ? Math.max(1, Math.round(c.frequencyDays/7)) : 4;
     }
@@ -733,8 +732,9 @@ function renderRoundsList(main){
 
   let html = '';
   if(data.customers.length){
-    const totalCustomers = data.customers.length;
-    const totalValue = data.customers.reduce((sum,c)=>sum+Number(c.price||0),0);
+    const activeCustomers = data.customers.filter(c=>!c.paused);
+    const totalCustomers = activeCustomers.length;
+    const totalValue = activeCustomers.reduce((sum,c)=>sum+Number(c.price||0),0);
     const overallAvg = totalCustomers ? totalValue/totalCustomers : 0;
     html += `<div class="summary-overall">
       <div class="stat"><div class="num">${totalCustomers}</div><div class="lbl">Customers</div></div>
@@ -758,8 +758,9 @@ function renderRoundsList(main){
     let grandCustomers = 0, grandValue = 0;
     roundNames.forEach(rn=>{
       const all = rounds[rn];
-      grandCustomers += all.length;
-      grandValue += all.reduce((sum,c)=>sum+Number(c.price||0),0);
+      const activeAll = all.filter(c=>!c.paused);
+      grandCustomers += activeAll.length;
+      grandValue += activeAll.reduce((sum,c)=>sum+Number(c.price||0),0);
       const daysUsed = roundDaysUsed(all);
       let overdue=0, due=0, owed=0, paused=0;
       all.forEach(c=>{
@@ -872,7 +873,7 @@ function renderRoundDetail(main, rn){
         <button class="btn-open" style="width:38px; height:38px; padding:0;" onclick="openFocusedHelp('rounds')" aria-label="Help for rounds">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
         </button>
-        <button class="btn-open" style="width:38px; height:38px; padding:0;" onclick="openMarketingBlast('${escapeAttr(rn)}','all')" aria-label="Send group marketing text">
+        <button class="btn-open" style="width:38px; height:38px; padding:0;" onclick="openMarketingBlast('${escapeAttr(rn)}')" aria-label="Send group marketing text">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-5v12L3 13z"/><path d="M11.6 16.8a3 3 0 0 1-5.8-1.6"/></svg>
         </button>
         <button class="btn-open" style="width:38px; height:38px; padding:0;" onclick="printSingleRound('${escapeAttr(rn)}')" aria-label="Print this round">
@@ -904,10 +905,11 @@ function renderRoundDetail(main, rn){
   }
 
   if(allInRound.length){
-    const roundTotal = allInRound.reduce((sum,c)=>sum+Number(c.price||0),0);
-    const roundAvg = roundTotal / allInRound.length;
+    const activeInRound = allInRound.filter(c=>!c.paused);
+    const roundTotal = activeInRound.reduce((sum,c)=>sum+Number(c.price||0),0);
+    const roundAvg = activeInRound.length ? roundTotal / activeInRound.length : 0;
     shellHtml += `<div class="summary-overall">
-      <div class="stat"><div class="num">${allInRound.length}</div><div class="lbl">Customers</div></div>
+      <div class="stat"><div class="num">${activeInRound.length}</div><div class="lbl">Customers</div></div>
       <div class="stat"><div class="num">${money(roundTotal)}</div><div class="lbl">Round value</div></div>
       <div class="stat"><div class="num">${money(roundAvg)}</div><div class="lbl">Avg / customer</div></div>
     </div>`;
@@ -962,8 +964,9 @@ function renderRoundDetail(main, rn){
     const owedTotal = custs.reduce((sum,c)=>sum+custStatus(c).balance,0);
     shellHtml += listTotalHtml(`${custs.length} owing · Total owed: ${money(owedTotal)}`);
   } else {
-    const listTotal = custs.reduce((sum,c)=>sum+Number(c.price||0),0);
-    shellHtml += listTotalHtml(`${custs.length} customer${custs.length===1?'':'s'} · ${money(listTotal)}`);
+    const activeCusts = custs.filter(c=>!c.paused);
+    const listTotal = activeCusts.reduce((sum,c)=>sum+Number(c.price||0),0);
+    shellHtml += listTotalHtml(`${activeCusts.length} customer${activeCusts.length===1?'':'s'} · ${money(listTotal)}`);
   }
   main.innerHTML = shellHtml;
 }
@@ -1011,7 +1014,6 @@ function custCardHtml(c){
         ${(s.owed && c.paymentReminderSent) ? `<span class="badge paused">🔔 ${fmtDate(c.paymentReminderSentDate).split(' ').slice(0,2).join(' ')}</span>` : ''}
         ${(c.photos && c.photos.length) ? `<span class="badge paused">📷 ${c.photos.length}</span>` : ''}
         ${needsPriceReview(c) ? `<span class="badge due" title="12+ months since last price increase">📈 Review</span>` : ''}
-        ${c.gutterInterested ? `<span class="badge anniversary" title="Interested in gutter cleaning">🌧️ Gutters</span>` : ''}
         ${showDayBadge ? `<span class="badge anniversary">Day ${c.visitDay||1}</span>` : ''}
       </div>
     </div>
@@ -1114,10 +1116,6 @@ function openCustomerForm(existing){
     </div>
     <label>Notes</label>
     <textarea id="f_notes" rows="2" placeholder="Gate code, dog, access notes...">${escapeHtml(c.notes||'')}</textarea>
-    <label class="check-row" style="display:flex; align-items:center; gap:8px; margin:10px 2px 0; text-transform:none; font-weight:600;">
-      <input type="checkbox" id="f_gutter" ${c.gutterInterested?'checked':''} style="width:18px; height:18px; margin:0;">
-      Interested in gutter cleaning
-    </label>
     <div class="form-actions">
       <button class="btn-primary" onclick="saveCustomerForm('${existing?existing.id:''}')">${existing?'Save changes':'Add customer'}</button>
     </div>
@@ -1145,8 +1143,7 @@ function saveCustomerForm(id){
     round: document.getElementById('f_round').value.trim() || 'Unassigned',
     price: parseFloat(document.getElementById('f_price').value) || 0,
     frequencyWeeks: parseInt(document.getElementById('f_freq').value) || 4,
-    notes: document.getElementById('f_notes').value.trim(),
-    gutterInterested: document.getElementById('f_gutter').checked
+    notes: document.getElementById('f_notes').value.trim()
   };
   if(id){
     const c = data.customers.find(x=>x.id===id);
@@ -1215,10 +1212,7 @@ function openCustomerDetail(id){
     ${(c.name && c.address) ? `<div style="color:var(--ink); font-size:0.9375rem; font-weight:700; margin-bottom:2px;">${escapeHtml(c.name)}</div>` : ''}
     <div style="color:var(--ink-muted); font-size:0.8125rem; margin-bottom:10px;">${escapeHtml(c.round||'Unassigned')} · ${money(c.price)} standard · every ${c.frequencyWeeks||4} week${(c.frequencyWeeks||4)===1?'':'s'}${c.paused?' · <span style="color:var(--ink-muted); font-weight:700;">Paused</span>':''}</div>
     ${needsPriceReview(c) ? `<div style="color:var(--amber); font-size:0.75rem; font-weight:700; margin:-6px 2px 10px;">📈 12+ months since last price increase</div>` : ''}
-    ${c.notes?`<div style="background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:10px 12px; font-size:0.8438rem; margin-bottom:10px;">${escapeHtml(c.notes)}</div>`:''}
-    <button onclick="toggleGutterInterest('${id}')" style="display:flex; align-items:center; gap:6px; background:${c.gutterInterested?'var(--blue-dim)':'var(--bg)'}; color:${c.gutterInterested?'var(--blue-deep)':'var(--ink-muted)'}; border:1px solid ${c.gutterInterested?'transparent':'var(--line)'}; border-radius:20px; padding:6px 12px; font-size:0.75rem; font-weight:700; margin-bottom:14px;">
-      🌧️ ${c.gutterInterested?'Interested in gutter cleaning':'Mark interested in gutter cleaning'}
-    </button>
+    ${c.notes?`<div style="background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:10px 12px; font-size:0.8438rem; margin-bottom:14px;">${escapeHtml(c.notes)}</div>`:''}
     ${(c.phone||c.email)?`<div style="display:flex; gap:8px; margin-bottom:10px;">
       ${c.phone?`<a href="tel:${escapeAttr(c.phone.replace(/\\s+/g,''))}" style="flex:1; text-decoration:none; background:var(--blue-dim); color:var(--blue-deep); border-radius:10px; padding:9px; font-size:0.8125rem; font-weight:700; text-align:center;">📞 ${escapeHtml(c.phone)}</a>`:''}
       ${c.email?`<button onclick="emailCustomer('${id}')" style="flex:1; min-width:0; background:var(--bg); color:var(--ink); border:1px solid var(--line); border-radius:10px; padding:9px; font-size:0.8125rem; font-weight:700; text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">✉️ ${escapeHtml(c.email)}</button>`:''}
@@ -1647,21 +1641,15 @@ function markReminderSent(id){
   }
 }
 
-function openMarketingBlast(roundName, filter){
-  filter = filter || 'all';
+function openMarketingBlast(roundName){
   const rounds = groupByRound(data.customers);
-  const roundCusts = (rounds[roundName] || []).filter(c=>c.phone);
-  const list = filter === 'gutter' ? roundCusts.filter(c=>c.gutterInterested) : roundCusts;
+  const list = (rounds[roundName] || []).filter(c=>c.phone);
   const tpl = document.getElementById('mkt_msg') ? document.getElementById('mkt_msg').value : (data.settings.marketingTemplate || DEFAULT_MARKETING_TEMPLATE);
 
   openSheet(`
     <div class="sheet-head">
-      <h2>Group text — ${escapeHtml(roundName)}</h2>
+      <h2 style="flex:1; min-width:0;">Group text — ${escapeHtml(roundName)}</h2>
       <button class="sheet-close" onclick="closeSheet()">✕</button>
-    </div>
-    <div class="seg-row" style="margin-bottom:14px;">
-      <button class="seg-btn ${filter==='all'?'active':''}" onclick="openMarketingBlast('${escapeAttr(roundName)}','all')">All with phone (${roundCusts.length})</button>
-      <button class="seg-btn ${filter==='gutter'?'active':''}" onclick="openMarketingBlast('${escapeAttr(roundName)}','gutter')">Gutter interested (${roundCusts.filter(c=>c.gutterInterested).length})</button>
     </div>
     <label style="margin-top:0;">Message <span style="text-transform:none; font-weight:500; opacity:0.7;">({name}, {company}, {yourname})</span></label>
     <textarea id="mkt_msg" rows="4">${escapeHtml(tpl)}</textarea>
@@ -1672,11 +1660,11 @@ function openMarketingBlast(roundName, filter){
       return `<div class="cust-card" id="bulkrow-${c.id}" style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
         <div style="min-width:0;">
           <div class="cust-addr" style="font-weight:800; font-size:0.9062rem;">${escapeHtml(c.address||c.name||'Customer')}</div>
-          <div style="font-size:0.75rem; color:var(--ink-muted); margin-top:2px;">${escapeHtml(c.phone)}${c.gutterInterested?' · 🌧️ Gutters':''}</div>
+          <div style="font-size:0.75rem; color:var(--ink-muted); margin-top:2px;">${escapeHtml(c.phone)}</div>
         </div>
         <button class="btn btn-clean" style="flex:0 0 auto; padding:9px 16px;" onclick="sendMarketingText('${c.id}'); markReminderSent('${c.id}')">Send</button>
       </div>`;
-    }).join('') : `<p style="color:var(--ink-muted); font-size:0.8438rem; margin:0 2px;">No one in this group has a phone number saved.</p>`}
+    }).join('') : `<p style="color:var(--ink-muted); font-size:0.8438rem; margin:0 2px;">No one in this round has a phone number saved.</p>`}
   `);
 }
 
@@ -1822,15 +1810,6 @@ function quoteForCustomer(id){
   const c = data.customers.find(x=>x.id===id);
   if(!c) return;
   openQuoteForm(null, { address: c.address||'', name: c.name||'', phone: c.phone||'', email: c.email||'' });
-}
-
-function toggleGutterInterest(id){
-  const c = data.customers.find(x=>x.id===id);
-  if(!c) return;
-  c.gutterInterested = !c.gutterInterested;
-  saveData();
-  openCustomerDetail(id);
-  toast(c.gutterInterested ? 'Marked interested in gutter cleaning' : 'Gutter cleaning interest removed');
 }
 
 function fillJobFromCustomer(id){
@@ -2967,8 +2946,9 @@ function printSingleRound(roundName){
   if(!custs.length){ toast('No customers in this round yet'); return; }
   const spansMultipleDays = roundDaysUsed(custs).length > 1;
   let roundTotal = 0;
+  let activeCount = 0;
   const rows = custs.map(c=>{
-    roundTotal += Number(c.price||0);
+    if(!c.paused){ roundTotal += Number(c.price||0); activeCount++; }
     const s = custStatus(c);
     return `<tr>
       <td>${escapeHtml(c.address||'')}${c.name?`<br><span style="color:#66798A">${escapeHtml(c.name)}</span>`:''}</td>
@@ -2979,7 +2959,7 @@ function printSingleRound(roundName){
       <td>${c.paused ? 'Paused' : (s.owed ? 'Owes '+money(s.balance) : 'OK')}</td>
     </tr>`;
   }).join('');
-  const roundAvg = roundTotal / custs.length;
+  const roundAvg = activeCount ? roundTotal / activeCount : 0;
   const body = `
     <table class="rpt-table"><thead><tr><th>Customer</th>${spansMultipleDays ? '<th>Day</th>' : ''}<th>Contact</th><th>Price</th><th>Frequency</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>
     <div class="rpt-total" style="border-top:2px solid #10344C; padding-top:10px; margin-top:16px; font-size:16px;">${custs.length} customer${custs.length===1?'':'s'} · Round total: ${money(roundTotal)} · Avg: ${money(roundAvg)}</div>
@@ -3430,7 +3410,7 @@ const FOCUSED_HELP = {
     body: () => [
       helpP('The Rounds tab shows every round, with a Rounds / Due / Owed switch. Open a round to see its customers, swipe a card right to mark cleaned or left to mark paid, and use Reorder to set your walking order.'),
       helpP('If a round takes more than one day, tap each customer\'s day badge in reorder mode to assign Day 1–5. A day switcher then appears above the customer list, and cards get a "Day N" badge.'),
-      helpP('The megaphone icon on a round\'s screen opens a group marketing text — send everyone in the round (or just those flagged as interested in gutter cleaning) a text one by one, using the marketing wording set in Settings.')
+      helpP('The megaphone icon on a round\'s screen opens a group marketing text — send everyone in the round with a phone number a text one by one, using the marketing wording set in Settings.')
     ]
   },
   jobs: {
@@ -3443,7 +3423,7 @@ const FOCUSED_HELP = {
     title: 'Customers',
     body: () => [
       helpP('A customer\'s screen shows their round, standard price, frequency, and any notes right at the top, followed by their clean history, payment history, price history, and any one-off jobs or photos linked to them. Use it to log a clean or payment by hand, pause them, or send a text reminder or receipt.'),
-      helpP('Tap the gutter cleaning chip to flag a customer as interested — they\'ll get a badge on their card and can be targeted with a group marketing text from their round. The "Get a quote for this customer" button opens a new quote pre-filled with their details, handy for quoting extra work like gutter clearing.'),
+      helpP('The "Get a quote for this customer" button opens a new quote pre-filled with their details, handy for quoting extra work like gutter clearing or fascia cleaning.'),
       helpP('The printer icon prints or emails a record of everything on this screen — handy for a customer who asks for a summary.')
     ]
   },
@@ -3770,7 +3750,7 @@ async function exportExcel(){
   }
 
   const summaryRows = roundNames.map(rn=>{
-    const custs = rounds[rn];
+    const custs = rounds[rn].filter(c=>!c.paused);
     const total = custs.reduce((sum,c)=>sum+Number(c.price||0),0);
     const avg = custs.length ? total/custs.length : 0;
     return {
@@ -3780,8 +3760,9 @@ async function exportExcel(){
       'Average / Customer': Math.round(avg * 100) / 100
     };
   });
-  const overallCustomers = data.customers.length;
-  const overallValue = data.customers.reduce((sum,c)=>sum+Number(c.price||0),0);
+  const activeOverall = data.customers.filter(c=>!c.paused);
+  const overallCustomers = activeOverall.length;
+  const overallValue = activeOverall.reduce((sum,c)=>sum+Number(c.price||0),0);
   summaryRows.push({
     'Round': 'TOTAL (all rounds)',
     'Customers': overallCustomers,
