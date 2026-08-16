@@ -370,7 +370,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 14;
+const APP_VERSION = 15;
 function formatVersion(v){ return '1.' + v; }
 const DEFAULT_CLEAN_TEMPLATE = "Hi {name}, just a reminder I'll be round to clean your windows soon. Let me know if that's not convenient.\n\nThanks,\n{yourname}\n{company}";
 const DEFAULT_PAY_TEMPLATE = "Hi {name}, a friendly reminder that your window cleaning payment of {amount} is outstanding.\n\nThanks,\n{yourname}\n{company}";
@@ -415,6 +415,7 @@ function migrateData(parsed){
   if(parsed.settings.companyPhone == null) parsed.settings.companyPhone = '';
   if(parsed.settings.logo == null) parsed.settings.logo = '';
   parsed.customers.forEach(c=>{
+    if(c.pauseReason == null) c.pauseReason = '';
     if(c.frequencyWeeks == null){
       c.frequencyWeeks = c.frequencyDays ? Math.max(1, Math.round(c.frequencyDays/7)) : 4;
     }
@@ -512,7 +513,7 @@ function custStatus(c){
   const freq = freqDays(c);
   let cleanBadge = null;
   if(c.paused){
-    cleanBadge = {type:'paused', text:'Paused'};
+    cleanBadge = {type:'paused', text: c.pauseReason ? `Paused — ${c.pauseReason}` : 'Paused'};
   } else if(lastClean){
     const due = daysBetween(lastClean, todayISO());
     if(due >= freq) cleanBadge = {type: due >= freq+7 ? 'overdue' : 'due', text: due >= freq+7 ? `${due}d overdue` : `Due (${due}d)`};
@@ -1210,7 +1211,7 @@ function openCustomerDetail(id){
       <button class="sheet-close" style="flex-shrink:0;" onclick="closeSheet()">✕</button>
     </div>
     ${(c.name && c.address) ? `<div style="color:var(--ink); font-size:0.9375rem; font-weight:700; margin-bottom:2px;">${escapeHtml(c.name)}</div>` : ''}
-    <div style="color:var(--ink-muted); font-size:0.8125rem; margin-bottom:10px;">${escapeHtml(c.round||'Unassigned')} · ${money(c.price)} standard · every ${c.frequencyWeeks||4} week${(c.frequencyWeeks||4)===1?'':'s'}${c.paused?' · <span style="color:var(--ink-muted); font-weight:700;">Paused</span>':''}</div>
+    <div style="color:var(--ink-muted); font-size:0.8125rem; margin-bottom:10px;">${escapeHtml(c.round||'Unassigned')} · ${money(c.price)} standard · every ${c.frequencyWeeks||4} week${(c.frequencyWeeks||4)===1?'':'s'}${c.paused?` · <span style="color:var(--ink-muted); font-weight:700;">Paused${c.pauseReason?' — '+escapeHtml(c.pauseReason):''}</span>`:''}</div>
     ${needsPriceReview(c) ? `<div style="color:var(--amber); font-size:0.75rem; font-weight:700; margin:-6px 2px 10px;">📈 12+ months since last price increase</div>` : ''}
     ${c.notes?`<div style="background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:10px 12px; font-size:0.8438rem; margin-bottom:14px;">${escapeHtml(c.notes)}</div>`:''}
     ${(c.phone||c.email)?`<div style="display:flex; gap:8px; margin-bottom:10px;">
@@ -1236,7 +1237,7 @@ function openCustomerDetail(id){
       <button class="btn btn-clean" onclick="quickClean('${id}'); openCustomerDetail('${id}');">Mark cleaned today</button>
       <button class="btn btn-paid" onclick="quickPaid('${id}'); openCustomerDetail('${id}');">Mark paid today</button>
     </div>
-    <button class="btn" style="width:100%; background:${c.paused?'var(--green-dim)':'var(--line)'}; color:${c.paused?'var(--green)':'var(--ink-muted)'}; margin-bottom:10px;" onclick="togglePause('${id}')">
+    <button class="btn" style="width:100%; background:${c.paused?'var(--green-dim)':'var(--line)'}; color:${c.paused?'var(--green)':'var(--ink-muted)'}; margin-bottom:10px;" onclick="${c.paused?`resumeCustomer('${id}')`:`openPauseReasonSheet('${id}')`}">
       ${c.paused ? '▶ Resume this customer' : '⏸ Pause this customer (skip due reminders)'}
     </button>
     <button class="btn" style="width:100%; background:var(--blue-dim); color:var(--blue-deep); margin-bottom:10px;" onclick="scheduleJobForCustomer('${id}')">
@@ -1495,11 +1496,63 @@ function emailCustomer(id){
   window.location.href = 'mailto:' + c.email;
 }
 
-function togglePause(id){
+const PAUSE_REASONS = ['Holiday', 'Work being done', 'Cancelled', 'Moved out', 'Other'];
+
+function openPauseReasonSheet(id){
   const c = data.customers.find(x=>x.id===id);
-  c.paused = !c.paused;
+  if(!c) return;
+  openSheet(`
+    <div class="sheet-head">
+      <h2 style="flex:1; min-width:0;">Pause this customer</h2>
+      <button class="sheet-close" onclick="closeSheet()">✕</button>
+    </div>
+    <p style="color:var(--ink-muted); font-size:0.8438rem; line-height:1.5; margin:0 2px 16px;">
+      They'll be skipped from due reminders and left out of round totals until resumed.
+    </p>
+    <label style="margin-top:0;">Reason</label>
+    <select id="pause_reason">
+      ${PAUSE_REASONS.map(r=>`<option value="${escapeAttr(r)}">${escapeHtml(r)}</option>`).join('')}
+    </select>
+    <div id="pause_other_wrap" style="display:none;">
+      <label>Other reason</label>
+      <input type="text" id="pause_other" placeholder="e.g. Building work next door">
+    </div>
+    <div class="form-actions">
+      <button class="btn-primary" onclick="confirmPause('${id}')">Pause customer</button>
+    </div>
+  `);
+  const sel = document.getElementById('pause_reason');
+  const otherWrap = document.getElementById('pause_other_wrap');
+  const syncOther = () => { otherWrap.style.display = sel.value === 'Other' ? 'block' : 'none'; };
+  sel.addEventListener('change', syncOther);
+  syncOther();
+}
+
+function confirmPause(id){
+  const c = data.customers.find(x=>x.id===id);
+  if(!c) return;
+  const sel = document.getElementById('pause_reason');
+  let reason = sel ? sel.value : '';
+  if(reason === 'Other'){
+    const other = document.getElementById('pause_other');
+    reason = (other && other.value.trim()) ? other.value.trim() : 'Other';
+  }
+  c.paused = true;
+  c.pauseReason = reason;
+  saveData();
+  closeSheet();
+  openCustomerDetail(id);
+  render();
+  toast('Customer paused — hidden from due reminders');
+}
+
+function resumeCustomer(id){
+  const c = data.customers.find(x=>x.id===id);
+  if(!c) return;
+  c.paused = false;
+  c.pauseReason = '';
   saveData(); openCustomerDetail(id); render();
-  toast(c.paused ? 'Customer paused — hidden from due reminders' : 'Customer resumed');
+  toast('Customer resumed');
 }
 
 function applyTemplate(tpl, tokens){
@@ -2237,7 +2290,7 @@ function confirmConvertQuoteToCustomer(quoteId){
     cleanHistory: [], paymentHistory: [],
     priceHistory: [{date: todayISO(), price}],
     order: maxOrder + 1,
-    photos: [], paused: false
+    photos: [], paused: false, pauseReason: ''
   };
   data.customers.push(newCustomer);
   q.status = 'converted';
@@ -3423,6 +3476,7 @@ const FOCUSED_HELP = {
     title: 'Customers',
     body: () => [
       helpP('A customer\'s screen shows their round, standard price, frequency, and any notes right at the top, followed by their clean history, payment history, price history, and any one-off jobs or photos linked to them. Use it to log a clean or payment by hand, pause them, or send a text reminder or receipt.'),
+      helpP('Pausing a customer asks for a reason — Holiday, Work being done, Cancelled, Moved out, or Other — which shows on their card and detail screen, and skips them from due reminders and round totals until resumed.'),
       helpP('The "Get a quote for this customer" button opens a new quote pre-filled with their details, handy for quoting extra work like gutter clearing or fascia cleaning.'),
       helpP('The printer icon prints or emails a record of everything on this screen — handy for a customer who asks for a summary.')
     ]
