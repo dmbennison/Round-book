@@ -369,7 +369,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 16;
+const APP_VERSION = 17;
 function formatVersion(v){ return '1.' + v; }
 const DEFAULT_CLEAN_TEMPLATE = "Hi {name}, just a reminder I'll be round to clean your windows soon. Let me know if that's not convenient.\n\nThanks,\n{yourname}\n{company}";
 const DEFAULT_PAY_TEMPLATE = "Hi {name}, a friendly reminder that your window cleaning payment of {amount} is outstanding.\n\nThanks,\n{yourname}\n{company}";
@@ -3984,14 +3984,30 @@ function loadWeather(){
   navigator.geolocation.getCurrentPosition(async (pos)=>{
     try{
       const { latitude, longitude } = pos.coords;
-      const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true&daily=precipitation_probability_max&forecast_days=1&timezone=auto`);
+      const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true&hourly=precipitation_probability&forecast_days=1&timezone=auto`);
       if(!res.ok) throw new Error('bad response');
       const json = await res.json();
       const cw = json && json.current_weather;
       if(!cw) throw new Error('no weather');
       const icon = WEATHER_CODES[cw.weathercode] || '🌡️';
       const temp = Math.round(cw.temperature);
-      const rainChance = json.daily && json.daily.precipitation_probability_max ? json.daily.precipitation_probability_max[0] : null;
+      let rainChance = null;
+      if(json.hourly && json.hourly.time && json.hourly.precipitation_probability){
+        // Match the hourly slot to the current time, rather than using the day's peak —
+        // that's the figure that actually matches what the weather app shows right now.
+        const nowISO = cw.time; // e.g. "2026-08-17T14:00"
+        let idx = json.hourly.time.indexOf(nowISO);
+        if(idx === -1){
+          // fall back to the closest hour if the exact timestamp isn't listed
+          const nowMs = new Date(nowISO).getTime();
+          let bestDiff = Infinity;
+          json.hourly.time.forEach((t, i)=>{
+            const diff = Math.abs(new Date(t).getTime() - nowMs);
+            if(diff < bestDiff){ bestDiff = diff; idx = i; }
+          });
+        }
+        if(idx !== -1) rainChance = json.hourly.precipitation_probability[idx];
+      }
       const rainPart = (rainChance != null) ? ` · 🌧️ ${rainChance}%` : '';
       const text = `${icon} ${temp}°C${rainPart}`;
       const el2 = document.getElementById('weatherPill');
