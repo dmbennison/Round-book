@@ -11,6 +11,8 @@
 <link rel="manifest" href="manifest.json">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/docx@8.2.4/build/index.umd.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
 <title>Round Book</title>
 <style>
   :root{
@@ -369,7 +371,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 17;
+const APP_VERSION = 19;
 function formatVersion(v){ return '1.' + v; }
 const DEFAULT_CLEAN_TEMPLATE = "Hi {name}, just a reminder I'll be round to clean your windows soon. Let me know if that's not convenient.\n\nThanks,\n{yourname}\n{company}";
 const DEFAULT_PAY_TEMPLATE = "Hi {name}, a friendly reminder that your window cleaning payment of {amount} is outstanding.\n\nThanks,\n{yourname}\n{company}";
@@ -409,6 +411,7 @@ function migrateData(parsed){
   if(!parsed.settings.quoteTemplate || OLD_QUOTE_TEMPLATES.includes(parsed.settings.quoteTemplate)) parsed.settings.quoteTemplate = DEFAULT_QUOTE_TEMPLATE;
   if(!parsed.settings.repeatQuoteTemplate || OLD_REPEAT_QUOTE_TEMPLATES.includes(parsed.settings.repeatQuoteTemplate)) parsed.settings.repeatQuoteTemplate = DEFAULT_REPEAT_QUOTE_TEMPLATE;
   if(!parsed.settings.marketingTemplate) parsed.settings.marketingTemplate = DEFAULT_MARKETING_TEMPLATE;
+  if(parsed.settings.messagingApp !== 'whatsapp') parsed.settings.messagingApp = 'sms';
   if(parsed.settings.companyName == null) parsed.settings.companyName = '';
   if(parsed.settings.companyAddress == null) parsed.settings.companyAddress = '';
   if(parsed.settings.companyPhone == null) parsed.settings.companyPhone = '';
@@ -1193,7 +1196,7 @@ function openCustomerDetail(id){
   const cleanRows = (c.cleanHistory||[]).slice().sort((a,b)=>a.date<b.date?1:-1)
     .map(e=>`<li>${fmtDate(e.date)} — ${money(e.amount)}<span style="display:flex; gap:4px;"><button class="hist-del" onclick="editHistAmount('${id}','clean','${e.date}')">Edit</button><button class="hist-del" onclick="removeHist('${id}','clean','${e.date}')">Remove</button></span></li>`).join('') || '<li style="color:var(--ink-muted)">No cleans logged yet</li>';
   const payRows = (c.paymentHistory||[]).slice().sort((a,b)=>a.date<b.date?1:-1)
-    .map(p=>`<li>${fmtDate(p.date)} — ${money(p.amount)}<span style="display:flex; gap:4px;">${(c.phone||c.email)?`<button class="hist-del" title="Send receipt" onclick="sendReceipt('${id}','${p.date}',${p.amount})">🧾 Receipt</button>`:''}<button class="hist-del" onclick="editHistAmount('${id}','pay','${p.date}')">Edit</button><button class="hist-del" onclick="removeHist('${id}','pay','${p.date}')">Remove</button></span></li>`).join('') || '<li style="color:var(--ink-muted)">No payments logged yet</li>';
+    .map(p=>`<li>${fmtDate(p.date)} — ${money(p.amount)}<span style="display:flex; gap:4px;"><button class="hist-del" title="Send receipt" onclick="openReceiptOptions('${id}','${p.date}',${p.amount})">🧾 Receipt</button><button class="hist-del" onclick="editHistAmount('${id}','pay','${p.date}')">Edit</button><button class="hist-del" onclick="removeHist('${id}','pay','${p.date}')">Remove</button></span></li>`).join('') || '<li style="color:var(--ink-muted)">No payments logged yet</li>';
   const priceRows = (c.priceHistory||[]).slice().sort((a,b)=>a.date<b.date?1:-1)
     .map((p,i)=>`<li>${fmtDate(p.date)} — ${money(p.price)}${i===0?' <span style="color:var(--ink-muted); font-weight:500;">(current)</span>':''}<span style="display:flex; gap:4px;"><button class="hist-del" onclick="editPriceHistoryEntry('${id}','${p.date}')">Edit</button><button class="hist-del" onclick="removePriceHistoryEntry('${id}','${p.date}')">Remove</button></span></li>`).join('') || '<li style="color:var(--ink-muted)">No price changes recorded</li>';
   const linkedJobs = (data.oneOffJobs||[]).filter(j=>j.customerId===id).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
@@ -1566,6 +1569,37 @@ function applyTemplate(tpl, tokens){
     .replace(/\{yourname\}/g, tokens.yourname || '');
 }
 
+// Normalizes a UK-style phone number into the digits-only, country-code-prefixed
+// format WhatsApp's click-to-chat links require (e.g. "07123 456789" -> "447123456789").
+function normalizePhoneForWhatsApp(phone){
+  let digits = (phone||'').replace(/[^\d+]/g,'');
+  if(digits.startsWith('+')) return digits.slice(1);
+  if(digits.startsWith('00')) return digits.slice(2);
+  if(digits.startsWith('0')) return '44' + digits.slice(1);
+  return digits;
+}
+
+// Single point of truth for "send this text to this phone number" — respects the
+// person's chosen messaging app (SMS or WhatsApp) from Settings, so every reminder,
+// receipt, quote, and marketing text goes out the same way without repeating this logic.
+function sendPhoneMessage(phone, msg){
+  const clean = (phone||'').replace(/\s+/g,'');
+  if(!clean) return;
+  if(data.settings.messagingApp === 'whatsapp'){
+    window.open(`https://wa.me/${normalizePhoneForWhatsApp(clean)}?text=${encodeURIComponent(msg)}`, '_blank');
+  } else {
+    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const separator = isIOS ? '&' : '?';
+    window.location.href = `sms:${clean}${separator}body=${encodeURIComponent(msg)}`;
+  }
+}
+
+function setMessagingApp(mode){
+  data.settings.messagingApp = mode === 'whatsapp' ? 'whatsapp' : 'sms';
+  saveData();
+  openSettings();
+}
+
 function sendReceipt(id, dateISO, amount){
   const c = data.customers.find(x=>x.id===id);
   if(!c) return;
@@ -1577,14 +1611,101 @@ function sendReceipt(id, dateISO, amount){
     name: firstName, amount: Number(amount), company, date: fmtDate(dateISO), yourname
   });
   if(c.phone){
-    const phone = c.phone.replace(/\s+/g,'');
-    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-    const separator = isIOS ? '&' : '?';
-    window.location.href = `sms:${phone}${separator}body=${encodeURIComponent(msg)}`;
+    sendPhoneMessage(c.phone, msg);
   } else {
     window.location.href = `mailto:${c.email}?subject=${encodeURIComponent('Receipt')}&body=${encodeURIComponent(msg)}`;
   }
 }
+
+function openReceiptOptions(id, dateISO, amount){
+  const c = data.customers.find(x=>x.id===id);
+  if(!c) return;
+  openSheet(`
+    <div class="sheet-head">
+      <h2 style="flex:1; min-width:0;">Send receipt</h2>
+      <button class="sheet-close" onclick="closeSheet()">✕</button>
+    </div>
+    <p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 16px; line-height:1.5;">${escapeHtml(c.name||c.address||'This customer')} · ${money(amount)} on ${fmtDate(dateISO)}</p>
+    ${(c.phone||c.email) ? `<button class="backup-btn" onclick="closeSheet(); sendReceipt('${id}','${dateISO}',${amount})">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      <div><div class="t1">Quick text message</div><div class="t2">${data.settings.messagingApp==='whatsapp'?'Sends via WhatsApp':'Sends as a text'}, using your receipt wording</div></div>
+    </button>` : ''}
+    <button class="backup-btn" onclick="printReceipt('${id}','${dateISO}',${amount})">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
+      <div><div class="t1">Formatted receipt</div><div class="t2">Print it or send a PDF copy via WhatsApp</div></div>
+    </button>
+  `);
+}
+
+function printReceipt(customerId, dateISO, amount){
+  const c = data.customers.find(x=>x.id===customerId);
+  if(!c) return;
+  const receiptNumber = 'RCT-' + (dateISO||todayISO()).replace(/-/g,'') + '-' + c.id.slice(-4).toUpperCase();
+  const company = data.settings.companyName || '';
+  const companyAddress = data.settings.companyAddress || '';
+  const companyPhone = data.settings.companyPhone || '';
+  const yourName = data.settings.yourName || '';
+  const hasLogo = !!data.settings.logo;
+  const fromLine = [yourName, company].filter(Boolean).join(' · ');
+
+  const metaRows = [
+    ['Receipt number', receiptNumber],
+    ['Receipt date', fmtDate(todayISO())],
+    ['Payment date', fmtDate(dateISO)],
+    ['Status', 'Paid']
+  ].map(([label,val])=>`<tr><td style="font-weight:700; width:140px; color:#66798A;">${label}</td><td>${escapeHtml(String(val))}</td></tr>`).join('');
+
+  const billToLines = [
+    c.name ? escapeHtml(c.name) : '',
+    c.address ? escapeHtml(c.address) : '',
+    c.phone ? escapeHtml(c.phone) : ''
+  ].filter(Boolean).map(l=>`<div>${l}</div>`).join('');
+
+  const description = `Window cleaning — ${escapeHtml(c.round||'Round')}`;
+
+  // See printJobInvoice for why the logo/name/address/phone blocks are kept as
+  // separate top-level siblings rather than nested in one div.
+  const logoBlock = hasLogo
+    ? `<div style="text-align:left; margin-bottom:4px;"><img class="inv-logo" src="${data.settings.logo}" style="display:block; max-height:60px; max-width:200px; object-fit:contain;"></div>`
+    : '';
+  const nameBlock = (!hasLogo && company)
+    ? `<div style="text-align:left; font-size:15px; font-weight:800; color:#10344C; margin-bottom:2px;">${escapeHtml(company)}</div>`
+    : '';
+  const addressBlock = companyAddress
+    ? `<div style="text-align:left; font-size:11px; color:#66798A; line-height:1.5;">${escapeHtml(companyAddress).replace(/\n/g,'<br>')}</div>`
+    : '';
+  const phoneBlock = companyPhone
+    ? `<div style="text-align:left; font-size:11px; color:#66798A; line-height:1.5;">${escapeHtml(companyPhone)}</div>`
+    : '';
+  const letterheadSpacer = (logoBlock || nameBlock || addressBlock || phoneBlock)
+    ? `<div style="margin-bottom:16px;"></div>` : '';
+
+  const body = `
+    ${logoBlock}${nameBlock}${addressBlock}${phoneBlock}${letterheadSpacer}
+    <div class="rpt-round-title" style="margin-top:0;">Receipt</div>
+    <table class="rpt-table inv-meta-table" style="margin-bottom:20px;"><tbody>${metaRows}</tbody></table>
+
+    <div class="rpt-round-title">Received from</div>
+    <div class="inv-billto">
+      <span class="inv-label">Customer</span>
+      ${billToLines || '<div style="color:#66798A;">No customer details on file</div>'}
+    </div>
+
+    <div class="rpt-round-title">Details</div>
+    <table class="rpt-table" style="margin-bottom:4px;">
+      <thead><tr><th>Description</th><th style="text-align:right;">Amount</th></tr></thead>
+      <tbody><tr><td>${description}</td><td style="text-align:right;">${money(amount)}</td></tr></tbody>
+    </table>
+    <div class="rpt-total inv-total-box"><span>Total paid</span><span class="inv-total-amount">${money(amount)}</span></div>
+    <div style="margin-top:14px;"><span class="inv-stamp paid">✓ Paid</span></div>
+
+    <div class="rpt-footer" style="text-align:left; border-top:none; margin-top:28px; padding-top:0;">
+      Thank you for your payment.${fromLine ? '<br>' + escapeHtml(fromLine) : ''}
+    </div>
+  `;
+  runPrint(`Receipt — ${c.address || c.name || receiptNumber}`, body, true, true);
+}
+
 
 function sendJobReceipt(id){
   const j = data.oneOffJobs.find(x=>x.id===id);
@@ -1596,10 +1717,7 @@ function sendJobReceipt(id){
   const msg = applyTemplate(data.settings.receiptTemplate, {
     name: firstName, amount: Number(j.price||0), company, date: fmtDate(j.date), yourname
   });
-  const phone = j.phone.replace(/\s+/g,'');
-  const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-  const separator = isIOS ? '&' : '?';
-  window.location.href = `sms:${phone}${separator}body=${encodeURIComponent(msg)}`;
+  sendPhoneMessage(j.phone, msg);
 }
 
 function sendQuoteText(id){
@@ -1614,10 +1732,7 @@ function sendQuoteText(id){
     name: firstName, amount: Number(q.price||0), company, date: fmtDate(q.date), yourname
   });
   if(q.phone){
-    const phone = q.phone.replace(/\s+/g,'');
-    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-    const separator = isIOS ? '&' : '?';
-    window.location.href = `sms:${phone}${separator}body=${encodeURIComponent(msg)}`;
+    sendPhoneMessage(q.phone, msg);
   } else {
     window.location.href = `mailto:${q.email}?subject=${encodeURIComponent('Your window cleaning quote')}&body=${encodeURIComponent(msg)}`;
   }
@@ -1641,10 +1756,7 @@ function sendTemplate(id, kind){
     saveData();
     render();
   }
-  const phone = c.phone.replace(/\s+/g,'');
-  const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-  const separator = isIOS ? '&' : '?';
-  window.location.href = `sms:${phone}${separator}body=${encodeURIComponent(msg)}`;
+  sendPhoneMessage(c.phone, msg);
 }
 
 function openBulkReminders(kind, roundName){
@@ -1667,7 +1779,7 @@ function openBulkReminders(kind, roundName){
       <button class="sheet-close" onclick="closeSheet()">✕</button>
     </div>
     <p style="color:var(--ink-muted); font-size:0.7812rem; margin:0 2px 14px; line-height:1.5;">
-      Tap Send for each customer — it opens Messages pre-filled and ready to go. Come back here for the next one.
+      Tap Send for each customer — it opens ${data.settings.messagingApp==='whatsapp'?'WhatsApp':'Messages'} pre-filled and ready to go. Come back here for the next one.
     </p>
     ${list.map(c=>{
       const s = custStatus(c);
@@ -1709,7 +1821,7 @@ function openMarketingBlast(roundName){
     <label style="margin-top:0;">Message <span style="text-transform:none; font-weight:500; opacity:0.7;">({name}, {company}, {yourname})</span></label>
     <textarea id="mkt_msg" rows="4">${escapeHtml(tpl)}</textarea>
     <p style="color:var(--ink-muted); font-size:0.7812rem; margin:10px 2px 14px; line-height:1.5;">
-      Tap Send for each customer — it opens Messages pre-filled and ready to go. Come back here for the next one.
+      Tap Send for each customer — it opens ${data.settings.messagingApp==='whatsapp'?'WhatsApp':'Messages'} pre-filled and ready to go. Come back here for the next one.
     </p>
     ${list.length ? list.map(c=>{
       return `<div class="cust-card" id="bulkrow-${c.id}" style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
@@ -1732,10 +1844,7 @@ function sendMarketingText(id){
   const company = data.settings.companyName || '';
   const yourname = data.settings.yourName || '';
   const msg = applyTemplate(tpl, {name: firstName, company, yourname});
-  const phone = c.phone.replace(/\s+/g,'');
-  const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-  const separator = isIOS ? '&' : '?';
-  window.location.href = `sms:${phone}${separator}body=${encodeURIComponent(msg)}`;
+  sendPhoneMessage(c.phone, msg);
 }
 
 function addHistDate(id, kind){
@@ -2308,7 +2417,7 @@ const THEMES = {
   rust:   {name:'Rust',   navy:'#5A2A1C', blue:'#E0723A'},
   plum:   {name:'Plum',   navy:'#4A1F52', blue:'#C15FC0'},
   forest: {name:'Forest', navy:'#1E4A2E', blue:'#4FAE64'},
-  ice:    {name:'Ice',    navy:'#1B4E63', blue:'#3DD6E0'}
+  crimson:{name:'Crimson', navy:'#5C1A22', blue:'#E13A4B'}
 };
 let themeName = localStorage.getItem('roundBookTheme') || 'ocean';
 
@@ -2413,6 +2522,12 @@ function openSettings(){
         </button>`;
       }).join('')}
     </div>
+    <div class="section-label">Messaging app</div>
+    <div class="seg-row">
+      <button class="seg-btn ${data.settings.messagingApp!=='whatsapp'?'active':''}" onclick="setMessagingApp('sms')">💬 Text message</button>
+      <button class="seg-btn ${data.settings.messagingApp==='whatsapp'?'active':''}" onclick="setMessagingApp('whatsapp')">🟢 WhatsApp</button>
+    </div>
+    <p style="color:var(--ink-muted); font-size:0.75rem; margin:4px 2px 16px; line-height:1.5;">Used whenever a message is sent straight to a customer's phone — cleaning and payment reminders, receipts, quotes, and group marketing texts.</p>
     <div class="section-label">Company name</div>
     <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 10px; line-height:1.5;">Shown on printed reports and invoices, and available as the <b>{company}</b> token in text messages.</p>
     <input type="text" id="companyNameInput" value="${escapeAttr(data.settings.companyName||'')}" placeholder="e.g. Darren's Window Cleaning">
@@ -2560,7 +2675,7 @@ let pendingReportTitle = '';
 let pendingReportBody = '';
 let pendingReportHideCompany = false;
 
-function runPrint(titleHtml, bodyHtml, hideCompanyHeader){
+function runPrint(titleHtml, bodyHtml, hideCompanyHeader, allowPdfShare){
   pendingReportTitle = titleHtml;
   pendingReportBody = bodyHtml;
   pendingReportHideCompany = !!hideCompanyHeader;
@@ -2569,11 +2684,15 @@ function runPrint(titleHtml, bodyHtml, hideCompanyHeader){
       <h2 style="flex:1; min-width:0;">${titleHtml}</h2>
       <button class="sheet-close" onclick="closeSheet()">✕</button>
     </div>
-    <p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 16px; line-height:1.5;">How would you like this report?</p>
+    <p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 16px; line-height:1.5;">How would you like this ${allowPdfShare?'document':'report'}?</p>
     <button class="backup-btn" onclick="printPendingReport()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
       <div><div class="t1">Print</div><div class="t2">Opens your printer dialog</div></div>
     </button>
+    ${allowPdfShare ? `<button class="backup-btn" id="pdfShareBtn" onclick="sendPendingReportPdf()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      <div><div class="t1">Send as PDF via WhatsApp</div><div class="t2">Shares a PDF copy</div></div>
+    </button>` : ''}
     <button class="backup-btn" onclick="exportPendingReportDocx()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
       <div><div class="t1">Save as Word document</div><div class="t2">Downloads a .docx file</div></div>
@@ -2595,6 +2714,97 @@ function printPendingReport(){
   `;
   closeSheet();
   window.print();
+}
+
+// Strips HTML and punctuation down to a safe, short filename stem.
+function sanitizeFilename(str){
+  const plain = (str||'Document').replace(/<[^>]*>/g,'');
+  const clean = plain.replace(/[^a-z0-9]+/gi,'-').replace(/^-+|-+$/g,'');
+  return (clean || 'Document').slice(0,60);
+}
+
+// Renders the pending report's title + body into an offscreen copy of the print
+// layout (same markup printPendingReport uses), rasterizes it, and packs it into
+// an A4 PDF — paginating automatically if the content runs longer than one page.
+async function generatePendingReportPdfBlob(){
+  const company = pendingReportHideCompany ? '' : (data.settings.companyName || '');
+  const container = document.createElement('div');
+  container.style.cssText = 'position:fixed; left:-9999px; top:0; width:794px; background:#ffffff; padding:32px; color:#1C2B36;';
+  container.innerHTML = `
+    <div class="rpt-header">
+      <div>
+        <h1>${pendingReportTitle}</h1>
+        ${company ? `<div style="font-size:13px; color:#66798A; font-weight:700; margin-top:2px;">${escapeHtml(company)}</div>` : ''}
+      </div>
+      <div class="rpt-date">${reportDate()}</div>
+    </div>
+    ${pendingReportBody}
+  `;
+  document.body.appendChild(container);
+  try{
+    const imgs = [...container.querySelectorAll('img')];
+    await Promise.all(imgs.map(img => img.complete ? Promise.resolve() : new Promise(res=>{ img.onload = img.onerror = res; })));
+    const canvas = await html2canvas(container, { scale: 2, backgroundColor: '#ffffff', useCORS: true });
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ unit: 'pt', format: 'a4' });
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const margin = 24;
+    const imgWidth = pageWidth - margin*2;
+    const imgHeight = canvas.height * imgWidth / canvas.width;
+    const imgData = canvas.toDataURL('image/png');
+    let heightLeft = imgHeight;
+    let position = margin;
+    pdf.addImage(imgData, 'PNG', margin, position, imgWidth, imgHeight);
+    heightLeft -= (pageHeight - margin*2);
+    while(heightLeft > 0){
+      position = margin - (imgHeight - heightLeft);
+      pdf.addPage();
+      pdf.addImage(imgData, 'PNG', margin, position, imgWidth, imgHeight);
+      heightLeft -= (pageHeight - margin*2);
+    }
+    return pdf.output('blob');
+  } finally {
+    document.body.removeChild(container);
+  }
+}
+
+// Shares a PDF Blob via the native share sheet (WhatsApp is one of the apps offered
+// there on both Android and iOS) when the browser supports sharing files. Where it
+// doesn't — mainly desktop browsers — the PDF is downloaded instead and WhatsApp Web
+// opens so it can be attached by hand.
+async function sharePdfBlob(blob, filename){
+  try{
+    const file = new File([blob], filename, {type:'application/pdf'});
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      await navigator.share({files:[file], title: filename});
+      return true;
+    }
+  }catch(e){
+    if(e && e.name === 'AbortError') return false; // user cancelled the share sheet
+  }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url), 60000);
+  toast('PDF downloaded — attach it in WhatsApp');
+  window.open('https://wa.me/', '_blank');
+  return true;
+}
+
+async function sendPendingReportPdf(){
+  const btn = document.getElementById('pdfShareBtn');
+  if(btn){ btn.style.opacity = '0.6'; btn.style.pointerEvents = 'none'; }
+  toast('Preparing PDF…');
+  try{
+    const blob = await generatePendingReportPdfBlob();
+    closeSheet();
+    await sharePdfBlob(blob, sanitizeFilename(pendingReportTitle) + '.pdf');
+  }catch(e){
+    toast('Could not create the PDF — try Print instead');
+    if(btn){ btn.style.opacity = ''; btn.style.pointerEvents = ''; }
+  }
 }
 
 function htmlToDocxElements(bodyHtml){
@@ -3137,7 +3347,7 @@ function printJobInvoice(id){
   // Always suppress the generic report header's company-name subtitle for invoices — the
   // letterhead block above already covers name/logo/address/phone, so showing both would
   // duplicate the company name under itself when there's no logo.
-  runPrint(`Invoice — ${j.address || j.name || invoiceNumber}`, body, true);
+  runPrint(`Invoice — ${j.address || j.name || invoiceNumber}`, body, true, true);
 }
 
 function printJobRecord(id){
@@ -3463,13 +3673,14 @@ const FOCUSED_HELP = {
   jobs: {
     title: 'One-off jobs',
     body: () => [
-      helpP('For anything outside your regular rounds. Swipe right for done, left for paid. Completed jobs get an anniversary flag after a year (switchable off per job), can be turned into a repeat-work quote, and can have a professional invoice printed or emailed — with your logo if you\'ve added one.')
+      helpP('For anything outside your regular rounds. Swipe right for done, left for paid. Completed jobs get an anniversary flag after a year (switchable off per job), can be turned into a repeat-work quote, and can have a professional invoice printed or sent as a PDF via WhatsApp — with your logo if you\'ve added one.')
     ]
   },
   customer: {
     title: 'Customers',
     body: () => [
       helpP('A customer\'s screen shows their round, standard price, frequency, and any notes right at the top, followed by their clean history, payment history, price history, and any one-off jobs or photos linked to them. Use it to log a clean or payment by hand, pause them, or send a text reminder or receipt.'),
+      helpP('Tapping 🧾 Receipt next to a payment gives a choice: a quick text using your receipt wording, or a formatted receipt in the same style as a job invoice, which you can print or send as a PDF via WhatsApp.'),
       helpP('Pausing a customer asks for a reason — Holiday, Work being done, Cancelled, Moved out, or Other — and stamps the date. Both show on their card and detail screen, and they\'re skipped from due reminders and round totals until resumed.'),
       helpP('The "Get a quote for this customer" button opens a new quote pre-filled with their details, handy for quoting extra work like gutter clearing or fascia cleaning.'),
       helpP('The printer icon prints or emails a record of everything on this screen — handy for a customer who asks for a summary.')
@@ -3507,7 +3718,7 @@ const FOCUSED_HELP = {
   settings: {
     title: 'Settings',
     body: () => [
-      helpP('Appearance, text size, colour scheme, company details and logo (for invoices), your name, and the wording of every text message template, including the group marketing text sent from a round.')
+      helpP('Appearance, text size, colour scheme, company details and logo (for invoices and receipts), your name, whether reminders/receipts/quotes go out as a text or via WhatsApp, and the wording of every message template.')
     ]
   },
   reminders: {

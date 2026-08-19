@@ -1,4 +1,4 @@
-const CACHE_NAME = 'round-book-v17';
+const CACHE_NAME = 'round-book-v19';
 const ASSETS = [
   './',
   './manifest.json',
@@ -6,7 +6,9 @@ const ASSETS = [
   './icon-512.png',
   './apple-touch-icon.png',
   'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',
-  'https://cdn.jsdelivr.net/npm/docx@8.2.4/build/index.umd.js'
+  'https://cdn.jsdelivr.net/npm/docx@8.2.4/build/index.umd.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'
 ];
 
 // Safari refuses to let a service worker answer a page-load request with a
