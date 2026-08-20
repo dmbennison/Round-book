@@ -371,7 +371,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 20;
+const APP_VERSION = 21;
 function formatVersion(v){ return '1.' + v; }
 const DEFAULT_CLEAN_TEMPLATE = "Hi {name}, just a reminder I'll be round to clean your windows soon. Let me know if that's not convenient.\n\nThanks,\n{yourname}\n{company}";
 const DEFAULT_PAY_TEMPLATE = "Hi {name}, a friendly reminder that your window cleaning payment of {amount} is outstanding.\n\nThanks,\n{yourname}\n{company}";
@@ -3760,7 +3760,8 @@ const FOCUSED_HELP = {
   backup: {
     title: 'Backup and restore',
     body: () => [
-      helpP('Everything lives only on this phone. Back up regularly from the Backup icon — export a full backup, export to Excel, restore from a backup file, or import customers from a spreadsheet (they land in a "Needs review" round until you check them over).')
+      helpP('Everything lives only on this phone. Back up regularly from the Backup icon — export a full backup, export to Excel, restore from a backup file, or import customers from a spreadsheet (they land in a "Needs review" round until you check them over).'),
+      helpP('The storage bar at the top shows roughly how much space your data is using — photos are usually the biggest share. If it\'s getting close to full, removing old photos frees up the most room.')
     ]
   },
   settings: {
@@ -3819,10 +3820,42 @@ function openHelp(){
   `);
 }
 
+// Rough byte size of the whole saved dataset, plus a breakdown for photos (usually
+// the biggest share by far, since they're stored as base64 text alongside everything
+// else). Used to give a plain-English "storage used" figure in Backup & restore.
+function computeStorageStats(){
+  const jsonStr = JSON.stringify(data);
+  const totalBytes = new Blob([jsonStr]).size;
+  let photoBytes = 0, photoCount = 0;
+  (data.customers||[]).forEach(c=>{
+    (c.photos||[]).forEach(p=>{
+      if(p.dataUrl){ photoBytes += new Blob([p.dataUrl]).size; photoCount++; }
+    });
+  });
+  (data.oneOffJobs||[]).forEach(j=>{
+    (j.photos||[]).forEach(p=>{
+      if(p.dataUrl){ photoBytes += new Blob([p.dataUrl]).size; photoCount++; }
+    });
+  });
+  const logoBytes = (data.settings && data.settings.logo) ? new Blob([data.settings.logo]).size : 0;
+  return { totalBytes, photoBytes, photoCount, logoBytes };
+}
+function formatBytes(bytes){
+  if(bytes < 1024) return bytes + ' B';
+  if(bytes < 1024*1024) return Math.round(bytes/1024) + ' KB';
+  return (bytes/(1024*1024)).toFixed(1) + ' MB';
+}
+
 function openBackup(){
   const count = data.customers.length;
   const days = daysSinceBackup();
   const lastText = days === Infinity ? "You haven't backed up yet" : days === 0 ? "Backed up today" : `Last backup: ${days} day${days===1?'':'s'} ago`;
+  const stats = computeStorageStats();
+  // 5MB is the tightest common browser quota (iOS Safari) — a conservative baseline
+  // so the bar turns amber/red before anyone actually hits a "storage full" error.
+  const assumedLimitBytes = 5 * 1024 * 1024;
+  const pctUsed = Math.min(100, Math.round((stats.totalBytes / assumedLimitBytes) * 100));
+  const barColor = pctUsed>=80 ? 'var(--red)' : pctUsed>=50 ? 'var(--amber)' : 'var(--green)';
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">Backup &amp; restore</h2>
@@ -3833,6 +3866,18 @@ function openBackup(){
       Everything is stored only on this phone, in this browser. Nothing is sent anywhere. Export a backup regularly in case the app data is ever cleared.
     </p>
     <p style="color:${days>=BACKUP_REMINDER_DAYS?'var(--amber)':'var(--ink-muted)'}; font-size:0.7812rem; font-weight:700; margin:0 2px 16px;">${lastText}</p>
+    <div style="background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:14px; margin-bottom:16px;">
+      <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px;">
+        <span style="font-size:0.8125rem; font-weight:800; color:var(--ink);">Storage used</span>
+        <span style="font-size:0.9375rem; font-weight:800; color:var(--ink);">${formatBytes(stats.totalBytes)}</span>
+      </div>
+      <div style="height:6px; background:var(--line); border-radius:3px; overflow:hidden; margin-bottom:10px;">
+        <div style="height:100%; width:${pctUsed}%; background:${barColor}; border-radius:3px;"></div>
+      </div>
+      <div style="font-size:0.75rem; color:var(--ink-muted); line-height:1.55;">
+        ${stats.photoCount ? `${stats.photoCount} photo${stats.photoCount===1?'':'s'} (${formatBytes(stats.photoBytes)}) — usually the biggest share. ` : ''}Browsers typically allow somewhere around 5–10MB per app before storage runs out — if you're getting close, removing old photos frees up the most space.
+      </div>
+    </div>
     <button class="backup-btn" onclick="exportData()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
       <div><div class="t1">Export backup</div><div class="t2">${count} customer${count===1?'':'s'} · saves a .json file</div></div>
