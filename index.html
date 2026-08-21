@@ -371,7 +371,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 21;
+const APP_VERSION = 22;
 function formatVersion(v){ return '1.' + v; }
 const DEFAULT_CLEAN_TEMPLATE = "Hi {name}, just a reminder I'll be round to clean your windows soon. Let me know if that's not convenient.\n\nThanks,\n{yourname}\n{company}";
 const DEFAULT_PAY_TEMPLATE = "Hi {name}, a friendly reminder that your window cleaning payment of {amount} is outstanding.\n\nThanks,\n{yourname}\n{company}";
@@ -419,6 +419,7 @@ function migrateData(parsed){
   parsed.customers.forEach(c=>{
     if(c.pauseReason == null) c.pauseReason = '';
     if(c.pauseDate == null) c.pauseDate = '';
+    if(c.textBeforeVisit == null) c.textBeforeVisit = false;
     if(c.frequencyWeeks == null){
       c.frequencyWeeks = c.frequencyDays ? Math.max(1, Math.round(c.frequencyDays/7)) : 4;
     }
@@ -1018,6 +1019,7 @@ function custCardHtml(c){
         ${(s.owed && c.paymentReminderSent) ? `<span class="badge paused">🔔 ${fmtDate(c.paymentReminderSentDate).split(' ').slice(0,2).join(' ')}</span>` : ''}
         ${(c.photos && c.photos.length) ? `<span class="badge paused">📷 ${c.photos.length}</span>` : ''}
         ${needsPriceReview(c) ? `<span class="badge due" title="12+ months since last price increase">📈 Review</span>` : ''}
+        ${c.textBeforeVisit ? `<span class="badge anniversary" title="Text before you arrive">📱 Text first</span>` : ''}
         ${showDayBadge ? `<span class="badge anniversary">Day ${c.visitDay||1}</span>` : ''}
       </div>
     </div>
@@ -1133,6 +1135,10 @@ function openCustomerForm(existing){
     </div>
     <label>Notes</label>
     <textarea id="f_notes" rows="2" placeholder="Gate code, dog, access notes...">${escapeHtml(c.notes||'')}</textarea>
+    <label style="display:flex; align-items:center; gap:8px; margin:10px 2px 0; text-transform:none; font-weight:600;">
+      <input type="checkbox" id="f_textBefore" ${c.textBeforeVisit?'checked':''} style="width:18px; height:18px; margin:0;">
+      Text before I arrive
+    </label>
     <div class="form-actions">
       <button class="btn-primary" onclick="saveCustomerForm('${existing?existing.id:''}')">${existing?'Save changes':'Add customer'}</button>
     </div>
@@ -1160,7 +1166,8 @@ function saveCustomerForm(id){
     round: document.getElementById('f_round').value.trim() || 'Unassigned',
     price: parseFloat(document.getElementById('f_price').value) || 0,
     frequencyWeeks: parseInt(document.getElementById('f_freq').value) || 4,
-    notes: document.getElementById('f_notes').value.trim()
+    notes: document.getElementById('f_notes').value.trim(),
+    textBeforeVisit: document.getElementById('f_textBefore').checked
   };
   if(id){
     const c = data.customers.find(x=>x.id===id);
@@ -1223,6 +1230,7 @@ function openCustomerDetail(id){
     ${(c.name && c.address) ? `<div style="color:var(--ink); font-size:0.9375rem; font-weight:700; margin-bottom:2px;">${escapeHtml(c.name)}</div>` : ''}
     <div style="color:var(--ink-muted); font-size:0.8125rem; margin-bottom:10px;">${escapeHtml(c.round||'Unassigned')} · ${money(c.price)} standard · every ${c.frequencyWeeks||4} week${(c.frequencyWeeks||4)===1?'':'s'}${c.paused?` · <span style="color:var(--ink-muted); font-weight:700;">Paused${c.pauseReason?' — '+escapeHtml(c.pauseReason):''}${c.pauseDate?' ('+fmtDate(c.pauseDate)+')':''}</span>`:''}</div>
     ${needsPriceReview(c) ? `<div style="color:var(--amber); font-size:0.75rem; font-weight:700; margin:-6px 2px 10px;">📈 12+ months since last price increase</div>` : ''}
+    ${c.textBeforeVisit ? `<div style="color:var(--blue-deep); font-size:0.75rem; font-weight:700; margin:-6px 2px 10px;">📱 Text before you arrive</div>` : ''}
     ${c.notes?`<div style="background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:10px 12px; font-size:0.8438rem; margin-bottom:14px;">${escapeHtml(c.notes)}</div>`:''}
     ${(c.phone||c.email)?`<div style="display:flex; gap:8px; margin-bottom:10px;">
       ${c.phone?`<a href="tel:${escapeAttr(c.phone.replace(/\\s+/g,''))}" style="flex:1; text-decoration:none; background:var(--blue-dim); color:var(--blue-deep); border-radius:10px; padding:9px; font-size:0.8125rem; font-weight:700; text-align:center;">📞 ${escapeHtml(c.phone)}</a>`:''}
@@ -1630,11 +1638,15 @@ function normalizePhoneForWhatsApp(phone){
 // Single point of truth for "send this text to this phone number" — respects the
 // person's chosen messaging app (SMS or WhatsApp) from Settings, so every reminder,
 // receipt, quote, and marketing text goes out the same way without repeating this logic.
+// Uses location.href rather than window.open — opening a new tab/window is what
+// leaves an orphaned blank Safari tab behind when the person switches back from
+// WhatsApp on an installed PWA. A same-context navigation lets iOS/Android hand off
+// to the WhatsApp app directly, so "back" returns to Round Book instead.
 function sendPhoneMessage(phone, msg){
   const clean = (phone||'').replace(/\s+/g,'');
   if(!clean) return;
   if(data.settings.messagingApp === 'whatsapp'){
-    window.open(`https://wa.me/${normalizePhoneForWhatsApp(clean)}?text=${encodeURIComponent(msg)}`, '_blank');
+    window.location.href = `https://wa.me/${normalizePhoneForWhatsApp(clean)}?text=${encodeURIComponent(msg)}`;
   } else {
     const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
     const separator = isIOS ? '&' : '?';
@@ -2449,7 +2461,7 @@ function confirmConvertQuoteToCustomer(quoteId){
     cleanHistory: [], paymentHistory: [],
     priceHistory: [{date: todayISO(), price}],
     order: maxOrder + 1,
-    photos: [], paused: false, pauseReason: '', pauseDate: ''
+    photos: [], paused: false, pauseReason: '', pauseDate: '', textBeforeVisit: false
   };
   data.customers.push(newCustomer);
   q.status = 'converted';
@@ -2465,7 +2477,7 @@ const THEMES = {
   rust:   {name:'Rust',   navy:'#5A2A1C', blue:'#E0723A'},
   plum:   {name:'Plum',   navy:'#4A1F52', blue:'#C15FC0'},
   forest: {name:'Forest', navy:'#1E4A2E', blue:'#4FAE64'},
-  crimson:{name:'Crimson', navy:'#5C1A22', blue:'#E13A4B'}
+  ruby:   {name:'Ruby',    navy:'#661018', blue:'#FF3B4A'}
 };
 let themeName = localStorage.getItem('roundBookTheme') || 'ocean';
 
@@ -3728,6 +3740,7 @@ const FOCUSED_HELP = {
     title: 'Customers',
     body: () => [
       helpP('A customer\'s screen shows their round, standard price, frequency, and any notes right at the top. Clean history, payment history, and one-off jobs each open as their own list — tap one to see it, close it to come straight back here. Price history and photos stay on the main screen.'),
+      helpP('Tick "Text before I arrive" on a customer\'s edit screen to flag that they need a heads-up text before you turn up — it shows as a badge on their card in round lists and on their detail screen as a reminder while you\'re working through the round.'),
       helpP('Tapping 🧾 Receipt next to a payment gives a choice: a quick text using your receipt wording, or a formatted receipt in the same style as a job invoice, which you can print or send as a PDF via WhatsApp.'),
       helpP('Pausing a customer asks for a reason — Holiday, Work being done, Cancelled, Moved out, or Other — and stamps the date. Both show on their card and detail screen, and they\'re skipped from due reminders and round totals until resumed.'),
       helpP('The "Get a quote for this customer" button opens a new quote pre-filled with their details, handy for quoting extra work like gutter clearing or fascia cleaning.'),
