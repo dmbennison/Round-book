@@ -371,7 +371,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 22;
+const APP_VERSION = 23;
 function formatVersion(v){ return '1.' + v; }
 const DEFAULT_CLEAN_TEMPLATE = "Hi {name}, just a reminder I'll be round to clean your windows soon. Let me know if that's not convenient.\n\nThanks,\n{yourname}\n{company}";
 const DEFAULT_PAY_TEMPLATE = "Hi {name}, a friendly reminder that your window cleaning payment of {amount} is outstanding.\n\nThanks,\n{yourname}\n{company}";
@@ -1213,8 +1213,6 @@ function deleteCustomer(id){
 function openCustomerDetail(id){
   const c = data.customers.find(x=>x.id===id);
   const s = custStatus(c);
-  const priceRows = (c.priceHistory||[]).slice().sort((a,b)=>a.date<b.date?1:-1)
-    .map((p,i)=>`<li>${fmtDate(p.date)} — ${money(p.price)}${i===0?' <span style="color:var(--ink-muted); font-weight:500;">(current)</span>':''}<span style="display:flex; gap:4px;"><button class="hist-del" onclick="editPriceHistoryEntry('${id}','${p.date}')">Edit</button><button class="hist-del" onclick="removePriceHistoryEntry('${id}','${p.date}')">Remove</button></span></li>`).join('') || '<li style="color:var(--ink-muted)">No price changes recorded</li>';
   const linkedJobs = (data.oneOffJobs||[]).filter(j=>j.customerId===id);
   const suggestedPayment = s.owed ? s.balance : (c.price||0);
 
@@ -1305,8 +1303,11 @@ function openCustomerDetail(id){
       <div style="flex:1; min-width:0;"><div class="t1">One-off jobs</div><div class="t2">${linkedJobs.length} job${linkedJobs.length===1?'':'s'} for this customer</div></div>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px; color:var(--ink-muted);"><path d="M9 18l6-6-6-6"/></svg>
     </button>
-    <div class="section-label">Price history</div>
-    <ul class="hist-list">${priceRows}</ul>
+    <button class="backup-btn" onclick="openCustomerHistoryList('${id}','price')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 4 4 5-6"/></svg>
+      <div style="flex:1; min-width:0;"><div class="t1">Price history</div><div class="t2">${(c.priceHistory||[]).length} change${(c.priceHistory||[]).length===1?'':'s'} recorded</div></div>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px; color:var(--ink-muted);"><path d="M9 18l6-6-6-6"/></svg>
+    </button>
     <div class="section-label">Photos</div>
     <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px;">
       ${(c.photos||[]).map(p=>`<img src="${p.dataUrl}" onclick="viewPhoto('${id}','${p.id}')" style="width:72px; height:72px; object-fit:cover; border-radius:10px; border:1px solid var(--line); cursor:pointer;">`).join('')}
@@ -1336,11 +1337,15 @@ function openCustomerHistoryList(id, kind){
     title = 'Payment history';
     rowsHtml = (c.paymentHistory||[]).slice().sort((a,b)=>a.date<b.date?1:-1)
       .map(p=>`<li>${fmtDate(p.date)} — ${money(p.amount)}<span style="display:flex; gap:4px;"><button class="hist-del" title="Send receipt" onclick="openReceiptOptions('${id}','${p.date}',${p.amount})">🧾 Receipt</button><button class="hist-del" onclick="editHistAmount('${id}','pay','${p.date}')">Edit</button><button class="hist-del" onclick="removeHist('${id}','pay','${p.date}')">Remove</button></span></li>`).join('') || '<li style="color:var(--ink-muted)">No payments logged yet</li>';
-  } else {
+  } else if(kind === 'jobs'){
     title = 'One-off jobs';
     const linkedJobs = (data.oneOffJobs||[]).filter(j=>j.customerId===id).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
     rowsHtml = linkedJobs
       .map(j=>`<li style="cursor:pointer;" onclick="openJobForm(data.oneOffJobs.find(x=>x.id==='${j.id}'))">${fmtDate(j.date)} — ${money(j.price)} <span style="color:var(--ink-muted); font-weight:500;">(${j.done?'done':'not done'}, ${j.paid?'paid':'unpaid'})</span></li>`).join('') || '<li style="color:var(--ink-muted)">No one-off jobs for this customer</li>';
+  } else {
+    title = 'Price history';
+    rowsHtml = (c.priceHistory||[]).slice().sort((a,b)=>a.date<b.date?1:-1)
+      .map((p,i)=>`<li>${fmtDate(p.date)} — ${money(p.price)}${i===0?' <span style="color:var(--ink-muted); font-weight:500;">(current)</span>':''}<span style="display:flex; gap:4px;"><button class="hist-del" onclick="editPriceHistoryEntry('${id}','${p.date}')">Edit</button><button class="hist-del" onclick="removePriceHistoryEntry('${id}','${p.date}')">Remove</button></span></li>`).join('') || '<li style="color:var(--ink-muted)">No price changes recorded</li>';
   }
   openSheet(`
     <div class="sheet-head">
@@ -1508,7 +1513,7 @@ function editPriceHistoryEntry(id, dateKey){
   openSheet(`
     <div class="sheet-head">
       <h2>Edit price entry</h2>
-      <button class="sheet-close" onclick="openCustomerDetail('${id}')">✕</button>
+      <button class="sheet-close" onclick="openCustomerHistoryList('${id}','price')">✕</button>
     </div>
     <label style="margin-top:0">Date</label>
     <input type="date" id="ph_date" value="${entry.date}">
@@ -1537,7 +1542,7 @@ function savePriceHistoryEdit(id, oldDateKey){
     c.price = newPrice;
   }
 
-  saveData(); openCustomerDetail(id); render();
+  saveData(); openCustomerHistoryList(id, 'price'); render();
   toast('Price entry updated');
 }
 
@@ -1546,7 +1551,7 @@ function removePriceHistoryEntry(id, dateKey){
   const idx = (c.priceHistory||[]).findIndex(p=>p.date===dateKey);
   if(idx===-1) return;
   c.priceHistory.splice(idx,1);
-  saveData(); openCustomerDetail(id); render();
+  saveData(); openCustomerHistoryList(id, 'price'); render();
 }
 
 function emailCustomer(id){
@@ -3739,7 +3744,7 @@ const FOCUSED_HELP = {
   customer: {
     title: 'Customers',
     body: () => [
-      helpP('A customer\'s screen shows their round, standard price, frequency, and any notes right at the top. Clean history, payment history, and one-off jobs each open as their own list — tap one to see it, close it to come straight back here. Price history and photos stay on the main screen.'),
+      helpP('A customer\'s screen shows their round, standard price, frequency, and any notes right at the top. Clean history, payment history, price history, and one-off jobs each open as their own list — tap one to see it, close it to come straight back here. Photos stay on the main screen.'),
       helpP('Tick "Text before I arrive" on a customer\'s edit screen to flag that they need a heads-up text before you turn up — it shows as a badge on their card in round lists and on their detail screen as a reminder while you\'re working through the round.'),
       helpP('Tapping 🧾 Receipt next to a payment gives a choice: a quick text using your receipt wording, or a formatted receipt in the same style as a job invoice, which you can print or send as a PDF via WhatsApp.'),
       helpP('Pausing a customer asks for a reason — Holiday, Work being done, Cancelled, Moved out, or Other — and stamps the date. Both show on their card and detail screen, and they\'re skipped from due reminders and round totals until resumed.'),
