@@ -371,7 +371,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 25;
+const APP_VERSION = 26;
 function formatVersion(v){ return '1.' + v; }
 const DEFAULT_CLEAN_TEMPLATE = "Hi {name}, just a reminder I'll be round to clean your windows soon. Let me know if that's not convenient.\n\nThanks,\n{yourname}\n{company}";
 const DEFAULT_PAY_TEMPLATE = "Hi {name}, a friendly reminder that your window cleaning payment of {amount} is outstanding.\n\nThanks,\n{yourname}\n{company}";
@@ -520,7 +520,10 @@ function custStatus(c){
     cleanBadge = {type:'paused', text: c.pauseReason ? `Paused — ${c.pauseReason}` : 'Paused'};
   } else if(lastClean){
     const due = daysBetween(lastClean, todayISO());
-    if(due >= freq) cleanBadge = {type:'due', text:`Due (${due}d)`};
+    if(due >= freq){
+      const daysPast = due - freq;
+      cleanBadge = {type:'due', text: daysPast===0 ? 'Due today' : `Due +${daysPast}`};
+    }
   } else {
     cleanBadge = {type:'due', text:'Never cleaned'};
   }
