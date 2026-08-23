@@ -371,7 +371,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 24;
+const APP_VERSION = 25;
 function formatVersion(v){ return '1.' + v; }
 const DEFAULT_CLEAN_TEMPLATE = "Hi {name}, just a reminder I'll be round to clean your windows soon. Let me know if that's not convenient.\n\nThanks,\n{yourname}\n{company}";
 const DEFAULT_PAY_TEMPLATE = "Hi {name}, a friendly reminder that your window cleaning payment of {amount} is outstanding.\n\nThanks,\n{yourname}\n{company}";
@@ -3672,6 +3672,28 @@ function printSchedule(){
 }
 
 /* ---------- backup ---------- */
+// Shares plain-English install instructions plus the app link, via the native
+// share sheet where available (so it can go straight out over WhatsApp, text,
+// email, etc.), falling back to copying the message to the clipboard.
+async function shareRoundBook(){
+  const url = 'https://dmbennison.github.io/Round-book/';
+  const text = `Round Book — a simple window cleaning round tracker.\n\nTo install it on your phone:\n📱 iPhone: open this link in Safari, tap the Share icon, then "Add to Home Screen".\n🤖 Android: open this link in Chrome, tap the menu (⋮), then "Add to Home Screen" or "Install app".\n\n${url}`;
+  if(navigator.share){
+    try{
+      await navigator.share({ title: 'Round Book', text });
+      return;
+    }catch(e){
+      if(e && e.name === 'AbortError') return; // person cancelled the share sheet
+    }
+  }
+  try{
+    await navigator.clipboard.writeText(text);
+    toast('Install instructions copied — paste them anywhere to share');
+  }catch(e){
+    toast('Could not share automatically — link: ' + url);
+  }
+}
+
 function openInfo(){
   openSheet(`
     <div class="sheet-head">
@@ -3681,9 +3703,14 @@ function openInfo(){
     <p style="color:var(--ink); font-size:0.875rem; line-height:1.6; margin:0 2px 16px;">
       Round Book is a simple, offline window cleaning round tracker — built to keep on top of customers, rounds, cleaning and payment dates, all stored privately on your own phone.
     </p>
-    <button onclick="openHelp()" style="display:flex; align-items:center; gap:10px; width:100%; text-align:left; background:var(--blue-dim); color:var(--blue-deep); border:none; border-radius:12px; padding:13px 14px; font-weight:800; font-size:0.9375rem; margin-bottom:16px;">
+    <button onclick="openHelp()" style="display:flex; align-items:center; gap:10px; width:100%; text-align:left; background:var(--blue-dim); color:var(--blue-deep); border:none; border-radius:12px; padding:13px 14px; font-weight:800; font-size:0.9375rem; margin-bottom:10px;">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px; height:20px; flex-shrink:0;"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
       <span style="flex:1;">User guide — how everything works</span>
+      <span style="opacity:0.6;">›</span>
+    </button>
+    <button onclick="shareRoundBook()" style="display:flex; align-items:center; gap:10px; width:100%; text-align:left; background:var(--surface); border:1px solid var(--line); color:var(--ink); border-radius:12px; padding:13px 14px; font-weight:800; font-size:0.9375rem; margin-bottom:16px;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px; height:20px; flex-shrink:0;"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+      <span style="flex:1;">Share Round Book</span>
       <span style="opacity:0.6;">›</span>
     </button>
     <p style="color:var(--ink-muted); font-size:0.8125rem; line-height:1.6; margin:0 2px 6px;">
