@@ -371,7 +371,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 23;
+const APP_VERSION = 24;
 function formatVersion(v){ return '1.' + v; }
 const DEFAULT_CLEAN_TEMPLATE = "Hi {name}, just a reminder I'll be round to clean your windows soon. Let me know if that's not convenient.\n\nThanks,\n{yourname}\n{company}";
 const DEFAULT_PAY_TEMPLATE = "Hi {name}, a friendly reminder that your window cleaning payment of {amount} is outstanding.\n\nThanks,\n{yourname}\n{company}";
@@ -520,7 +520,7 @@ function custStatus(c){
     cleanBadge = {type:'paused', text: c.pauseReason ? `Paused — ${c.pauseReason}` : 'Paused'};
   } else if(lastClean){
     const due = daysBetween(lastClean, todayISO());
-    if(due >= freq) cleanBadge = {type: due >= freq+7 ? 'overdue' : 'due', text: due >= freq+7 ? `${due}d overdue` : `Due (${due}d)`};
+    if(due >= freq) cleanBadge = {type:'due', text:`Due (${due}d)`};
   } else {
     cleanBadge = {type:'due', text:'Never cleaned'};
   }
@@ -767,11 +767,10 @@ function renderRoundsList(main){
       grandCustomers += activeAll.length;
       grandValue += activeAll.reduce((sum,c)=>sum+Number(c.price||0),0);
       const daysUsed = roundDaysUsed(all);
-      let overdue=0, due=0, owed=0, paused=0;
+      let due=0, owed=0, paused=0;
       all.forEach(c=>{
         const s = custStatus(c);
         if(c.paused) paused++;
-        else if(s.cleanBadge && s.cleanBadge.type==='overdue') overdue++;
         else if(s.cleanBadge && s.cleanBadge.type==='due') due++;
         if(s.owed) owed++;
       });
@@ -781,11 +780,10 @@ function renderRoundsList(main){
           <div class="rcount">${all.length} customer${all.length===1?'':'s'}${daysUsed.length>1?` · ${daysUsed.length} days`:''}</div>
         </div>
         <div class="badges">
-          ${overdue?`<span class="badge overdue">${overdue} overdue</span>`:''}
           ${due?`<span class="badge due">${due} due</span>`:''}
           ${owed?`<span class="badge owed">${owed} owe</span>`:''}
           ${paused?`<span class="badge paused">${paused} paused</span>`:''}
-          ${(!overdue&&!due&&!owed)?`<span class="badge ok">All clear</span>`:''}
+          ${(!due&&!owed)?`<span class="badge ok">All clear</span>`:''}
           <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 6l6 6-6 6"/></svg>
         </div>
       </div>`;
@@ -797,11 +795,10 @@ function renderRoundsList(main){
     roundNames.forEach(rn=>{
       const dueCusts = rounds[rn].filter(c=>{
         const s = custStatus(c);
-        return !c.paused && s.cleanBadge && (s.cleanBadge.type==='due' || s.cleanBadge.type==='overdue');
+        return !c.paused && s.cleanBadge && s.cleanBadge.type==='due';
       }).sort((a,b)=>{
-        const sa=custStatus(a), sb=custStatus(b);
-        const rank = x => x.cleanBadge.type==='overdue' ? 0 : 1;
-        return rank(sa)-rank(sb);
+        const daysDueOf = x => { const lc = lastDateOf(x.cleanHistory); return lc ? daysBetween(lc, todayISO()) : 0; };
+        return daysDueOf(b) - daysDueOf(a);
       });
       if(!dueCusts.length) return;
       anyDue = true;
@@ -940,7 +937,7 @@ function renderRoundDetail(main, rn){
   if(roundFilterMode === 'due'){
     baseList = baseList.filter(c=>{
       const s = custStatus(c);
-      return !c.paused && s.cleanBadge && (s.cleanBadge.type==='due' || s.cleanBadge.type==='overdue');
+      return !c.paused && s.cleanBadge && s.cleanBadge.type==='due';
     });
   } else if(roundFilterMode === 'owed'){
     baseList = baseList.filter(c=>custStatus(c).owed);
@@ -1831,7 +1828,7 @@ function openBulkReminders(kind, roundName){
   if(kind === 'due'){
     list = roundCusts.filter(c=>{
       const s = custStatus(c);
-      return !c.paused && s.cleanBadge && (s.cleanBadge.type==='due' || s.cleanBadge.type==='overdue') && c.phone;
+      return !c.paused && s.cleanBadge && s.cleanBadge.type==='due' && c.phone;
     });
   } else {
     list = roundCusts.filter(c=> custStatus(c).owed && c.phone);
@@ -2680,7 +2677,7 @@ function openReports(){
     </p>
     <button class="backup-btn" onclick="printWindowsDue()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
-      <div><div class="t1">Windows due, by round</div><div class="t2">Who's due or overdue a clean right now</div></div>
+      <div><div class="t1">Windows due, by round</div><div class="t2">Who's due a clean right now</div></div>
     </button>
     <button class="backup-btn" onclick="printMoneyOwed()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M9 10h6M9 14h5"/></svg>
@@ -3179,29 +3176,26 @@ function printWindowsDue(){
   roundNames.forEach((rn)=>{
     const custs = rounds[rn].filter(c=>{
       const s = custStatus(c);
-      return !c.paused && s.cleanBadge && (s.cleanBadge.type==='due' || s.cleanBadge.type==='overdue');
+      return !c.paused && s.cleanBadge && s.cleanBadge.type==='due';
     }).sort((a,b)=>{
-      const sa=custStatus(a), sb=custStatus(b);
-      const rank = x => x.cleanBadge.type==='overdue' ? 0 : 1;
-      return rank(sa)-rank(sb);
+      const daysDueOf = x => { const lc = lastDateOf(x.cleanHistory); return lc ? daysBetween(lc, todayISO()) : 0; };
+      return daysDueOf(b) - daysDueOf(a);
     });
     if(!custs.length) return;
     body += `<div class="rpt-round-title${anyRoundShown?' rpt-page-break':''}">${escapeHtml(rn)}</div>`;
     anyRoundShown = true;
     const rows = custs.map(c=>{
       const s = custStatus(c);
-      const flagClass = s.cleanBadge.type;
-      const flagText = s.cleanBadge.type==='overdue' ? 'Overdue' : 'Due';
       return `<tr>
         <td>${escapeHtml(c.address||'')}${c.name?`<br><span style="color:#66798A">${escapeHtml(c.name)}</span>`:''}</td>
         <td>${fmtDate(s.lastClean)}</td>
         <td>${fmtDate(nextDueISO(c))}</td>
-        <td class="rpt-flag ${flagClass}">${flagText}</td>
+        <td class="rpt-flag due">${escapeHtml(s.cleanBadge.text)}</td>
       </tr>`;
     }).join('');
     body += `<table class="rpt-table"><thead><tr><th>Customer</th><th>Last cleaned</th><th>Next due</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>`;
   });
-  if(!anyRoundShown) body = '<div class="rpt-empty-note">Nobody\'s due or overdue a clean right now.</div>';
+  if(!anyRoundShown) body = '<div class="rpt-empty-note">Nobody\'s due a clean right now.</div>';
   runPrint('Windows Due, by Round', body);
 }
 
@@ -3763,7 +3757,7 @@ const FOCUSED_HELP = {
     title: 'Reports',
     body: () => [
       helpP('Tap the printer icon for a list of reports — each one generates a clean, printer-friendly page. Choose <b>Print</b> (good for saving as a PDF too) or <b>Save as Word document</b> for an editable .docx. Both work offline.'),
-      helpRow('Windows due, by round', "Who's due/overdue right now"),
+      helpRow('Windows due, by round', "Who's due right now"),
       helpRow('Money owed', 'Cleaned but not yet paid'),
       helpRow('Full round lists', 'Every customer, by round'),
       helpRow('Round cleaning dates', 'List or calendar, last 5 weeks'),
