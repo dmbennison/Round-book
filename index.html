@@ -371,14 +371,15 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 26;
+const APP_VERSION = 27;
 function formatVersion(v){ return '1.' + v; }
 const DEFAULT_CLEAN_TEMPLATE = "Hi {name}, just a reminder I'll be round to clean your windows soon. Let me know if that's not convenient.\n\nThanks,\n{yourname}\n{company}";
-const DEFAULT_PAY_TEMPLATE = "Hi {name}, a friendly reminder that your window cleaning payment of {amount} is outstanding.\n\nThanks,\n{yourname}\n{company}";
+const DEFAULT_PAY_TEMPLATE = "Hi {name}, a friendly reminder that your window cleaning payment of {amount} is outstanding.\n\n{bankdetails}Thanks,\n{yourname}\n{company}";
 const DEFAULT_RECEIPT_TEMPLATE = "Hi {name}, thank you for your payment of {amount} received {date}.\n\nThanks,\n{yourname}\n{company}";
-const DEFAULT_QUOTE_TEMPLATE = "Hi {name}, thanks for asking about window cleaning. I'd quote {amount} for this job — let me know if you'd like to go ahead.\n\nThanks,\n{yourname}\n{company}";
-const DEFAULT_REPEAT_QUOTE_TEMPLATE = "Hi {name}, hope you're well! I cleaned your windows for you before and wondered if you'd like the same job done again? I'd quote {amount}, same as last time — just let me know and I'll get you booked back in.\n\nThanks,\n{yourname}\n{company}";
+const DEFAULT_QUOTE_TEMPLATE = "Hi {name}, thanks for asking about window cleaning. I'd quote {amount} for the following work: {work}\n\nLet me know if you'd like to go ahead.\n\nThanks,\n{yourname}\n{company}";
+const DEFAULT_REPEAT_QUOTE_TEMPLATE = "Hi {name}, hope you're well! I cleaned your windows for you before and wondered if you'd like the same job done again? I'd quote {amount} for the following work: {work}\n\nJust let me know and I'll get you booked back in.\n\nThanks,\n{yourname}\n{company}";
 const DEFAULT_MARKETING_TEMPLATE = "Hi {name}, just letting you know we also offer gutter clearing and fascia cleaning alongside your window clean — let me know if you'd like a quote.\n\nThanks,\n{yourname}\n{company}";
+const DEFAULT_CLEANED_TODAY_TEMPLATE = "Hi {name}, your windows have been cleaned today!\n\n{bankdetails}Thanks,\n{yourname}\n{company}";
 function migrateData(parsed){
   parsed.customers = parsed.customers || [];
   parsed.oneOffJobs = parsed.oneOffJobs || [];
@@ -398,24 +399,35 @@ function migrateData(parsed){
   // never customised it) so improvements to the default wording reach existing installs too.
   // Anything that doesn't match a known-old default is a real customisation and is left alone.
   const OLD_CLEAN_TEMPLATES = ["Hi {name}, just a reminder I'll be round to clean your windows soon. Let me know if that's not convenient. Thanks!"];
-  const OLD_PAY_TEMPLATES = ["Hi {name}, a friendly reminder that your window cleaning payment of {amount} is outstanding. Thanks!"];
+  const OLD_PAY_TEMPLATES = [
+    "Hi {name}, a friendly reminder that your window cleaning payment of {amount} is outstanding. Thanks!",
+    "Hi {name}, a friendly reminder that your window cleaning payment of {amount} is outstanding.\n\nThanks,\n{yourname}\n{company}"
+  ];
   const OLD_RECEIPT_TEMPLATES = ["Hi {name}, thank you for your payment of {amount} received {date}. {company}"];
   const OLD_QUOTE_TEMPLATES = [
     "Hi {name}, thanks for asking about window cleaning. I'd quote {amount} for this job — let me know if you'd like to go ahead. {company}",
-    "Hi {name}, thanks for asking about window cleaning. I'd quote {amount} for this job — let me know if you'd like to go ahead. Thanks, {yourname}"
+    "Hi {name}, thanks for asking about window cleaning. I'd quote {amount} for this job — let me know if you'd like to go ahead. Thanks, {yourname}",
+    "Hi {name}, thanks for asking about window cleaning. I'd quote {amount} for this job — let me know if you'd like to go ahead.\n\nThanks,\n{yourname}\n{company}"
   ];
-  const OLD_REPEAT_QUOTE_TEMPLATES = ["Hi {name}, great to clean for you again. For regular cleans I'd quote {amount} — let me know if you'd like to set up a round. Thanks, {yourname}"];
+  const OLD_REPEAT_QUOTE_TEMPLATES = [
+    "Hi {name}, great to clean for you again. For regular cleans I'd quote {amount} — let me know if you'd like to set up a round. Thanks, {yourname}",
+    "Hi {name}, hope you're well! I cleaned your windows for you before and wondered if you'd like the same job done again? I'd quote {amount}, same as last time — just let me know and I'll get you booked back in.\n\nThanks,\n{yourname}\n{company}"
+  ];
   if(!parsed.settings.cleanTemplate || OLD_CLEAN_TEMPLATES.includes(parsed.settings.cleanTemplate)) parsed.settings.cleanTemplate = DEFAULT_CLEAN_TEMPLATE;
   if(!parsed.settings.payTemplate || OLD_PAY_TEMPLATES.includes(parsed.settings.payTemplate)) parsed.settings.payTemplate = DEFAULT_PAY_TEMPLATE;
   if(!parsed.settings.receiptTemplate || OLD_RECEIPT_TEMPLATES.includes(parsed.settings.receiptTemplate)) parsed.settings.receiptTemplate = DEFAULT_RECEIPT_TEMPLATE;
   if(!parsed.settings.quoteTemplate || OLD_QUOTE_TEMPLATES.includes(parsed.settings.quoteTemplate)) parsed.settings.quoteTemplate = DEFAULT_QUOTE_TEMPLATE;
   if(!parsed.settings.repeatQuoteTemplate || OLD_REPEAT_QUOTE_TEMPLATES.includes(parsed.settings.repeatQuoteTemplate)) parsed.settings.repeatQuoteTemplate = DEFAULT_REPEAT_QUOTE_TEMPLATE;
   if(!parsed.settings.marketingTemplate) parsed.settings.marketingTemplate = DEFAULT_MARKETING_TEMPLATE;
+  if(!parsed.settings.cleanedTodayTemplate) parsed.settings.cleanedTodayTemplate = DEFAULT_CLEANED_TODAY_TEMPLATE;
   if(parsed.settings.messagingApp !== 'whatsapp') parsed.settings.messagingApp = 'sms';
   if(parsed.settings.companyName == null) parsed.settings.companyName = '';
   if(parsed.settings.companyAddress == null) parsed.settings.companyAddress = '';
   if(parsed.settings.companyPhone == null) parsed.settings.companyPhone = '';
   if(parsed.settings.logo == null) parsed.settings.logo = '';
+  if(parsed.settings.bankPayeeName == null) parsed.settings.bankPayeeName = '';
+  if(parsed.settings.bankAccountNumber == null) parsed.settings.bankAccountNumber = '';
+  if(parsed.settings.bankSortCode == null) parsed.settings.bankSortCode = '';
   parsed.customers.forEach(c=>{
     if(c.pauseReason == null) c.pauseReason = '';
     if(c.pauseDate == null) c.pauseDate = '';
@@ -1238,6 +1250,7 @@ function openCustomerDetail(id){
       <button class="btn" style="background:var(--blue-dim); color:var(--blue-deep);" onclick="sendTemplate('${id}','clean')">💬 Cleaning reminder</button>
       <button class="btn" style="background:var(--amber-dim); color:var(--amber);" onclick="sendTemplate('${id}','pay'); openCustomerDetail('${id}');">💬 Payment reminder</button>
     </div>`:''}
+    ${(c.phone && s.lastClean===todayISO())?`<button class="btn" style="width:100%; background:var(--green-dim); color:var(--green); margin-bottom:14px;" onclick="sendTemplate('${id}','cleanedToday')">💬 Windows cleaned today</button>`:''}
 
     <div style="background:${s.owed?'var(--red-dim)':s.credit?'var(--green-dim)':'var(--green-dim)'}; color:${s.owed?'var(--red)':'var(--green)'}; border-radius:10px; padding:12px; font-weight:800; text-align:center; margin-bottom:14px;">
       ${s.owed ? `Owes ${money(s.balance)}` : s.credit ? `In credit: ${money(Math.abs(s.balance))} (carries onto next bill)` : 'Fully paid up'}
@@ -1411,7 +1424,7 @@ async function handleLogoSelected(inputEl){
     const dataUrl = await compressLogo(file, 500);
     data.settings.logo = dataUrl;
     if(saveData()){
-      openSettings();
+      openBusinessDetails();
       toast('Logo added');
     }
   }catch(e){
@@ -1422,7 +1435,7 @@ async function handleLogoSelected(inputEl){
 function removeLogo(){
   data.settings.logo = '';
   saveData();
-  openSettings();
+  openBusinessDetails();
   toast('Logo removed');
 }
 
@@ -1621,13 +1634,26 @@ function resumeCustomer(id){
   toast('Customer resumed');
 }
 
+// Builds the "pay by bank transfer" block used by the {bankdetails} token — empty
+// string if no bank details are saved yet, so templates render cleanly either way.
+function bankDetailsBlock(){
+  const s = data.settings || {};
+  if(!s.bankPayeeName && !s.bankAccountNumber && !s.bankSortCode) return '';
+  const lines = ['You can pay by direct bank transfer using the following details:'];
+  if(s.bankPayeeName) lines.push(`Payee Name: ${s.bankPayeeName}`);
+  if(s.bankAccountNumber) lines.push(`Account Number: ${s.bankAccountNumber}`);
+  if(s.bankSortCode) lines.push(`Sort Code: ${s.bankSortCode}`);
+  return lines.join('\n') + '\n\n';
+}
 function applyTemplate(tpl, tokens){
   return (tpl||'')
     .replace(/\{name\}/g, tokens.name || 'there')
     .replace(/\{amount\}/g, tokens.amount != null ? money(tokens.amount) : '')
     .replace(/\{company\}/g, tokens.company || '')
     .replace(/\{date\}/g, tokens.date || '')
-    .replace(/\{yourname\}/g, tokens.yourname || '');
+    .replace(/\{yourname\}/g, tokens.yourname || '')
+    .replace(/\{work\}/g, tokens.work || 'your window cleaning')
+    .replace(/\{bankdetails\}/g, bankDetailsBlock());
 }
 
 // Normalizes a UK-style phone number into the digits-only, country-code-prefixed
@@ -1794,7 +1820,7 @@ function sendQuoteText(id){
   const yourname = data.settings.yourName || '';
   const tpl = q.fromJobId ? data.settings.repeatQuoteTemplate : data.settings.quoteTemplate;
   const msg = applyTemplate(tpl, {
-    name: firstName, amount: Number(q.price||0), company, date: fmtDate(q.date), yourname
+    name: firstName, amount: Number(q.price||0), company, date: fmtDate(q.date), yourname, work: q.notes||''
   });
   if(q.phone){
     sendPhoneMessage(q.phone, msg);
@@ -1812,6 +1838,8 @@ function sendTemplate(id, kind){
   let msg;
   if(kind === 'clean'){
     msg = applyTemplate(data.settings.cleanTemplate, {name: firstName, company, yourname});
+  } else if(kind === 'cleanedToday'){
+    msg = applyTemplate(data.settings.cleanedTodayTemplate, {name: firstName, company, yourname});
   } else {
     const s = custStatus(c);
     const amt = s.owed ? s.balance : c.price;
@@ -2593,7 +2621,65 @@ function openSettings(){
       <button class="seg-btn ${data.settings.messagingApp==='whatsapp'?'active':''}" onclick="setMessagingApp('whatsapp')">🟢 WhatsApp</button>
     </div>
     <p style="color:var(--ink-muted); font-size:0.75rem; margin:4px 2px 16px; line-height:1.5;">Used whenever a message is sent straight to a customer's phone — cleaning and payment reminders, receipts, quotes, and group marketing texts.</p>
-    <div class="section-label">Company name</div>
+    <div class="section-label">Business details</div>
+    <button class="backup-btn" onclick="openBusinessDetails()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 9h1M9 13h1M14 9h1M14 13h1"/></svg>
+      <div><div class="t1">Business details</div><div class="t2">Company info, logo, your name, and bank details</div></div>
+    </button>
+    <div class="section-label">Text message templates</div>
+    <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 12px; line-height:1.5;">Use <b>{name}</b> for the customer's first name, <b>{amount}</b> for the amount, <b>{date}</b> for the payment date (receipts only), <b>{work}</b> for the quoted work (quotes only), <b>{company}</b> for your company name, <b>{yourname}</b> for your own name, and <b>{bankdetails}</b> to insert your bank transfer details (only appears if you've added them under Business details).</p>
+    <label style="margin-top:0;">Cleaning reminder</label>
+    <textarea id="tpl_clean" rows="3">${escapeHtml(data.settings.cleanTemplate)}</textarea>
+    <label>Payment reminder</label>
+    <textarea id="tpl_pay" rows="3">${escapeHtml(data.settings.payTemplate)}</textarea>
+    <label>Windows cleaned today</label>
+    <textarea id="tpl_cleaned_today" rows="3">${escapeHtml(data.settings.cleanedTodayTemplate||DEFAULT_CLEANED_TODAY_TEMPLATE)}</textarea>
+    <label>Receipt</label>
+    <textarea id="tpl_receipt" rows="3">${escapeHtml(data.settings.receiptTemplate)}</textarea>
+    <label>Quote <span style="text-transform:none; font-weight:500; opacity:0.7;">(new enquiry)</span></label>
+    <textarea id="tpl_quote" rows="3">${escapeHtml(data.settings.quoteTemplate)}</textarea>
+    <label>Quote <span style="text-transform:none; font-weight:500; opacity:0.7;">(repeat work)</span></label>
+    <textarea id="tpl_repeat_quote" rows="3">${escapeHtml(data.settings.repeatQuoteTemplate)}</textarea>
+    <label>Marketing text <span style="text-transform:none; font-weight:500; opacity:0.7;">(group texts to a round)</span></label>
+    <textarea id="tpl_marketing" rows="3">${escapeHtml(data.settings.marketingTemplate||DEFAULT_MARKETING_TEMPLATE)}</textarea>
+    <div class="form-actions">
+      <button class="btn-primary" onclick="saveTemplates()">Save settings</button>
+    </div>
+    <button class="btn-danger-text" onclick="resetTemplates()">Reset message wording to default</button>
+  `);
+}
+function saveTemplates(){
+  data.settings.cleanTemplate = document.getElementById('tpl_clean').value.trim() || DEFAULT_CLEAN_TEMPLATE;
+  data.settings.payTemplate = document.getElementById('tpl_pay').value.trim() || DEFAULT_PAY_TEMPLATE;
+  data.settings.cleanedTodayTemplate = document.getElementById('tpl_cleaned_today').value.trim() || DEFAULT_CLEANED_TODAY_TEMPLATE;
+  data.settings.receiptTemplate = document.getElementById('tpl_receipt').value.trim() || DEFAULT_RECEIPT_TEMPLATE;
+  data.settings.quoteTemplate = document.getElementById('tpl_quote').value.trim() || DEFAULT_QUOTE_TEMPLATE;
+  data.settings.repeatQuoteTemplate = document.getElementById('tpl_repeat_quote').value.trim() || DEFAULT_REPEAT_QUOTE_TEMPLATE;
+  data.settings.marketingTemplate = document.getElementById('tpl_marketing').value.trim() || DEFAULT_MARKETING_TEMPLATE;
+  saveData();
+  toast('Settings saved');
+  closeSheet();
+}
+function resetTemplates(){
+  data.settings.cleanTemplate = DEFAULT_CLEAN_TEMPLATE;
+  data.settings.payTemplate = DEFAULT_PAY_TEMPLATE;
+  data.settings.cleanedTodayTemplate = DEFAULT_CLEANED_TODAY_TEMPLATE;
+  data.settings.receiptTemplate = DEFAULT_RECEIPT_TEMPLATE;
+  data.settings.quoteTemplate = DEFAULT_QUOTE_TEMPLATE;
+  data.settings.repeatQuoteTemplate = DEFAULT_REPEAT_QUOTE_TEMPLATE;
+  data.settings.marketingTemplate = DEFAULT_MARKETING_TEMPLATE;
+  saveData();
+  openSettings();
+  toast('Reset to default wording');
+}
+
+function openBusinessDetails(){
+  openSheet(`
+    <div class="sheet-head">
+      <h2 style="flex:1; min-width:0;">Business details</h2>
+      <button class="sheet-close" onclick="closeSheet()">✕</button>
+    </div>
+    <div class="section-label" style="margin-top:0;">Company name</div>
     <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 10px; line-height:1.5;">Shown on printed reports and invoices, and available as the <b>{company}</b> token in text messages.</p>
     <input type="text" id="companyNameInput" value="${escapeAttr(data.settings.companyName||'')}" placeholder="e.g. Darren's Window Cleaning">
     <div class="section-label">Company address <span style="text-transform:none; font-weight:500; opacity:0.7;">(optional)</span></div>
@@ -2620,51 +2706,30 @@ function openSettings(){
     <div class="section-label">Your name</div>
     <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 10px; line-height:1.5;">Used to sign off texts more personally — available as the <b>{yourname}</b> token.</p>
     <input type="text" id="yourNameInput" value="${escapeAttr(data.settings.yourName||'')}" placeholder="e.g. Dave">
-    <div class="section-label">Text message templates</div>
-    <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 12px; line-height:1.5;">Use <b>{name}</b> for the customer's first name, <b>{amount}</b> for the amount, <b>{date}</b> for the payment date (receipts only), <b>{company}</b> for your company name, and <b>{yourname}</b> for your own name.</p>
-    <label style="margin-top:0;">Cleaning reminder</label>
-    <textarea id="tpl_clean" rows="3">${escapeHtml(data.settings.cleanTemplate)}</textarea>
-    <label>Payment reminder</label>
-    <textarea id="tpl_pay" rows="3">${escapeHtml(data.settings.payTemplate)}</textarea>
-    <label>Receipt</label>
-    <textarea id="tpl_receipt" rows="3">${escapeHtml(data.settings.receiptTemplate)}</textarea>
-    <label>Quote <span style="text-transform:none; font-weight:500; opacity:0.7;">(new enquiry)</span></label>
-    <textarea id="tpl_quote" rows="3">${escapeHtml(data.settings.quoteTemplate)}</textarea>
-    <label>Quote <span style="text-transform:none; font-weight:500; opacity:0.7;">(repeat work)</span></label>
-    <textarea id="tpl_repeat_quote" rows="3">${escapeHtml(data.settings.repeatQuoteTemplate)}</textarea>
-    <label>Marketing text <span style="text-transform:none; font-weight:500; opacity:0.7;">(group texts to a round)</span></label>
-    <textarea id="tpl_marketing" rows="3">${escapeHtml(data.settings.marketingTemplate||DEFAULT_MARKETING_TEMPLATE)}</textarea>
+    <div class="section-label">Bank details</div>
+    <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 10px; line-height:1.5;">Added automatically to payment reminders and "windows cleaned today" texts via the <b>{bankdetails}</b> token, so customers can pay by bank transfer. Left blank, that token just disappears.</p>
+    <label style="margin-top:0;">Payee Name</label>
+    <input type="text" id="bankPayeeInput" value="${escapeAttr(data.settings.bankPayeeName||'')}" placeholder="e.g. D Bennison">
+    <label>Account Number</label>
+    <input type="text" id="bankAccountInput" value="${escapeAttr(data.settings.bankAccountNumber||'')}" placeholder="e.g. 12345678" inputmode="numeric">
+    <label>Sort Code</label>
+    <input type="text" id="bankSortCodeInput" value="${escapeAttr(data.settings.bankSortCode||'')}" placeholder="e.g. 12-34-56" inputmode="numeric">
     <div class="form-actions">
-      <button class="btn-primary" onclick="saveTemplates()">Save settings</button>
+      <button class="btn-primary" onclick="saveBusinessDetails()">Save business details</button>
     </div>
-    <button class="btn-danger-text" onclick="resetTemplates()">Reset message wording to default</button>
   `);
 }
-function saveTemplates(){
-  data.settings.cleanTemplate = document.getElementById('tpl_clean').value.trim() || DEFAULT_CLEAN_TEMPLATE;
-  data.settings.payTemplate = document.getElementById('tpl_pay').value.trim() || DEFAULT_PAY_TEMPLATE;
-  data.settings.receiptTemplate = document.getElementById('tpl_receipt').value.trim() || DEFAULT_RECEIPT_TEMPLATE;
-  data.settings.quoteTemplate = document.getElementById('tpl_quote').value.trim() || DEFAULT_QUOTE_TEMPLATE;
-  data.settings.repeatQuoteTemplate = document.getElementById('tpl_repeat_quote').value.trim() || DEFAULT_REPEAT_QUOTE_TEMPLATE;
-  data.settings.marketingTemplate = document.getElementById('tpl_marketing').value.trim() || DEFAULT_MARKETING_TEMPLATE;
+function saveBusinessDetails(){
   data.settings.companyName = document.getElementById('companyNameInput').value.trim();
   data.settings.companyAddress = document.getElementById('companyAddressInput').value.trim();
   data.settings.companyPhone = document.getElementById('companyPhoneInput').value.trim();
   data.settings.yourName = document.getElementById('yourNameInput').value.trim();
+  data.settings.bankPayeeName = document.getElementById('bankPayeeInput').value.trim();
+  data.settings.bankAccountNumber = document.getElementById('bankAccountInput').value.trim();
+  data.settings.bankSortCode = document.getElementById('bankSortCodeInput').value.trim();
   saveData();
-  toast('Settings saved');
-  closeSheet();
-}
-function resetTemplates(){
-  data.settings.cleanTemplate = DEFAULT_CLEAN_TEMPLATE;
-  data.settings.payTemplate = DEFAULT_PAY_TEMPLATE;
-  data.settings.receiptTemplate = DEFAULT_RECEIPT_TEMPLATE;
-  data.settings.quoteTemplate = DEFAULT_QUOTE_TEMPLATE;
-  data.settings.repeatQuoteTemplate = DEFAULT_REPEAT_QUOTE_TEMPLATE;
-  data.settings.marketingTemplate = DEFAULT_MARKETING_TEMPLATE;
-  saveData();
+  toast('Business details saved');
   openSettings();
-  toast('Reset to default wording');
 }
 
 /* ---------- reports ---------- */
@@ -3771,6 +3836,7 @@ const FOCUSED_HELP = {
       helpP('A customer\'s screen shows their round, standard price, frequency, and any notes right at the top. Clean history, payment history, price history, and one-off jobs each open as their own list — tap one to see it, close it to come straight back here. Photos stay on the main screen.'),
       helpP('Tick "Text before I arrive" on a customer\'s edit screen to flag that they need a heads-up text before you turn up — it shows as a badge on their card in round lists and on their detail screen as a reminder while you\'re working through the round.'),
       helpP('Tapping 🧾 Receipt next to a payment gives a choice: a quick text using your receipt wording, or a formatted receipt in the same style as a job invoice, which you can print or send as a PDF via WhatsApp.'),
+      helpP('A green "Windows cleaned today" button appears once a customer has a clean logged for today (and they have a phone number saved) — a quick way to let them know it\'s done and remind them how to pay.'),
       helpP('Pausing a customer asks for a reason — Holiday, Work being done, Cancelled, Moved out, or Other — and stamps the date. Both show on their card and detail screen, and they\'re skipped from due reminders and round totals until resumed.'),
       helpP('The "Get a quote for this customer" button opens a new quote pre-filled with their details, handy for quoting extra work like gutter clearing or fascia cleaning.'),
       helpP('The printer icon prints or emails a record of everything on this screen — handy for a customer who asks for a summary.')
@@ -3809,7 +3875,8 @@ const FOCUSED_HELP = {
   settings: {
     title: 'Settings',
     body: () => [
-      helpP('Appearance, text size, colour scheme, company details and logo (for invoices and receipts), your name, whether reminders/receipts/quotes go out as a text or via WhatsApp, and the wording of every message template.')
+      helpP('Appearance, text size, colour scheme, messaging app (text or WhatsApp), and the wording of every message template — including a "Windows cleaned today" text.'),
+      helpP('Business details — company name, address, phone, logo, your name, and your bank details for taking payment by transfer — now live on their own screen, opened from the Business details button.')
     ]
   },
   reminders: {
