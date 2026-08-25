@@ -371,12 +371,12 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 27;
+const APP_VERSION = 28;
 function formatVersion(v){ return '1.' + v; }
 const DEFAULT_CLEAN_TEMPLATE = "Hi {name}, just a reminder I'll be round to clean your windows soon. Let me know if that's not convenient.\n\nThanks,\n{yourname}\n{company}";
 const DEFAULT_PAY_TEMPLATE = "Hi {name}, a friendly reminder that your window cleaning payment of {amount} is outstanding.\n\n{bankdetails}Thanks,\n{yourname}\n{company}";
 const DEFAULT_RECEIPT_TEMPLATE = "Hi {name}, thank you for your payment of {amount} received {date}.\n\nThanks,\n{yourname}\n{company}";
-const DEFAULT_QUOTE_TEMPLATE = "Hi {name}, thanks for asking about window cleaning. I'd quote {amount} for the following work: {work}\n\nLet me know if you'd like to go ahead.\n\nThanks,\n{yourname}\n{company}";
+const DEFAULT_QUOTE_TEMPLATE = "Hi {name}, thanks for your enquiry. I'd quote {amount} for the following work: {work}\nLet me know if you'd like to go ahead.\nThanks,\n{yourname}\n{company}";
 const DEFAULT_REPEAT_QUOTE_TEMPLATE = "Hi {name}, hope you're well! I cleaned your windows for you before and wondered if you'd like the same job done again? I'd quote {amount} for the following work: {work}\n\nJust let me know and I'll get you booked back in.\n\nThanks,\n{yourname}\n{company}";
 const DEFAULT_MARKETING_TEMPLATE = "Hi {name}, just letting you know we also offer gutter clearing and fascia cleaning alongside your window clean — let me know if you'd like a quote.\n\nThanks,\n{yourname}\n{company}";
 const DEFAULT_CLEANED_TODAY_TEMPLATE = "Hi {name}, your windows have been cleaned today!\n\n{bankdetails}Thanks,\n{yourname}\n{company}";
@@ -407,7 +407,8 @@ function migrateData(parsed){
   const OLD_QUOTE_TEMPLATES = [
     "Hi {name}, thanks for asking about window cleaning. I'd quote {amount} for this job — let me know if you'd like to go ahead. {company}",
     "Hi {name}, thanks for asking about window cleaning. I'd quote {amount} for this job — let me know if you'd like to go ahead. Thanks, {yourname}",
-    "Hi {name}, thanks for asking about window cleaning. I'd quote {amount} for this job — let me know if you'd like to go ahead.\n\nThanks,\n{yourname}\n{company}"
+    "Hi {name}, thanks for asking about window cleaning. I'd quote {amount} for this job — let me know if you'd like to go ahead.\n\nThanks,\n{yourname}\n{company}",
+    "Hi {name}, thanks for asking about window cleaning. I'd quote {amount} for the following work: {work}\n\nLet me know if you'd like to go ahead.\n\nThanks,\n{yourname}\n{company}"
   ];
   const OLD_REPEAT_QUOTE_TEMPLATES = [
     "Hi {name}, great to clean for you again. For regular cleans I'd quote {amount} — let me know if you'd like to set up a round. Thanks, {yourname}",
@@ -1033,6 +1034,7 @@ function custCardHtml(c){
         ${needsPriceReview(c) ? `<span class="badge due" title="12+ months since last price increase">📈 Review</span>` : ''}
         ${c.textBeforeVisit ? `<span class="badge anniversary" title="Text before you arrive">📱 Text first</span>` : ''}
         ${showDayBadge ? `<span class="badge anniversary">Day ${c.visitDay||1}</span>` : ''}
+        ${(c.phone && s.lastClean===todayISO()) ? `<button onclick="event.stopPropagation(); sendTemplate('${c.id}','cleanedToday')" style="display:inline-flex; align-items:center; gap:4px; background:var(--green-dim); color:var(--green); border:none; border-radius:20px; padding:5px 10px; font-size:0.7188rem; font-weight:800; line-height:1;">💬 Cleaned today</button>` : ''}
       </div>
     </div>
   </div>`;
@@ -1250,7 +1252,6 @@ function openCustomerDetail(id){
       <button class="btn" style="background:var(--blue-dim); color:var(--blue-deep);" onclick="sendTemplate('${id}','clean')">💬 Cleaning reminder</button>
       <button class="btn" style="background:var(--amber-dim); color:var(--amber);" onclick="sendTemplate('${id}','pay'); openCustomerDetail('${id}');">💬 Payment reminder</button>
     </div>`:''}
-    ${(c.phone && s.lastClean===todayISO())?`<button class="btn" style="width:100%; background:var(--green-dim); color:var(--green); margin-bottom:14px;" onclick="sendTemplate('${id}','cleanedToday')">💬 Windows cleaned today</button>`:''}
 
     <div style="background:${s.owed?'var(--red-dim)':s.credit?'var(--green-dim)':'var(--green-dim)'}; color:${s.owed?'var(--red)':'var(--green)'}; border-radius:10px; padding:12px; font-weight:800; text-align:center; margin-bottom:14px;">
       ${s.owed ? `Owes ${money(s.balance)}` : s.credit ? `In credit: ${money(Math.abs(s.balance))} (carries onto next bill)` : 'Fully paid up'}
@@ -3821,7 +3822,8 @@ const FOCUSED_HELP = {
     body: () => [
       helpP('The Rounds tab shows every round, with a Rounds / Due / Owed switch. Open a round to see its customers, swipe a card right to mark cleaned or left to mark paid, and use Reorder to set your walking order.'),
       helpP('If a round takes more than one day, tap each customer\'s day badge in reorder mode to assign Day 1–5. A day switcher then appears above the customer list, and cards get a "Day N" badge.'),
-      helpP('The megaphone icon on a round\'s screen opens a group marketing text — send everyone in the round with a phone number a text one by one, using the marketing wording set in Settings.')
+      helpP('The megaphone icon on a round\'s screen opens a group marketing text — send everyone in the round with a phone number a text one by one, using the marketing wording set in Settings.'),
+      helpP('A small "Cleaned today" button appears on a customer\'s card once they have a clean logged for today (and a phone number saved) — a quick way to let them know it\'s done and remind them how to pay.')
     ]
   },
   jobs: {
@@ -3836,7 +3838,6 @@ const FOCUSED_HELP = {
       helpP('A customer\'s screen shows their round, standard price, frequency, and any notes right at the top. Clean history, payment history, price history, and one-off jobs each open as their own list — tap one to see it, close it to come straight back here. Photos stay on the main screen.'),
       helpP('Tick "Text before I arrive" on a customer\'s edit screen to flag that they need a heads-up text before you turn up — it shows as a badge on their card in round lists and on their detail screen as a reminder while you\'re working through the round.'),
       helpP('Tapping 🧾 Receipt next to a payment gives a choice: a quick text using your receipt wording, or a formatted receipt in the same style as a job invoice, which you can print or send as a PDF via WhatsApp.'),
-      helpP('A green "Windows cleaned today" button appears once a customer has a clean logged for today (and they have a phone number saved) — a quick way to let them know it\'s done and remind them how to pay.'),
       helpP('Pausing a customer asks for a reason — Holiday, Work being done, Cancelled, Moved out, or Other — and stamps the date. Both show on their card and detail screen, and they\'re skipped from due reminders and round totals until resumed.'),
       helpP('The "Get a quote for this customer" button opens a new quote pre-filled with their details, handy for quoting extra work like gutter clearing or fascia cleaning.'),
       helpP('The printer icon prints or emails a record of everything on this screen — handy for a customer who asks for a summary.')
