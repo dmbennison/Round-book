@@ -221,7 +221,6 @@
     flex-wrap:wrap; gap:4px 0;
   }
   .hist-list li:last-child{border-bottom:none;}
-  .hist-del{background:none; border:none; color:var(--ink-muted); font-size:0.75rem; padding:4px 6px; white-space:nowrap;}
 
   .stat-row{display:flex; gap:8px; margin-bottom:16px;}
   .stat{flex:1; background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:12px; text-align:center;}
@@ -235,6 +234,18 @@
   .backup-btn svg{width:20px;height:20px; color:var(--blue); flex-shrink:0;}
   .backup-btn .t1{font-size:0.9062rem; font-weight:700;}
   .backup-btn .t2{font-size:0.75rem; color:var(--ink-muted); margin-top:1px;}
+
+  .cust-section{border:1px solid var(--line); border-radius:12px; margin-bottom:12px; overflow:hidden; background:var(--surface);}
+  .cust-section summary{
+    list-style:none; cursor:pointer; padding:13px 14px; font-weight:800; font-size:0.875rem; color:var(--ink);
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+  }
+  .cust-section summary::-webkit-details-marker{display:none;}
+  .cust-section summary .chev{width:16px; height:16px; color:var(--ink-muted); flex-shrink:0; transition:transform .2s;}
+  .cust-section[open] summary .chev{transform:rotate(180deg);}
+  .cust-section .cust-section-body{padding:2px 14px 14px;}
+  .cust-section .cust-section-body > *:first-child{margin-top:0;}
+
   #importFile, #importSpreadsheetFile{display:none;}
   .toast{
     position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:var(--navy-dark); color:#fff;
@@ -371,7 +382,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 28;
+const APP_VERSION = 30;
 function formatVersion(v){ return '1.' + v; }
 const DEFAULT_CLEAN_TEMPLATE = "Hi {name}, just a reminder I'll be round to clean your windows soon. Let me know if that's not convenient.\n\nThanks,\n{yourname}\n{company}";
 const DEFAULT_PAY_TEMPLATE = "Hi {name}, a friendly reminder that your window cleaning payment of {amount} is outstanding.\n\n{bankdetails}Thanks,\n{yourname}\n{company}";
@@ -873,6 +884,27 @@ function openRound(rn){ currentRound = rn; reorderMode = false; roundFilterMode 
 function backToRounds(){ currentRound = null; reorderMode = false; roundFilterMode = 'all'; roundDayFilter = 'all'; render(); window.scrollTo(0, 0); }
 function setRoundFilterMode(v){ roundFilterMode = v; render(); }
 
+function openRoundActionsMenu(rn){
+  openSheet(`
+    <div class="sheet-head">
+      <h2 style="flex:1; min-width:0;">${escapeHtml(rn)}</h2>
+      <button class="sheet-close" onclick="closeSheet()">✕</button>
+    </div>
+    <button class="backup-btn" onclick="printSingleRound('${escapeAttr(rn)}')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
+      <div><div class="t1">Print this round</div><div class="t2">Customer list with contact details and prices</div></div>
+    </button>
+    <button class="backup-btn" onclick="openMarketingBlast('${escapeAttr(rn)}')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-5v12L3 13z"/><path d="M11.6 16.8a3 3 0 0 1-5.8-1.6"/></svg>
+      <div><div class="t1">Send group marketing text</div><div class="t2">Text everyone in this round with a phone number</div></div>
+    </button>
+    <button class="backup-btn" onclick="openFocusedHelp('rounds')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      <div><div class="t1">Help</div><div class="t2">How rounds work</div></div>
+    </button>
+  `);
+}
+
 function renderRoundDetail(main, rn){
   const allInRound = sortByRoute(data.customers.filter(c=>(c.round||'Unassigned')===rn));
   const daysUsed = roundDaysUsed(allInRound);
@@ -887,17 +919,9 @@ function renderRoundDetail(main, rn){
     </div>
     <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:12px;">
       <h2 style="font-size:1.25rem;">${escapeHtml(rn)}</h2>
-      <div style="display:flex; gap:8px; flex-shrink:0;">
-        <button class="btn-open" style="width:38px; height:38px; padding:0;" onclick="openFocusedHelp('rounds')" aria-label="Help for rounds">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-        </button>
-        <button class="btn-open" style="width:38px; height:38px; padding:0;" onclick="openMarketingBlast('${escapeAttr(rn)}')" aria-label="Send group marketing text">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-5v12L3 13z"/><path d="M11.6 16.8a3 3 0 0 1-5.8-1.6"/></svg>
-        </button>
-        <button class="btn-open" style="width:38px; height:38px; padding:0;" onclick="printSingleRound('${escapeAttr(rn)}')" aria-label="Print this round">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
-        </button>
-      </div>
+      <button class="btn-open" style="width:38px; height:38px; padding:0; flex-shrink:0;" onclick="openRoundActionsMenu('${escapeAttr(rn)}')" aria-label="Round actions">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
+      </button>
     </div>
   `;
 
@@ -1228,7 +1252,7 @@ function openCustomerDetail(id){
   const c = data.customers.find(x=>x.id===id);
   const s = custStatus(c);
   const linkedJobs = (data.oneOffJobs||[]).filter(j=>j.customerId===id);
-  const suggestedPayment = s.owed ? s.balance : (c.price||0);
+  const chev = `<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>`;
 
   openSheet(`
     <div class="sheet-head">
@@ -1244,13 +1268,9 @@ function openCustomerDetail(id){
     ${needsPriceReview(c) ? `<div style="color:var(--amber); font-size:0.75rem; font-weight:700; margin:-6px 2px 10px;">📈 12+ months since last price increase</div>` : ''}
     ${c.textBeforeVisit ? `<div style="color:var(--blue-deep); font-size:0.75rem; font-weight:700; margin:-6px 2px 10px;">📱 Text before you arrive</div>` : ''}
     ${c.notes?`<div style="background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:10px 12px; font-size:0.8438rem; margin-bottom:14px;">${escapeHtml(c.notes)}</div>`:''}
-    ${(c.phone||c.email)?`<div style="display:flex; gap:8px; margin-bottom:10px;">
+    ${(c.phone||c.email)?`<div style="display:flex; gap:8px; margin-bottom:14px;">
       ${c.phone?`<a href="tel:${escapeAttr(c.phone.replace(/\\s+/g,''))}" style="flex:1; text-decoration:none; background:var(--blue-dim); color:var(--blue-deep); border-radius:10px; padding:9px; font-size:0.8125rem; font-weight:700; text-align:center;">📞 ${escapeHtml(c.phone)}</a>`:''}
       ${c.email?`<button onclick="emailCustomer('${id}')" style="flex:1; min-width:0; background:var(--bg); color:var(--ink); border:1px solid var(--line); border-radius:10px; padding:9px; font-size:0.8125rem; font-weight:700; text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">✉️ ${escapeHtml(c.email)}</button>`:''}
-    </div>`:''}
-    ${c.phone?`<div class="row2" style="margin-bottom:14px;">
-      <button class="btn" style="background:var(--blue-dim); color:var(--blue-deep);" onclick="sendTemplate('${id}','clean')">💬 Cleaning reminder</button>
-      <button class="btn" style="background:var(--amber-dim); color:var(--amber);" onclick="sendTemplate('${id}','pay'); openCustomerDetail('${id}');">💬 Payment reminder</button>
     </div>`:''}
 
     <div style="background:${s.owed?'var(--red-dim)':s.credit?'var(--green-dim)':'var(--green-dim)'}; color:${s.owed?'var(--red)':'var(--green)'}; border-radius:10px; padding:12px; font-weight:800; text-align:center; margin-bottom:14px;">
@@ -1263,71 +1283,69 @@ function openCustomerDetail(id){
       <div class="stat"><div class="num">${fmtDate(s.lastPaid).split(' ').slice(0,2).join(' ')}</div><div class="lbl">Last paid</div></div>
     </div>
 
-    <div class="cust-actions" style="margin-bottom:12px;">
-      <button class="btn btn-clean" onclick="quickClean('${id}'); openCustomerDetail('${id}');">Mark cleaned today</button>
-      <button class="btn btn-paid" onclick="quickPaid('${id}'); openCustomerDetail('${id}');">Mark paid today</button>
-    </div>
-    <button class="btn" style="width:100%; background:${c.paused?'var(--green-dim)':'var(--line)'}; color:${c.paused?'var(--green)':'var(--ink-muted)'}; margin-bottom:10px;" onclick="${c.paused?`resumeCustomer('${id}')`:`openPauseReasonSheet('${id}')`}">
-      ${c.paused ? '▶ Resume this customer' : '⏸ Pause this customer (skip due reminders)'}
-    </button>
-    <button class="btn" style="width:100%; background:var(--blue-dim); color:var(--blue-deep); margin-bottom:10px;" onclick="scheduleJobForCustomer('${id}')">
-      📋 Schedule a one-off job for this customer
-    </button>
-    <button class="btn" style="width:100%; background:var(--amber-dim); color:var(--amber); margin-bottom:20px;" onclick="quoteForCustomer('${id}')">
-      💷 Get a quote for this customer
-    </button>
-    <div class="row2">
-      <div>
-        <label style="margin-top:0">Add clean on date</label>
-        <input type="date" id="d_clean" value="${todayISO()}">
+    <details class="cust-section" open>
+      <summary>Actions ${chev}</summary>
+      <div class="cust-section-body">
+        <div class="cust-actions" style="margin-bottom:12px;">
+          <button class="btn btn-clean" onclick="quickClean('${id}'); openCustomerDetail('${id}');">Mark cleaned today</button>
+          <button class="btn btn-paid" onclick="quickPaid('${id}'); openCustomerDetail('${id}');">Mark paid today</button>
+        </div>
+        ${c.phone?`<div class="row2" style="margin-bottom:10px;">
+          <button class="btn" style="background:var(--blue-dim); color:var(--blue-deep);" onclick="sendTemplate('${id}','clean')">💬 Cleaning reminder</button>
+          <button class="btn" style="background:var(--amber-dim); color:var(--amber);" onclick="sendTemplate('${id}','pay'); openCustomerDetail('${id}');">💬 Payment reminder</button>
+        </div>`:''}
+        <div class="row2" style="margin-bottom:10px;">
+          <button class="btn btn-clean" onclick="openAddCleanForm('${id}')">+ Add a clean</button>
+          <button class="btn btn-paid" onclick="openAddPaymentForm('${id}')">+ Add a payment</button>
+        </div>
+        <button class="btn" style="width:100%; background:${c.paused?'var(--green-dim)':'var(--line)'}; color:${c.paused?'var(--green)':'var(--ink-muted)'}; margin-bottom:10px;" onclick="${c.paused?`resumeCustomer('${id}')`:`openPauseReasonSheet('${id}')`}">
+          ${c.paused ? '▶ Resume this customer' : '⏸ Pause this customer (skip due reminders)'}
+        </button>
+        <button class="btn" style="width:100%; background:var(--amber-dim); color:var(--amber); margin-bottom:10px;" onclick="quoteForCustomer('${id}')">
+          💷 Get a quote for this customer
+        </button>
+        <button class="btn" style="width:100%; background:var(--blue-dim); color:var(--blue-deep);" onclick="scheduleJobForCustomer('${id}')">
+          📋 Schedule a one-off job for this customer
+        </button>
       </div>
-      <div>
-        <label style="margin-top:0">Amount charged</label>
-        <input type="number" id="d_clean_amount" value="${c.price||0}" step="0.5" min="0">
-      </div>
-    </div>
-    <button class="btn btn-clean" style="width:100%; margin-top:10px; margin-bottom:8px;" onclick="addHistDate('${id}','clean')">Add clean</button>
-    <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 16px;">Adjust the amount for extras (e.g. garage door) or reductions (e.g. fronts only).</p>
-    <div class="row2">
-      <div>
-        <label style="margin-top:0">Add payment on date</label>
-        <input type="date" id="d_pay" value="${todayISO()}">
-      </div>
-      <div>
-        <label style="margin-top:0">Amount paid</label>
-        <input type="number" id="d_pay_amount" value="${suggestedPayment}" step="0.5" min="0">
-      </div>
-    </div>
-    <button class="btn btn-paid" style="width:100%; margin-top:10px; margin-bottom:8px;" onclick="addHistDate('${id}','pay')">Add payment</button>
-    <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 20px;">Pay less than the balance and the rest rolls onto next bill. Pay more and they'll show in credit.</p>
+    </details>
 
-    <div class="section-label" style="margin-top:0">History</div>
-    <button class="backup-btn" onclick="openCustomerHistoryList('${id}','clean')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
-      <div style="flex:1; min-width:0;"><div class="t1">Clean history</div><div class="t2">${(c.cleanHistory||[]).length} clean${(c.cleanHistory||[]).length===1?'':'s'} logged</div></div>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px; color:var(--ink-muted);"><path d="M9 18l6-6-6-6"/></svg>
-    </button>
-    <button class="backup-btn" onclick="openCustomerHistoryList('${id}','pay')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-      <div style="flex:1; min-width:0;"><div class="t1">Payment history</div><div class="t2">${(c.paymentHistory||[]).length} payment${(c.paymentHistory||[]).length===1?'':'s'} logged</div></div>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px; color:var(--ink-muted);"><path d="M9 18l6-6-6-6"/></svg>
-    </button>
-    <button class="backup-btn" onclick="openCustomerHistoryList('${id}','jobs')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-      <div style="flex:1; min-width:0;"><div class="t1">One-off jobs</div><div class="t2">${linkedJobs.length} job${linkedJobs.length===1?'':'s'} for this customer</div></div>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px; color:var(--ink-muted);"><path d="M9 18l6-6-6-6"/></svg>
-    </button>
-    <button class="backup-btn" onclick="openCustomerHistoryList('${id}','price')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 4 4 5-6"/></svg>
-      <div style="flex:1; min-width:0;"><div class="t1">Price history</div><div class="t2">${(c.priceHistory||[]).length} change${(c.priceHistory||[]).length===1?'':'s'} recorded</div></div>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px; color:var(--ink-muted);"><path d="M9 18l6-6-6-6"/></svg>
-    </button>
-    <div class="section-label">Photos</div>
-    <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px;">
-      ${(c.photos||[]).map(p=>`<img src="${p.dataUrl}" onclick="viewPhoto('${id}','${p.id}')" style="width:72px; height:72px; object-fit:cover; border-radius:10px; border:1px solid var(--line); cursor:pointer;">`).join('')}
-      <button onclick="document.getElementById('photoInput_${id}').click()" style="width:72px; height:72px; border-radius:10px; border:2px dashed var(--line); background:none; color:var(--ink-muted); font-size:1.625rem; display:flex; align-items:center; justify-content:center;">+</button>
-      <input type="file" accept="image/*" id="photoInput_${id}" style="display:none;" onchange="handlePhotoSelected('${id}', this)">
-    </div>
+    <details class="cust-section">
+      <summary>History ${chev}</summary>
+      <div class="cust-section-body">
+        <button class="backup-btn" onclick="openCustomerHistoryList('${id}','clean')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+          <div style="flex:1; min-width:0;"><div class="t1">Clean history</div><div class="t2">${(c.cleanHistory||[]).length} clean${(c.cleanHistory||[]).length===1?'':'s'} logged</div></div>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px; color:var(--ink-muted);"><path d="M9 18l6-6-6-6"/></svg>
+        </button>
+        <button class="backup-btn" onclick="openCustomerHistoryList('${id}','pay')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          <div style="flex:1; min-width:0;"><div class="t1">Payment history</div><div class="t2">${(c.paymentHistory||[]).length} payment${(c.paymentHistory||[]).length===1?'':'s'} logged</div></div>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px; color:var(--ink-muted);"><path d="M9 18l6-6-6-6"/></svg>
+        </button>
+        <button class="backup-btn" onclick="openCustomerHistoryList('${id}','jobs')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          <div style="flex:1; min-width:0;"><div class="t1">One-off jobs</div><div class="t2">${linkedJobs.length} job${linkedJobs.length===1?'':'s'} for this customer</div></div>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px; color:var(--ink-muted);"><path d="M9 18l6-6-6-6"/></svg>
+        </button>
+        <button class="backup-btn" style="margin-bottom:0;" onclick="openCustomerHistoryList('${id}','price')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 4 4 5-6"/></svg>
+          <div style="flex:1; min-width:0;"><div class="t1">Price history</div><div class="t2">${(c.priceHistory||[]).length} change${(c.priceHistory||[]).length===1?'':'s'} recorded</div></div>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px; color:var(--ink-muted);"><path d="M9 18l6-6-6-6"/></svg>
+        </button>
+      </div>
+    </details>
+
+    <details class="cust-section"${(c.photos&&c.photos.length)?' open':''}>
+      <summary>Photos${(c.photos&&c.photos.length)?` (${c.photos.length})`:''} ${chev}</summary>
+      <div class="cust-section-body">
+        <div style="display:flex; flex-wrap:wrap; gap:8px;">
+          ${(c.photos||[]).map(p=>`<img src="${p.dataUrl}" onclick="viewPhoto('${id}','${p.id}')" style="width:72px; height:72px; object-fit:cover; border-radius:10px; border:1px solid var(--line); cursor:pointer;">`).join('')}
+          <button onclick="document.getElementById('photoInput_${id}').click()" style="width:72px; height:72px; border-radius:10px; border:2px dashed var(--line); background:none; color:var(--ink-muted); font-size:1.625rem; display:flex; align-items:center; justify-content:center;">+</button>
+          <input type="file" accept="image/*" id="photoInput_${id}" style="display:none;" onchange="handlePhotoSelected('${id}', this)">
+        </div>
+      </div>
+    </details>
 
     <div class="form-actions">
       <button class="btn-primary" style="background:var(--navy);" onclick="openCustomerForm(data.customers.find(x=>x.id==='${id}'))">Edit customer</button>
@@ -1346,11 +1364,11 @@ function openCustomerHistoryList(id, kind){
   if(kind === 'clean'){
     title = 'Clean history';
     rowsHtml = (c.cleanHistory||[]).slice().sort((a,b)=>a.date<b.date?1:-1)
-      .map(e=>`<li>${fmtDate(e.date)} — ${money(e.amount)}<span style="display:flex; gap:4px;"><button class="hist-del" onclick="editHistAmount('${id}','clean','${e.date}')">Edit</button><button class="hist-del" onclick="removeHist('${id}','clean','${e.date}')">Remove</button></span></li>`).join('') || '<li style="color:var(--ink-muted)">No cleans logged yet</li>';
+      .map(e=>`<li style="cursor:pointer;" onclick="openHistEntryActions('${id}','clean','${e.date}',${e.amount})">${fmtDate(e.date)} — ${money(e.amount)}</li>`).join('') || '<li style="color:var(--ink-muted)">No cleans logged yet</li>';
   } else if(kind === 'pay'){
     title = 'Payment history';
     rowsHtml = (c.paymentHistory||[]).slice().sort((a,b)=>a.date<b.date?1:-1)
-      .map(p=>`<li>${fmtDate(p.date)} — ${money(p.amount)}<span style="display:flex; gap:4px;"><button class="hist-del" title="Send receipt" onclick="openReceiptOptions('${id}','${p.date}',${p.amount})">🧾 Receipt</button><button class="hist-del" onclick="editHistAmount('${id}','pay','${p.date}')">Edit</button><button class="hist-del" onclick="removeHist('${id}','pay','${p.date}')">Remove</button></span></li>`).join('') || '<li style="color:var(--ink-muted)">No payments logged yet</li>';
+      .map(p=>`<li style="cursor:pointer;" onclick="openHistEntryActions('${id}','pay','${p.date}',${p.amount})">${fmtDate(p.date)} — ${money(p.amount)}</li>`).join('') || '<li style="color:var(--ink-muted)">No payments logged yet</li>';
   } else if(kind === 'jobs'){
     title = 'One-off jobs';
     const linkedJobs = (data.oneOffJobs||[]).filter(j=>j.customerId===id).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
@@ -1359,7 +1377,7 @@ function openCustomerHistoryList(id, kind){
   } else {
     title = 'Price history';
     rowsHtml = (c.priceHistory||[]).slice().sort((a,b)=>a.date<b.date?1:-1)
-      .map((p,i)=>`<li>${fmtDate(p.date)} — ${money(p.price)}${i===0?' <span style="color:var(--ink-muted); font-weight:500;">(current)</span>':''}<span style="display:flex; gap:4px;"><button class="hist-del" onclick="editPriceHistoryEntry('${id}','${p.date}')">Edit</button><button class="hist-del" onclick="removePriceHistoryEntry('${id}','${p.date}')">Remove</button></span></li>`).join('') || '<li style="color:var(--ink-muted)">No price changes recorded</li>';
+      .map((p,i)=>`<li style="cursor:pointer;" onclick="openHistEntryActions('${id}','price','${p.date}',${p.price})">${fmtDate(p.date)} — ${money(p.price)}${i===0?' <span style="color:var(--ink-muted); font-weight:500;">(current)</span>':''}</li>`).join('') || '<li style="color:var(--ink-muted)">No price changes recorded</li>';
   }
   openSheet(`
     <div class="sheet-head">
@@ -1368,6 +1386,32 @@ function openCustomerHistoryList(id, kind){
     </div>
     <ul class="hist-list">${rowsHtml}</ul>
   `, () => openCustomerDetail(id));
+}
+
+// Tapping a clean/payment/price row opens this small menu instead of showing
+// Edit/Remove (and Receipt, for payments) inline on every row — keeps the list
+// itself scannable, with the actions just one tap further in.
+function openHistEntryActions(id, kind, dateVal, amount){
+  const label = kind==='clean' ? 'Clean' : kind==='pay' ? 'Payment' : 'Price entry';
+  openSheet(`
+    <div class="sheet-head">
+      <h2 style="flex:1; min-width:0;">${label} — ${fmtDate(dateVal)}</h2>
+      <button class="sheet-close" onclick="closeSheet()">✕</button>
+    </div>
+    <p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 16px;">${money(amount)}</p>
+    ${kind==='pay' ? `<button class="backup-btn" onclick="openReceiptOptions('${id}','${dateVal}',${amount})">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      <div><div class="t1">Send receipt</div><div class="t2">Text message or a formatted PDF receipt</div></div>
+    </button>` : ''}
+    <button class="backup-btn" onclick="${kind==='price'?`editPriceHistoryEntry('${id}','${dateVal}')`:`editHistAmount('${id}','${kind}','${dateVal}')`}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4z"/></svg>
+      <div><div class="t1">Edit amount</div><div class="t2">Change the ${kind==='clean'?'amount charged':kind==='pay'?'amount paid':'price'}</div></div>
+    </button>
+    <button class="backup-btn" style="color:var(--red);" onclick="${kind==='price'?`removePriceHistoryEntry('${id}','${dateVal}')`:`removeHist('${id}','${kind}','${dateVal}')`}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--red);"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+      <div><div class="t1" style="color:var(--red);">Remove entry</div><div class="t2">Deletes this ${label.toLowerCase()}</div></div>
+    </button>
+  `, () => openCustomerHistoryList(id, kind));
 }
 
 function compressImage(file, maxDim, quality){
@@ -1939,6 +1983,46 @@ function sendMarketingText(id){
   const yourname = data.settings.yourName || '';
   const msg = applyTemplate(tpl, {name: firstName, company, yourname});
   sendPhoneMessage(c.phone, msg);
+}
+
+function openAddCleanForm(id){
+  const c = data.customers.find(x=>x.id===id);
+  if(!c) return;
+  openSheet(`
+    <div class="sheet-head">
+      <h2 style="flex:1; min-width:0;">Add a clean</h2>
+      <button class="sheet-close" onclick="openCustomerDetail('${id}')">✕</button>
+    </div>
+    <label style="margin-top:0">Date</label>
+    <input type="date" id="d_clean" value="${todayISO()}">
+    <label>Amount charged</label>
+    <input type="number" id="d_clean_amount" value="${c.price||0}" step="0.5" min="0">
+    <p style="color:var(--ink-muted); font-size:0.75rem; margin:6px 2px 0; line-height:1.5;">Adjust the amount for extras (e.g. garage door) or reductions (e.g. fronts only).</p>
+    <div class="form-actions">
+      <button class="btn-primary" onclick="addHistDate('${id}','clean')">Add clean</button>
+    </div>
+  `, () => openCustomerDetail(id));
+}
+
+function openAddPaymentForm(id){
+  const c = data.customers.find(x=>x.id===id);
+  if(!c) return;
+  const s = custStatus(c);
+  const suggestedPayment = s.owed ? s.balance : (c.price||0);
+  openSheet(`
+    <div class="sheet-head">
+      <h2 style="flex:1; min-width:0;">Add a payment</h2>
+      <button class="sheet-close" onclick="openCustomerDetail('${id}')">✕</button>
+    </div>
+    <label style="margin-top:0">Date</label>
+    <input type="date" id="d_pay" value="${todayISO()}">
+    <label>Amount paid</label>
+    <input type="number" id="d_pay_amount" value="${suggestedPayment}" step="0.5" min="0">
+    <p style="color:var(--ink-muted); font-size:0.75rem; margin:6px 2px 0; line-height:1.5;">Pay less than the balance and the rest rolls onto next bill. Pay more and they'll show in credit.</p>
+    <div class="form-actions">
+      <button class="btn-primary" onclick="addHistDate('${id}','pay')">Add payment</button>
+    </div>
+  `, () => openCustomerDetail(id));
 }
 
 function addHistDate(id, kind){
@@ -2627,7 +2711,19 @@ function openSettings(){
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 9h1M9 13h1M14 9h1M14 13h1"/></svg>
       <div><div class="t1">Business details</div><div class="t2">Company info, logo, your name, and bank details</div></div>
     </button>
-    <div class="section-label">Text message templates</div>
+    <button class="backup-btn" onclick="openMessageTemplates()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      <div><div class="t1">Message templates</div><div class="t2">Wording for reminders, receipts, and quotes</div></div>
+    </button>
+  `);
+}
+
+function openMessageTemplates(){
+  openSheet(`
+    <div class="sheet-head">
+      <h2 style="flex:1; min-width:0;">Message templates</h2>
+      <button class="sheet-close" onclick="closeSheet()">✕</button>
+    </div>
     <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 12px; line-height:1.5;">Use <b>{name}</b> for the customer's first name, <b>{amount}</b> for the amount, <b>{date}</b> for the payment date (receipts only), <b>{work}</b> for the quoted work (quotes only), <b>{company}</b> for your company name, <b>{yourname}</b> for your own name, and <b>{bankdetails}</b> to insert your bank transfer details (only appears if you've added them under Business details).</p>
     <label style="margin-top:0;">Cleaning reminder</label>
     <textarea id="tpl_clean" rows="3">${escapeHtml(data.settings.cleanTemplate)}</textarea>
@@ -2644,7 +2740,7 @@ function openSettings(){
     <label>Marketing text <span style="text-transform:none; font-weight:500; opacity:0.7;">(group texts to a round)</span></label>
     <textarea id="tpl_marketing" rows="3">${escapeHtml(data.settings.marketingTemplate||DEFAULT_MARKETING_TEMPLATE)}</textarea>
     <div class="form-actions">
-      <button class="btn-primary" onclick="saveTemplates()">Save settings</button>
+      <button class="btn-primary" onclick="saveTemplates()">Save templates</button>
     </div>
     <button class="btn-danger-text" onclick="resetTemplates()">Reset message wording to default</button>
   `);
@@ -2658,8 +2754,8 @@ function saveTemplates(){
   data.settings.repeatQuoteTemplate = document.getElementById('tpl_repeat_quote').value.trim() || DEFAULT_REPEAT_QUOTE_TEMPLATE;
   data.settings.marketingTemplate = document.getElementById('tpl_marketing').value.trim() || DEFAULT_MARKETING_TEMPLATE;
   saveData();
-  toast('Settings saved');
-  closeSheet();
+  toast('Templates saved');
+  openSettings();
 }
 function resetTemplates(){
   data.settings.cleanTemplate = DEFAULT_CLEAN_TEMPLATE;
@@ -2670,7 +2766,7 @@ function resetTemplates(){
   data.settings.repeatQuoteTemplate = DEFAULT_REPEAT_QUOTE_TEMPLATE;
   data.settings.marketingTemplate = DEFAULT_MARKETING_TEMPLATE;
   saveData();
-  openSettings();
+  openMessageTemplates();
   toast('Reset to default wording');
 }
 
@@ -3822,7 +3918,7 @@ const FOCUSED_HELP = {
     body: () => [
       helpP('The Rounds tab shows every round, with a Rounds / Due / Owed switch. Open a round to see its customers, swipe a card right to mark cleaned or left to mark paid, and use Reorder to set your walking order.'),
       helpP('If a round takes more than one day, tap each customer\'s day badge in reorder mode to assign Day 1–5. A day switcher then appears above the customer list, and cards get a "Day N" badge.'),
-      helpP('The megaphone icon on a round\'s screen opens a group marketing text — send everyone in the round with a phone number a text one by one, using the marketing wording set in Settings.'),
+      helpP('The ⋯ button on a round\'s screen opens Print, group marketing text, and Help — the round\'s screen stays uncluttered with just that one button.'),
       helpP('A small "Cleaned today" button appears on a customer\'s card once they have a clean logged for today (and a phone number saved) — a quick way to let them know it\'s done and remind them how to pay.')
     ]
   },
@@ -3835,9 +3931,10 @@ const FOCUSED_HELP = {
   customer: {
     title: 'Customers',
     body: () => [
-      helpP('A customer\'s screen shows their round, standard price, frequency, and any notes right at the top. Clean history, payment history, price history, and one-off jobs each open as their own list — tap one to see it, close it to come straight back here. Photos stay on the main screen.'),
+      helpP('A customer\'s screen shows their round, standard price, frequency, balance, and any notes right at the top. Below that, Actions, History, and Photos each collapse into their own section — tap a heading to open or close it, so the screen stays short until you need something.'),
+      helpP('"Add a clean" and "Add a payment" open a small pop-up for the date and amount, rather than sitting inline on the customer screen — keeps things tidier when you\'re just browsing.'),
+      helpP('Tapping an entry in Clean history, Payment history, or Price history opens a small menu — Edit, Remove, and (for payments) Send receipt — rather than showing all three on every row.'),
       helpP('Tick "Text before I arrive" on a customer\'s edit screen to flag that they need a heads-up text before you turn up — it shows as a badge on their card in round lists and on their detail screen as a reminder while you\'re working through the round.'),
-      helpP('Tapping 🧾 Receipt next to a payment gives a choice: a quick text using your receipt wording, or a formatted receipt in the same style as a job invoice, which you can print or send as a PDF via WhatsApp.'),
       helpP('Pausing a customer asks for a reason — Holiday, Work being done, Cancelled, Moved out, or Other — and stamps the date. Both show on their card and detail screen, and they\'re skipped from due reminders and round totals until resumed.'),
       helpP('The "Get a quote for this customer" button opens a new quote pre-filled with their details, handy for quoting extra work like gutter clearing or fascia cleaning.'),
       helpP('The printer icon prints or emails a record of everything on this screen — handy for a customer who asks for a summary.')
@@ -3876,8 +3973,7 @@ const FOCUSED_HELP = {
   settings: {
     title: 'Settings',
     body: () => [
-      helpP('Appearance, text size, colour scheme, messaging app (text or WhatsApp), and the wording of every message template — including a "Windows cleaned today" text.'),
-      helpP('Business details — company name, address, phone, logo, your name, and your bank details for taking payment by transfer — now live on their own screen, opened from the Business details button.')
+      helpP('Appearance, text size, colour scheme, and messaging app (text or WhatsApp) live on the main Settings screen. Business details (company info, logo, your name, bank details) and Message templates each have their own screen, opened from a button here.')
     ]
   },
   reminders: {
