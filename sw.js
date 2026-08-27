@@ -1,4 +1,4 @@
-const CACHE_NAME = 'round-book-v30';
+const CACHE_NAME = 'round-book-v31';
 const ASSETS = [
   './',
   './manifest.json',

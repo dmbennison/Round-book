@@ -266,8 +266,10 @@
   }
   .seg-btn.active .count{background:rgba(255,255,255,0.22);}
 
-  .summary-overall{display:flex; gap:8px; margin-bottom:18px;}
-  .summary-overall .stat{flex:1;}
+  .summary-overall{display:flex; gap:6px; margin-bottom:12px;}
+  .summary-overall .stat{flex:1; padding:7px;}
+  .summary-overall .stat .num{font-size:0.6875rem;}
+  .summary-overall .stat .lbl{font-size:0.5625rem;}
 
   .print-area{display:none;}
   .rpt-round-title{font-size:16px; font-weight:800; margin:20px 0 8px; border-bottom:2px solid #10344C; padding-bottom:4px;}
@@ -382,7 +384,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 30;
+const APP_VERSION = 31;
 function formatVersion(v){ return '1.' + v; }
 const DEFAULT_CLEAN_TEMPLATE = "Hi {name}, just a reminder I'll be round to clean your windows soon. Let me know if that's not convenient.\n\nThanks,\n{yourname}\n{company}";
 const DEFAULT_PAY_TEMPLATE = "Hi {name}, a friendly reminder that your window cleaning payment of {amount} is outstanding.\n\n{bankdetails}Thanks,\n{yourname}\n{company}";
@@ -831,7 +833,7 @@ function renderRoundsList(main){
       anyDue = true;
       dueGrandCount += dueCusts.length;
       dueGrandValue += dueCusts.reduce((s,c)=>s+Number(c.price||0),0);
-      const anyPhone = dueCusts.some(c=>c.phone);
+      const anyPhone = dueCusts.some(c=>isMobileNumber(c.phone));
       html += `<div class="round-group-header" style="display:flex; align-items:center; justify-content:space-between; margin:18px 2px 8px;">
         <div class="section-label" style="margin:0;">${escapeHtml(rn)} <span style="font-weight:600; color:var(--ink-muted); text-transform:none; letter-spacing:0;">(${dueCusts.length})</span></div>
         ${anyPhone ? `<button onclick="openBulkReminders('due','${escapeAttr(rn)}')" style="background:none; border:none; color:var(--blue); font-size:0.75rem; font-weight:800;">✉️ Remind all</button>` : ''}
@@ -859,7 +861,7 @@ function renderRoundsList(main){
       owedGrandCount += owedCusts.length;
       const roundTotal = owedCusts.reduce((s,c)=>s+custStatus(c).balance,0);
       grandTotal += roundTotal;
-      const anyPhone = owedCusts.some(c=>c.phone);
+      const anyPhone = owedCusts.some(c=>isMobileNumber(c.phone));
       html += `<div class="round-group-header" style="display:flex; align-items:center; justify-content:space-between; margin:18px 2px 8px;">
         <div class="section-label" style="margin:0;">${escapeHtml(rn)} <span style="font-weight:600; color:var(--ink-muted); text-transform:none; letter-spacing:0;">(owing ${money(roundTotal)})</span></div>
         ${anyPhone ? `<button onclick="openBulkReminders('owed','${escapeAttr(rn)}')" style="background:none; border:none; color:var(--blue); font-size:0.75rem; font-weight:800;">✉️ Remind all</button>` : ''}
@@ -898,7 +900,7 @@ function openRoundActionsMenu(rn){
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-5v12L3 13z"/><path d="M11.6 16.8a3 3 0 0 1-5.8-1.6"/></svg>
       <div><div class="t1">Send group marketing text</div><div class="t2">Text everyone in this round with a phone number</div></div>
     </button>
-    <button class="backup-btn" onclick="openFocusedHelp('rounds')">
+    <button class="backup-btn" onclick="openFocusedHelp('rounds', ()=>openRoundActionsMenu('${escapeAttr(rn)}'))">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
       <div><div class="t1">Help</div><div class="t2">How rounds work</div></div>
     </button>
@@ -1058,7 +1060,7 @@ function custCardHtml(c){
         ${needsPriceReview(c) ? `<span class="badge due" title="12+ months since last price increase">📈 Review</span>` : ''}
         ${c.textBeforeVisit ? `<span class="badge anniversary" title="Text before you arrive">📱 Text first</span>` : ''}
         ${showDayBadge ? `<span class="badge anniversary">Day ${c.visitDay||1}</span>` : ''}
-        ${(c.phone && s.lastClean===todayISO()) ? `<button onclick="event.stopPropagation(); sendTemplate('${c.id}','cleanedToday')" style="display:inline-flex; align-items:center; gap:4px; background:var(--green-dim); color:var(--green); border:none; border-radius:20px; padding:5px 10px; font-size:0.7188rem; font-weight:800; line-height:1;">💬 Cleaned today</button>` : ''}
+        ${(isMobileNumber(c.phone) && s.lastClean===todayISO()) ? `<button onclick="event.stopPropagation(); sendTemplate('${c.id}','cleanedToday')" style="display:inline-flex; align-items:center; gap:4px; background:var(--green-dim); color:var(--green); border:none; border-radius:20px; padding:5px 10px; font-size:0.7188rem; font-weight:800; line-height:1;">💬 Cleaned today</button>` : ''}
       </div>
     </div>
   </div>`;
@@ -1181,7 +1183,7 @@ function openCustomerForm(existing){
       <button class="btn-primary" onclick="saveCustomerForm('${existing?existing.id:''}')">${existing?'Save changes':'Add customer'}</button>
     </div>
     ${existing?`<button class="btn-danger-text" onclick="deleteCustomer('${existing.id}')">Delete customer</button>`:''}
-  `);
+  `, existing ? (() => openCustomerDetail(existing.id)) : null);
 }
 
 function saveCustomerForm(id){
@@ -1239,6 +1241,7 @@ function deleteCustomer(id){
   const idx = data.customers.findIndex(x=>x.id===id);
   if(idx===-1) return;
   const removed = data.customers[idx];
+  if(!confirm(`Delete ${removed.address||removed.name||'this customer'}? This removes all their history too.`)) return;
   data.customers.splice(idx,1);
   saveData(); closeSheet(); render();
   toast(`Deleted ${removed.address||removed.name||'customer'}`, 'Undo', ()=>{
@@ -1260,7 +1263,7 @@ function openCustomerDetail(id){
       <button class="sheet-close" style="flex-shrink:0; margin-right:6px;" onclick="printCustomerRecord('${id}')" aria-label="Print this customer">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
       </button>
-      ${helpIconBtn('customer')}
+      ${helpIconBtn('customer', () => openCustomerDetail(id))}
       <button class="sheet-close" style="flex-shrink:0;" onclick="closeSheet()">✕</button>
     </div>
     ${(c.name && c.address) ? `<div style="color:var(--ink); font-size:0.9375rem; font-weight:700; margin-bottom:2px;">${escapeHtml(c.name)}</div>` : ''}
@@ -1283,16 +1286,16 @@ function openCustomerDetail(id){
       <div class="stat"><div class="num">${fmtDate(s.lastPaid).split(' ').slice(0,2).join(' ')}</div><div class="lbl">Last paid</div></div>
     </div>
 
-    <details class="cust-section" open>
+    <details class="cust-section">
       <summary>Actions ${chev}</summary>
       <div class="cust-section-body">
         <div class="cust-actions" style="margin-bottom:12px;">
           <button class="btn btn-clean" onclick="quickClean('${id}'); openCustomerDetail('${id}');">Mark cleaned today</button>
           <button class="btn btn-paid" onclick="quickPaid('${id}'); openCustomerDetail('${id}');">Mark paid today</button>
         </div>
-        ${c.phone?`<div class="row2" style="margin-bottom:10px;">
-          <button class="btn" style="background:var(--blue-dim); color:var(--blue-deep);" onclick="sendTemplate('${id}','clean')">💬 Cleaning reminder</button>
-          <button class="btn" style="background:var(--amber-dim); color:var(--amber);" onclick="sendTemplate('${id}','pay'); openCustomerDetail('${id}');">💬 Payment reminder</button>
+        ${isMobileNumber(c.phone)?`<div class="row2" style="margin-bottom:10px;">
+          <button class="btn" style="background:var(--blue-dim); color:var(--blue-deep);" onclick="sendTemplate('${id}','clean',()=>openCustomerDetail('${id}'))">💬 Cleaning reminder</button>
+          <button class="btn" style="background:var(--amber-dim); color:var(--amber);" onclick="sendTemplate('${id}','pay',()=>openCustomerDetail('${id}'))">💬 Payment reminder</button>
         </div>`:''}
         <div class="row2" style="margin-bottom:10px;">
           <button class="btn btn-clean" onclick="openAddCleanForm('${id}')">+ Add a clean</button>
@@ -1302,10 +1305,10 @@ function openCustomerDetail(id){
           ${c.paused ? '▶ Resume this customer' : '⏸ Pause this customer (skip due reminders)'}
         </button>
         <button class="btn" style="width:100%; background:var(--amber-dim); color:var(--amber); margin-bottom:10px;" onclick="quoteForCustomer('${id}')">
-          💷 Get a quote for this customer
+          💷 Get a quote
         </button>
         <button class="btn" style="width:100%; background:var(--blue-dim); color:var(--blue-deep);" onclick="scheduleJobForCustomer('${id}')">
-          📋 Schedule a one-off job for this customer
+          📋 Schedule a one-off job
         </button>
       </div>
     </details>
@@ -1373,7 +1376,7 @@ function openCustomerHistoryList(id, kind){
     title = 'One-off jobs';
     const linkedJobs = (data.oneOffJobs||[]).filter(j=>j.customerId===id).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
     rowsHtml = linkedJobs
-      .map(j=>`<li style="cursor:pointer;" onclick="openJobForm(data.oneOffJobs.find(x=>x.id==='${j.id}'))">${fmtDate(j.date)} — ${money(j.price)} <span style="color:var(--ink-muted); font-weight:500;">(${j.done?'done':'not done'}, ${j.paid?'paid':'unpaid'})</span></li>`).join('') || '<li style="color:var(--ink-muted)">No one-off jobs for this customer</li>';
+      .map(j=>`<li style="cursor:pointer;" onclick="openJobForm(data.oneOffJobs.find(x=>x.id==='${j.id}'), null, ()=>openCustomerHistoryList('${id}','jobs'))">${fmtDate(j.date)} — ${money(j.price)} <span style="color:var(--ink-muted); font-weight:500;">(${j.done?'done':'not done'}, ${j.paid?'paid':'unpaid'})</span></li>`).join('') || '<li style="color:var(--ink-muted)">No one-off jobs for this customer</li>';
   } else {
     title = 'Price history';
     rowsHtml = (c.priceHistory||[]).slice().sort((a,b)=>a.date<b.date?1:-1)
@@ -1478,6 +1481,7 @@ async function handleLogoSelected(inputEl){
   inputEl.value = '';
 }
 function removeLogo(){
+  if(!confirm('Remove your logo?')) return;
   data.settings.logo = '';
   saveData();
   openBusinessDetails();
@@ -1544,6 +1548,7 @@ async function sharePhoto(id, photoId){
 }
 
 function deletePhoto(id, photoId){
+  if(!confirm('Delete this photo?')) return;
   const c = data.customers.find(x=>x.id===id);
   c.photos = (c.photos||[]).filter(p=>p.id!==photoId);
   saveData();
@@ -1608,6 +1613,7 @@ function removePriceHistoryEntry(id, dateKey){
   const c = data.customers.find(x=>x.id===id);
   const idx = (c.priceHistory||[]).findIndex(p=>p.date===dateKey);
   if(idx===-1) return;
+  if(!confirm('Remove this price entry?')) return;
   c.priceHistory.splice(idx,1);
   saveData(); openCustomerHistoryList(id, 'price'); render();
 }
@@ -1642,7 +1648,7 @@ function openPauseReasonSheet(id){
     <div class="form-actions">
       <button class="btn-primary" onclick="confirmPause('${id}')">Pause customer</button>
     </div>
-  `);
+  `, () => openCustomerDetail(id));
   const sel = document.getElementById('pause_reason');
   const otherWrap = document.getElementById('pause_other_wrap');
   const syncOther = () => { otherWrap.style.display = sel.value === 'Other' ? 'block' : 'none'; };
@@ -1663,7 +1669,6 @@ function confirmPause(id){
   c.pauseReason = reason;
   c.pauseDate = todayISO();
   saveData();
-  closeSheet();
   openCustomerDetail(id);
   render();
   toast('Customer paused — hidden from due reminders');
@@ -1730,6 +1735,49 @@ function sendPhoneMessage(phone, msg){
   }
 }
 
+// Recognizes UK mobile numbers (07..., +447..., 00447...) as distinct from
+// landlines — texts and WhatsApp messages can only reach a mobile, so every
+// "send a text" option in the app is gated on this rather than just "has a phone".
+function isMobileNumber(phone){
+  if(!phone) return false;
+  const digits = (phone||'').replace(/[^\d+]/g,'');
+  if(/^07\d{9}$/.test(digits)) return true;
+  if(/^(\+44|0044)7\d{9}$/.test(digits)) return true;
+  return false;
+}
+
+let pendingMsgPhone = '';
+let pendingMsgAfterSend = null;
+
+// Shared "compose, edit, send" screen for any single-recipient text — cleaning and
+// payment reminders, receipts, quotes. Mirrors the editable-textarea pattern already
+// used for group marketing texts, so wording can always be tweaked before it goes out.
+// returnTo is passed straight through to openSheet so closing this (by any route)
+// lands back on whichever screen it was opened from.
+function openMessagePreview(title, phone, msg, afterSend, returnTo){
+  pendingMsgPhone = phone;
+  pendingMsgAfterSend = afterSend || null;
+  openSheet(`
+    <div class="sheet-head">
+      <h2 style="flex:1; min-width:0;">${escapeHtml(title)}</h2>
+      <button class="sheet-close" onclick="closeSheet()">✕</button>
+    </div>
+    <label style="margin-top:0;">Message</label>
+    <textarea id="msg_preview_text" rows="7">${escapeHtml(msg)}</textarea>
+    <div class="form-actions">
+      <button class="btn-primary" onclick="sendPreviewedMessage()">Send ${data.settings.messagingApp==='whatsapp'?'via WhatsApp':'as text'}</button>
+    </div>
+  `, returnTo);
+}
+function sendPreviewedMessage(){
+  const text = document.getElementById('msg_preview_text').value;
+  const phone = pendingMsgPhone;
+  const afterSend = pendingMsgAfterSend;
+  sendPhoneMessage(phone, text);
+  if(afterSend) afterSend();
+  closeSheet();
+}
+
 function setMessagingApp(mode){
   data.settings.messagingApp = mode === 'whatsapp' ? 'whatsapp' : 'sms';
   saveData();
@@ -1739,15 +1787,16 @@ function setMessagingApp(mode){
 function sendReceipt(id, dateISO, amount){
   const c = data.customers.find(x=>x.id===id);
   if(!c) return;
-  if(!c.phone && !c.email){ toast('No phone or email saved for this customer'); return; }
+  const mobile = isMobileNumber(c.phone);
+  if(!mobile && !c.email){ toast('No mobile number or email saved for this customer'); return; }
   const firstName = c.name ? c.name.trim().split(' ')[0] : '';
   const company = data.settings.companyName || '';
   const yourname = data.settings.yourName || '';
   const msg = applyTemplate(data.settings.receiptTemplate, {
     name: firstName, amount: Number(amount), company, date: fmtDate(dateISO), yourname
   });
-  if(c.phone){
-    sendPhoneMessage(c.phone, msg);
+  if(mobile){
+    openMessagePreview('Send receipt', c.phone, msg, null, () => openReceiptOptions(id, dateISO, amount));
   } else {
     window.location.href = `mailto:${c.email}?subject=${encodeURIComponent('Receipt')}&body=${encodeURIComponent(msg)}`;
   }
@@ -1756,21 +1805,22 @@ function sendReceipt(id, dateISO, amount){
 function openReceiptOptions(id, dateISO, amount){
   const c = data.customers.find(x=>x.id===id);
   if(!c) return;
+  const mobile = isMobileNumber(c.phone);
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">Send receipt</h2>
       <button class="sheet-close" onclick="closeSheet()">✕</button>
     </div>
     <p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 16px; line-height:1.5;">${escapeHtml(c.name||c.address||'This customer')} · ${money(amount)} on ${fmtDate(dateISO)}</p>
-    ${(c.phone||c.email) ? `<button class="backup-btn" onclick="closeSheet(); sendReceipt('${id}','${dateISO}',${amount})">
+    ${(mobile||c.email) ? `<button class="backup-btn" onclick="sendReceipt('${id}','${dateISO}',${amount})">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-      <div><div class="t1">Quick text message</div><div class="t2">${data.settings.messagingApp==='whatsapp'?'Sends via WhatsApp':'Sends as a text'}, using your receipt wording</div></div>
+      <div><div class="t1">Quick text message</div><div class="t2">${mobile?(data.settings.messagingApp==='whatsapp'?'Sends via WhatsApp':'Sends as a text'):'Sends by email'}, using your receipt wording</div></div>
     </button>` : ''}
     <button class="backup-btn" onclick="printReceipt('${id}','${dateISO}',${amount})">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
       <div><div class="t1">Formatted receipt</div><div class="t2">Print it or send a PDF copy via WhatsApp</div></div>
     </button>
-  `);
+  `, () => openHistEntryActions(id, 'pay', dateISO, amount));
 }
 
 function printReceipt(customerId, dateISO, amount){
@@ -1839,27 +1889,28 @@ function printReceipt(customerId, dateISO, amount){
       Thank you for your payment.${fromLine ? '<br>' + escapeHtml(fromLine) : ''}
     </div>
   `;
-  runPrint(`Receipt — ${c.address || c.name || receiptNumber}`, body, true, true);
+  runPrint(`Receipt — ${c.address || c.name || receiptNumber}`, body, true, true, () => openReceiptOptions(customerId, dateISO, amount));
 }
 
 
 function sendJobReceipt(id){
   const j = data.oneOffJobs.find(x=>x.id===id);
   if(!j) return;
-  if(!j.phone){ toast('No phone number saved for this job'); return; }
+  if(!isMobileNumber(j.phone)){ toast('No mobile number saved for this job'); return; }
   const firstName = j.name ? j.name.trim().split(' ')[0] : '';
   const company = data.settings.companyName || '';
   const yourname = data.settings.yourName || '';
   const msg = applyTemplate(data.settings.receiptTemplate, {
     name: firstName, amount: Number(j.price||0), company, date: fmtDate(j.date), yourname
   });
-  sendPhoneMessage(j.phone, msg);
+  openMessagePreview('Send receipt', j.phone, msg, null, () => openJobForm(data.oneOffJobs.find(x=>x.id===id)));
 }
 
 function sendQuoteText(id){
   const q = data.quotes.find(x=>x.id===id);
   if(!q) return;
-  if(!q.phone && !q.email){ toast('No phone or email saved for this quote'); return; }
+  const mobile = isMobileNumber(q.phone);
+  if(!mobile && !q.email){ toast('No mobile number or email saved for this quote'); return; }
   const firstName = q.name ? q.name.trim().split(' ')[0] : '';
   const company = data.settings.companyName || '';
   const yourname = data.settings.yourName || '';
@@ -1867,34 +1918,39 @@ function sendQuoteText(id){
   const msg = applyTemplate(tpl, {
     name: firstName, amount: Number(q.price||0), company, date: fmtDate(q.date), yourname, work: q.notes||''
   });
-  if(q.phone){
-    sendPhoneMessage(q.phone, msg);
+  if(mobile){
+    openMessagePreview('Send quote', q.phone, msg, null, () => openQuoteForm(data.quotes.find(x=>x.id===id)));
   } else {
     window.location.href = `mailto:${q.email}?subject=${encodeURIComponent('Your window cleaning quote')}&body=${encodeURIComponent(msg)}`;
   }
 }
 
-function sendTemplate(id, kind){
+function sendTemplate(id, kind, returnTo){
   const c = data.customers.find(x=>x.id===id);
-  if(!c.phone){ toast('No phone number saved for this customer'); return; }
+  if(!isMobileNumber(c.phone)){ toast('No mobile number saved for this customer'); return; }
   const firstName = c.name ? c.name.trim().split(' ')[0] : '';
   const company = data.settings.companyName || '';
   const yourname = data.settings.yourName || '';
-  let msg;
+  let msg, title, afterSend = null;
   if(kind === 'clean'){
     msg = applyTemplate(data.settings.cleanTemplate, {name: firstName, company, yourname});
+    title = 'Cleaning reminder';
   } else if(kind === 'cleanedToday'){
     msg = applyTemplate(data.settings.cleanedTodayTemplate, {name: firstName, company, yourname});
+    title = 'Windows cleaned today';
   } else {
     const s = custStatus(c);
     const amt = s.owed ? s.balance : c.price;
     msg = applyTemplate(data.settings.payTemplate, {name: firstName, amount: amt, company, yourname});
-    c.paymentReminderSent = true;
-    c.paymentReminderSentDate = todayISO();
-    saveData();
-    render();
+    title = 'Payment reminder';
+    afterSend = () => {
+      c.paymentReminderSent = true;
+      c.paymentReminderSentDate = todayISO();
+      saveData();
+      render();
+    };
   }
-  sendPhoneMessage(c.phone, msg);
+  openMessagePreview(title, c.phone, msg, afterSend, returnTo);
 }
 
 function openBulkReminders(kind, roundName){
@@ -1904,19 +1960,24 @@ function openBulkReminders(kind, roundName){
   if(kind === 'due'){
     list = roundCusts.filter(c=>{
       const s = custStatus(c);
-      return !c.paused && s.cleanBadge && s.cleanBadge.type==='due' && c.phone;
+      return !c.paused && s.cleanBadge && s.cleanBadge.type==='due' && isMobileNumber(c.phone);
     });
   } else {
-    list = roundCusts.filter(c=> custStatus(c).owed && c.phone);
+    list = roundCusts.filter(c=> custStatus(c).owed && isMobileNumber(c.phone));
   }
-  if(!list.length){ toast('No one with a phone number to remind'); return; }
+  if(!list.length){ toast('No one with a mobile number to remind'); return; }
+
+  const tplField = document.getElementById('bulk_msg');
+  const tpl = tplField ? tplField.value : (kind==='due' ? data.settings.cleanTemplate : data.settings.payTemplate);
 
   openSheet(`
     <div class="sheet-head">
-      <h2>Remind — ${escapeHtml(roundName)}</h2>
+      <h2 style="flex:1; min-width:0;">Remind — ${escapeHtml(roundName)}</h2>
       <button class="sheet-close" onclick="closeSheet()">✕</button>
     </div>
-    <p style="color:var(--ink-muted); font-size:0.7812rem; margin:0 2px 14px; line-height:1.5;">
+    <label style="margin-top:0;">Message <span style="text-transform:none; font-weight:500; opacity:0.7;">({name}${kind==='owed'?', {amount}, {bankdetails}':''}, {company}, {yourname})</span></label>
+    <textarea id="bulk_msg" rows="4">${escapeHtml(tpl)}</textarea>
+    <p style="color:var(--ink-muted); font-size:0.7812rem; margin:10px 2px 14px; line-height:1.5;">
       Tap Send for each customer — it opens ${data.settings.messagingApp==='whatsapp'?'WhatsApp':'Messages'} pre-filled and ready to go. Come back here for the next one.
     </p>
     ${list.map(c=>{
@@ -1927,10 +1988,33 @@ function openBulkReminders(kind, roundName){
           <div class="cust-addr" style="font-weight:800; font-size:0.9062rem;">${escapeHtml(c.address||c.name||'Customer')}</div>
           <div style="font-size:0.75rem; color:var(--ink-muted); margin-top:2px;">${escapeHtml(c.phone)}${kind==='owed'?` · Owes ${money(s.balance)}`:''}${alreadySent?` · 🔔 Reminded ${fmtDate(c.paymentReminderSentDate).split(' ').slice(0,2).join(' ')}`:''}</div>
         </div>
-        <button class="btn btn-clean" style="flex:0 0 auto; padding:9px 16px;" onclick="sendTemplate('${c.id}','${kind==='due'?'clean':'pay'}'); markReminderSent('${c.id}')">${alreadySent?'Send again':'Send'}</button>
+        <button class="btn btn-clean" style="flex:0 0 auto; padding:9px 16px;" onclick="sendBulkReminder('${c.id}','${kind}')">${alreadySent?'Send again':'Send'}</button>
       </div>`;
     }).join('')}
   `);
+}
+
+function sendBulkReminder(id, kind){
+  const c = data.customers.find(x=>x.id===id);
+  if(!c || !isMobileNumber(c.phone)) return;
+  const msgField = document.getElementById('bulk_msg');
+  const tpl = msgField ? msgField.value : (kind==='due' ? data.settings.cleanTemplate : data.settings.payTemplate);
+  const firstName = c.name ? c.name.trim().split(' ')[0] : '';
+  const company = data.settings.companyName || '';
+  const yourname = data.settings.yourName || '';
+  let amt;
+  if(kind === 'owed'){
+    const s = custStatus(c);
+    amt = s.owed ? s.balance : c.price;
+  }
+  const msg = applyTemplate(tpl, {name: firstName, amount: amt, company, yourname});
+  sendPhoneMessage(c.phone, msg);
+  if(kind === 'owed'){
+    c.paymentReminderSent = true;
+    c.paymentReminderSentDate = todayISO();
+    saveData();
+  }
+  markReminderSent(id);
 }
 
 function markReminderSent(id){
@@ -1948,7 +2032,7 @@ function markReminderSent(id){
 
 function openMarketingBlast(roundName){
   const rounds = groupByRound(data.customers);
-  const list = (rounds[roundName] || []).filter(c=>c.phone);
+  const list = (rounds[roundName] || []).filter(c=>isMobileNumber(c.phone));
   const tpl = document.getElementById('mkt_msg') ? document.getElementById('mkt_msg').value : (data.settings.marketingTemplate || DEFAULT_MARKETING_TEMPLATE);
 
   openSheet(`
@@ -1969,13 +2053,13 @@ function openMarketingBlast(roundName){
         </div>
         <button class="btn btn-clean" style="flex:0 0 auto; padding:9px 16px;" onclick="sendMarketingText('${c.id}'); markReminderSent('${c.id}')">Send</button>
       </div>`;
-    }).join('') : `<p style="color:var(--ink-muted); font-size:0.8438rem; margin:0 2px;">No one in this round has a phone number saved.</p>`}
-  `);
+    }).join('') : `<p style="color:var(--ink-muted); font-size:0.8438rem; margin:0 2px;">No one in this round has a mobile number saved.</p>`}
+  `, () => openRoundActionsMenu(roundName));
 }
 
 function sendMarketingText(id){
   const c = data.customers.find(x=>x.id===id);
-  if(!c || !c.phone){ toast('No phone number saved for this customer'); return; }
+  if(!c || !isMobileNumber(c.phone)){ toast('No mobile number saved for this customer'); return; }
   const msgField = document.getElementById('mkt_msg');
   const tpl = msgField ? msgField.value : (data.settings.marketingTemplate || DEFAULT_MARKETING_TEMPLATE);
   const firstName = c.name ? c.name.trim().split(' ')[0] : '';
@@ -2046,6 +2130,7 @@ function addHistDate(id, kind){
 }
 function removeHist(id, kind, dateVal){
   const c = data.customers.find(x=>x.id===id);
+  if(!confirm(`Remove this ${kind==='clean'?'clean':'payment'}?`)) return;
   if(kind==='clean'){
     const idx = c.cleanHistory.findIndex(e=>e.date===dateVal);
     if(idx>-1) c.cleanHistory.splice(idx,1);
@@ -2145,13 +2230,13 @@ function toggleJobPaid(id){
 function scheduleJobForCustomer(id){
   const c = data.customers.find(x=>x.id===id);
   if(!c) return;
-  openJobForm(null, { address: c.address||'', name: c.name||'', phone: c.phone||'', price: c.price||0, customerId: c.id });
+  openJobForm(null, { address: c.address||'', name: c.name||'', phone: c.phone||'', price: c.price||0, customerId: c.id }, () => openCustomerDetail(id));
 }
 
 function quoteForCustomer(id){
   const c = data.customers.find(x=>x.id===id);
   if(!c) return;
-  openQuoteForm(null, { address: c.address||'', name: c.name||'', phone: c.phone||'', email: c.email||'' });
+  openQuoteForm(null, { address: c.address||'', name: c.name||'', phone: c.phone||'', email: c.email||'' }, () => openCustomerDetail(id));
 }
 
 function fillJobFromCustomer(id){
@@ -2171,7 +2256,7 @@ function fillJobFromCustomer(id){
   if(linkNote) linkNote.textContent = `🔗 Linked to ${c.address||c.name||'this customer'} — will show in their history`;
 }
 
-function openJobForm(existing, prefill){
+function openJobForm(existing, prefill, returnTo){
   const j = existing || prefill || {};
   openSheet(`
     <div class="sheet-head">
@@ -2179,7 +2264,7 @@ function openJobForm(existing, prefill){
       ${existing?`<button class="sheet-close" style="flex-shrink:0; margin-right:6px;" onclick="printJobRecord('${existing.id}')" aria-label="Print this job">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
       </button>`:''}
-      ${helpIconBtn('jobs')}
+      ${helpIconBtn('jobs', () => openJobForm(existing, prefill, returnTo))}
       <button class="sheet-close" style="flex-shrink:0;" onclick="closeSheet()">✕</button>
     </div>
     ${(!existing)?`
@@ -2202,14 +2287,22 @@ function openJobForm(existing, prefill){
     <input type="text" id="j_name" value="${escapeAttr(j.name||'')}" placeholder="e.g. Mr Ahmed">
     <label>Phone (optional)</label>
     <input type="text" id="j_phone" value="${escapeAttr(j.phone||'')}" placeholder="07..." inputmode="tel">
-    <label>Date</label>
-    <input type="date" id="j_date" value="${j.date||todayISO()}">
-    <label>Price</label>
-    <input type="number" id="j_price" value="${j.price!=null?j.price:''}" placeholder="£" min="0" step="0.5">
+    <div class="row2">
+      <div>
+        <label style="margin-top:0">Date</label>
+        <input type="date" id="j_date" value="${j.date||todayISO()}">
+      </div>
+      <div>
+        <label style="margin-top:0">Price</label>
+        <input type="number" id="j_price" value="${j.price!=null?j.price:''}" placeholder="£" min="0" step="0.5">
+      </div>
+    </div>
     <label>Notes</label>
     <textarea id="j_notes" rows="2" placeholder="What's the job...">${escapeHtml(j.notes||'')}</textarea>
-    ${existing ? `<button class="btn" style="width:100%; background:var(--blue-dim); color:var(--blue-deep); margin-top:14px;" onclick="printJobInvoice('${existing.id}')">🧾 Print invoice</button>` : ''}
-    ${(existing && existing.phone) ? `<button class="btn" style="width:100%; background:var(--amber-dim); color:var(--amber); margin-top:8px;" onclick="sendJobReceipt('${existing.id}')">🧾 Send receipt</button>` : ''}
+    ${existing?`<div class="row2" style="margin-top:14px;">
+      <button class="btn" style="background:var(--blue-dim); color:var(--blue-deep);" onclick="printJobInvoice('${existing.id}')">🧾 Print invoice</button>
+      ${isMobileNumber(existing.phone) ? `<button class="btn" style="background:var(--amber-dim); color:var(--amber);" onclick="sendJobReceipt('${existing.id}')">🧾 Send receipt</button>` : ''}
+    </div>`:''}
     <label style="display:flex; align-items:center; gap:8px; margin-top:16px; cursor:pointer;">
       <input type="checkbox" id="j_remind" ${j.remind24h?'checked':''} style="width:18px; height:18px; flex-shrink:0;">
       <span style="font-size:0.8125rem; font-weight:600; color:var(--ink); text-transform:none; letter-spacing:0;">Remind me the day before this job</span>
@@ -2234,7 +2327,7 @@ function openJobForm(existing, prefill){
         <input type="file" accept="image/*" id="jobPhotoInput_${existing.id}" style="display:none;" onchange="handleJobPhotoSelected('${existing.id}', this)">
       </div>
     `:`<div class="section-label">Photos</div><p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 8px;">Save this job first, then reopen it to add photos.</p>`}
-  `);
+  `, returnTo);
 }
 
 function viewJobPhoto(id, photoId){
@@ -2296,6 +2389,7 @@ async function shareJobPhoto(id, photoId){
 }
 
 function deleteJobPhoto(id, photoId){
+  if(!confirm('Delete this photo?')) return;
   const j = data.oneOffJobs.find(x=>x.id===id);
   j.photos = (j.photos||[]).filter(p=>p.id!==photoId);
   saveData();
@@ -2338,6 +2432,7 @@ function deleteJob(id){
   const idx = data.oneOffJobs.findIndex(x=>x.id===id);
   if(idx===-1) return;
   const removed = data.oneOffJobs[idx];
+  if(!confirm(`Delete the job at ${removed.address||removed.name||'this address'}?`)) return;
   data.oneOffJobs.splice(idx,1);
   saveData(); closeSheet(); render();
   toast(`Deleted job at ${removed.address||removed.name||'job'}`, 'Undo', ()=>{
@@ -2422,12 +2517,12 @@ function markQuoteDeclined(id){
   toast('Quote marked declined');
 }
 
-function openQuoteForm(existing, prefill){
+function openQuoteForm(existing, prefill, returnTo){
   const q = existing || prefill || {};
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">${existing?'Edit quote':'Add quote'}</h2>
-      ${helpIconBtn('quotes')}
+      ${helpIconBtn('quotes', () => openQuoteForm(existing, prefill, returnTo))}
       <button class="sheet-close" onclick="closeSheet()">✕</button>
     </div>
     <input type="hidden" id="q_fromJobId" value="${escapeAttr((prefill&&prefill.fromJobId)||'')}">
@@ -2461,7 +2556,7 @@ function openQuoteForm(existing, prefill){
       <button class="seg-btn ${q.status==='declined'?'active':''}" onclick="setQuoteStatusField('declined', this)">Declined</button>
     </div>
     <input type="hidden" id="q_status" value="${q.status||'pending'}">
-    ${existing && (existing.phone || existing.email) ? `<button class="btn" style="width:100%; background:var(--amber-dim); color:var(--amber); margin-top:14px;" onclick="sendQuoteText('${existing.id}')">💬 ${existing.phone?'Send quote by text':'Send quote by email'}${existing.fromJobId?' (repeat work)':''}</button>` : ''}
+    ${existing && (isMobileNumber(existing.phone) || existing.email) ? `<button class="btn" style="width:100%; background:var(--amber-dim); color:var(--amber); margin-top:14px;" onclick="sendQuoteText('${existing.id}')">💬 ${isMobileNumber(existing.phone)?'Send quote by text':'Send quote by email'}${existing.fromJobId?' (repeat work)':''}</button>` : ''}
     <div class="form-actions">
       <button class="btn-primary" onclick="saveQuoteForm('${existing?existing.id:''}')">${existing?'Save changes':'Add quote'}</button>
     </div>
@@ -2472,7 +2567,7 @@ function openQuoteForm(existing, prefill){
       <button class="btn" style="width:100%; background:var(--green-dim); color:var(--green); margin-bottom:8px;" onclick="convertQuoteToJob('${existing.id}')">📋 Convert to a one-off job</button>
     ` : ''}
     ${existing && existing.status==='converted' ? `<p style="color:var(--ink-muted); font-size:0.75rem; margin:14px 2px 0;">✅ This quote has already been converted.</p>` : ''}
-  `);
+  `, returnTo);
 }
 function setQuoteStatusField(status, btn){
   const el = document.getElementById('q_status');
@@ -2514,6 +2609,7 @@ function deleteQuote(id){
   const idx = data.quotes.findIndex(x=>x.id===id);
   if(idx===-1) return;
   const removed = data.quotes[idx];
+  if(!confirm(`Delete the quote for ${removed.address||removed.name||'this customer'}?`)) return;
   data.quotes.splice(idx,1);
   saveData(); closeSheet(); render();
   toast(`Deleted quote for ${removed.address||removed.name||'quote'}`, 'Undo', ()=>{
@@ -2561,7 +2657,7 @@ function openConvertQuoteToCustomer(quoteId){
     <div class="form-actions">
       <button class="btn-primary" onclick="confirmConvertQuoteToCustomer('${quoteId}')">Create customer</button>
     </div>
-  `);
+  `, () => openQuoteForm(data.quotes.find(x=>x.id===quoteId)));
 }
 function confirmConvertQuoteToCustomer(quoteId){
   const q = data.quotes.find(x=>x.id===quoteId);
@@ -2674,7 +2770,7 @@ function openSettings(){
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">Settings</h2>
-      ${helpIconBtn('settings')}
+      ${helpIconBtn('settings', () => openSettings())}
       <button class="sheet-close" onclick="closeSheet()">✕</button>
     </div>
     <div class="section-label" style="margin-top:0;">Appearance</div>
@@ -2718,53 +2814,77 @@ function openSettings(){
   `);
 }
 
+// Each entry drives one row on the Message Templates screen and its edit dialog —
+// add a template here and it gets a button, an editor, and reset support for free.
+const TEMPLATE_DEFS = [
+  { key: 'cleanTemplate', label: 'Cleaning reminder', default: DEFAULT_CLEAN_TEMPLATE },
+  { key: 'payTemplate', label: 'Payment reminder', default: DEFAULT_PAY_TEMPLATE },
+  { key: 'cleanedTodayTemplate', label: 'Windows cleaned today', default: DEFAULT_CLEANED_TODAY_TEMPLATE },
+  { key: 'receiptTemplate', label: 'Receipt', default: DEFAULT_RECEIPT_TEMPLATE },
+  { key: 'quoteTemplate', label: 'Quote (new enquiry)', default: DEFAULT_QUOTE_TEMPLATE },
+  { key: 'repeatQuoteTemplate', label: 'Quote (repeat work)', default: DEFAULT_REPEAT_QUOTE_TEMPLATE },
+  { key: 'marketingTemplate', label: 'Marketing text (group texts)', default: DEFAULT_MARKETING_TEMPLATE }
+];
+
 function openMessageTemplates(){
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">Message templates</h2>
       <button class="sheet-close" onclick="closeSheet()">✕</button>
     </div>
-    <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 12px; line-height:1.5;">Use <b>{name}</b> for the customer's first name, <b>{amount}</b> for the amount, <b>{date}</b> for the payment date (receipts only), <b>{work}</b> for the quoted work (quotes only), <b>{company}</b> for your company name, <b>{yourname}</b> for your own name, and <b>{bankdetails}</b> to insert your bank transfer details (only appears if you've added them under Business details).</p>
-    <label style="margin-top:0;">Cleaning reminder</label>
-    <textarea id="tpl_clean" rows="3">${escapeHtml(data.settings.cleanTemplate)}</textarea>
-    <label>Payment reminder</label>
-    <textarea id="tpl_pay" rows="3">${escapeHtml(data.settings.payTemplate)}</textarea>
-    <label>Windows cleaned today</label>
-    <textarea id="tpl_cleaned_today" rows="3">${escapeHtml(data.settings.cleanedTodayTemplate||DEFAULT_CLEANED_TODAY_TEMPLATE)}</textarea>
-    <label>Receipt</label>
-    <textarea id="tpl_receipt" rows="3">${escapeHtml(data.settings.receiptTemplate)}</textarea>
-    <label>Quote <span style="text-transform:none; font-weight:500; opacity:0.7;">(new enquiry)</span></label>
-    <textarea id="tpl_quote" rows="3">${escapeHtml(data.settings.quoteTemplate)}</textarea>
-    <label>Quote <span style="text-transform:none; font-weight:500; opacity:0.7;">(repeat work)</span></label>
-    <textarea id="tpl_repeat_quote" rows="3">${escapeHtml(data.settings.repeatQuoteTemplate)}</textarea>
-    <label>Marketing text <span style="text-transform:none; font-weight:500; opacity:0.7;">(group texts to a round)</span></label>
-    <textarea id="tpl_marketing" rows="3">${escapeHtml(data.settings.marketingTemplate||DEFAULT_MARKETING_TEMPLATE)}</textarea>
-    <div class="form-actions">
-      <button class="btn-primary" onclick="saveTemplates()">Save templates</button>
+    <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 12px; line-height:1.5;">Tap a message to edit its wording. Use <b>{name}</b>, <b>{amount}</b>, <b>{date}</b> (receipts), <b>{work}</b> (quotes), <b>{company}</b>, <b>{yourname}</b>, and <b>{bankdetails}</b> (only appears if you've added bank details under Business details).</p>
+    ${TEMPLATE_DEFS.map(def=>{
+      const val = (data.settings[def.key] || def.default).replace(/\s+/g,' ').trim();
+      return `<button class="backup-btn" onclick="openEditTemplate('${def.key}')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <div style="flex:1; min-width:0;"><div class="t1">${escapeHtml(def.label)}</div><div class="t2" style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(val)}</div></div>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px; color:var(--ink-muted); flex-shrink:0;"><path d="M9 18l6-6-6-6"/></svg>
+      </button>`;
+    }).join('')}
+    <button class="btn-danger-text" onclick="resetAllTemplates()">Reset all message wording to default</button>
+  `, () => openSettings());
+}
+
+function openEditTemplate(key){
+  const def = TEMPLATE_DEFS.find(d=>d.key===key);
+  if(!def) return;
+  const val = data.settings[key] || def.default;
+  openSheet(`
+    <div class="sheet-head">
+      <h2 style="flex:1; min-width:0;">${escapeHtml(def.label)}</h2>
+      <button class="sheet-close" onclick="closeSheet()">✕</button>
     </div>
-    <button class="btn-danger-text" onclick="resetTemplates()">Reset message wording to default</button>
-  `);
+    <label style="margin-top:0;">Message</label>
+    <textarea id="tpl_edit_text" rows="7">${escapeHtml(val)}</textarea>
+    <div class="form-actions">
+      <button class="btn-primary" onclick="saveEditedTemplate('${key}')">Save</button>
+    </div>
+    <button class="btn-danger-text" onclick="resetOneTemplate('${key}')">Reset this message to default</button>
+  `, () => openMessageTemplates());
 }
-function saveTemplates(){
-  data.settings.cleanTemplate = document.getElementById('tpl_clean').value.trim() || DEFAULT_CLEAN_TEMPLATE;
-  data.settings.payTemplate = document.getElementById('tpl_pay').value.trim() || DEFAULT_PAY_TEMPLATE;
-  data.settings.cleanedTodayTemplate = document.getElementById('tpl_cleaned_today').value.trim() || DEFAULT_CLEANED_TODAY_TEMPLATE;
-  data.settings.receiptTemplate = document.getElementById('tpl_receipt').value.trim() || DEFAULT_RECEIPT_TEMPLATE;
-  data.settings.quoteTemplate = document.getElementById('tpl_quote').value.trim() || DEFAULT_QUOTE_TEMPLATE;
-  data.settings.repeatQuoteTemplate = document.getElementById('tpl_repeat_quote').value.trim() || DEFAULT_REPEAT_QUOTE_TEMPLATE;
-  data.settings.marketingTemplate = document.getElementById('tpl_marketing').value.trim() || DEFAULT_MARKETING_TEMPLATE;
+
+function saveEditedTemplate(key){
+  const def = TEMPLATE_DEFS.find(d=>d.key===key);
+  if(!def) return;
+  data.settings[key] = document.getElementById('tpl_edit_text').value.trim() || def.default;
   saveData();
-  toast('Templates saved');
-  openSettings();
+  toast('Saved');
+  openMessageTemplates();
 }
-function resetTemplates(){
-  data.settings.cleanTemplate = DEFAULT_CLEAN_TEMPLATE;
-  data.settings.payTemplate = DEFAULT_PAY_TEMPLATE;
-  data.settings.cleanedTodayTemplate = DEFAULT_CLEANED_TODAY_TEMPLATE;
-  data.settings.receiptTemplate = DEFAULT_RECEIPT_TEMPLATE;
-  data.settings.quoteTemplate = DEFAULT_QUOTE_TEMPLATE;
-  data.settings.repeatQuoteTemplate = DEFAULT_REPEAT_QUOTE_TEMPLATE;
-  data.settings.marketingTemplate = DEFAULT_MARKETING_TEMPLATE;
+
+function resetOneTemplate(key){
+  const def = TEMPLATE_DEFS.find(d=>d.key===key);
+  if(!def) return;
+  if(!confirm(`Reset "${def.label}" wording to default?`)) return;
+  data.settings[key] = def.default;
+  saveData();
+  toast('Reset to default wording');
+  openMessageTemplates();
+}
+
+function resetAllTemplates(){
+  if(!confirm('Reset all message wording to default? This replaces any custom wording you\'ve set for every message.')) return;
+  TEMPLATE_DEFS.forEach(def=>{ data.settings[def.key] = def.default; });
   saveData();
   openMessageTemplates();
   toast('Reset to default wording');
@@ -2814,7 +2934,7 @@ function openBusinessDetails(){
     <div class="form-actions">
       <button class="btn-primary" onclick="saveBusinessDetails()">Save business details</button>
     </div>
-  `);
+  `, () => openSettings());
 }
 function saveBusinessDetails(){
   data.settings.companyName = document.getElementById('companyNameInput').value.trim();
@@ -2834,7 +2954,7 @@ function openReports(){
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">Print reports</h2>
-      ${helpIconBtn('reports')}
+      ${helpIconBtn('reports', () => openReports())}
       <button class="sheet-close" onclick="closeSheet()">✕</button>
     </div>
     <p style="color:var(--ink-muted); font-size:0.8438rem; line-height:1.5; margin:0 2px 16px;">
@@ -2902,7 +3022,7 @@ let pendingReportTitle = '';
 let pendingReportBody = '';
 let pendingReportHideCompany = false;
 
-function runPrint(titleHtml, bodyHtml, hideCompanyHeader, allowPdfShare){
+function runPrint(titleHtml, bodyHtml, hideCompanyHeader, allowPdfShare, returnTo){
   pendingReportTitle = titleHtml;
   pendingReportBody = bodyHtml;
   pendingReportHideCompany = !!hideCompanyHeader;
@@ -2924,7 +3044,7 @@ function runPrint(titleHtml, bodyHtml, hideCompanyHeader, allowPdfShare){
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
       <div><div class="t1">Save as Word document</div><div class="t2">Downloads a .docx file</div></div>
     </button>
-  `);
+  `, returnTo);
 }
 
 function printPendingReport(){
@@ -3248,7 +3368,7 @@ function printRoundsLastCleaned(){
   const rounds = groupByRound(data.customers);
   const roundNames = Object.keys(rounds).sort((a,b)=>a.localeCompare(b));
   if(!roundNames.length){
-    runPrint('Round Cleaning Dates', '<div class="rpt-empty-note">No rounds yet.</div>');
+    runPrint('Round Cleaning Dates', '<div class="rpt-empty-note">No rounds yet.</div>', false, false, () => openReports());
     return;
   }
   const cutoff = new Date();
@@ -3276,12 +3396,12 @@ function printRoundsLastCleaned(){
     </tr>`;
   }).join('');
   const body = `<table class="rpt-table rpt-table-as-tabs"><thead><tr><th>Round</th><th>Dates cleaned (last 5 weeks)</th></tr></thead><tbody>${rows}</tbody></table>`;
-  runPrint('Round Cleaning Dates', body);
+  runPrint('Round Cleaning Dates', body, false, false, () => openReports());
 }
 
 function printRoundsLastCleanedCalendar(){
   if(!data.customers.length){
-    runPrint('Round Cleaning Dates — Calendar', '<div class="rpt-empty-note">No rounds yet.</div>');
+    runPrint('Round Cleaning Dates — Calendar', '<div class="rpt-empty-note">No rounds yet.</div>', false, false, () => openReports());
     return;
   }
   const today = new Date();
@@ -3330,7 +3450,7 @@ function printRoundsLastCleanedCalendar(){
     </table>
     <p style="font-size:11px; color:#66798A; margin-top:12px;">Shows any round with a customer cleaned on that day. Greyed-out days fall outside the last 5 weeks.</p>
   `;
-  runPrint('Round Cleaning Dates — Calendar', body);
+  runPrint('Round Cleaning Dates — Calendar', body, false, false, () => openReports());
 }
 
 function printWindowsDue(){
@@ -3361,7 +3481,7 @@ function printWindowsDue(){
     body += `<table class="rpt-table"><thead><tr><th>Customer</th><th>Last cleaned</th><th>Next due</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>`;
   });
   if(!anyRoundShown) body = '<div class="rpt-empty-note">Nobody\'s due a clean right now.</div>';
-  runPrint('Windows Due, by Round', body);
+  runPrint('Windows Due, by Round', body, false, false, () => openReports());
 }
 
 function printMoneyOwed(){
@@ -3390,7 +3510,7 @@ function printMoneyOwed(){
     body = `<table class="rpt-table"><thead><tr><th>Round</th><th>Customer</th><th>Last paid</th><th style="text-align:right;">Owed</th></tr></thead><tbody>${rows}</tbody></table>
     <div class="rpt-total" style="border-top:2px solid #10344C; padding-top:10px; margin-top:12px; font-size:16px;">Total outstanding: ${money(total)}</div>`;
   }
-  runPrint('Money Owed', body);
+  runPrint('Money Owed', body, false, false, () => openReports());
 }
 
 function printFullRounds(){
@@ -3426,7 +3546,7 @@ function printFullRounds(){
     const grandAvg = grandCount ? grandTotal/grandCount : 0;
     body += `<div class="rpt-total" style="border-top:2px solid #10344C; padding-top:10px; margin-top:16px; font-size:16px;">Grand total (all rounds): ${grandCount} customers · ${money(grandTotal)} · Avg: ${money(grandAvg)}</div>`;
   }
-  runPrint('Full Round Lists', body);
+  runPrint('Full Round Lists', body, false, false, () => openReports());
 }
 
 function printSingleRound(roundName){
@@ -3453,7 +3573,7 @@ function printSingleRound(roundName){
     <table class="rpt-table"><thead><tr><th>Customer</th>${spansMultipleDays ? '<th>Day</th>' : ''}<th>Contact</th><th>Price</th><th>Frequency</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>
     <div class="rpt-total" style="border-top:2px solid #10344C; padding-top:10px; margin-top:16px; font-size:16px;">${custs.length} customer${custs.length===1?'':'s'} · Round total: ${money(roundTotal)} · Avg: ${money(roundAvg)}</div>
   `;
-  runPrint(roundName, body);
+  runPrint(roundName, body, false, false, () => openRoundActionsMenu(roundName));
 }
 
 function printCustomerRecord(id){
@@ -3496,7 +3616,7 @@ function printCustomerRecord(id){
     <table class="rpt-table"><thead><tr><th>Date</th><th style="text-align:right;">Amount</th></tr></thead><tbody>${payRows}</tbody></table>
     ${photosHtml}
   `;
-  runPrint(c.address || c.name || 'Customer Record', body);
+  runPrint(c.address || c.name || 'Customer Record', body, false, false, () => openCustomerDetail(id));
 }
 
 function printJobInvoice(id){
@@ -3571,7 +3691,7 @@ function printJobInvoice(id){
   // Always suppress the generic report header's company-name subtitle for invoices — the
   // letterhead block above already covers name/logo/address/phone, so showing both would
   // duplicate the company name under itself when there's no logo.
-  runPrint(`Invoice — ${j.address || j.name || invoiceNumber}`, body, true, true);
+  runPrint(`Invoice — ${j.address || j.name || invoiceNumber}`, body, true, true, () => openJobForm(data.oneOffJobs.find(x=>x.id===id)));
 }
 
 function printJobRecord(id){
@@ -3596,13 +3716,13 @@ function printJobRecord(id){
     ${j.notes ? `<div style="background:#F5F7F8; border:1px solid #E3E9EC; border-radius:8px; padding:10px 12px; font-size:13px; margin-bottom:16px;">${escapeHtml(j.notes)}</div>` : ''}
     ${photosHtml}
   `;
-  runPrint(j.address || j.name || 'One-off Job', body);
+  runPrint(j.address || j.name || 'One-off Job', body, false, false, () => openJobForm(data.oneOffJobs.find(x=>x.id===id)));
 }
 
 function printAllJobs(){
   const jobs = (data.oneOffJobs||[]).slice().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   if(!jobs.length){
-    runPrint('One-off Jobs', '<div class="rpt-empty-note">No one-off jobs added yet.</div>');
+    runPrint('One-off Jobs', '<div class="rpt-empty-note">No one-off jobs added yet.</div>', false, false, () => openReports());
     return;
   }
   let total = 0;
@@ -3620,7 +3740,7 @@ function printAllJobs(){
     <table class="rpt-table"><thead><tr><th>Date</th><th>Job</th><th style="text-align:right;">Price</th><th>Status</th><th>Payment</th></tr></thead><tbody>${rows}</tbody></table>
     <div class="rpt-total" style="border-top:2px solid #10344C; padding-top:10px; margin-top:12px; font-size:16px;">Total value: ${money(total)}</div>
   `;
-  runPrint('One-off Jobs', body);
+  runPrint('One-off Jobs', body, false, false, () => openReports());
 }
 
 function getLastPriceIncreaseDate(c){
@@ -3647,7 +3767,7 @@ function printPriceReview(){
   flagged.sort((a,b)=> b.days - a.days);
 
   if(!flagged.length){
-    runPrint('Price Review Due', '<div class="rpt-empty-note">Nobody is due a price review right now.</div>');
+    runPrint('Price Review Due', '<div class="rpt-empty-note">Nobody is due a price review right now.</div>', false, false, () => openReports());
     return;
   }
 
@@ -3662,7 +3782,7 @@ function printPriceReview(){
     <table class="rpt-table"><thead><tr><th>Customer</th><th>Round</th><th style="text-align:right;">Current price</th><th>Last increase</th><th>Next clean</th></tr></thead><tbody>${rows}</tbody></table>
     <p style="font-size:11px; color:#66798A; margin-top:12px;">Shows customers where it will have been 12 months or more since their last price increase by their next scheduled clean. Customers with no price history are not included.</p>
   `;
-  runPrint('Price Review Due', body);
+  runPrint('Price Review Due', body, false, false, () => openReports());
 }
 
 function printEarnings(){
@@ -3679,7 +3799,7 @@ function printEarnings(){
   });
 
   if(!payments.length){
-    runPrint('Earnings Report', '<div class="rpt-empty-note">No payments recorded yet.</div>');
+    runPrint('Earnings Report', '<div class="rpt-empty-note">No payments recorded yet.</div>', false, false, () => openReports());
     return;
   }
 
@@ -3719,7 +3839,7 @@ function printEarnings(){
       </tbody>
     </table>
   `;
-  runPrint('Earnings Report', body);
+  runPrint('Earnings Report', body, false, false, () => openReports());
 }
 
 function printDailyWork(){
@@ -3765,7 +3885,7 @@ function printDailyWork(){
       30-day total: ${money(grandTotal)} across ${grandCount} clean${grandCount===1?'':'s'}/job${grandCount===1?'':'s'}
     </div>
   `;
-  runPrint('Daily Work Done — Last 30 Days', body);
+  runPrint('Daily Work Done — Last 30 Days', body, false, false, () => openReports());
 }
 
 function printSchedule(){
@@ -3833,7 +3953,7 @@ function printSchedule(){
     </table>
     <p style="font-size:11px; color:#66798A; margin-top:12px;">Blue chips show any round with a customer due for cleaning that day, based on their last clean date and frequency — rounds split across several visit days show which day is due. Amber chips (🔧) show one-off jobs scheduled that day. Greyed-out days fall outside the next 30 days. Customers not yet cleaned at all aren't included, since there's no date to schedule from.</p>
   `;
-  runPrint('Monthly Schedule', body);
+  runPrint('Monthly Schedule', body, false, false, () => openReports());
 }
 
 /* ---------- backup ---------- */
@@ -3897,7 +4017,9 @@ function helpH(text){
 function helpP(text){
   return `<p style="color:var(--ink); font-size:0.8438rem; line-height:1.6; margin:0 2px 12px;">${text}</p>`;
 }
-function helpIconBtn(topic){
+let helpReturnCallback = null;
+function helpIconBtn(topic, returnTo){
+  helpReturnCallback = returnTo || null;
   return `<button class="sheet-close" style="flex-shrink:0; margin-right:6px;" onclick="openFocusedHelp('${topic}')" aria-label="Help for this screen">
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
   </button>`;
@@ -3934,6 +4056,7 @@ const FOCUSED_HELP = {
       helpP('A customer\'s screen shows their round, standard price, frequency, balance, and any notes right at the top. Below that, Actions, History, and Photos each collapse into their own section — tap a heading to open or close it, so the screen stays short until you need something.'),
       helpP('"Add a clean" and "Add a payment" open a small pop-up for the date and amount, rather than sitting inline on the customer screen — keeps things tidier when you\'re just browsing.'),
       helpP('Tapping an entry in Clean history, Payment history, or Price history opens a small menu — Edit, Remove, and (for payments) Send receipt — rather than showing all three on every row.'),
+      helpP('Texts (cleaning/payment reminders, receipts, quotes, "cleaned today") only offer to send to a mobile number — landlines are skipped — and always open a preview you can edit before it goes out.'),
       helpP('Tick "Text before I arrive" on a customer\'s edit screen to flag that they need a heads-up text before you turn up — it shows as a badge on their card in round lists and on their detail screen as a reminder while you\'re working through the round.'),
       helpP('Pausing a customer asks for a reason — Holiday, Work being done, Cancelled, Moved out, or Other — and stamps the date. Both show on their card and detail screen, and they\'re skipped from due reminders and round totals until resumed.'),
       helpP('The "Get a quote for this customer" button opens a new quote pre-filled with their details, handy for quoting extra work like gutter clearing or fascia cleaning.'),
@@ -3985,24 +4108,25 @@ const FOCUSED_HELP = {
 };
 const FOCUSED_HELP_ORDER = ['rounds','jobs','quotes','customer','reminders','backup','reports','settings'];
 
-function openFocusedHelp(topic){
+function openFocusedHelp(topic, explicitReturnTo){
   const h = FOCUSED_HELP[topic];
-  if(!h){ openHelp(); return; }
+  const returnTo = explicitReturnTo || helpReturnCallback;
+  if(!h){ openHelp(returnTo); return; }
   openSheet(`
     <div class="sheet-head">
       <h2>${escapeHtml(h.title)}</h2>
       <button class="sheet-close" onclick="closeSheet()">✕</button>
     </div>
     ${h.body().join('')}
-    <button onclick="openHelp()" style="display:flex; align-items:center; gap:10px; width:100%; text-align:left; background:var(--blue-dim); color:var(--blue-deep); border:none; border-radius:12px; padding:12px 14px; font-weight:800; font-size:0.8438rem; margin-top:6px;">
+    <button onclick="openHelp(helpReturnCallback)" style="display:flex; align-items:center; gap:10px; width:100%; text-align:left; background:var(--blue-dim); color:var(--blue-deep); border:none; border-radius:12px; padding:12px 14px; font-weight:800; font-size:0.8438rem; margin-top:6px;">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px; height:18px; flex-shrink:0;"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
       <span style="flex:1;">Full user guide</span>
       <span style="opacity:0.6;">›</span>
     </button>
-  `);
+  `, returnTo);
 }
 
-function openHelp(){
+function openHelp(returnTo){
   openSheet(`
     <div class="sheet-head">
       <h2>User guide</h2>
@@ -4023,7 +4147,7 @@ function openHelp(){
     ${helpH('Feedback')}
     ${helpP('Spotted a problem or got an idea? Get in touch — feedback\'s always welcome.')}
     <a href="mailto:dmbennison@gmail.com?subject=Round%20Book%20feedback" style="display:block; text-decoration:none; background:var(--blue-dim); color:var(--blue-deep); border-radius:12px; padding:12px; text-align:center; font-weight:800; font-size:0.875rem; margin-bottom:4px;">✉️ dmbennison@gmail.com</a>
-  `);
+  `, returnTo);
 }
 
 // Rough byte size of the whole saved dataset, plus a breakdown for photos (usually
@@ -4065,7 +4189,7 @@ function openBackup(){
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">Backup &amp; restore</h2>
-      ${helpIconBtn('backup')}
+      ${helpIconBtn('backup', () => openBackup())}
       <button class="sheet-close" onclick="closeSheet()">✕</button>
     </div>
     <p style="color:var(--ink-muted); font-size:0.8438rem; line-height:1.5; margin:0 2px 4px;">
