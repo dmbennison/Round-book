@@ -391,7 +391,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 32;
+const APP_VERSION = 33;
 function formatVersion(v){ return '1.' + v; }
 const DIRECTIONS_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>';
 const DEFAULT_CLEAN_TEMPLATE = "Hi {name}, just a reminder I'll be round to clean your windows soon. Let me know if that's not convenient.\n\nThanks,\n{yourname}\n{company}";
@@ -408,6 +408,8 @@ function migrateData(parsed){
     if(!j.photos) j.photos = [];
     if(j.remind24h == null) j.remind24h = false;
     if(j.customerId === undefined) j.customerId = null;
+    if(j.paymentReminderSent == null) j.paymentReminderSent = false;
+    if(j.paymentReminderSentDate === undefined) j.paymentReminderSentDate = null;
   });
   parsed.quotes = parsed.quotes || [];
   parsed.quotes.forEach(q=>{
@@ -1929,6 +1931,26 @@ function sendJobReceipt(id){
   openMessagePreview('Send receipt', j.phone, msg, null, () => openJobForm(data.oneOffJobs.find(x=>x.id===id)));
 }
 
+function sendJobPaymentReminder(id){
+  const j = data.oneOffJobs.find(x=>x.id===id);
+  if(!j) return;
+  if(!isMobileNumber(j.phone)){ toast('No mobile number saved for this job'); return; }
+  const firstName = j.name ? j.name.trim().split(' ')[0] : '';
+  const company = data.settings.companyName || '';
+  const yourname = data.settings.yourName || '';
+  const msg = applyTemplate(data.settings.payTemplate, {
+    name: firstName, amount: Number(j.price||0), company, yourname
+  });
+  const afterSend = () => {
+    j.paymentReminderSent = true;
+    j.paymentReminderSentDate = todayISO();
+    saveData();
+    render();
+  };
+  openMessagePreview('Payment reminder', j.phone, msg, afterSend, () => openJobForm(data.oneOffJobs.find(x=>x.id===id)));
+}
+
+
 function sendQuoteText(id){
   const q = data.quotes.find(x=>x.id===id);
   if(!q) return;
@@ -2250,6 +2272,8 @@ function toggleJobPaid(id){
   const j = data.oneOffJobs.find(x=>x.id===id);
   j.paid = !j.paid;
   if(j.paid) j.paidDate = todayISO();
+  j.paymentReminderSent = false;
+  j.paymentReminderSentDate = null;
   saveData(); render();
 }
 
@@ -2325,10 +2349,12 @@ function openJobForm(existing, prefill, returnTo){
     </div>
     <label>Notes</label>
     <textarea id="j_notes" rows="2" placeholder="What's the job...">${escapeHtml(j.notes||'')}</textarea>
+    ${(existing && !existing.paid && existing.paymentReminderSent) ? `<div style="font-size:0.75rem; font-weight:700; margin:10px 2px 0; color:var(--amber);">🔔 Payment reminder sent ${fmtDate(existing.paymentReminderSentDate)}</div>` : ''}
     ${existing?`<div class="row2" style="margin-top:14px;">
       <button class="btn" style="background:var(--blue-dim); color:var(--blue-deep);" onclick="printJobInvoice('${existing.id}')">🧾 Print invoice</button>
       ${isMobileNumber(existing.phone) ? `<button class="btn" style="background:var(--amber-dim); color:var(--amber);" onclick="sendJobReceipt('${existing.id}')">🧾 Send receipt</button>` : ''}
     </div>`:''}
+    ${(existing && !existing.paid && isMobileNumber(existing.phone)) ? `<button class="btn" style="background:var(--amber-dim); color:var(--amber); width:100%; margin-top:10px;" onclick="sendJobPaymentReminder('${existing.id}')">💬 Payment reminder</button>` : ''}
     <label style="display:flex; align-items:center; gap:8px; margin-top:16px; cursor:pointer;">
       <input type="checkbox" id="j_remind" ${j.remind24h?'checked':''} style="width:18px; height:18px; flex-shrink:0;">
       <span style="font-size:0.8125rem; font-weight:600; color:var(--ink); text-transform:none; letter-spacing:0;">Remind me the day before this job</span>
@@ -4075,7 +4101,8 @@ const FOCUSED_HELP = {
     title: 'One-off jobs',
     body: () => [
       helpP('For anything outside your regular rounds. Swipe right for done, left for paid. Completed jobs get an anniversary flag after a year (switchable off per job), can be turned into a repeat-work quote, and can have a professional invoice printed or sent as a PDF via WhatsApp — with your logo if you\'ve added one.'),
-      helpP('The small blue compass button on a job\'s card opens directions to its address in your phone\'s map app.')
+      helpP('The small blue compass button on a job\'s card opens directions to its address in your phone\'s map app.'),
+      helpP('If a job has a mobile number and isn\'t marked paid yet, a "Payment reminder" button appears on its form — sends the same payment reminder text used for round customers, with the job\'s price filled in.')
     ]
   },
   customer: {
