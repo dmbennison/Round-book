@@ -272,6 +272,7 @@
     font-size:0.6875rem; padding:1px 6px; border-radius:20px; background:rgba(0,0,0,0.06); color:inherit;
   }
   .seg-btn.active .count{background:rgba(255,255,255,0.22);}
+  .seg-btn-sm{padding:6px 6px; font-size:0.75rem;}
 
   .summary-overall{display:flex; gap:6px; margin-bottom:12px;}
   .summary-overall .stat{flex:1; padding:7px;}
@@ -391,7 +392,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 33;
+const APP_VERSION = 34;
 function formatVersion(v){ return '1.' + v; }
 const DIRECTIONS_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>';
 const DEFAULT_CLEAN_TEMPLATE = "Hi {name}, just a reminder I'll be round to clean your windows soon. Let me know if that's not convenient.\n\nThanks,\n{yourname}\n{company}";
@@ -971,15 +972,15 @@ function renderRoundDetail(main, rn){
 
   if(spansMultipleDays){
     shellHtml += `<div class="seg-row">
-      <button class="seg-btn ${roundDayFilter==='all'?'active':''}" onclick="setRoundDayFilter('all')">All days</button>
+      <button class="seg-btn ${roundDayFilter==='all'?'active':''}" onclick="setRoundDayFilter('all')">All</button>
       ${daysUsed.map(d=>`<button class="seg-btn ${roundDayFilter===d?'active':''}" onclick="setRoundDayFilter(${d})">Day ${d}</button>`).join('')}
     </div>`;
   }
 
   shellHtml += `<div class="seg-row">
-    <button class="seg-btn ${roundFilterMode==='all'?'active':''}" onclick="setRoundFilterMode('all')">All</button>
-    <button class="seg-btn ${roundFilterMode==='due'?'active':''}" onclick="setRoundFilterMode('due')">📅 Due only</button>
-    <button class="seg-btn ${roundFilterMode==='owed'?'active':''}" onclick="setRoundFilterMode('owed')">💷 Owed only</button>
+    <button class="seg-btn seg-btn-sm ${roundFilterMode==='all'?'active':''}" onclick="setRoundFilterMode('all')">All</button>
+    <button class="seg-btn seg-btn-sm ${roundFilterMode==='due'?'active':''}" onclick="setRoundFilterMode('due')">Due</button>
+    <button class="seg-btn seg-btn-sm ${roundFilterMode==='owed'?'active':''}" onclick="setRoundFilterMode('owed')">Owed</button>
   </div>`;
 
   let baseList = allInRound;
@@ -1315,7 +1316,7 @@ function openCustomerDetail(id){
           <button class="btn btn-paid" onclick="openAddPaymentForm('${id}')">+ Add a payment</button>
         </div>
         <button class="btn" style="width:100%; background:${c.paused?'var(--green-dim)':'var(--line)'}; color:${c.paused?'var(--green)':'var(--ink-muted)'}; margin-bottom:10px;" onclick="${c.paused?`resumeCustomer('${id}')`:`openPauseReasonSheet('${id}')`}">
-          ${c.paused ? '▶ Resume this customer' : '⏸ Pause this customer (skip due reminders)'}
+          ${c.paused ? '▶ Resume this customer' : '⏸ Pause'}
         </button>
         <button class="btn" style="width:100%; background:var(--amber-dim); color:var(--amber); margin-bottom:10px;" onclick="quoteForCustomer('${id}')">
           💷 Get a quote
