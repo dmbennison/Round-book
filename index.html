@@ -153,6 +153,13 @@
   .cust-name{font-size:1rem; font-weight:800;}
   .cust-addr{font-size:0.8125rem; color:var(--ink-muted); margin-top:2px;}
   .cust-price{font-size:0.875rem; font-weight:800; color:var(--emphasis); white-space:nowrap;}
+  .cust-right{display:flex; flex-direction:column; align-items:flex-end; gap:6px;}
+  .dir-btn{
+    width:26px; height:26px; border-radius:50%; border:none; background:var(--blue); color:#fff;
+    display:flex; align-items:center; justify-content:center; padding:0; flex:0 0 auto;
+  }
+  .dir-btn svg{width:14px;height:14px;}
+  .dir-btn:active{background:var(--blue-deep);}
   .cust-meta{display:flex; gap:6px; flex-wrap:wrap; margin-top:10px;}
   .cust-actions{display:flex; gap:8px; margin-top:12px;}
   .btn{
@@ -384,8 +391,9 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 31;
+const APP_VERSION = 32;
 function formatVersion(v){ return '1.' + v; }
+const DIRECTIONS_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>';
 const DEFAULT_CLEAN_TEMPLATE = "Hi {name}, just a reminder I'll be round to clean your windows soon. Let me know if that's not convenient.\n\nThanks,\n{yourname}\n{company}";
 const DEFAULT_PAY_TEMPLATE = "Hi {name}, a friendly reminder that your window cleaning payment of {amount} is outstanding.\n\n{bankdetails}Thanks,\n{yourname}\n{company}";
 const DEFAULT_RECEIPT_TEMPLATE = "Hi {name}, thank you for your payment of {amount} received {date}.\n\nThanks,\n{yourname}\n{company}";
@@ -1050,7 +1058,10 @@ function custCardHtml(c){
           <div class="cust-addr" style="font-size:1rem; font-weight:800; color:var(--ink);">${escapeHtml(c.address||'No address')}</div>
           ${(c.name||c.phone) ? `<div class="cust-name" style="font-size:0.8125rem; font-weight:600; color:var(--ink-muted); margin-top:2px;">${[escapeHtml(c.name||''), c.phone?escapeHtml(c.phone):''].filter(Boolean).join(' · ')}</div>` : ''}
         </div>
-        <div class="cust-price">${money(c.price)}</div>
+        <div class="cust-right">
+          <div class="cust-price">${money(c.price)}</div>
+          ${c.address ? `<button class="dir-btn" onclick="event.stopPropagation(); openDirections('customer','${c.id}')" title="Directions" aria-label="Directions">${DIRECTIONS_ICON}</button>` : ''}
+        </div>
       </div>
       <div class="cust-meta">
         ${s.cleanBadge ? `<span class="badge ${s.cleanBadge.type}"${c.paused&&c.pauseDate?` title="Paused since ${fmtDate(c.pauseDate)}"`:''}>${s.cleanBadge.text}</span>` : `<span class="badge ok">Cleaned ${fmtDate(s.lastClean)}</span>`}
@@ -1735,6 +1746,18 @@ function sendPhoneMessage(phone, msg){
   }
 }
 
+// Opens turn-by-turn directions to a customer/job address in the device's
+// default map app. Uses a Google Maps universal link with location.href
+// (same reasoning as sendPhoneMessage above) so the OS hands off to the
+// native Maps app directly instead of leaving an orphaned blank tab.
+function openDirections(kind, id){
+  const item = kind === 'job'
+    ? data.oneOffJobs.find(x=>x.id===id)
+    : data.customers.find(x=>x.id===id);
+  if(!item || !item.address){ toast('No address set'); return; }
+  window.location.href = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(item.address)}`;
+}
+
 // Recognizes UK mobile numbers (07..., +447..., 00447...) as distinct from
 // landlines — texts and WhatsApp messages can only reach a mobile, so every
 // "send a text" option in the app is gated on this rather than just "has a phone".
@@ -2193,7 +2216,10 @@ function jobCardHtml(j, today){
           ${(j.name||j.phone) ? `<div class="cust-name" style="font-size:0.8125rem; font-weight:600; color:var(--ink-muted); margin-top:2px;">${[escapeHtml(j.name||''), j.phone?escapeHtml(j.phone):''].filter(Boolean).join(' · ')}</div>` : ''}
           <div style="font-size:0.75rem; color:var(--ink-muted); margin-top:2px;">${fmtDate(j.date)}${j.remind24h?' · 🔔 Reminder set':''}</div>
         </div>
-        <div class="cust-price">${money(j.price)}</div>
+        <div class="cust-right">
+          <div class="cust-price">${money(j.price)}</div>
+          ${j.address ? `<button class="dir-btn" onclick="event.stopPropagation(); openDirections('job','${j.id}')" title="Directions" aria-label="Directions">${DIRECTIONS_ICON}</button>` : ''}
+        </div>
       </div>
       <div class="cust-meta">
         ${statusBadge}
@@ -4041,13 +4067,15 @@ const FOCUSED_HELP = {
       helpP('The Rounds tab shows every round, with a Rounds / Due / Owed switch. Open a round to see its customers, swipe a card right to mark cleaned or left to mark paid, and use Reorder to set your walking order.'),
       helpP('If a round takes more than one day, tap each customer\'s day badge in reorder mode to assign Day 1–5. A day switcher then appears above the customer list, and cards get a "Day N" badge.'),
       helpP('The ⋯ button on a round\'s screen opens Print, group marketing text, and Help — the round\'s screen stays uncluttered with just that one button.'),
-      helpP('A small "Cleaned today" button appears on a customer\'s card once they have a clean logged for today (and a phone number saved) — a quick way to let them know it\'s done and remind them how to pay.')
+      helpP('A small "Cleaned today" button appears on a customer\'s card once they have a clean logged for today (and a phone number saved) — a quick way to let them know it\'s done and remind them how to pay.'),
+      helpP('The small blue compass button on a customer\'s card opens directions to their address in your phone\'s map app.')
     ]
   },
   jobs: {
     title: 'One-off jobs',
     body: () => [
-      helpP('For anything outside your regular rounds. Swipe right for done, left for paid. Completed jobs get an anniversary flag after a year (switchable off per job), can be turned into a repeat-work quote, and can have a professional invoice printed or sent as a PDF via WhatsApp — with your logo if you\'ve added one.')
+      helpP('For anything outside your regular rounds. Swipe right for done, left for paid. Completed jobs get an anniversary flag after a year (switchable off per job), can be turned into a repeat-work quote, and can have a professional invoice printed or sent as a PDF via WhatsApp — with your logo if you\'ve added one.'),
+      helpP('The small blue compass button on a job\'s card opens directions to its address in your phone\'s map app.')
     ]
   },
   customer: {
