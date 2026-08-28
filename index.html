@@ -33,6 +33,7 @@
     --line:#E3E9EC;
     --radius:14px;
     --emphasis:var(--navy);
+    --card-tint:#EEF6FB;
   }
   body.dark{
     --bg:#0E1620;
@@ -45,6 +46,7 @@
     --amber-dim:#3A2C10;
     --red-dim:#3A1616;
     --emphasis:#EAF1F6;
+    --card-tint:#182530;
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color: transparent;}
   html,body{height:100%;}
@@ -111,9 +113,9 @@
   .day-divider:first-child{margin-top:0;}
 
   .round-card{
-    background:linear-gradient(to bottom, var(--surface), var(--blue-dim));
+    background:linear-gradient(to bottom, var(--surface), var(--card-tint));
     border-radius:var(--radius); padding:14px 16px; margin-bottom:10px;
-    border:1px solid var(--line); display:flex; align-items:center; justify-content:space-between; gap:10px;
+    border:1px solid #000; display:flex; align-items:center; justify-content:space-between; gap:10px;
     position:relative; overflow:hidden;
   }
   .round-card::before{
@@ -142,9 +144,9 @@
   .swipe-bg-left{background:var(--green); justify-content:flex-start;}
   .swipe-bg-right{background:var(--blue); justify-content:flex-end;}
   .cust-card{
-    background:linear-gradient(to bottom, var(--surface), var(--blue-dim));
+    background:linear-gradient(to bottom, var(--surface), var(--card-tint));
     border-radius:var(--radius); padding:14px 16px;
-    border:1px solid var(--line); position:relative; z-index:1; touch-action:pan-y; overflow:hidden;
+    border:1px solid #000; position:relative; z-index:1; touch-action:pan-y; overflow:hidden;
   }
   .cust-card::before{
     content:""; position:absolute; left:0; top:0; bottom:0; width:5px; background:var(--blue);
@@ -163,7 +165,7 @@
   .cust-meta{display:flex; gap:6px; flex-wrap:wrap; margin-top:10px;}
   .cust-actions{display:flex; gap:8px; margin-top:12px;}
   .btn{
-    flex:1; padding:10px 8px; border-radius:10px; border:none; font-size:0.8438rem; font-weight:800;
+    flex:1; padding:10px 8px; border-radius:10px; border:1px solid #000; font-size:0.8438rem; font-weight:800;
     display:flex; align-items:center; justify-content:center; gap:6px;
   }
   .btn svg{width:15px;height:15px;}
@@ -218,7 +220,7 @@
   .row2{display:flex; gap:10px;}
   .row2 > div{flex:1;}
   .form-actions{display:flex; gap:10px; margin-top:20px;}
-  .btn-primary{background:var(--blue); color:#fff; padding:13px; border-radius:12px; border:none; font-weight:800; font-size:0.9375rem; flex:1;}
+  .btn-primary{background:var(--blue); color:#fff; padding:13px; border-radius:12px; border:1px solid #000; font-weight:800; font-size:0.9375rem; flex:1;}
   .btn-primary:active{background:#2585c2;}
   .btn-danger-text{background:none; border:none; color:var(--red); font-weight:700; font-size:0.8438rem; padding:14px 2px 2px; width:100%; text-align:center;}
 
@@ -230,19 +232,19 @@
   .hist-list li:last-child{border-bottom:none;}
 
   .stat-row{display:flex; gap:8px; margin-bottom:16px;}
-  .stat{flex:1; background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:12px; text-align:center;}
+  .stat{flex:1; background:var(--surface); border:1px solid #000; border-radius:12px; padding:12px; text-align:center;}
   .stat .num{font-size:1.1875rem; font-weight:800;}
   .stat .lbl{font-size:0.6562rem; color:var(--ink-muted); font-weight:700; text-transform:uppercase; letter-spacing:.03em; margin-top:2px;}
 
   .backup-btn{
-    display:flex; align-items:center; gap:12px; background:var(--surface); border:1px solid var(--line);
+    display:flex; align-items:center; gap:12px; background:var(--surface); border:1px solid #000;
     border-radius:12px; padding:14px; margin-bottom:10px; text-align:left; width:100%;
   }
   .backup-btn svg{width:20px;height:20px; color:var(--blue); flex-shrink:0;}
   .backup-btn .t1{font-size:0.9062rem; font-weight:700;}
   .backup-btn .t2{font-size:0.75rem; color:var(--ink-muted); margin-top:1px;}
 
-  .cust-section{border:1px solid var(--line); border-radius:12px; margin-bottom:12px; overflow:hidden; background:var(--surface);}
+  .cust-section{border:1px solid #000; border-radius:12px; margin-bottom:12px; overflow:hidden; background:var(--surface);}
   .cust-section summary{
     list-style:none; cursor:pointer; padding:13px 14px; font-weight:800; font-size:0.875rem; color:var(--ink);
     display:flex; align-items:center; justify-content:space-between; gap:8px;
@@ -264,7 +266,7 @@
 
   .seg-row{display:flex; gap:8px; margin-bottom:14px;}
   .seg-btn{
-    flex:1; padding:10px 6px; border-radius:11px; border:1px solid var(--line); background:var(--surface);
+    flex:1; padding:10px 6px; border-radius:11px; border:1px solid #000; background:var(--surface);
     font-size:0.8438rem; font-weight:800; color:var(--ink-muted); display:flex; align-items:center; justify-content:center; gap:6px;
   }
   .seg-btn.active{background:var(--navy); border-color:var(--navy); color:#fff;}
@@ -392,7 +394,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 34;
+const APP_VERSION = 35;
 function formatVersion(v){ return '1.' + v; }
 const DIRECTIONS_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>';
 const DEFAULT_CLEAN_TEMPLATE = "Hi {name}, just a reminder I'll be round to clean your windows soon. Let me know if that's not convenient.\n\nThanks,\n{yourname}\n{company}";
@@ -1287,7 +1289,7 @@ function openCustomerDetail(id){
     ${c.notes?`<div style="background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:10px 12px; font-size:0.8438rem; margin-bottom:14px;">${escapeHtml(c.notes)}</div>`:''}
     ${(c.phone||c.email)?`<div style="display:flex; gap:8px; margin-bottom:14px;">
       ${c.phone?`<a href="tel:${escapeAttr(c.phone.replace(/\\s+/g,''))}" style="flex:1; text-decoration:none; background:var(--blue-dim); color:var(--blue-deep); border-radius:10px; padding:9px; font-size:0.8125rem; font-weight:700; text-align:center;">📞 ${escapeHtml(c.phone)}</a>`:''}
-      ${c.email?`<button onclick="emailCustomer('${id}')" style="flex:1; min-width:0; background:var(--bg); color:var(--ink); border:1px solid var(--line); border-radius:10px; padding:9px; font-size:0.8125rem; font-weight:700; text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">✉️ ${escapeHtml(c.email)}</button>`:''}
+      ${c.email?`<button onclick="emailCustomer('${id}')" style="flex:1; min-width:0; background:var(--bg); color:var(--ink); border:1px solid #000; border-radius:10px; padding:9px; font-size:0.8125rem; font-weight:700; text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">✉️ ${escapeHtml(c.email)}</button>`:''}
     </div>`:''}
 
     <div style="background:${s.owed?'var(--red-dim)':s.credit?'var(--green-dim)':'var(--green-dim)'}; color:${s.owed?'var(--red)':'var(--green)'}; border-radius:10px; padding:12px; font-weight:800; text-align:center; margin-bottom:14px;">
@@ -2805,6 +2807,10 @@ function applyTheme(){
   // toward white in light mode and toward the dark surface colour in dark mode, so every
   // scheme gets its own badge colour instead of everything defaulting to ocean-blue.
   root.setProperty('--blue-dim', darkMode ? mixHex(t.blue, '#0E1620', 0.82) : mixHex(t.blue, '#FFFFFF', 0.86));
+  // A much paler tint than --blue-dim, used only for the subtle gradient fill on
+  // cards (round-card, cust-card) — kept pale so the black outline (below) reads
+  // as the card's main definition rather than the fill colour.
+  root.setProperty('--card-tint', darkMode ? mixHex(t.blue, '#16212C', 0.92) : mixHex(t.blue, '#FFFFFF', 0.94));
   // A soft tint of the main screen background, so the page itself carries a hint of the
   // chosen scheme rather than staying neutral grey — card surfaces (--surface) stay
   // untinted so content still stands out clearly on top.
@@ -4041,12 +4047,12 @@ function openInfo(){
     <p style="color:var(--ink); font-size:0.875rem; line-height:1.6; margin:0 2px 16px;">
       Round Book is a simple, offline window cleaning round tracker — built to keep on top of customers, rounds, cleaning and payment dates, all stored privately on your own phone.
     </p>
-    <button onclick="openHelp()" style="display:flex; align-items:center; gap:10px; width:100%; text-align:left; background:var(--blue-dim); color:var(--blue-deep); border:none; border-radius:12px; padding:13px 14px; font-weight:800; font-size:0.9375rem; margin-bottom:10px;">
+    <button onclick="openHelp()" style="display:flex; align-items:center; gap:10px; width:100%; text-align:left; background:var(--blue-dim); color:var(--blue-deep); border:1px solid #000; border-radius:12px; padding:13px 14px; font-weight:800; font-size:0.9375rem; margin-bottom:10px;">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px; height:20px; flex-shrink:0;"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
       <span style="flex:1;">User guide — how everything works</span>
       <span style="opacity:0.6;">›</span>
     </button>
-    <button onclick="shareRoundBook()" style="display:flex; align-items:center; gap:10px; width:100%; text-align:left; background:var(--surface); border:1px solid var(--line); color:var(--ink); border-radius:12px; padding:13px 14px; font-weight:800; font-size:0.9375rem; margin-bottom:16px;">
+    <button onclick="shareRoundBook()" style="display:flex; align-items:center; gap:10px; width:100%; text-align:left; background:var(--surface); border:1px solid #000; color:var(--ink); border-radius:12px; padding:13px 14px; font-weight:800; font-size:0.9375rem; margin-bottom:16px;">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px; height:20px; flex-shrink:0;"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
       <span style="flex:1;">Share Round Book</span>
       <span style="opacity:0.6;">›</span>
@@ -4174,7 +4180,7 @@ function openFocusedHelp(topic, explicitReturnTo){
       <button class="sheet-close" onclick="closeSheet()">✕</button>
     </div>
     ${h.body().join('')}
-    <button onclick="openHelp(helpReturnCallback)" style="display:flex; align-items:center; gap:10px; width:100%; text-align:left; background:var(--blue-dim); color:var(--blue-deep); border:none; border-radius:12px; padding:12px 14px; font-weight:800; font-size:0.8438rem; margin-top:6px;">
+    <button onclick="openHelp(helpReturnCallback)" style="display:flex; align-items:center; gap:10px; width:100%; text-align:left; background:var(--blue-dim); color:var(--blue-deep); border:1px solid #000; border-radius:12px; padding:12px 14px; font-weight:800; font-size:0.8438rem; margin-top:6px;">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px; height:18px; flex-shrink:0;"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
       <span style="flex:1;">Full user guide</span>
       <span style="opacity:0.6;">›</span>
@@ -4252,7 +4258,7 @@ function openBackup(){
       Everything is stored only on this phone, in this browser. Nothing is sent anywhere. Export a backup regularly in case the app data is ever cleared.
     </p>
     <p style="color:${days>=BACKUP_REMINDER_DAYS?'var(--amber)':'var(--ink-muted)'}; font-size:0.7812rem; font-weight:700; margin:0 2px 16px;">${lastText}</p>
-    <div style="background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:14px; margin-bottom:16px;">
+    <div style="background:var(--surface); border:1px solid #000; border-radius:12px; padding:14px; margin-bottom:16px;">
       <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px;">
         <span style="font-size:0.8125rem; font-weight:800; color:var(--ink);">Storage used</span>
         <span style="font-size:0.9375rem; font-weight:800; color:var(--ink);">${formatBytes(stats.totalBytes)}</span>
