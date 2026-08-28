@@ -394,7 +394,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 36;
+const APP_VERSION = 37;
 function formatVersion(v){ return '1.' + v; }
 const DIRECTIONS_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>';
 const DEFAULT_CLEAN_TEMPLATE = "Hi {name}, just a reminder I'll be round to clean your windows soon. Let me know if that's not convenient.\n\nThanks,\n{yourname}\n{company}";
@@ -494,7 +494,15 @@ function saveData(){
     localStorage.setItem(STORE_KEY, JSON.stringify(data));
     return true;
   }catch(e){
-    toast('Storage is full — try removing an old photo, then save again');
+    // The screen that called saveData() almost always shows its own toast right
+    // after this returns (e.g. "Saved", "Customer updated") — since they share the
+    // same toast element, that call would instantly overwrite this warning before
+    // anyone could read it, making a failed save look identical to a successful one.
+    // The change stays visible for the rest of this session (it's already applied
+    // to the in-memory `data` object) but silently reverts on the next app reload,
+    // since it was never actually written to storage. Delaying this warning by a
+    // beat means it always fires last and wins, so it can never be hidden that way.
+    setTimeout(() => toast('Storage is full — nothing was saved. Free up space, then try again.', 'Open Backup', () => openBackup()), 60);
     return false;
   }
 }
