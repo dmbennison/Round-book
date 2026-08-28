@@ -394,7 +394,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 37;
+const APP_VERSION = 38;
 function formatVersion(v){ return '1.' + v; }
 const DIRECTIONS_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>';
 const DEFAULT_CLEAN_TEMPLATE = "Hi {name}, just a reminder I'll be round to clean your windows soon. Let me know if that's not convenient.\n\nThanks,\n{yourname}\n{company}";
@@ -1992,7 +1992,7 @@ function sendTemplate(id, kind, returnTo){
     msg = applyTemplate(data.settings.cleanTemplate, {name: firstName, company, yourname});
     title = 'Cleaning reminder';
   } else if(kind === 'cleanedToday'){
-    msg = applyTemplate(data.settings.cleanedTodayTemplate, {name: firstName, company, yourname});
+    msg = applyTemplate(data.settings.cleanedTodayTemplate, {name: firstName, amount: c.price, company, yourname});
     title = 'Windows cleaned today';
   } else {
     const s = custStatus(c);
