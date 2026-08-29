@@ -399,10 +399,74 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 40;
+const APP_VERSION = 41;
 function formatVersion(v){ return '1.' + v; }
 const DIRECTIONS_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>';
 const CALL_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>';
+const ADD_CONTACT_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="16" y1="11" x2="22" y2="11"/></svg>';
+
+// Escapes text for safe use inside a vCard field per the vCard 3.0 spec.
+function vcardEscape(str){
+  return String(str||'').replace(/\\/g,'\\\\').replace(/,/g,'\\,').replace(/;/g,'\\;').replace(/\n/g,'\\n');
+}
+// Builds one vCard block for a customer or job. Generic across both since they
+// share the same shape of contact info (name, phone, email, address, notes).
+function buildVCard(item){
+  const name = (item.name && item.name.trim()) || item.address || 'Customer';
+  const lines = ['BEGIN:VCARD','VERSION:3.0', `FN:${vcardEscape(name)}`];
+  if(item.phone) lines.push(`TEL;TYPE=CELL:${vcardEscape(item.phone)}`);
+  if(item.email) lines.push(`EMAIL:${vcardEscape(item.email)}`);
+  if(item.address) lines.push(`ADR;TYPE=HOME:;;${vcardEscape(item.address)};;;;`);
+  const noteParts = [];
+  if(item.round) noteParts.push(`Round Book: ${item.round}`);
+  if(item.notes) noteParts.push(item.notes);
+  if(noteParts.length) lines.push(`NOTE:${vcardEscape(noteParts.join(' — '))}`);
+  lines.push('END:VCARD');
+  return lines.join('\r\n');
+}
+// Adds a single customer/job to the phone's Contacts app. Uses the same
+// location.href hand-off technique as the tel:/directions links elsewhere in the
+// app — the OS recognises the vCard data URI and opens the native "Add Contact"
+// screen directly, rather than this navigating away to a blank page.
+function addToContacts(kind, id){
+  const item = kind === 'job' ? data.oneOffJobs.find(x=>x.id===id) : data.customers.find(x=>x.id===id);
+  if(!item){ return; }
+  if(!item.phone && !item.email && !item.address){ toast('Nothing to add — no phone, email, or address saved'); return; }
+  window.location.href = 'data:text/vcard;charset=utf-8,' + encodeURIComponent(buildVCard(item));
+}
+// Bulk export — every customer with a phone, email, or address, as one .vcf file
+// containing multiple vCards (the format supports concatenating several blocks).
+// Mirrors exportData()'s share-sheet-first, download-fallback pattern.
+async function exportContacts(){
+  const eligible = data.customers.filter(c => c.phone || c.email || c.address);
+  if(!eligible.length){ toast('No customers with contact details to export'); return; }
+  const vcardStr = eligible.map(buildVCard).join('\r\n');
+  const filename = `round-book-contacts-${todayISO()}.vcf`;
+
+  if(navigator.canShare){
+    try{
+      const file = new File([vcardStr], filename, {type:'text/vcard'});
+      if(navigator.canShare({files:[file]})){
+        await navigator.share({files:[file], title:'Round Book Contacts'});
+        toast('Contacts shared');
+        return;
+      }
+    }catch(e){
+      if(e && e.name === 'AbortError') return;
+    }
+  }
+
+  const blob = new Blob([vcardStr], {type:'text/vcard'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url), 2000);
+  toast('Contacts file saved');
+}
 const DEFAULT_CLEAN_TEMPLATE = "Hi {name}, just a reminder I'll be round to clean your windows soon. Let me know if that's not convenient.\n\nThanks,\n{yourname}\n{company}";
 const DEFAULT_PAY_TEMPLATE = "Hi {name}, a friendly reminder that your window cleaning payment of {amount} is outstanding.\n\n{bankdetails}Thanks,\n{yourname}\n{company}";
 const DEFAULT_RECEIPT_TEMPLATE = "Hi {name}, thank you for your payment of {amount} received {date}.\n\nThanks,\n{yourname}\n{company}";
@@ -1314,6 +1378,7 @@ function openCustomerDetail(id){
     ${(c.phone||c.email)?`<div style="display:flex; gap:8px; margin-bottom:14px;">
       ${c.phone?`<a href="tel:${escapeAttr(c.phone.replace(/\\s+/g,''))}" style="flex:1; text-decoration:none; background:var(--blue-dim); color:var(--blue-deep); border-radius:10px; padding:9px; font-size:0.8125rem; font-weight:700; text-align:center;">📞 ${escapeHtml(c.phone)}</a>`:''}
       ${c.email?`<button onclick="emailCustomer('${id}')" style="flex:1; min-width:0; background:var(--bg); color:var(--ink); border:1px solid #000; border-radius:10px; padding:9px; font-size:0.8125rem; font-weight:700; text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">✉️ ${escapeHtml(c.email)}</button>`:''}
+      <button onclick="addToContacts('customer','${id}')" title="Add to Contacts" aria-label="Add to Contacts" style="flex:0 0 auto; width:40px; background:var(--bg); color:var(--ink); border:1px solid #000; border-radius:10px; display:flex; align-items:center; justify-content:center; padding:0;">${ADD_CONTACT_ICON.replace('viewBox="0 0 24 24"','viewBox="0 0 24 24" width="17" height="17"')}</button>
     </div>`:''}
 
     <div style="background:${s.owed?'var(--red-dim)':s.credit?'var(--green-dim)':'var(--green-dim)'}; color:${s.owed?'var(--red)':'var(--green)'}; border-radius:10px; padding:12px; font-weight:800; text-align:center; margin-bottom:14px;">
@@ -2458,6 +2523,10 @@ function openJobForm(existing, prefill, returnTo){
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
       <div style="flex:1; min-width:0;"><div class="t1">Messages</div><div class="t2">${existing.messageLog.length} sent</div></div>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px; color:var(--ink-muted);"><path d="M9 18l6-6-6-6"/></svg>
+    </button>` : ''}
+    ${(existing && (existing.phone||existing.email||existing.address)) ? `<button class="backup-btn" style="margin-top:10px; margin-bottom:0;" onclick="addToContacts('job','${existing.id}')">
+      ${ADD_CONTACT_ICON}
+      <div style="flex:1; min-width:0;"><div class="t1">Add to Contacts</div><div class="t2">Saves them to your phone's Contacts app</div></div>
     </button>` : ''}
     <label style="display:flex; align-items:center; gap:8px; margin-top:16px; cursor:pointer;">
       <input type="checkbox" id="j_remind" ${j.remind24h?'checked':''} style="width:18px; height:18px; flex-shrink:0;">
@@ -4221,6 +4290,7 @@ const FOCUSED_HELP = {
       helpP('"Add a clean" and "Add a payment" open a small pop-up for the date and amount. Tapping an entry in Clean history, Payment history, or Price history opens a menu with Edit, Remove, and (for payments) Send receipt.'),
       helpP('Texts (cleaning/payment reminders, receipts, quotes, "cleaned today") only offer to send to a mobile number — landlines are skipped — and always open a preview you can edit before it goes out.'),
       helpP('A "Messages" entry under History lists every text actually sent to that customer, newest first — a quick way to check whether someone\'s already been chased today.'),
+      helpP('The small icon next to a customer\'s phone/email adds them straight to your phone\'s Contacts app.'),
       helpP('Tick "Text before I arrive" on a customer\'s edit screen to flag that they need a heads-up text before you turn up — it shows as a badge on their card and detail screen.'),
       helpP('Pausing a customer asks for a reason — Holiday, Work being done, Cancelled, Moved out, or Other — and stamps the date. Paused customers are skipped from due reminders and round totals until resumed.'),
       helpP('The "Get a quote for this customer" button opens a new quote pre-filled with their details.'),
@@ -4253,7 +4323,7 @@ const FOCUSED_HELP = {
   backup: {
     title: 'Backup and restore',
     body: () => [
-      helpP('Everything lives only on this phone. Back up regularly from the Backup icon — export a full backup, export to Excel, restore from a backup file, or import customers from a spreadsheet (they land in a "Needs review" round until you check them over).'),
+      helpP('Everything lives only on this phone. Back up regularly from the Backup icon — export a full backup, export to Excel, export everyone as a contacts file, restore from a backup file, or import customers from a spreadsheet (they land in a "Needs review" round until you check them over).'),
       helpP('The storage bar at the top shows roughly how much space your data is using — photos are usually the biggest share. If it\'s getting close to full, removing old photos frees up the most room.')
     ]
   },
@@ -4378,6 +4448,10 @@ function openBackup(){
     <button class="backup-btn" onclick="exportExcel()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v16H4z"/><path d="M4 10h16M10 4v16"/></svg>
       <div><div class="t1">Export as Excel</div><div class="t2">One sheet per round · .xlsx file</div></div>
+    </button>
+    <button class="backup-btn" onclick="exportContacts()">
+      ${ADD_CONTACT_ICON}
+      <div><div class="t1">Export contacts</div><div class="t2">Every customer with a phone, email, or address · .vcf file</div></div>
     </button>
     <button class="backup-btn" onclick="document.getElementById('importFile').click()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>
