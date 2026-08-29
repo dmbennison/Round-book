@@ -394,7 +394,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 38;
+const APP_VERSION = 39;
 function formatVersion(v){ return '1.' + v; }
 const DIRECTIONS_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>';
 const DEFAULT_CLEAN_TEMPLATE = "Hi {name}, just a reminder I'll be round to clean your windows soon. Let me know if that's not convenient.\n\nThanks,\n{yourname}\n{company}";
@@ -403,7 +403,7 @@ const DEFAULT_RECEIPT_TEMPLATE = "Hi {name}, thank you for your payment of {amou
 const DEFAULT_QUOTE_TEMPLATE = "Hi {name}, thanks for your enquiry. I'd quote {amount} for the following work: {work}\nLet me know if you'd like to go ahead.\nThanks,\n{yourname}\n{company}";
 const DEFAULT_REPEAT_QUOTE_TEMPLATE = "Hi {name}, hope you're well! I cleaned your windows for you before and wondered if you'd like the same job done again? I'd quote {amount} for the following work: {work}\n\nJust let me know and I'll get you booked back in.\n\nThanks,\n{yourname}\n{company}";
 const DEFAULT_MARKETING_TEMPLATE = "Hi {name}, just letting you know we also offer gutter clearing and fascia cleaning alongside your window clean — let me know if you'd like a quote.\n\nThanks,\n{yourname}\n{company}";
-const DEFAULT_CLEANED_TODAY_TEMPLATE = "Hi {name}, your windows have been cleaned today!\n\n{bankdetails}Thanks,\n{yourname}\n{company}";
+const DEFAULT_CLEANED_TODAY_TEMPLATE = "Hi {name}, your windows have been cleaned today! The cost for this clean is {amount}.\n\n{bankdetails}Thanks,\n{yourname}\n{company}";
 function migrateData(parsed){
   parsed.customers = parsed.customers || [];
   parsed.oneOffJobs = parsed.oneOffJobs || [];
@@ -440,13 +440,14 @@ function migrateData(parsed){
     "Hi {name}, great to clean for you again. For regular cleans I'd quote {amount} — let me know if you'd like to set up a round. Thanks, {yourname}",
     "Hi {name}, hope you're well! I cleaned your windows for you before and wondered if you'd like the same job done again? I'd quote {amount}, same as last time — just let me know and I'll get you booked back in.\n\nThanks,\n{yourname}\n{company}"
   ];
+  const OLD_CLEANED_TODAY_TEMPLATES = ["Hi {name}, your windows have been cleaned today!\n\n{bankdetails}Thanks,\n{yourname}\n{company}"];
   if(!parsed.settings.cleanTemplate || OLD_CLEAN_TEMPLATES.includes(parsed.settings.cleanTemplate)) parsed.settings.cleanTemplate = DEFAULT_CLEAN_TEMPLATE;
   if(!parsed.settings.payTemplate || OLD_PAY_TEMPLATES.includes(parsed.settings.payTemplate)) parsed.settings.payTemplate = DEFAULT_PAY_TEMPLATE;
   if(!parsed.settings.receiptTemplate || OLD_RECEIPT_TEMPLATES.includes(parsed.settings.receiptTemplate)) parsed.settings.receiptTemplate = DEFAULT_RECEIPT_TEMPLATE;
   if(!parsed.settings.quoteTemplate || OLD_QUOTE_TEMPLATES.includes(parsed.settings.quoteTemplate)) parsed.settings.quoteTemplate = DEFAULT_QUOTE_TEMPLATE;
   if(!parsed.settings.repeatQuoteTemplate || OLD_REPEAT_QUOTE_TEMPLATES.includes(parsed.settings.repeatQuoteTemplate)) parsed.settings.repeatQuoteTemplate = DEFAULT_REPEAT_QUOTE_TEMPLATE;
   if(!parsed.settings.marketingTemplate) parsed.settings.marketingTemplate = DEFAULT_MARKETING_TEMPLATE;
-  if(!parsed.settings.cleanedTodayTemplate) parsed.settings.cleanedTodayTemplate = DEFAULT_CLEANED_TODAY_TEMPLATE;
+  if(!parsed.settings.cleanedTodayTemplate || OLD_CLEANED_TODAY_TEMPLATES.includes(parsed.settings.cleanedTodayTemplate)) parsed.settings.cleanedTodayTemplate = DEFAULT_CLEANED_TODAY_TEMPLATE;
   if(parsed.settings.messagingApp !== 'whatsapp') parsed.settings.messagingApp = 'sms';
   if(parsed.settings.companyName == null) parsed.settings.companyName = '';
   if(parsed.settings.companyAddress == null) parsed.settings.companyAddress = '';
@@ -1710,14 +1711,16 @@ function resumeCustomer(id){
 
 // Builds the "pay by bank transfer" block used by the {bankdetails} token — empty
 // string if no bank details are saved yet, so templates render cleanly either way.
+// Just the details themselves, no lead-in sentence and no extra blank line — the
+// surrounding template text supplies whatever framing/spacing it needs.
 function bankDetailsBlock(){
   const s = data.settings || {};
   if(!s.bankPayeeName && !s.bankAccountNumber && !s.bankSortCode) return '';
-  const lines = ['You can pay by direct bank transfer using the following details:'];
+  const lines = [];
   if(s.bankPayeeName) lines.push(`Payee Name: ${s.bankPayeeName}`);
   if(s.bankAccountNumber) lines.push(`Account Number: ${s.bankAccountNumber}`);
   if(s.bankSortCode) lines.push(`Sort Code: ${s.bankSortCode}`);
-  return lines.join('\n') + '\n\n';
+  return lines.join('\n') + '\n';
 }
 function applyTemplate(tpl, tokens){
   return (tpl||'')
