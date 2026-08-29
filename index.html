@@ -399,7 +399,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 41;
+const APP_VERSION = 42;
 function formatVersion(v){ return '1.' + v; }
 const DIRECTIONS_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>';
 const CALL_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>';
@@ -424,15 +424,41 @@ function buildVCard(item){
   lines.push('END:VCARD');
   return lines.join('\r\n');
 }
-// Adds a single customer/job to the phone's Contacts app. Uses the same
-// location.href hand-off technique as the tel:/directions links elsewhere in the
-// app — the OS recognises the vCard data URI and opens the native "Add Contact"
-// screen directly, rather than this navigating away to a blank page.
-function addToContacts(kind, id){
+// Adds a single customer/job to the phone's Contacts app. A raw `location.href =
+// 'data:...'` navigation (the original approach here) is silently blocked by some
+// browsers for top-level navigations to data: URIs, so this uses the same
+// share-sheet-first, Blob-download-fallback pattern as exportContacts()/exportData()
+// below, which is the proven-working technique already used elsewhere in the app.
+async function addToContacts(kind, id){
   const item = kind === 'job' ? data.oneOffJobs.find(x=>x.id===id) : data.customers.find(x=>x.id===id);
   if(!item){ return; }
   if(!item.phone && !item.email && !item.address){ toast('Nothing to add — no phone, email, or address saved'); return; }
-  window.location.href = 'data:text/vcard;charset=utf-8,' + encodeURIComponent(buildVCard(item));
+  const vcard = buildVCard(item);
+  const nameForFile = ((item.name && item.name.trim()) || item.address || 'contact').replace(/[^a-z0-9]+/gi,'-').replace(/^-+|-+$/g,'') || 'contact';
+  const filename = `${nameForFile}.vcf`;
+
+  if(navigator.canShare){
+    try{
+      const file = new File([vcard], filename, {type:'text/vcard'});
+      if(navigator.canShare({files:[file]})){
+        await navigator.share({files:[file], title:'Add to Contacts'});
+        return;
+      }
+    }catch(e){
+      if(e && e.name === 'AbortError') return;
+      // fall through to classic download on any other failure
+    }
+  }
+
+  const blob = new Blob([vcard], {type:'text/vcard'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url), 2000);
 }
 // Bulk export — every customer with a phone, email, or address, as one .vcf file
 // containing multiple vCards (the format supports concatenating several blocks).
