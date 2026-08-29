@@ -134,6 +134,7 @@
   .badge.due{background:var(--amber-dim); color:var(--amber);}
   .badge.overdue{background:var(--red-dim); color:var(--red);}
   .badge.owed{background:var(--red-dim); color:var(--red);}
+  .badge.escalate{background:var(--red); color:#fff;}
   .badge.ok{background:var(--green-dim); color:var(--green);}
   .badge.paused{background:var(--line); color:var(--ink-muted);}
   .badge.anniversary{background:var(--blue-dim); color:var(--blue-deep);}
@@ -156,12 +157,16 @@
   .cust-addr{font-size:0.8125rem; color:var(--ink-muted); margin-top:2px;}
   .cust-price{font-size:0.875rem; font-weight:800; color:var(--emphasis); white-space:nowrap;}
   .cust-right{display:flex; flex-direction:column; align-items:flex-end; gap:6px;}
-  .dir-btn{
-    width:26px; height:26px; border-radius:50%; border:none; background:var(--blue); color:#fff;
+  .cust-btn-row{display:flex; gap:6px;}
+  .dir-btn, .call-btn{
+    width:26px; height:26px; border-radius:50%; border:none; color:#fff;
     display:flex; align-items:center; justify-content:center; padding:0; flex:0 0 auto;
   }
-  .dir-btn svg{width:14px;height:14px;}
+  .dir-btn{background:var(--blue);}
+  .call-btn{background:var(--green);}
+  .dir-btn svg, .call-btn svg{width:14px;height:14px;}
   .dir-btn:active{background:var(--blue-deep);}
+  .call-btn:active{filter:brightness(0.88);}
   .cust-meta{display:flex; gap:6px; flex-wrap:wrap; margin-top:10px;}
   .cust-actions{display:flex; gap:8px; margin-top:12px;}
   .btn{
@@ -394,9 +399,10 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 39;
+const APP_VERSION = 40;
 function formatVersion(v){ return '1.' + v; }
 const DIRECTIONS_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>';
+const CALL_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>';
 const DEFAULT_CLEAN_TEMPLATE = "Hi {name}, just a reminder I'll be round to clean your windows soon. Let me know if that's not convenient.\n\nThanks,\n{yourname}\n{company}";
 const DEFAULT_PAY_TEMPLATE = "Hi {name}, a friendly reminder that your window cleaning payment of {amount} is outstanding.\n\n{bankdetails}Thanks,\n{yourname}\n{company}";
 const DEFAULT_RECEIPT_TEMPLATE = "Hi {name}, thank you for your payment of {amount} received {date}.\n\nThanks,\n{yourname}\n{company}";
@@ -413,6 +419,8 @@ function migrateData(parsed){
     if(j.customerId === undefined) j.customerId = null;
     if(j.paymentReminderSent == null) j.paymentReminderSent = false;
     if(j.paymentReminderSentDate === undefined) j.paymentReminderSentDate = null;
+    if(j.paymentReminderCount == null) j.paymentReminderCount = 0;
+    if(!j.messageLog) j.messageLog = [];
   });
   parsed.quotes = parsed.quotes || [];
   parsed.quotes.forEach(q=>{
@@ -480,6 +488,8 @@ function migrateData(parsed){
     if(!c.paymentHistory) c.paymentHistory = [];
     if(c.paymentReminderSent == null) c.paymentReminderSent = false;
     if(c.paymentReminderSentDate === undefined) c.paymentReminderSentDate = null;
+    if(c.paymentReminderCount == null) c.paymentReminderCount = 0;
+    if(!c.messageLog) c.messageLog = [];
   });
   return parsed;
 }
@@ -1074,12 +1084,16 @@ function custCardHtml(c){
         </div>
         <div class="cust-right">
           <div class="cust-price">${money(c.price)}</div>
-          ${c.address ? `<button class="dir-btn" onclick="event.stopPropagation(); openDirections('customer','${c.id}')" title="Directions" aria-label="Directions">${DIRECTIONS_ICON}</button>` : ''}
+          <div class="cust-btn-row">
+            ${c.phone ? `<button class="call-btn" onclick="event.stopPropagation(); callCustomer('customer','${c.id}')" title="Call" aria-label="Call">${CALL_ICON}</button>` : ''}
+            ${c.address ? `<button class="dir-btn" onclick="event.stopPropagation(); openDirections('customer','${c.id}')" title="Directions" aria-label="Directions">${DIRECTIONS_ICON}</button>` : ''}
+          </div>
         </div>
       </div>
       <div class="cust-meta">
         ${s.cleanBadge ? `<span class="badge ${s.cleanBadge.type}"${c.paused&&c.pauseDate?` title="Paused since ${fmtDate(c.pauseDate)}"`:''}>${s.cleanBadge.text}</span>` : `<span class="badge ok">Cleaned ${fmtDate(s.lastClean)}</span>`}
         ${s.owed ? `<span class="badge owed">Owes ${money(s.balance)}</span>` : s.credit ? `<span class="badge ok">Credit ${money(Math.abs(s.balance))}</span>` : `<span class="badge ok">Paid up</span>`}
+        ${(s.owed && (c.paymentReminderCount||0) >= 2) ? `<span class="badge escalate" title="${c.paymentReminderCount} payment reminders sent, still unpaid">⚠ Chase</span>` : ''}
         ${(s.owed && c.paymentReminderSent) ? `<span class="badge paused">🔔 ${fmtDate(c.paymentReminderSentDate).split(' ').slice(0,2).join(' ')}</span>` : ''}
         ${(c.photos && c.photos.length) ? `<span class="badge paused">📷 ${c.photos.length}</span>` : ''}
         ${needsPriceReview(c) ? `<span class="badge due" title="12+ months since last price increase">📈 Review</span>` : ''}
@@ -1103,6 +1117,7 @@ function quickPaid(id){
   c.paymentHistory.push({date: todayISO(), amount: c.price||0});
   c.paymentReminderSent = false;
   c.paymentReminderSentDate = null;
+  c.paymentReminderCount = 0;
   saveData(); render(); toast(`Marked ${c.name||c.address||'customer'} as paid`);
 }
 
@@ -1303,7 +1318,7 @@ function openCustomerDetail(id){
 
     <div style="background:${s.owed?'var(--red-dim)':s.credit?'var(--green-dim)':'var(--green-dim)'}; color:${s.owed?'var(--red)':'var(--green)'}; border-radius:10px; padding:12px; font-weight:800; text-align:center; margin-bottom:14px;">
       ${s.owed ? `Owes ${money(s.balance)}` : s.credit ? `In credit: ${money(Math.abs(s.balance))} (carries onto next bill)` : 'Fully paid up'}
-      ${(s.owed && c.paymentReminderSent) ? `<div style="font-size:0.75rem; font-weight:700; margin-top:4px; opacity:0.85;">🔔 Payment reminder sent ${fmtDate(c.paymentReminderSentDate)}</div>` : ''}
+      ${(s.owed && c.paymentReminderSent) ? `<div style="font-size:0.75rem; font-weight:700; margin-top:4px; opacity:0.85;">🔔 Payment reminder sent ${fmtDate(c.paymentReminderSentDate)}${(c.paymentReminderCount||0) >= 2 ? ` · ⚠ ${c.paymentReminderCount} reminders sent` : ''}</div>` : ''}
     </div>
 
     <div class="stat-row">
@@ -1361,6 +1376,11 @@ function openCustomerDetail(id){
           <div style="flex:1; min-width:0;"><div class="t1">Price history</div><div class="t2">${(c.priceHistory||[]).length} change${(c.priceHistory||[]).length===1?'':'s'} recorded</div></div>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px; color:var(--ink-muted);"><path d="M9 18l6-6-6-6"/></svg>
         </button>
+        <button class="backup-btn" style="margin-bottom:0;" onclick="openMessageLog('customer','${id}')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          <div style="flex:1; min-width:0;"><div class="t1">Messages</div><div class="t2">${(c.messageLog||[]).length} sent</div></div>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px; color:var(--ink-muted);"><path d="M9 18l6-6-6-6"/></svg>
+        </button>
       </div>
     </details>
 
@@ -1414,6 +1434,28 @@ function openCustomerHistoryList(id, kind){
     </div>
     <ul class="hist-list">${rowsHtml}</ul>
   `, () => openCustomerDetail(id));
+}
+
+// Read-only log of every message actually sent for a customer or job — reminders,
+// receipts, quotes, marketing texts. Newest first. Nothing here is editable; it's
+// just a record of what's already gone out, so you can tell at a glance whether
+// someone's been chased today without reopening every message type separately.
+function openMessageLog(kind, id){
+  const item = kind === 'job' ? data.oneOffJobs.find(x=>x.id===id) : data.customers.find(x=>x.id===id);
+  if(!item) return;
+  const log = item.messageLog || [];
+  const rowsHtml = log.map(entry => {
+    const label = MESSAGE_LOG_LABELS[entry.kind] || entry.kind;
+    const time = entry.time ? new Date(entry.time).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '';
+    return `<li>${escapeHtml(label)} <span style="color:var(--ink-muted); font-weight:500;">— ${fmtDate(entry.date)}${time?` at ${time}`:''}</span></li>`;
+  }).join('') || '<li style="color:var(--ink-muted)">No messages sent yet</li>';
+  openSheet(`
+    <div class="sheet-head">
+      <h2 style="flex:1; min-width:0;">Messages</h2>
+      <button class="sheet-close" onclick="closeSheet()">✕</button>
+    </div>
+    <ul class="hist-list">${rowsHtml}</ul>
+  `, () => kind === 'job' ? openJobForm(data.oneOffJobs.find(x=>x.id===id)) : openCustomerDetail(id));
 }
 
 // Tapping a clean/payment/price row opens this small menu instead of showing
@@ -1722,6 +1764,19 @@ function bankDetailsBlock(){
   if(s.bankSortCode) lines.push(`Sort Code: ${s.bankSortCode}`);
   return lines.join('\n') + '\n';
 }
+// Human-readable labels for the message log shown on a customer/job's screen.
+const MESSAGE_LOG_LABELS = {
+  clean: 'Cleaning reminder', cleanedToday: 'Windows cleaned today', pay: 'Payment reminder',
+  receipt: 'Receipt', quote: 'Quote', repeatQuote: 'Repeat work quote', marketing: 'Marketing text'
+};
+// Records that a message actually went out, for the read-only message log on a
+// customer/job's screen. Capped so it can't grow forever on a long-standing customer.
+function logMessage(item, kind){
+  if(!item) return;
+  if(!item.messageLog) item.messageLog = [];
+  item.messageLog.unshift({kind, date: todayISO(), time: Date.now()});
+  if(item.messageLog.length > 30) item.messageLog.length = 30;
+}
 function applyTemplate(tpl, tokens){
   return (tpl||'')
     .replace(/\{name\}/g, tokens.name || 'there')
@@ -1774,6 +1829,17 @@ function openDirections(kind, id){
   window.location.href = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(item.address)}`;
 }
 
+// Dials a customer/job's saved number via the device's phone app. Unlike the
+// messaging functions this isn't restricted to mobile numbers — landlines can be
+// called even though they can't receive texts.
+function callCustomer(kind, id){
+  const item = kind === 'job'
+    ? data.oneOffJobs.find(x=>x.id===id)
+    : data.customers.find(x=>x.id===id);
+  if(!item || !item.phone){ toast('No phone number set'); return; }
+  window.location.href = `tel:${item.phone.replace(/\s+/g,'')}`;
+}
+
 // Recognizes UK mobile numbers (07..., +447..., 00447...) as distinct from
 // landlines — texts and WhatsApp messages can only reach a mobile, so every
 // "send a text" option in the app is gated on this rather than just "has a phone".
@@ -1787,15 +1853,18 @@ function isMobileNumber(phone){
 
 let pendingMsgPhone = '';
 let pendingMsgAfterSend = null;
+let pendingMsgLog = null;
 
 // Shared "compose, edit, send" screen for any single-recipient text — cleaning and
 // payment reminders, receipts, quotes. Mirrors the editable-textarea pattern already
 // used for group marketing texts, so wording can always be tweaked before it goes out.
 // returnTo is passed straight through to openSheet so closing this (by any route)
-// lands back on whichever screen it was opened from.
-function openMessagePreview(title, phone, msg, afterSend, returnTo){
+// lands back on whichever screen it was opened from. logInfo is optional —
+// {item, kind} — and records the send in that customer/job's message log.
+function openMessagePreview(title, phone, msg, afterSend, returnTo, logInfo){
   pendingMsgPhone = phone;
   pendingMsgAfterSend = afterSend || null;
+  pendingMsgLog = logInfo || null;
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">${escapeHtml(title)}</h2>
@@ -1812,7 +1881,12 @@ function sendPreviewedMessage(){
   const text = document.getElementById('msg_preview_text').value;
   const phone = pendingMsgPhone;
   const afterSend = pendingMsgAfterSend;
+  const logInfo = pendingMsgLog;
   sendPhoneMessage(phone, text);
+  if(logInfo && logInfo.item){
+    logMessage(logInfo.item, logInfo.kind);
+    saveData();
+  }
   if(afterSend) afterSend();
   closeSheet();
 }
@@ -1835,7 +1909,7 @@ function sendReceipt(id, dateISO, amount){
     name: firstName, amount: Number(amount), company, date: fmtDate(dateISO), yourname
   });
   if(mobile){
-    openMessagePreview('Send receipt', c.phone, msg, null, () => openReceiptOptions(id, dateISO, amount));
+    openMessagePreview('Send receipt', c.phone, msg, null, () => openReceiptOptions(id, dateISO, amount), {item: c, kind: 'receipt'});
   } else {
     window.location.href = `mailto:${c.email}?subject=${encodeURIComponent('Receipt')}&body=${encodeURIComponent(msg)}`;
   }
@@ -1942,7 +2016,7 @@ function sendJobReceipt(id){
   const msg = applyTemplate(data.settings.receiptTemplate, {
     name: firstName, amount: Number(j.price||0), company, date: fmtDate(j.date), yourname
   });
-  openMessagePreview('Send receipt', j.phone, msg, null, () => openJobForm(data.oneOffJobs.find(x=>x.id===id)));
+  openMessagePreview('Send receipt', j.phone, msg, null, () => openJobForm(data.oneOffJobs.find(x=>x.id===id)), {item: j, kind: 'receipt'});
 }
 
 function sendJobPaymentReminder(id){
@@ -1958,10 +2032,11 @@ function sendJobPaymentReminder(id){
   const afterSend = () => {
     j.paymentReminderSent = true;
     j.paymentReminderSentDate = todayISO();
+    j.paymentReminderCount = (j.paymentReminderCount||0) + 1;
     saveData();
     render();
   };
-  openMessagePreview('Payment reminder', j.phone, msg, afterSend, () => openJobForm(data.oneOffJobs.find(x=>x.id===id)));
+  openMessagePreview('Payment reminder', j.phone, msg, afterSend, () => openJobForm(data.oneOffJobs.find(x=>x.id===id)), {item: j, kind: 'pay'});
 }
 
 
@@ -1978,7 +2053,7 @@ function sendQuoteText(id){
     name: firstName, amount: Number(q.price||0), company, date: fmtDate(q.date), yourname, work: q.notes||''
   });
   if(mobile){
-    openMessagePreview('Send quote', q.phone, msg, null, () => openQuoteForm(data.quotes.find(x=>x.id===id)));
+    openMessagePreview('Send quote', q.phone, msg, null, () => openQuoteForm(data.quotes.find(x=>x.id===id)), {item: q, kind: q.fromJobId ? 'repeatQuote' : 'quote'});
   } else {
     window.location.href = `mailto:${q.email}?subject=${encodeURIComponent('Your window cleaning quote')}&body=${encodeURIComponent(msg)}`;
   }
@@ -2005,11 +2080,12 @@ function sendTemplate(id, kind, returnTo){
     afterSend = () => {
       c.paymentReminderSent = true;
       c.paymentReminderSentDate = todayISO();
+      c.paymentReminderCount = (c.paymentReminderCount||0) + 1;
       saveData();
       render();
     };
   }
-  openMessagePreview(title, c.phone, msg, afterSend, returnTo);
+  openMessagePreview(title, c.phone, msg, afterSend, returnTo, {item: c, kind});
 }
 
 function openBulkReminders(kind, roundName){
@@ -2068,11 +2144,13 @@ function sendBulkReminder(id, kind){
   }
   const msg = applyTemplate(tpl, {name: firstName, amount: amt, company, yourname});
   sendPhoneMessage(c.phone, msg);
+  logMessage(c, kind === 'owed' ? 'pay' : 'clean');
   if(kind === 'owed'){
     c.paymentReminderSent = true;
     c.paymentReminderSentDate = todayISO();
-    saveData();
+    c.paymentReminderCount = (c.paymentReminderCount||0) + 1;
   }
+  saveData();
   markReminderSent(id);
 }
 
@@ -2126,6 +2204,8 @@ function sendMarketingText(id){
   const yourname = data.settings.yourName || '';
   const msg = applyTemplate(tpl, {name: firstName, company, yourname});
   sendPhoneMessage(c.phone, msg);
+  logMessage(c, 'marketing');
+  saveData();
 }
 
 function openAddCleanForm(id){
@@ -2184,6 +2264,7 @@ function addHistDate(id, kind){
     c.paymentHistory = c.paymentHistory||[]; c.paymentHistory.push({date:v, amount: isNaN(amt)?0:amt});
     c.paymentReminderSent = false;
     c.paymentReminderSentDate = null;
+    c.paymentReminderCount = 0;
   }
   saveData(); openCustomerDetail(id); render();
 }
@@ -2254,7 +2335,10 @@ function jobCardHtml(j, today){
         </div>
         <div class="cust-right">
           <div class="cust-price">${money(j.price)}</div>
-          ${j.address ? `<button class="dir-btn" onclick="event.stopPropagation(); openDirections('job','${j.id}')" title="Directions" aria-label="Directions">${DIRECTIONS_ICON}</button>` : ''}
+          <div class="cust-btn-row">
+            ${j.phone ? `<button class="call-btn" onclick="event.stopPropagation(); callCustomer('job','${j.id}')" title="Call" aria-label="Call">${CALL_ICON}</button>` : ''}
+            ${j.address ? `<button class="dir-btn" onclick="event.stopPropagation(); openDirections('job','${j.id}')" title="Directions" aria-label="Directions">${DIRECTIONS_ICON}</button>` : ''}
+          </div>
         </div>
       </div>
       <div class="cust-meta">
@@ -2288,6 +2372,7 @@ function toggleJobPaid(id){
   if(j.paid) j.paidDate = todayISO();
   j.paymentReminderSent = false;
   j.paymentReminderSentDate = null;
+  j.paymentReminderCount = 0;
   saveData(); render();
 }
 
@@ -2369,6 +2454,11 @@ function openJobForm(existing, prefill, returnTo){
       ${isMobileNumber(existing.phone) ? `<button class="btn" style="background:var(--amber-dim); color:var(--amber);" onclick="sendJobReceipt('${existing.id}')">🧾 Send receipt</button>` : ''}
     </div>`:''}
     ${(existing && !existing.paid && isMobileNumber(existing.phone)) ? `<button class="btn" style="background:var(--amber-dim); color:var(--amber); width:100%; margin-top:10px;" onclick="sendJobPaymentReminder('${existing.id}')">💬 Payment reminder</button>` : ''}
+    ${(existing && existing.messageLog && existing.messageLog.length) ? `<button class="backup-btn" style="margin-top:10px;" onclick="openMessageLog('job','${existing.id}')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      <div style="flex:1; min-width:0;"><div class="t1">Messages</div><div class="t2">${existing.messageLog.length} sent</div></div>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px; color:var(--ink-muted);"><path d="M9 18l6-6-6-6"/></svg>
+    </button>` : ''}
     <label style="display:flex; align-items:center; gap:8px; margin-top:16px; cursor:pointer;">
       <input type="checkbox" id="j_remind" ${j.remind24h?'checked':''} style="width:18px; height:18px; flex-shrink:0;">
       <span style="font-size:0.8125rem; font-weight:600; color:var(--ink); text-transform:none; letter-spacing:0;">Remind me the day before this job</span>
@@ -4112,14 +4202,15 @@ const FOCUSED_HELP = {
       helpP('If a round takes more than one day, tap each customer\'s day badge in reorder mode to assign Day 1–5. A day switcher then appears above the customer list, and cards get a "Day N" badge.'),
       helpP('The ⋯ button on a round\'s screen opens Print, group marketing text, and Help.'),
       helpP('A "Cleaned today" button appears on a customer\'s card once they have a clean logged for today and a phone number saved — tap it to text them that it\'s done.'),
-      helpP('The small blue compass button on a customer\'s card opens directions to their address in your phone\'s map app.')
+      helpP('The small green phone button on a customer\'s card calls them; the small blue compass button opens directions to their address in your phone\'s map app.'),
+      helpP('If a customer\'s had 2 or more payment reminders sent with no payment logged, a red "⚠ Chase" badge appears on their card — a sign it\'s worth a phone call rather than another text.')
     ]
   },
   jobs: {
     title: 'One-off jobs',
     body: () => [
       helpP('For anything outside your regular rounds. Swipe right for done, left for paid. Completed jobs get an anniversary flag after a year (switchable off per job), can be turned into a repeat-work quote, and can have a professional invoice printed or sent as a PDF via WhatsApp — with your logo if you\'ve added one.'),
-      helpP('The small blue compass button on a job\'s card opens directions to its address in your phone\'s map app.'),
+      helpP('The small green phone button on a job\'s card calls them; the small blue compass button opens directions to its address in your phone\'s map app.'),
       helpP('If a job has a mobile number and isn\'t marked paid yet, a "Payment reminder" button appears on its form.')
     ]
   },
@@ -4129,6 +4220,7 @@ const FOCUSED_HELP = {
       helpP('A customer\'s screen shows their round, standard price, frequency, balance, and any notes at the top. Below that, Actions, History, and Photos each collapse into their own section — tap a heading to open or close it.'),
       helpP('"Add a clean" and "Add a payment" open a small pop-up for the date and amount. Tapping an entry in Clean history, Payment history, or Price history opens a menu with Edit, Remove, and (for payments) Send receipt.'),
       helpP('Texts (cleaning/payment reminders, receipts, quotes, "cleaned today") only offer to send to a mobile number — landlines are skipped — and always open a preview you can edit before it goes out.'),
+      helpP('A "Messages" entry under History lists every text actually sent to that customer, newest first — a quick way to check whether someone\'s already been chased today.'),
       helpP('Tick "Text before I arrive" on a customer\'s edit screen to flag that they need a heads-up text before you turn up — it shows as a badge on their card and detail screen.'),
       helpP('Pausing a customer asks for a reason — Holiday, Work being done, Cancelled, Moved out, or Other — and stamps the date. Paused customers are skipped from due reminders and round totals until resumed.'),
       helpP('The "Get a quote for this customer" button opens a new quote pre-filled with their details.'),
