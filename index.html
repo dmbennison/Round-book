@@ -399,7 +399,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 42;
+const APP_VERSION = 43;
 function formatVersion(v){ return '1.' + v; }
 const DIRECTIONS_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>';
 const CALL_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>';
@@ -424,41 +424,25 @@ function buildVCard(item){
   lines.push('END:VCARD');
   return lines.join('\r\n');
 }
-// Adds a single customer/job to the phone's Contacts app. A raw `location.href =
-// 'data:...'` navigation (the original approach here) is silently blocked by some
-// browsers for top-level navigations to data: URIs, so this uses the same
-// share-sheet-first, Blob-download-fallback pattern as exportContacts()/exportData()
-// below, which is the proven-working technique already used elsewhere in the app.
-async function addToContacts(kind, id){
+// Adds a single customer/job to the phone's Contacts app. Two things learned the
+// hard way here: a raw `location.href = 'data:...'` navigation does nothing on
+// several browsers (top-level navigation to data: URIs is blocked/unreliable), and
+// routing through navigator.share() just opens the generic share sheet with no
+// "Add to Contacts" option, since share targets don't get to register for that.
+// Navigating to a blob: URL directly (no `download` attribute, so the browser
+// isn't forced into a plain file-save) is what actually gets Safari/iOS to
+// recognise the vCard content type and open its own native "Add Contact" screen.
+function addToContacts(kind, id){
   const item = kind === 'job' ? data.oneOffJobs.find(x=>x.id===id) : data.customers.find(x=>x.id===id);
   if(!item){ return; }
   if(!item.phone && !item.email && !item.address){ toast('Nothing to add — no phone, email, or address saved'); return; }
   const vcard = buildVCard(item);
-  const nameForFile = ((item.name && item.name.trim()) || item.address || 'contact').replace(/[^a-z0-9]+/gi,'-').replace(/^-+|-+$/g,'') || 'contact';
-  const filename = `${nameForFile}.vcf`;
-
-  if(navigator.canShare){
-    try{
-      const file = new File([vcard], filename, {type:'text/vcard'});
-      if(navigator.canShare({files:[file]})){
-        await navigator.share({files:[file], title:'Add to Contacts'});
-        return;
-      }
-    }catch(e){
-      if(e && e.name === 'AbortError') return;
-      // fall through to classic download on any other failure
-    }
-  }
-
   const blob = new Blob([vcard], {type:'text/vcard'});
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(()=>URL.revokeObjectURL(url), 2000);
+  window.location.href = url;
+  // Give the browser time to actually open/parse the blob before it's released —
+  // revoking too early can leave the "Add Contact" screen with nothing to show.
+  setTimeout(()=>URL.revokeObjectURL(url), 30000);
 }
 // Bulk export — every customer with a phone, email, or address, as one .vcf file
 // containing multiple vCards (the format supports concatenating several blocks).
@@ -1101,7 +1085,13 @@ function renderRoundDetail(main, rn){
   if(roundFilterMode === 'due'){
     baseList = baseList.filter(c=>{
       const s = custStatus(c);
-      return !c.paused && s.cleanBadge && s.cleanBadge.type==='due';
+      const dueNow = s.cleanBadge && s.cleanBadge.type==='due';
+      // Once cleaned, a customer drops out of "due" straight away — but keep them
+      // visible in this filtered list for the rest of the day, so you can still see
+      // everyone you've worked through today without them vanishing mid-round.
+      // They naturally drop off tomorrow once lastClean no longer matches today.
+      const cleanedToday = s.lastClean === todayISO();
+      return !c.paused && (dueNow || cleanedToday);
     });
   } else if(roundFilterMode === 'owed'){
     baseList = baseList.filter(c=>custStatus(c).owed);
@@ -4294,6 +4284,7 @@ const FOCUSED_HELP = {
     title: 'Rounds',
     body: () => [
       helpP('The Rounds tab shows every round, with a Rounds / Due / Owed switch. Open a round to see its customers, swipe a card right to mark cleaned or left to mark paid, and use Reorder to set your walking order.'),
+      helpP('Marking someone cleaned doesn\'t remove them from the Due view straight away — they stay there for the rest of the day, so you can still see everyone you\'ve worked through. They drop off automatically the next day.'),
       helpP('If a round takes more than one day, tap each customer\'s day badge in reorder mode to assign Day 1–5. A day switcher then appears above the customer list, and cards get a "Day N" badge.'),
       helpP('The ⋯ button on a round\'s screen opens Print, group marketing text, and Help.'),
       helpP('A "Cleaned today" button appears on a customer\'s card once they have a clean logged for today and a phone number saved — tap it to text them that it\'s done.'),
