@@ -283,7 +283,7 @@
 
   .summary-overall{display:flex; gap:6px; margin-bottom:12px;}
   .summary-overall .stat{flex:1; padding:7px;}
-  .summary-overall .stat .num{font-size:0.6875rem;}
+  .summary-overall .stat .num{font-size:1rem;}
   .summary-overall .stat .lbl{font-size:0.5625rem;}
 
   .print-area{display:none;}
@@ -399,7 +399,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 43;
+const APP_VERSION = 45;
 function formatVersion(v){ return '1.' + v; }
 const DIRECTIONS_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>';
 const CALL_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>';
@@ -876,7 +876,12 @@ function renderRoundsList(main){
     const totalCustomers = activeCustomers.length;
     const totalValue = activeCustomers.reduce((sum,c)=>sum+Number(c.price||0),0);
     const overallAvg = totalCustomers ? totalValue/totalCustomers : 0;
-    html += `<div class="summary-overall">
+    html += `<div style="display:flex; align-items:center; justify-content:flex-end; margin-bottom:8px;">
+      <button class="btn-open" style="width:38px; height:38px; padding:0;" onclick="openRoundReports()" aria-label="Print reports">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
+      </button>
+    </div>
+    <div class="summary-overall">
       <div class="stat"><div class="num">${totalCustomers}</div><div class="lbl">Customers</div></div>
       <div class="stat"><div class="num">${money(totalValue)}</div><div class="lbl">Round value</div></div>
       <div class="stat"><div class="num">${money(overallAvg)}</div><div class="lbl">Avg / customer</div></div>
@@ -3195,16 +3200,15 @@ function saveBusinessDetails(){
 }
 
 /* ---------- reports ---------- */
-function openReports(){
+// Small print menu specific to the Rounds tab overview — the reports here span
+// every round at once (unlike "Print this round" on a single round's own screen,
+// or the general Reports menu, which covers everything else).
+function openRoundReports(){
   openSheet(`
     <div class="sheet-head">
-      <h2 style="flex:1; min-width:0;">Print reports</h2>
-      ${helpIconBtn('reports', () => openReports())}
+      <h2 style="flex:1; min-width:0;">Print</h2>
       <button class="sheet-close" onclick="closeSheet()">✕</button>
     </div>
-    <p style="color:var(--ink-muted); font-size:0.8438rem; line-height:1.5; margin:0 2px 16px;">
-      Generates a printer-friendly page. Use your phone's print option (Share → Print) to print it or save it as a PDF — works offline too.
-    </p>
     <button class="backup-btn" onclick="printWindowsDue()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
       <div><div class="t1">Windows due, by round</div><div class="t2">Who's due a clean right now</div></div>
@@ -3217,6 +3221,19 @@ function openReports(){
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v16H4z"/><path d="M4 10h16M10 4v16"/></svg>
       <div><div class="t1">Full round lists</div><div class="t2">Every customer, grouped by round</div></div>
     </button>
+  `);
+}
+
+function openReports(){
+  openSheet(`
+    <div class="sheet-head">
+      <h2 style="flex:1; min-width:0;">Print reports</h2>
+      ${helpIconBtn('reports', () => openReports())}
+      <button class="sheet-close" onclick="closeSheet()">✕</button>
+    </div>
+    <p style="color:var(--ink-muted); font-size:0.8438rem; line-height:1.5; margin:0 2px 16px;">
+      Generates a printer-friendly page. Use your phone's print option (Share → Print) to print it or save it as a PDF — works offline too.
+    </p>
     <button class="backup-btn" onclick="printRoundsLastCleaned()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4M16 2v4M3 10h18"/><rect x="3" y="4" width="18" height="18" rx="2"/></svg>
       <div><div class="t1">Round cleaning dates — list</div><div class="t2">Every date each round was cleaned in the last 5 weeks</div></div>
@@ -3726,7 +3743,7 @@ function printWindowsDue(){
     body += `<table class="rpt-table"><thead><tr><th>Customer</th><th>Last cleaned</th><th>Next due</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>`;
   });
   if(!anyRoundShown) body = '<div class="rpt-empty-note">Nobody\'s due a clean right now.</div>';
-  runPrint('Windows Due, by Round', body, false, false, () => openReports());
+  runPrint('Windows Due, by Round', body, false, false, () => openRoundReports());
 }
 
 function printMoneyOwed(){
@@ -3755,7 +3772,7 @@ function printMoneyOwed(){
     body = `<table class="rpt-table"><thead><tr><th>Round</th><th>Customer</th><th>Last paid</th><th style="text-align:right;">Owed</th></tr></thead><tbody>${rows}</tbody></table>
     <div class="rpt-total" style="border-top:2px solid #10344C; padding-top:10px; margin-top:12px; font-size:16px;">Total outstanding: ${money(total)}</div>`;
   }
-  runPrint('Money Owed', body, false, false, () => openReports());
+  runPrint('Money Owed', body, false, false, () => openRoundReports());
 }
 
 function printFullRounds(){
@@ -3791,7 +3808,7 @@ function printFullRounds(){
     const grandAvg = grandCount ? grandTotal/grandCount : 0;
     body += `<div class="rpt-total" style="border-top:2px solid #10344C; padding-top:10px; margin-top:16px; font-size:16px;">Grand total (all rounds): ${grandCount} customers · ${money(grandTotal)} · Avg: ${money(grandAvg)}</div>`;
   }
-  runPrint('Full Round Lists', body, false, false, () => openReports());
+  runPrint('Full Round Lists', body, false, false, () => openRoundReports());
 }
 
 function printSingleRound(roundName){
@@ -4284,6 +4301,7 @@ const FOCUSED_HELP = {
     title: 'Rounds',
     body: () => [
       helpP('The Rounds tab shows every round, with a Rounds / Due / Owed switch. Open a round to see its customers, swipe a card right to mark cleaned or left to mark paid, and use Reorder to set your walking order.'),
+      helpP('The printer icon above the summary numbers covers reports across every round at once — Windows due, Money owed, and Full round lists. A single round\'s own screen has its own separate Print option, just for that round.'),
       helpP('Marking someone cleaned doesn\'t remove them from the Due view straight away — they stay there for the rest of the day, so you can still see everyone you\'ve worked through. They drop off automatically the next day.'),
       helpP('If a round takes more than one day, tap each customer\'s day badge in reorder mode to assign Day 1–5. A day switcher then appears above the customer list, and cards get a "Day N" badge.'),
       helpP('The ⋯ button on a round\'s screen opens Print, group marketing text, and Help.'),
@@ -4325,15 +4343,13 @@ const FOCUSED_HELP = {
     title: 'Reports',
     body: () => [
       helpP('Tap the printer icon for a list of reports — each one generates a clean, printer-friendly page. Choose <b>Print</b> (good for saving as a PDF too) or <b>Save as Word document</b> for an editable .docx. Both work offline.'),
-      helpRow('Windows due, by round', "Who's due right now"),
-      helpRow('Money owed', 'Cleaned but not yet paid'),
-      helpRow('Full round lists', 'Every customer, by round'),
       helpRow('Round cleaning dates', 'List or calendar, last 5 weeks'),
       helpRow('Earnings report', 'Totals by week/month/year'),
       helpRow('Daily work done', 'Value completed, day by day'),
       helpRow('Monthly schedule', 'Calendar of rounds and jobs due'),
       helpRow('One-off jobs', 'Every job, status and value'),
       helpRow('Price review due', '12+ months since last increase'),
+      helpP('<span style="color:var(--ink-muted); font-style:italic;">Windows due, Money owed, and Full round lists have moved to the printer icon on the Rounds tab, since they\'re about the rounds themselves.</span>'),
       helpP('<span style="color:var(--ink-muted); font-style:italic;">Reports always use the same neutral styling, so they look consistent whoever opens them.</span>')
     ]
   },
