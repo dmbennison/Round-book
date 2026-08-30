@@ -399,7 +399,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 45;
+const APP_VERSION = 46;
 function formatVersion(v){ return '1.' + v; }
 const DIRECTIONS_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>';
 const CALL_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>';
@@ -876,7 +876,8 @@ function renderRoundsList(main){
     const totalCustomers = activeCustomers.length;
     const totalValue = activeCustomers.reduce((sum,c)=>sum+Number(c.price||0),0);
     const overallAvg = totalCustomers ? totalValue/totalCustomers : 0;
-    html += `<div style="display:flex; align-items:center; justify-content:flex-end; margin-bottom:8px;">
+    html += `<div style="display:flex; align-items:center; justify-content:flex-end; gap:8px; margin-bottom:8px;">
+      ${mainScreenHelpBtn('rounds', "()=>setTab('rounds')")}
       <button class="btn-open" style="width:38px; height:38px; padding:0;" onclick="openRoundReports()" aria-label="Print reports">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
       </button>
@@ -2377,6 +2378,12 @@ function handleFabClick(){
 function renderJobs(main){
   let html = '';
   const today = todayISO();
+  html += `<div style="display:flex; align-items:center; justify-content:flex-end; gap:8px; margin-bottom:8px;">
+    ${mainScreenHelpBtn('jobs', "()=>setTab('jobs')")}
+    <button class="btn-open" style="width:38px; height:38px; padding:0;" onclick="printAllJobs()" aria-label="Print report">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
+    </button>
+  </div>`;
   const jobs = (data.oneOffJobs || [])
     .slice()
     .sort((a,b)=>{
@@ -2691,6 +2698,12 @@ function deleteJob(id){
 /* ---------- quotes ---------- */
 function renderQuotes(main){
   let html = '';
+  html += `<div style="display:flex; align-items:center; justify-content:flex-end; gap:8px; margin-bottom:8px;">
+    ${mainScreenHelpBtn('quotes', "()=>setTab('quotes')")}
+    <button class="btn-open" style="width:38px; height:38px; padding:0;" onclick="printQuotes()" aria-label="Print report">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
+    </button>
+  </div>`;
   const todayForSort = todayISO();
   const quotes = (data.quotes || [])
     .slice()
@@ -3253,10 +3266,6 @@ function openReports(){
     <button class="backup-btn" onclick="printSchedule()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18M8 2v4M16 2v4"/></svg>
       <div><div class="t1">Monthly schedule</div><div class="t2">Calendar of rounds and one-off jobs due, day by day</div></div>
-    </button>
-    <button class="backup-btn" onclick="printAllJobs()">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-      <div><div class="t1">One-off jobs</div><div class="t2">Every one-off job, with status and total value</div></div>
     </button>
     <button class="backup-btn" onclick="printPriceReview()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
@@ -3984,7 +3993,7 @@ function printJobRecord(id){
 function printAllJobs(){
   const jobs = (data.oneOffJobs||[]).slice().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   if(!jobs.length){
-    runPrint('One-off Jobs', '<div class="rpt-empty-note">No one-off jobs added yet.</div>', false, false, () => openReports());
+    runPrint('One-off Jobs', '<div class="rpt-empty-note">No one-off jobs added yet.</div>', false, false);
     return;
   }
   let total = 0;
@@ -4002,7 +4011,33 @@ function printAllJobs(){
     <table class="rpt-table"><thead><tr><th>Date</th><th>Job</th><th style="text-align:right;">Price</th><th>Status</th><th>Payment</th></tr></thead><tbody>${rows}</tbody></table>
     <div class="rpt-total" style="border-top:2px solid #10344C; padding-top:10px; margin-top:12px; font-size:16px;">Total value: ${money(total)}</div>
   `;
-  runPrint('One-off Jobs', body, false, false, () => openReports());
+  runPrint('One-off Jobs', body, false, false);
+}
+
+function printQuotes(){
+  const quotes = (data.quotes||[]).slice().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  if(!quotes.length){
+    runPrint('Quotes', '<div class="rpt-empty-note">No quotes added yet.</div>', false, false);
+    return;
+  }
+  const statusLabel = q => q.status==='accepted' ? 'Accepted' : q.status==='declined' ? 'Declined' : q.status==='converted' ? 'Converted' : 'Pending';
+  const statusClass = q => q.status==='accepted' ? '' : q.status==='declined' ? 'overdue' : q.status==='converted' ? '' : (quoteNeedsFollowUp(q, todayISO()) ? 'due' : '');
+  let total = 0;
+  const rows = quotes.map(q=>{
+    total += Number(q.price||0);
+    const followUp = quoteNeedsFollowUp(q, todayISO());
+    return `<tr>
+      <td>${fmtDate(q.date)}</td>
+      <td>${escapeHtml(q.address||'')}${(q.name||q.phone)?`<br><span style="color:#66798A">${[escapeHtml(q.name||''), q.phone?escapeHtml(q.phone):''].filter(Boolean).join(' · ')}</span>`:''}</td>
+      <td style="text-align:right;">${money(q.price)}</td>
+      <td class="rpt-flag ${statusClass(q)}">${statusLabel(q)}${followUp?' — needs follow-up':''}</td>
+    </tr>`;
+  }).join('');
+  const body = `
+    <table class="rpt-table"><thead><tr><th>Date</th><th>Quote</th><th style="text-align:right;">Price</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>
+    <div class="rpt-total" style="border-top:2px solid #10344C; padding-top:10px; margin-top:12px; font-size:16px;">Total quoted value: ${money(total)}</div>
+  `;
+  runPrint('Quotes', body, false, false);
 }
 
 function getLastPriceIncreaseDate(c){
@@ -4280,6 +4315,13 @@ function helpP(text){
   return `<p style="color:var(--ink); font-size:0.8438rem; line-height:1.6; margin:0 2px 12px;">${text}</p>`;
 }
 let helpReturnCallback = null;
+// Same "?" help icon as helpIconBtn, but sized/styled for a main tab screen's own
+// header row (next to that screen's print icon) rather than a sheet's header.
+function mainScreenHelpBtn(topic, returnTo){
+  return `<button class="btn-open" style="width:38px; height:38px; padding:0;" onclick="openFocusedHelp('${topic}', ${returnTo})" aria-label="Help">
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+  </button>`;
+}
 function helpIconBtn(topic, returnTo){
   helpReturnCallback = returnTo || null;
   return `<button class="sheet-close" style="flex-shrink:0; margin-right:6px;" onclick="openFocusedHelp('${topic}')" aria-label="Help for this screen">
@@ -4315,7 +4357,8 @@ const FOCUSED_HELP = {
     body: () => [
       helpP('For anything outside your regular rounds. Swipe right for done, left for paid. Completed jobs get an anniversary flag after a year (switchable off per job), can be turned into a repeat-work quote, and can have a professional invoice printed or sent as a PDF via WhatsApp — with your logo if you\'ve added one.'),
       helpP('The small green phone button on a job\'s card calls them; the small blue compass button opens directions to its address in your phone\'s map app.'),
-      helpP('If a job has a mobile number and isn\'t marked paid yet, a "Payment reminder" button appears on its form.')
+      helpP('If a job has a mobile number and isn\'t marked paid yet, a "Payment reminder" button appears on its form.'),
+      helpP('The printer icon at the top of this screen prints every one-off job, with status and total value.')
     ]
   },
   customer: {
@@ -4336,7 +4379,8 @@ const FOCUSED_HELP = {
     title: 'Quotes',
     body: () => [
       helpP('Swipe right to accept, left to decline. Accepted quotes convert straight into a job or customer. Send a quote by text or email from its edit screen. Quotes left Pending past their follow-up window (7 days by default) get flagged automatically.'),
-      helpP('You can also start a quote straight from an existing customer\'s screen using "Get a quote for this customer" — their name, address, phone and email come pre-filled.')
+      helpP('You can also start a quote straight from an existing customer\'s screen using "Get a quote for this customer" — their name, address, phone and email come pre-filled.'),
+      helpP('The printer icon at the top of this screen prints every quote, with status and total value.')
     ]
   },
   reports: {
@@ -4349,7 +4393,7 @@ const FOCUSED_HELP = {
       helpRow('Monthly schedule', 'Calendar of rounds and jobs due'),
       helpRow('One-off jobs', 'Every job, status and value'),
       helpRow('Price review due', '12+ months since last increase'),
-      helpP('<span style="color:var(--ink-muted); font-style:italic;">Windows due, Money owed, and Full round lists have moved to the printer icon on the Rounds tab, since they\'re about the rounds themselves.</span>'),
+      helpP('<span style="color:var(--ink-muted); font-style:italic;">Windows due, Money owed, and Full round lists have moved to the printer icon on the Rounds tab. One-off jobs and Quotes each have their own printer icon on their own tab, since they only cover that one list.</span>'),
       helpP('<span style="color:var(--ink-muted); font-style:italic;">Reports always use the same neutral styling, so they look consistent whoever opens them.</span>')
     ]
   },
