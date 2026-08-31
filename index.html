@@ -399,7 +399,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 46;
+const APP_VERSION = 47;
 function formatVersion(v){ return '1.' + v; }
 const DIRECTIONS_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>';
 const CALL_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>';
@@ -1125,6 +1125,13 @@ function renderRoundDetail(main, rn){
   if(roundFilterMode === 'owed'){
     const owedTotal = custs.reduce((sum,c)=>sum+custStatus(c).balance,0);
     shellHtml += listTotalHtml(`${custs.length} owing · Total owed: ${money(owedTotal)}`);
+  } else if(roundFilterMode === 'due'){
+    // custs here includes customers already cleaned today (kept visible per the
+    // "stays till end of day" behaviour above) — the total should only count
+    // what's actually still left to do, not what's already been done.
+    const remaining = custs.filter(c=>!c.paused && custStatus(c).lastClean !== todayISO());
+    const remainingTotal = remaining.reduce((sum,c)=>sum+Number(c.price||0),0);
+    shellHtml += listTotalHtml(`${remaining.length} remaining · ${money(remainingTotal)}`);
   } else {
     const activeCusts = custs.filter(c=>!c.paused);
     const listTotal = activeCusts.reduce((sum,c)=>sum+Number(c.price||0),0);
@@ -1458,7 +1465,7 @@ function openCustomerDetail(id){
           <div style="flex:1; min-width:0;"><div class="t1">One-off jobs</div><div class="t2">${linkedJobs.length} job${linkedJobs.length===1?'':'s'} for this customer</div></div>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px; color:var(--ink-muted);"><path d="M9 18l6-6-6-6"/></svg>
         </button>
-        <button class="backup-btn" style="margin-bottom:0;" onclick="openCustomerHistoryList('${id}','price')">
+        <button class="backup-btn" onclick="openCustomerHistoryList('${id}','price')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 4 4 5-6"/></svg>
           <div style="flex:1; min-width:0;"><div class="t1">Price history</div><div class="t2">${(c.priceHistory||[]).length} change${(c.priceHistory||[]).length===1?'':'s'} recorded</div></div>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px; color:var(--ink-muted);"><path d="M9 18l6-6-6-6"/></svg>
@@ -4344,7 +4351,7 @@ const FOCUSED_HELP = {
     body: () => [
       helpP('The Rounds tab shows every round, with a Rounds / Due / Owed switch. Open a round to see its customers, swipe a card right to mark cleaned or left to mark paid, and use Reorder to set your walking order.'),
       helpP('The printer icon above the summary numbers covers reports across every round at once — Windows due, Money owed, and Full round lists. A single round\'s own screen has its own separate Print option, just for that round.'),
-      helpP('Marking someone cleaned doesn\'t remove them from the Due view straight away — they stay there for the rest of the day, so you can still see everyone you\'ve worked through. They drop off automatically the next day.'),
+      helpP('Marking someone cleaned doesn\'t remove them from the Due view straight away — they stay there for the rest of the day, so you can still see everyone you\'ve worked through. They drop off automatically the next day. The total at the bottom only counts what\'s still left to do.'),
       helpP('If a round takes more than one day, tap each customer\'s day badge in reorder mode to assign Day 1–5. A day switcher then appears above the customer list, and cards get a "Day N" badge.'),
       helpP('The ⋯ button on a round\'s screen opens Print, group marketing text, and Help.'),
       helpP('A "Cleaned today" button appears on a customer\'s card once they have a clean logged for today and a phone number saved — tap it to text them that it\'s done.'),
