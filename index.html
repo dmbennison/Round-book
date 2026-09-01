@@ -215,11 +215,11 @@
 
   label{display:block; font-size:0.7812rem; font-weight:700; color:var(--ink-muted); margin:14px 2px 6px;}
   label:first-of-type{margin-top:0;}
-  input[type=text], input[type=number], input[type=date], select, textarea{
+  input[type=text], input[type=number], input[type=date], input[type=time], select, textarea{
     width:100%; max-width:100%; min-width:0; padding:12px; border-radius:11px; border:1px solid var(--line); background:var(--surface);
     font-size:0.9688rem; color:var(--ink); font-family:inherit; box-sizing:border-box;
   }
-  input[type=date]{
+  input[type=date], input[type=time]{
     display:block; width:100%; min-width:0; max-width:100%; box-sizing:border-box;
     -webkit-appearance:none; appearance:none;
   }
@@ -400,7 +400,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 49;
+const APP_VERSION = 50;
 function formatVersion(v){ return '1.' + v; }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
@@ -409,6 +409,7 @@ function formatVersion(v){ return '1.' + v; }
 // the most recent 10 entries (oldest ones can be left in the array or trimmed,
 // either is fine, since the display always slices to 10).
 const VERSION_HISTORY = [
+  {version: 50, changes: ['Fixed the Time field on a one-off job appearing tiny instead of matching the Date field']},
   {version: 49, changes: ['One-off jobs can now have an optional time as well as a date', 'Added this version history to the About screen']},
   {version: 48, changes: ['Added "Defer due date 4 weeks" for a customer, as a short-term alternative to Pause — the exact date can be edited', 'Added "Defer whole round 4 weeks" to push back everyone in a round at once']},
   {version: 47, changes: ['The totals at the bottom of a round\'s Due view now only count what\'s actually left to clean', 'Fixed a missing gap above the Messages button on the customer screen']},
