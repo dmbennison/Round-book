@@ -400,8 +400,26 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 48;
+const APP_VERSION = 49;
 function formatVersion(v){ return '1.' + v; }
+// User-facing changelog shown in the About screen's "Version history".
+// MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
+// entry here (newest first) describing what changed, in plain terms a user would
+// understand — not technical/implementation detail. The screen only ever displays
+// the most recent 10 entries (oldest ones can be left in the array or trimmed,
+// either is fine, since the display always slices to 10).
+const VERSION_HISTORY = [
+  {version: 49, changes: ['One-off jobs can now have an optional time as well as a date', 'Added this version history to the About screen']},
+  {version: 48, changes: ['Added "Defer due date 4 weeks" for a customer, as a short-term alternative to Pause — the exact date can be edited', 'Added "Defer whole round 4 weeks" to push back everyone in a round at once']},
+  {version: 47, changes: ['The totals at the bottom of a round\'s Due view now only count what\'s actually left to clean', 'Fixed a missing gap above the Messages button on the customer screen']},
+  {version: 46, changes: ['Moved the One-off jobs report to its own tab', 'Added a new Quotes report', 'Added a help icon to the Rounds, One-off jobs, and Quotes tabs']},
+  {version: 45, changes: ['Moved Windows due / Money owed / Full round lists reports to a new printer icon on the Rounds tab']},
+  {version: 44, changes: ['Made the Customers / Round value / Avg per customer numbers bigger']},
+  {version: 43, changes: ['Fixed Add to Contacts not offering a way to actually add the contact', 'A customer marked cleaned now stays visible in the Due view until the end of the day']},
+  {version: 42, changes: ['Fixed Add to Contacts doing nothing when tapped']},
+  {version: 41, changes: ['Added "Add to Contacts" for a customer or job, plus a bulk export of everyone from Backup & Restore']},
+  {version: 40, changes: ['Added a tap-to-call button', 'Added a warning flag for customers chased for payment 2+ times with no payment', 'Added a message log showing what\'s actually been sent to a customer or job']}
+];
 const DIRECTIONS_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>';
 const CALL_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>';
 const ADD_CONTACT_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="16" y1="11" x2="22" y2="11"/></svg>';
@@ -492,6 +510,7 @@ function migrateData(parsed){
     if(!j.photos) j.photos = [];
     if(j.remind24h == null) j.remind24h = false;
     if(j.customerId === undefined) j.customerId = null;
+    if(j.time === undefined) j.time = '';
     if(j.paymentReminderSent == null) j.paymentReminderSent = false;
     if(j.paymentReminderSentDate === undefined) j.paymentReminderSentDate = null;
     if(j.paymentReminderCount == null) j.paymentReminderCount = 0;
@@ -605,6 +624,17 @@ function fmtDate(iso){
   const mm = String(d.getMonth()+1).padStart(2,'0');
   const yy = String(d.getFullYear()).slice(-2);
   return `${dd}/${mm}/${yy}`;
+}
+// Formats a 24hr "HH:MM" input value (e.g. '14:30') as a friendly '2:30 PM'.
+function fmtTime(t){
+  if(!t) return '';
+  const parts = t.split(':');
+  const h = parseInt(parts[0], 10);
+  const m = parts[1];
+  if(isNaN(h)) return '';
+  const period = h < 12 ? 'AM' : 'PM';
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}:${m} ${period}`;
 }
 function daysBetween(a,b){
   const d1=new Date(a+'T00:00:00'), d2=new Date(b+'T00:00:00');
@@ -1540,7 +1570,7 @@ function openCustomerHistoryList(id, kind){
     title = 'One-off jobs';
     const linkedJobs = (data.oneOffJobs||[]).filter(j=>j.customerId===id).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
     rowsHtml = linkedJobs
-      .map(j=>`<li style="cursor:pointer;" onclick="openJobForm(data.oneOffJobs.find(x=>x.id==='${j.id}'), null, ()=>openCustomerHistoryList('${id}','jobs'))">${fmtDate(j.date)} — ${money(j.price)} <span style="color:var(--ink-muted); font-weight:500;">(${j.done?'done':'not done'}, ${j.paid?'paid':'unpaid'})</span></li>`).join('') || '<li style="color:var(--ink-muted)">No one-off jobs for this customer</li>';
+      .map(j=>`<li style="cursor:pointer;" onclick="openJobForm(data.oneOffJobs.find(x=>x.id==='${j.id}'), null, ()=>openCustomerHistoryList('${id}','jobs'))">${fmtDate(j.date)}${j.time?` at ${fmtTime(j.time)}`:''} — ${money(j.price)} <span style="color:var(--ink-muted); font-weight:500;">(${j.done?'done':'not done'}, ${j.paid?'paid':'unpaid'})</span></li>`).join('') || '<li style="color:var(--ink-muted)">No one-off jobs for this customer</li>';
   } else {
     title = 'Price history';
     rowsHtml = (c.priceHistory||[]).slice().sort((a,b)=>a.date<b.date?1:-1)
@@ -2528,7 +2558,7 @@ function jobCardHtml(j, today){
         <div>
           <div class="cust-addr" style="font-size:1rem; font-weight:800; color:var(--ink);">${escapeHtml(j.address||'No address')}</div>
           ${(j.name||j.phone) ? `<div class="cust-name" style="font-size:0.8125rem; font-weight:600; color:var(--ink-muted); margin-top:2px;">${[escapeHtml(j.name||''), j.phone?escapeHtml(j.phone):''].filter(Boolean).join(' · ')}</div>` : ''}
-          <div style="font-size:0.75rem; color:var(--ink-muted); margin-top:2px;">${fmtDate(j.date)}${j.remind24h?' · 🔔 Reminder set':''}</div>
+          <div style="font-size:0.75rem; color:var(--ink-muted); margin-top:2px;">${fmtDate(j.date)}${j.time?` at ${fmtTime(j.time)}`:''}${j.remind24h?' · 🔔 Reminder set':''}</div>
         </div>
         <div class="cust-right">
           <div class="cust-price">${money(j.price)}</div>
@@ -2639,10 +2669,12 @@ function openJobForm(existing, prefill, returnTo){
         <input type="date" id="j_date" value="${j.date||todayISO()}">
       </div>
       <div>
-        <label style="margin-top:0">Price</label>
-        <input type="number" id="j_price" value="${j.price!=null?j.price:''}" placeholder="£" min="0" step="0.5">
+        <label style="margin-top:0">Time <span style="text-transform:none; font-weight:500; opacity:0.7;">(optional)</span></label>
+        <input type="time" id="j_time" value="${j.time||''}">
       </div>
     </div>
+    <label>Price</label>
+    <input type="number" id="j_price" value="${j.price!=null?j.price:''}" placeholder="£" min="0" step="0.5">
     <label>Notes</label>
     <textarea id="j_notes" rows="2" placeholder="What's the job...">${escapeHtml(j.notes||'')}</textarea>
     ${(existing && !existing.paid && existing.paymentReminderSent) ? `<div style="font-size:0.75rem; font-weight:700; margin:10px 2px 0; color:var(--amber);">🔔 Payment reminder sent ${fmtDate(existing.paymentReminderSentDate)}</div>` : ''}
@@ -2763,6 +2795,7 @@ function saveJobForm(id){
     address, name,
     phone: document.getElementById('j_phone').value.trim(),
     date: document.getElementById('j_date').value || todayISO(),
+    time: document.getElementById('j_time').value || '',
     price: parseFloat(document.getElementById('j_price').value) || 0,
     notes: document.getElementById('j_notes').value.trim(),
     remind24h: document.getElementById('j_remind').checked,
@@ -4402,14 +4435,37 @@ function openInfo(){
     <p style="color:var(--ink-muted); font-size:0.8125rem; line-height:1.6; margin:0 2px 6px;">
       Created by <b style="color:var(--ink);">D M Bennison using Claude</b>.
     </p>
-    <p style="color:var(--ink-muted); font-size:0.75rem; line-height:1.6; margin:0 2px 18px;">
+    <p style="color:var(--ink-muted); font-size:0.75rem; line-height:1.6; margin:0 2px 6px;">
       Version ${formatVersion(APP_VERSION)}
     </p>
+    <button onclick="openVersionHistory()" style="background:none; border:none; padding:0; color:var(--blue); font-size:0.75rem; font-weight:700; margin:0 2px 18px; display:block;">What's changed recently →</button>
     <p style="color:var(--ink-muted); font-size:0.7812rem; line-height:1.6; margin:0 2px 10px;">
       Spotted a problem, got an idea for an improvement, or just want to say something about the app? Get in touch — feedback's always welcome.
     </p>
     <a href="mailto:dmbennison@gmail.com?subject=Round%20Book%20feedback" style="display:block; text-decoration:none; background:var(--blue-dim); color:var(--blue-deep); border-radius:12px; padding:12px; text-align:center; font-weight:800; font-size:0.875rem;">✉️ dmbennison@gmail.com</a>
   `);
+}
+
+// Shows what's changed over the most recent versions — always capped to the last
+// 10 entries in VERSION_HISTORY, however many are actually kept in that array.
+function openVersionHistory(){
+  const entries = VERSION_HISTORY.slice(0, 10);
+  const rowsHtml = entries.map(v => `
+    <div style="margin-bottom:16px;">
+      <div style="font-size:0.8125rem; font-weight:800; color:var(--ink); margin-bottom:4px;">Version ${formatVersion(v.version)}</div>
+      <ul style="margin:0; padding-left:18px; color:var(--ink-muted); font-size:0.8125rem; line-height:1.6;">
+        ${v.changes.map(c => `<li>${escapeHtml(c)}</li>`).join('')}
+      </ul>
+    </div>
+  `).join('') || '<p style="color:var(--ink-muted); font-size:0.8438rem;">No version history recorded yet.</p>';
+  openSheet(`
+    <div class="sheet-head">
+      <h2 style="flex:1; min-width:0;">Version history</h2>
+      <button class="sheet-close" onclick="closeSheet()">✕</button>
+    </div>
+    <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 16px;">Showing the last ${entries.length} version${entries.length===1?'':'s'}.</p>
+    ${rowsHtml}
+  `, () => openInfo());
 }
 
 function helpH(text){
@@ -4460,6 +4516,7 @@ const FOCUSED_HELP = {
     title: 'One-off jobs',
     body: () => [
       helpP('For anything outside your regular rounds. Swipe right for done, left for paid. Completed jobs get an anniversary flag after a year (switchable off per job), can be turned into a repeat-work quote, and can have a professional invoice printed or sent as a PDF via WhatsApp — with your logo if you\'ve added one.'),
+      helpP('A job can have a time as well as a date, if it\'s worth being specific — leave it blank if not.'),
       helpP('The small green phone button on a job\'s card calls them; the small blue compass button opens directions to its address in your phone\'s map app.'),
       helpP('If a job has a mobile number and isn\'t marked paid yet, a "Payment reminder" button appears on its form.'),
       helpP('The printer icon at the top of this screen prints every one-off job, with status and total value.')
