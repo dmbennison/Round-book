@@ -137,6 +137,7 @@
   .badge.escalate{background:var(--red); color:#fff;}
   .badge.ok{background:var(--green-dim); color:var(--green);}
   .badge.paused{background:var(--line); color:var(--ink-muted);}
+  .badge.deferred{background:var(--blue-dim); color:var(--blue-deep);}
   .badge.anniversary{background:var(--blue-dim); color:var(--blue-deep);}
   .chev{opacity:0.35;}
 
@@ -399,7 +400,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 47;
+const APP_VERSION = 48;
 function formatVersion(v){ return '1.' + v; }
 const DIRECTIONS_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>';
 const CALL_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>';
@@ -562,6 +563,7 @@ function migrateData(parsed){
     if(!c.paymentHistory) c.paymentHistory = [];
     if(c.paymentReminderSent == null) c.paymentReminderSent = false;
     if(c.paymentReminderSentDate === undefined) c.paymentReminderSentDate = null;
+    if(c.deferUntil === undefined) c.deferUntil = null;
     if(c.paymentReminderCount == null) c.paymentReminderCount = 0;
     if(!c.messageLog) c.messageLog = [];
   });
@@ -648,8 +650,14 @@ function custStatus(c){
   const lastPaid = lastOf((c.paymentHistory||[]).map(p=>p.date));
   const freq = freqDays(c);
   let cleanBadge = null;
+  const deferred = c.deferUntil && c.deferUntil > todayISO();
   if(c.paused){
     cleanBadge = {type:'paused', text: c.pauseReason ? `Paused — ${c.pauseReason}` : 'Paused'};
+  } else if(deferred){
+    // A short, deliberate delay to the next clean — distinct from Pause, which is
+    // for longer or indefinite breaks. Suppresses the "due" badge until the
+    // deferred date, without touching cleanHistory or the normal cycle after that.
+    cleanBadge = {type:'deferred', text: `Deferred to ${fmtDate(c.deferUntil)}`};
   } else if(lastClean){
     const due = daysBetween(lastClean, todayISO());
     if(due >= freq){
@@ -1012,6 +1020,10 @@ function openRoundActionsMenu(rn){
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-5v12L3 13z"/><path d="M11.6 16.8a3 3 0 0 1-5.8-1.6"/></svg>
       <div><div class="t1">Send group marketing text</div><div class="t2">Text everyone in this round with a phone number</div></div>
     </button>
+    <button class="backup-btn" onclick="nudgeRoundDue('${escapeAttr(rn)}')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      <div><div class="t1">Defer whole round 4 weeks</div><div class="t2">Push every active customer's due date back at once</div></div>
+    </button>
     <button class="backup-btn" onclick="openFocusedHelp('rounds', ()=>openRoundActionsMenu('${escapeAttr(rn)}'))">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
       <div><div class="t1">Help</div><div class="t2">How rounds work</div></div>
@@ -1202,6 +1214,7 @@ function quickClean(id){
   const c = data.customers.find(x=>x.id===id);
   c.cleanHistory = c.cleanHistory || [];
   c.cleanHistory.push({date: todayISO(), amount: c.price||0});
+  c.deferUntil = null;
   saveData(); render(); toast(`Marked ${c.name||c.address||'customer'} as cleaned today`);
 }
 function quickPaid(id){
@@ -1435,6 +1448,18 @@ function openCustomerDetail(id){
           <button class="btn btn-clean" onclick="openAddCleanForm('${id}')">+ Add a clean</button>
           <button class="btn btn-paid" onclick="openAddPaymentForm('${id}')">+ Add a payment</button>
         </div>
+        ${!c.paused ? (
+          (s.cleanBadge && s.cleanBadge.type === 'deferred') ? `
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin:0 2px 6px;">
+          <span style="font-size:0.75rem; color:var(--ink-muted);">⏭ Deferred to ${fmtDate(c.deferUntil)}</span>
+          <button onclick="editDeferDate('${id}')" style="font-size:0.75rem; font-weight:700; color:var(--blue); background:none; border:none; padding:0;">Edit date</button>
+        </div>
+        <div class="row2" style="margin-bottom:10px;">
+          <button class="btn" style="background:var(--blue-dim); color:var(--blue-deep);" onclick="deferCustomerDue('${id}')">+4 more weeks</button>
+          <button class="btn" style="background:var(--line); color:var(--ink-muted);" onclick="cancelDefer('${id}')">Cancel defer</button>
+        </div>` : `
+        <button class="btn" style="width:100%; background:var(--blue-dim); color:var(--blue-deep); margin-bottom:10px;" onclick="deferCustomerDue('${id}')">⏭ Defer due date 4 weeks</button>`
+        ) : ''}
         <button class="btn" style="width:100%; background:${c.paused?'var(--green-dim)':'var(--line)'}; color:${c.paused?'var(--green)':'var(--ink-muted)'}; margin-bottom:10px;" onclick="${c.paused?`resumeCustomer('${id}')`:`openPauseReasonSheet('${id}')`}">
           ${c.paused ? '▶ Resume this customer' : '⏸ Pause'}
         </button>
@@ -1843,6 +1868,77 @@ function resumeCustomer(id){
   c.pauseDate = '';
   saveData(); openCustomerDetail(id); render();
   toast('Customer resumed');
+}
+
+// Pushes a customer's next due date out by 4 weeks without logging a clean — for a
+// short, one-off delay (holiday, bad weather, access issue) where they're still an
+// active customer, unlike Pause which is meant for longer or indefinite breaks.
+// Shared date math for both the single-customer and whole-round defer actions.
+// Bases the new date off whichever is latest: their natural next-due date (so
+// someone not yet due gets their whole cycle pushed out), today (so an
+// already-overdue customer still gets a genuine 4 weeks from now), or an existing
+// deferral (so nudging again while already deferred stacks correctly).
+function deferredDateFor(c){
+  const today = todayISO();
+  const naturalDue = nextDueISO(c) || today;
+  let base = naturalDue > today ? naturalDue : today;
+  if(c.deferUntil && c.deferUntil > base) base = c.deferUntil;
+  const d = new Date(base+'T00:00:00');
+  d.setDate(d.getDate() + 28);
+  return d.toISOString().slice(0,10);
+}
+function deferCustomerDue(id){
+  const c = data.customers.find(x=>x.id===id);
+  if(!c) return;
+  c.deferUntil = deferredDateFor(c);
+  saveData(); openCustomerDetail(id); render();
+  toast(`Due date deferred to ${fmtDate(c.deferUntil)}`);
+}
+function cancelDefer(id){
+  const c = data.customers.find(x=>x.id===id);
+  if(!c) return;
+  c.deferUntil = null;
+  saveData(); openCustomerDetail(id); render();
+  toast('Defer cancelled');
+}
+// Lets the deferred date be fine-tuned to an exact date rather than only ever
+// jumping in fixed 4-week steps.
+function editDeferDate(id){
+  const c = data.customers.find(x=>x.id===id);
+  if(!c) return;
+  openSheet(`
+    <div class="sheet-head">
+      <h2 style="flex:1; min-width:0;">Edit deferred date</h2>
+      <button class="sheet-close" onclick="closeSheet()">✕</button>
+    </div>
+    <label style="margin-top:0;">Due again from</label>
+    <input type="date" id="defer_date_input" value="${c.deferUntil || deferredDateFor(c)}">
+    <div class="form-actions">
+      <button class="btn-primary" onclick="saveDeferDate('${id}')">Save</button>
+    </div>
+  `, () => openCustomerDetail(id));
+}
+function saveDeferDate(id){
+  const c = data.customers.find(x=>x.id===id);
+  if(!c) return;
+  const v = document.getElementById('defer_date_input').value;
+  if(!v){ toast('Pick a date'); return; }
+  c.deferUntil = v;
+  saveData(); openCustomerDetail(id); render();
+  toast(`Due date deferred to ${fmtDate(c.deferUntil)}`);
+}
+// Applies the same defer-by-4-weeks logic to every active (non-paused) customer
+// in a round at once — for things like bad weather or a run of cancellations that
+// affect the whole round rather than one customer.
+function nudgeRoundDue(rn){
+  const custs = data.customers.filter(c => c.round === rn && !c.paused);
+  if(!custs.length){ toast('No active customers in this round'); return; }
+  if(!confirm(`Defer the due date by 4 weeks for all ${custs.length} active customer${custs.length===1?'':'s'} in "${rn}"?`)) return;
+  custs.forEach(c => { c.deferUntil = deferredDateFor(c); });
+  saveData();
+  closeSheet();
+  render();
+  toast(`Deferred ${custs.length} customer${custs.length===1?'':'s'} in "${rn}" by 4 weeks`);
 }
 
 // Builds the "pay by bank transfer" block used by the {bankdetails} token — empty
@@ -2350,6 +2446,7 @@ function addHistDate(id, kind){
     const amtRaw = document.getElementById('d_clean_amount').value;
     const amt = amtRaw!=='' ? parseFloat(amtRaw) : (c.price||0);
     c.cleanHistory = c.cleanHistory||[]; c.cleanHistory.push({date:v, amount: isNaN(amt)?0:amt});
+    c.deferUntil = null;
   } else {
     const v = document.getElementById('d_pay').value;
     if(!v) return;
@@ -4353,7 +4450,7 @@ const FOCUSED_HELP = {
       helpP('The printer icon above the summary numbers covers reports across every round at once — Windows due, Money owed, and Full round lists. A single round\'s own screen has its own separate Print option, just for that round.'),
       helpP('Marking someone cleaned doesn\'t remove them from the Due view straight away — they stay there for the rest of the day, so you can still see everyone you\'ve worked through. They drop off automatically the next day. The total at the bottom only counts what\'s still left to do.'),
       helpP('If a round takes more than one day, tap each customer\'s day badge in reorder mode to assign Day 1–5. A day switcher then appears above the customer list, and cards get a "Day N" badge.'),
-      helpP('The ⋯ button on a round\'s screen opens Print, group marketing text, and Help.'),
+      helpP('The ⋯ button on a round\'s screen opens Print, group marketing text, Defer whole round 4 weeks, and Help.'),
       helpP('A "Cleaned today" button appears on a customer\'s card once they have a clean logged for today and a phone number saved — tap it to text them that it\'s done.'),
       helpP('The small green phone button on a customer\'s card calls them; the small blue compass button opens directions to their address in your phone\'s map app.'),
       helpP('If a customer\'s had 2 or more payment reminders sent with no payment logged, a red "⚠ Chase" badge appears on their card — a sign it\'s worth a phone call rather than another text.')
@@ -4377,7 +4474,8 @@ const FOCUSED_HELP = {
       helpP('A "Messages" entry under History lists every text actually sent to that customer, newest first — a quick way to check whether someone\'s already been chased today.'),
       helpP('The small icon next to a customer\'s phone/email adds them straight to your phone\'s Contacts app.'),
       helpP('Tick "Text before I arrive" on a customer\'s edit screen to flag that they need a heads-up text before you turn up — it shows as a badge on their card and detail screen.'),
-      helpP('Pausing a customer asks for a reason — Holiday, Work being done, Cancelled, Moved out, or Other — and stamps the date. Paused customers are skipped from due reminders and round totals until resumed.'),
+      helpP('Pausing a customer asks for a reason — Holiday, Work being done, Cancelled, Moved out, or Other — and stamps the date. Paused customers are skipped from due reminders and round totals until resumed. Use Pause for a longer or indefinite break.'),
+      helpP('"Defer due date 4 weeks" pushes a customer\'s next due date out without pausing them or touching their clean history — for a short, one-off delay like a holiday or bad weather. The exact date can be fine-tuned with "Edit date", and clears itself automatically the next time they\'re actually cleaned. The whole round can be deferred at once from the ⋯ menu on the round\'s own screen.'),
       helpP('The "Get a quote for this customer" button opens a new quote pre-filled with their details.'),
       helpP('The printer icon prints or emails a record of everything on this screen.')
     ]
