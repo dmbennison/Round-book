@@ -400,7 +400,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 50;
+const APP_VERSION = 51;
 function formatVersion(v){ return '1.' + v; }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
@@ -409,6 +409,7 @@ function formatVersion(v){ return '1.' + v; }
 // the most recent 10 entries (oldest ones can be left in the array or trimmed,
 // either is fine, since the display always slices to 10).
 const VERSION_HISTORY = [
+  {version: 51, changes: ['Photos now stored separately from your customer/job records, with far more room — a growing photo library can no longer risk running out of storage', 'Existing photos are automatically moved over the first time this version runs', 'Backup exports still include everything, including photos, in one file']},
   {version: 50, changes: ['Fixed the Time field on a one-off job appearing tiny instead of matching the Date field']},
   {version: 49, changes: ['One-off jobs can now have an optional time as well as a date', 'Added this version history to the About screen']},
   {version: 48, changes: ['Added "Defer due date 4 weeks" for a customer, as a short-term alternative to Pause — the exact date can be edited', 'Added "Defer whole round 4 weeks" to push back everyone in a round at once']},
@@ -613,6 +614,173 @@ function saveData(){
     return false;
   }
 }
+/* ---------- photo storage (IndexedDB) ----------
+   Photos (customer/job) are stored as compressed Blobs in IndexedDB, not embedded
+   in the main `data` object — IndexedDB's storage limit is dramatically larger than
+   localStorage's ~5-10MB, so a growing photo library can no longer threaten the
+   customer/job records that actually run the business. Only a photo's {id, date}
+   lives in `data`; the pixels live here, referenced by id. */
+const PHOTO_DB_NAME = 'roundBookPhotos';
+const PHOTO_STORE = 'photos';
+let photoDbPromise = null;
+let photoStorageAvailable = true;
+function openPhotoDb(){
+  if(photoDbPromise) return photoDbPromise;
+  photoDbPromise = new Promise((resolve, reject)=>{
+    if(!('indexedDB' in window)){ reject(new Error('IndexedDB not available')); return; }
+    const req = indexedDB.open(PHOTO_DB_NAME, 1);
+    req.onupgradeneeded = ()=>{ req.result.createObjectStore(PHOTO_STORE); };
+    req.onsuccess = ()=> resolve(req.result);
+    req.onerror = ()=> reject(req.error);
+  });
+  photoDbPromise.catch(()=>{ photoStorageAvailable = false; });
+  return photoDbPromise;
+}
+async function idbSavePhoto(id, blob){
+  const db = await openPhotoDb();
+  return new Promise((resolve, reject)=>{
+    const tx = db.transaction(PHOTO_STORE, 'readwrite');
+    tx.objectStore(PHOTO_STORE).put(blob, id);
+    tx.oncomplete = ()=>resolve();
+    tx.onerror = ()=>reject(tx.error);
+  });
+}
+async function idbGetPhoto(id){
+  const db = await openPhotoDb();
+  return new Promise((resolve, reject)=>{
+    const tx = db.transaction(PHOTO_STORE, 'readonly');
+    const req = tx.objectStore(PHOTO_STORE).get(id);
+    req.onsuccess = ()=>resolve(req.result || null);
+    req.onerror = ()=>reject(req.error);
+  });
+}
+async function idbDeletePhoto(id){
+  const db = await openPhotoDb();
+  return new Promise((resolve, reject)=>{
+    const tx = db.transaction(PHOTO_STORE, 'readwrite');
+    tx.objectStore(PHOTO_STORE).delete(id);
+    tx.oncomplete = ()=>resolve();
+    tx.onerror = ()=>reject(tx.error);
+  });
+}
+// Returns a Map<id, Blob> of every stored photo — used for startup preload, the
+// storage-used figures, and bundling photos into a portable backup export.
+async function idbGetAllPhotos(){
+  const db = await openPhotoDb();
+  return new Promise((resolve, reject)=>{
+    const tx = db.transaction(PHOTO_STORE, 'readonly');
+    const store = tx.objectStore(PHOTO_STORE);
+    const out = new Map();
+    const req = store.openCursor();
+    req.onsuccess = (e)=>{
+      const cursor = e.target.result;
+      if(cursor){ out.set(cursor.key, cursor.value); cursor.continue(); }
+      else resolve(out);
+    };
+    req.onerror = ()=>reject(req.error);
+  });
+}
+function blobToDataURL(blob){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onload = ()=>resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+async function dataURLToBlob(dataUrl){
+  const res = await fetch(dataUrl);
+  return res.blob();
+}
+
+// id -> object URL, resolved once per session. Every screen that shows a photo reads
+// from this synchronously (populated ahead of time — see initPhotoStorage below) so
+// none of the existing render code needs to become async just to show a thumbnail.
+let photoUrlCache = new Map();
+let photoBytesTotal = 0;
+let photoCountTotal = 0;
+
+function cachePhotoBlob(id, blob){
+  const existing = photoUrlCache.get(id);
+  if(existing) URL.revokeObjectURL(existing);
+  photoUrlCache.set(id, URL.createObjectURL(blob));
+}
+function uncachePhoto(id){
+  const existing = photoUrlCache.get(id);
+  if(existing){ URL.revokeObjectURL(existing); photoUrlCache.delete(id); }
+}
+
+// One-time migration: any photo still holding an old-style embedded `dataUrl` (from
+// before photos moved to IndexedDB — this includes every photo already on the phone
+// the first time this version runs, and any older backup file being restored) gets
+// decoded, stored in IndexedDB, and stripped down to just {id, date}. Safe to call
+// repeatedly — already-migrated photos are left untouched.
+async function migrateLegacyPhotosToIndexedDB(targetData){
+  const jobs = [];
+  const migrateList = (list) => {
+    (list||[]).forEach(p=>{
+      if(p && p.dataUrl){
+        const blob = dataURLToBlob(p.dataUrl);
+        jobs.push(blob.then(b => idbSavePhoto(p.id, b).then(()=>{ delete p.dataUrl; })));
+      }
+    });
+  };
+  (targetData.customers||[]).forEach(c => migrateList(c.photos));
+  (targetData.oneOffJobs||[]).forEach(j => migrateList(j.photos));
+  if(jobs.length) await Promise.all(jobs).catch(()=>{ photoStorageAvailable = false; });
+}
+// Decodes a bundled backup export's photo blobs (see exportData) back into
+// IndexedDB. Older backups (pre-dating this change) don't have this — their photos
+// are still embedded per-photo as `dataUrl` and are handled by the migration above
+// instead, since migrateData() runs on every import too.
+async function restoreBundledPhotoBlobs(targetData){
+  if(!targetData._photoBlobs) return;
+  const entries = Object.entries(targetData._photoBlobs);
+  await Promise.all(entries.map(async ([id, dataUrl]) => {
+    try{ const blob = await dataURLToBlob(dataUrl); await idbSavePhoto(id, blob); }catch(e){}
+  }));
+  delete targetData._photoBlobs;
+}
+// Loads every stored photo into photoUrlCache and totals up real byte usage — run
+// once at startup (after migration) so every subsequent render in the session can
+// just read photoUrlCache.get(id) synchronously, same as everything else in this app.
+async function preloadAllPhotoUrls(){
+  try{
+    const all = await idbGetAllPhotos();
+    let bytes = 0;
+    all.forEach((blob, id) => { cachePhotoBlob(id, blob); bytes += blob.size; });
+    photoBytesTotal = bytes;
+    photoCountTotal = all.size;
+  }catch(e){ photoStorageAvailable = false; }
+}
+// Removes any IndexedDB photo blob no longer referenced by a customer or job — e.g.
+// after a delete-customer/delete-job that wasn't undone. Deliberately NOT run
+// immediately on delete, since both of those have an "Undo" toast that restores the
+// record (including its photo ids) — running this at the next startup instead means
+// Undo always still works, and nothing genuinely orphaned lingers for long.
+async function cleanupOrphanedPhotos(){
+  try{
+    const referenced = new Set();
+    (data.customers||[]).forEach(c => (c.photos||[]).forEach(p=>referenced.add(p.id)));
+    (data.oneOffJobs||[]).forEach(j => (j.photos||[]).forEach(p=>referenced.add(p.id)));
+    const all = await idbGetAllPhotos();
+    const toRemove = [...all.keys()].filter(id => !referenced.has(id));
+    if(!toRemove.length) return;
+    await Promise.all(toRemove.map(id => idbDeletePhoto(id).then(()=>{
+      uncachePhoto(id);
+      const blob = all.get(id);
+      if(blob){ photoBytesTotal -= blob.size; photoCountTotal--; }
+    })));
+  }catch(e){}
+}
+async function initPhotoStorage(){
+  await migrateLegacyPhotosToIndexedDB(data);
+  saveData(); // persist the now-slimmed-down data — this is what actually frees up
+              // localStorage space for anyone upgrading with existing photos
+  await preloadAllPhotoUrls();
+  await cleanupOrphanedPhotos();
+}
+
 let data = loadData();
 
 /* ---------- helpers ---------- */
@@ -1538,7 +1706,7 @@ function openCustomerDetail(id){
       <summary>Photos${(c.photos&&c.photos.length)?` (${c.photos.length})`:''} ${chev}</summary>
       <div class="cust-section-body">
         <div style="display:flex; flex-wrap:wrap; gap:8px;">
-          ${(c.photos||[]).map(p=>`<img src="${p.dataUrl}" onclick="viewPhoto('${id}','${p.id}')" style="width:72px; height:72px; object-fit:cover; border-radius:10px; border:1px solid var(--line); cursor:pointer;">`).join('')}
+          ${(c.photos||[]).map(p=>`<img src="${photoUrlCache.get(p.id) || p.dataUrl || ''}" onclick="viewPhoto('${id}','${p.id}')" style="width:72px; height:72px; object-fit:cover; border-radius:10px; border:1px solid var(--line); cursor:pointer;">`).join('')}
           <button onclick="document.getElementById('photoInput_${id}').click()" style="width:72px; height:72px; border-radius:10px; border:2px dashed var(--line); background:none; color:var(--ink-muted); font-size:1.625rem; display:flex; align-items:center; justify-content:center;">+</button>
           <input type="file" accept="image/*" id="photoInput_${id}" style="display:none;" onchange="handlePhotoSelected('${id}', this)">
         </div>
@@ -1634,6 +1802,9 @@ function openHistEntryActions(id, kind, dateVal, amount){
   `, () => openCustomerHistoryList(id, kind));
 }
 
+// Resolves a compressed Blob (not a dataURL) — used for customer/job photos, which
+// are stored in IndexedDB rather than embedded in the main data object. A Blob also
+// avoids the ~33% size inflation that base64/dataURL encoding would otherwise add.
 function compressImage(file, maxDim, quality){
   return new Promise((resolve, reject)=>{
     const reader = new FileReader();
@@ -1646,7 +1817,9 @@ function compressImage(file, maxDim, quality){
         const canvas = document.createElement('canvas');
         canvas.width = w; canvas.height = h;
         canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-        resolve(canvas.toDataURL('image/jpeg', quality));
+        canvas.toBlob((blob)=>{
+          if(blob) resolve(blob); else reject(new Error('toBlob failed'));
+        }, 'image/jpeg', quality);
       };
       img.onerror = reject;
       img.src = e.target.result;
@@ -1710,10 +1883,23 @@ async function handlePhotoSelected(id, inputEl){
   if(!file) return;
   toast('Adding photo…');
   try{
-    const dataUrl = await compressImage(file, 900, 0.7);
-    const c = data.customers.find(x=>x.id===id);
-    c.photos = c.photos || [];
-    c.photos.push({id: uid(), dataUrl, date: todayISO()});
+    const blob = await compressImage(file, 900, 0.7);
+    const photoId = uid();
+    if(photoStorageAvailable){
+      await idbSavePhoto(photoId, blob);
+      cachePhotoBlob(photoId, blob);
+      photoBytesTotal += blob.size; photoCountTotal++;
+      const c = data.customers.find(x=>x.id===id);
+      c.photos = c.photos || [];
+      c.photos.push({id: photoId, date: todayISO()});
+    } else {
+      // IndexedDB unavailable (rare) — fall back to the old embedded-dataURL
+      // behaviour rather than losing the photo.
+      const dataUrl = await blobToDataURL(blob);
+      const c = data.customers.find(x=>x.id===id);
+      c.photos = c.photos || [];
+      c.photos.push({id: photoId, dataUrl, date: todayISO()});
+    }
     if(saveData()){
       openCustomerDetail(id);
       render();
@@ -1729,12 +1915,13 @@ function viewPhoto(id, photoId){
   const c = data.customers.find(x=>x.id===id);
   const p = (c.photos||[]).find(x=>x.id===photoId);
   if(!p) return;
+  const src = photoUrlCache.get(photoId) || p.dataUrl || '';
   openSheet(`
     <div class="sheet-head">
       <h2>Photo</h2>
       <button class="sheet-close" onclick="openCustomerDetail('${id}')">✕</button>
     </div>
-    <img src="${p.dataUrl}" style="width:100%; border-radius:12px; margin-bottom:6px;">
+    <img src="${src}" style="width:100%; border-radius:12px; margin-bottom:6px;">
     <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 16px;">Added ${fmtDate(p.date)}</p>
     <div class="row2" style="margin-bottom:8px;">
       <button class="btn btn-clean" onclick="sharePhoto('${id}','${photoId}')">📤 Share</button>
@@ -1749,8 +1936,8 @@ async function sharePhoto(id, photoId){
   const p = (c.photos||[]).find(x=>x.id===photoId);
   if(!p) return;
   try{
-    const res = await fetch(p.dataUrl);
-    const blob = await res.blob();
+    const blob = photoStorageAvailable ? await idbGetPhoto(photoId) : await (await fetch(p.dataUrl)).blob();
+    if(!blob) throw new Error('photo not found');
     const safeName = (c.address || c.name || 'photo').replace(/[^a-z0-9]+/gi, '-').toLowerCase();
     const file = new File([blob], `${safeName}-${p.date}.jpg`, { type: blob.type || 'image/jpeg' });
     if(navigator.canShare && navigator.canShare({ files: [file] })){
@@ -1769,6 +1956,10 @@ function deletePhoto(id, photoId){
   const c = data.customers.find(x=>x.id===id);
   c.photos = (c.photos||[]).filter(p=>p.id!==photoId);
   saveData();
+  if(photoStorageAvailable){
+    idbDeletePhoto(photoId).then(()=>{}).catch(()=>{});
+    uncachePhoto(photoId);
+  }
   openCustomerDetail(id);
   render();
 }
@@ -2712,7 +2903,7 @@ function openJobForm(existing, prefill, returnTo){
     ${existing?`
       <div class="section-label">Photos</div>
       <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
-        ${(j.photos||[]).map(p=>`<img src="${p.dataUrl}" onclick="viewJobPhoto('${existing.id}','${p.id}')" style="width:72px; height:72px; object-fit:cover; border-radius:10px; border:1px solid var(--line); cursor:pointer;">`).join('')}
+        ${(j.photos||[]).map(p=>`<img src="${photoUrlCache.get(p.id) || p.dataUrl || ''}" onclick="viewJobPhoto('${existing.id}','${p.id}')" style="width:72px; height:72px; object-fit:cover; border-radius:10px; border:1px solid var(--line); cursor:pointer;">`).join('')}
         <button onclick="document.getElementById('jobPhotoInput_${existing.id}').click()" style="width:72px; height:72px; border-radius:10px; border:2px dashed var(--line); background:none; color:var(--ink-muted); font-size:1.625rem; display:flex; align-items:center; justify-content:center;">+</button>
         <input type="file" accept="image/*" id="jobPhotoInput_${existing.id}" style="display:none;" onchange="handleJobPhotoSelected('${existing.id}', this)">
       </div>
@@ -2724,12 +2915,13 @@ function viewJobPhoto(id, photoId){
   const j = data.oneOffJobs.find(x=>x.id===id);
   const p = (j.photos||[]).find(x=>x.id===photoId);
   if(!p) return;
+  const src = photoUrlCache.get(photoId) || p.dataUrl || '';
   openSheet(`
     <div class="sheet-head">
       <h2>Photo</h2>
       <button class="sheet-close" onclick="openJobForm(data.oneOffJobs.find(x=>x.id==='${id}'))">✕</button>
     </div>
-    <img src="${p.dataUrl}" style="width:100%; border-radius:12px; margin-bottom:6px;">
+    <img src="${src}" style="width:100%; border-radius:12px; margin-bottom:6px;">
     <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 16px;">Added ${fmtDate(p.date)}</p>
     <div class="row2" style="margin-bottom:8px;">
       <button class="btn btn-clean" onclick="shareJobPhoto('${id}','${photoId}')">📤 Share</button>
@@ -2744,10 +2936,19 @@ async function handleJobPhotoSelected(id, inputEl){
   if(!file) return;
   toast('Adding photo…');
   try{
-    const dataUrl = await compressImage(file, 900, 0.7);
+    const blob = await compressImage(file, 900, 0.7);
+    const photoId = uid();
     const j = data.oneOffJobs.find(x=>x.id===id);
     j.photos = j.photos || [];
-    j.photos.push({id: uid(), dataUrl, date: todayISO()});
+    if(photoStorageAvailable){
+      await idbSavePhoto(photoId, blob);
+      cachePhotoBlob(photoId, blob);
+      photoBytesTotal += blob.size; photoCountTotal++;
+      j.photos.push({id: photoId, date: todayISO()});
+    } else {
+      const dataUrl = await blobToDataURL(blob);
+      j.photos.push({id: photoId, dataUrl, date: todayISO()});
+    }
     if(saveData()){
       openJobForm(j);
       toast('Photo added');
@@ -2763,8 +2964,8 @@ async function shareJobPhoto(id, photoId){
   const p = (j.photos||[]).find(x=>x.id===photoId);
   if(!p) return;
   try{
-    const res = await fetch(p.dataUrl);
-    const blob = await res.blob();
+    const blob = photoStorageAvailable ? await idbGetPhoto(photoId) : await (await fetch(p.dataUrl)).blob();
+    if(!blob) throw new Error('photo not found');
     const safeName = (j.address || j.name || 'photo').replace(/[^a-z0-9]+/gi, '-').toLowerCase();
     const file = new File([blob], `${safeName}-${p.date}.jpg`, { type: blob.type || 'image/jpeg' });
     if(navigator.canShare && navigator.canShare({ files: [file] })){
@@ -2783,6 +2984,10 @@ function deleteJobPhoto(id, photoId){
   const j = data.oneOffJobs.find(x=>x.id===id);
   j.photos = (j.photos||[]).filter(p=>p.id!==photoId);
   saveData();
+  if(photoStorageAvailable){
+    idbDeletePhoto(photoId).then(()=>{}).catch(()=>{});
+    uncachePhoto(photoId);
+  }
   openJobForm(j);
 }
 
@@ -4011,7 +4216,7 @@ function printCustomerRecord(id){
   const photosHtml = (c.photos && c.photos.length) ? `
     <div class="rpt-round-title">Photos</div>
     <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:16px;">
-      ${c.photos.map(p=>`<img src="${p.dataUrl}" style="width:160px; height:160px; object-fit:cover; border-radius:6px; border:1px solid #E3E9EC;">`).join('')}
+      ${c.photos.map(p=>`<img src="${photoUrlCache.get(p.id) || p.dataUrl || ''}" style="width:160px; height:160px; object-fit:cover; border-radius:6px; border:1px solid #E3E9EC;">`).join('')}
     </div>
   ` : '';
 
@@ -4117,7 +4322,7 @@ function printJobRecord(id){
   const photosHtml = (j.photos && j.photos.length) ? `
     <div class="rpt-round-title">Photos</div>
     <div style="display:flex; flex-wrap:wrap; gap:10px;">
-      ${j.photos.map(p=>`<img src="${p.dataUrl}" style="width:160px; height:160px; object-fit:cover; border-radius:6px; border:1px solid #E3E9EC;">`).join('')}
+      ${j.photos.map(p=>`<img src="${photoUrlCache.get(p.id) || p.dataUrl || ''}" style="width:160px; height:160px; object-fit:cover; border-radius:6px; border:1px solid #E3E9EC;">`).join('')}
     </div>
   ` : '';
   const body = `
@@ -4564,7 +4769,7 @@ const FOCUSED_HELP = {
     title: 'Backup and restore',
     body: () => [
       helpP('Everything lives only on this phone. Back up regularly from the Backup icon — export a full backup, export to Excel, export everyone as a contacts file, restore from a backup file, or import customers from a spreadsheet (they land in a "Needs review" round until you check them over).'),
-      helpP('The storage bar at the top shows roughly how much space your data is using — photos are usually the biggest share. If it\'s getting close to full, removing old photos frees up the most room.')
+      helpP('The storage bar at the top shows your customer/job records — the pool with a tight ~5-10MB limit. Photos are stored separately, with much more room, so a growing photo library can\'t threaten your actual records.')
     ]
   },
   settings: {
@@ -4623,25 +4828,33 @@ function openHelp(returnTo){
   `, returnTo);
 }
 
-// Rough byte size of the whole saved dataset, plus a breakdown for photos (usually
-// the biggest share by far, since they're stored as base64 text alongside everything
-// else). Used to give a plain-English "storage used" figure in Backup & restore.
+// Rough byte size of the actual localStorage footprint (customers/jobs/quotes/
+// settings — the pool with the tight ~5-10MB browser limit), plus photo storage
+// tracked separately, since photos now live in IndexedDB with a much larger limit.
 function computeStorageStats(){
   const jsonStr = JSON.stringify(data);
   const totalBytes = new Blob([jsonStr]).size;
-  let photoBytes = 0, photoCount = 0;
+  // Normally all photos live in IndexedDB (see photoBytesTotal, tracked at startup
+  // and kept in sync on add/delete) — but if IndexedDB was ever unavailable, some
+  // may still be embedded here as a fallback, so those get counted in too.
+  let legacyPhotoBytes = 0, legacyPhotoCount = 0;
   (data.customers||[]).forEach(c=>{
     (c.photos||[]).forEach(p=>{
-      if(p.dataUrl){ photoBytes += new Blob([p.dataUrl]).size; photoCount++; }
+      if(p.dataUrl){ legacyPhotoBytes += new Blob([p.dataUrl]).size; legacyPhotoCount++; }
     });
   });
   (data.oneOffJobs||[]).forEach(j=>{
     (j.photos||[]).forEach(p=>{
-      if(p.dataUrl){ photoBytes += new Blob([p.dataUrl]).size; photoCount++; }
+      if(p.dataUrl){ legacyPhotoBytes += new Blob([p.dataUrl]).size; legacyPhotoCount++; }
     });
   });
   const logoBytes = (data.settings && data.settings.logo) ? new Blob([data.settings.logo]).size : 0;
-  return { totalBytes, photoBytes, photoCount, logoBytes };
+  return {
+    totalBytes,
+    photoBytes: photoBytesTotal + legacyPhotoBytes,
+    photoCount: photoCountTotal + legacyPhotoCount,
+    logoBytes
+  };
 }
 function formatBytes(bytes){
   if(bytes < 1024) return bytes + ' B';
@@ -4671,16 +4884,25 @@ function openBackup(){
     <p style="color:${days>=BACKUP_REMINDER_DAYS?'var(--amber)':'var(--ink-muted)'}; font-size:0.7812rem; font-weight:700; margin:0 2px 16px;">${lastText}</p>
     <div style="background:var(--surface); border:1px solid #000; border-radius:12px; padding:14px; margin-bottom:16px;">
       <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px;">
-        <span style="font-size:0.8125rem; font-weight:800; color:var(--ink);">Storage used</span>
+        <span style="font-size:0.8125rem; font-weight:800; color:var(--ink);">Customer &amp; job data</span>
         <span style="font-size:0.9375rem; font-weight:800; color:var(--ink);">${formatBytes(stats.totalBytes)}</span>
       </div>
       <div style="height:6px; background:var(--line); border-radius:3px; overflow:hidden; margin-bottom:10px;">
         <div style="height:100%; width:${pctUsed}%; background:${barColor}; border-radius:3px;"></div>
       </div>
       <div style="font-size:0.75rem; color:var(--ink-muted); line-height:1.55;">
-        ${stats.photoCount ? `${stats.photoCount} photo${stats.photoCount===1?'':'s'} (${formatBytes(stats.photoBytes)}) — usually the biggest share. ` : ''}Browsers typically allow somewhere around 5–10MB per app before storage runs out — if you're getting close, removing old photos frees up the most space.
+        This is the tight-limit pool (customer records, clean/payment history, settings) — browsers typically allow somewhere around 5–10MB here before storage runs out.
       </div>
     </div>
+    ${stats.photoCount ? `<div style="background:var(--surface); border:1px solid #000; border-radius:12px; padding:14px; margin-bottom:16px;">
+      <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px;">
+        <span style="font-size:0.8125rem; font-weight:800; color:var(--ink);">Photos</span>
+        <span style="font-size:0.9375rem; font-weight:800; color:var(--ink);">${formatBytes(stats.photoBytes)}</span>
+      </div>
+      <div style="font-size:0.75rem; color:var(--ink-muted); line-height:1.55;">
+        ${stats.photoCount} photo${stats.photoCount===1?'':'s'} — stored separately from the pool above, with much more room, so a growing photo library can't threaten your customer records.
+      </div>
+    </div>` : ''}
     <button class="backup-btn" onclick="exportData()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
       <div><div class="t1">Export backup</div><div class="t2">${count} customer${count===1?'':'s'} · saves a .json file</div></div>
@@ -4704,7 +4926,25 @@ function openBackup(){
   `);
 }
 async function exportData(){
-  const jsonStr = JSON.stringify(data, null, 2);
+  toast('Preparing backup…');
+  // Photos live in IndexedDB, not in `data` — bundle them into the export as base64
+  // under `_photoBlobs` so a single backup file stays a complete, portable copy of
+  // everything, exactly as it was before photos moved out of localStorage.
+  const exportObj = JSON.parse(JSON.stringify(data)); // shallow-safe clone before mutating
+  if(photoStorageAvailable){
+    try{
+      const referenced = new Set();
+      (exportObj.customers||[]).forEach(c => (c.photos||[]).forEach(p=>referenced.add(p.id)));
+      (exportObj.oneOffJobs||[]).forEach(j => (j.photos||[]).forEach(p=>referenced.add(p.id)));
+      const photoBlobs = {};
+      await Promise.all([...referenced].map(async id => {
+        const blob = await idbGetPhoto(id);
+        if(blob) photoBlobs[id] = await blobToDataURL(blob);
+      }));
+      exportObj._photoBlobs = photoBlobs;
+    }catch(e){ /* export still proceeds without bundled photos rather than failing outright */ }
+  }
+  const jsonStr = JSON.stringify(exportObj, null, 2);
   const filename = `round-book-backup-${todayISO()}.json`;
 
   const markBackedUp = ()=>{
@@ -4744,13 +4984,27 @@ document.getElementById('importFile').addEventListener('change', function(e){
   const file = e.target.files[0];
   if(!file) return;
   const reader = new FileReader();
-  reader.onload = function(evt){
+  reader.onload = async function(evt){
     try{
       const parsed = JSON.parse(evt.target.result);
       if(!parsed.customers || !Array.isArray(parsed.customers)) throw new Error('bad format');
       if(confirm(`Import ${parsed.customers.length} customers? This will replace all data currently on this phone.`)){
-        data = migrateData(parsed);
+        toast('Restoring backup…');
+        const migrated = migrateData(parsed);
+        // Handles both a backup from this version (photos bundled under
+        // _photoBlobs) and an older backup from before photos moved to IndexedDB
+        // (photos still embedded per-entry as dataUrl, same as any legacy data
+        // already on the phone).
+        await restoreBundledPhotoBlobs(migrated);
+        await migrateLegacyPhotosToIndexedDB(migrated);
+        data = migrated;
         saveData();
+        // Replacing all data outright — start the photo URL cache fresh rather
+        // than trying to reconcile it against whatever was cached before.
+        photoUrlCache.forEach(url => URL.revokeObjectURL(url));
+        photoUrlCache = new Map();
+        await preloadAllPhotoUrls();
+        await cleanupOrphanedPhotos();
         closeSheet();
         render();
         toast('Backup restored');
@@ -5134,8 +5388,15 @@ if(data.customers.length === 0 && !localStorage.getItem('roundBookSeeded')){
   localStorage.setItem('roundBookSeeded','1');
 }
 
-render();
-initSwipeHandlers();
+// Photos need to be migrated out of localStorage / preloaded from IndexedDB before
+// the first render, so every screen can rely on photoUrlCache being ready — same
+// approach as the rest of the app (data is fully ready before render() runs), just
+// with one unavoidable async step first. Renders immediately either way rather than
+// risking a stuck blank screen if IndexedDB is ever unavailable or slow.
+initPhotoStorage().catch(()=>{}).finally(()=>{
+  render();
+  initSwipeHandlers();
+});
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
