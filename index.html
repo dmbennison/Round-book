@@ -400,7 +400,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 51;
+const APP_VERSION = 52;
 function formatVersion(v){ return '1.' + v; }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
@@ -409,6 +409,7 @@ function formatVersion(v){ return '1.' + v; }
 // the most recent 10 entries (oldest ones can be left in the array or trimmed,
 // either is fine, since the display always slices to 10).
 const VERSION_HISTORY = [
+  {version: 52, changes: ['Photo storage now shows a real progress bar with your phone\'s actual available space, matching the customer data bar', 'Removed the explanatory text under both storage bars, keeping just the numbers', 'Photos are now saved at higher size and quality, since there\'s much more storage room available now']},
   {version: 51, changes: ['Photos now stored separately from your customer/job records, with far more room — a growing photo library can no longer risk running out of storage', 'Existing photos are automatically moved over the first time this version runs', 'Backup exports still include everything, including photos, in one file']},
   {version: 50, changes: ['Fixed the Time field on a one-off job appearing tiny instead of matching the Date field']},
   {version: 49, changes: ['One-off jobs can now have an optional time as well as a date', 'Added this version history to the About screen']},
@@ -1883,7 +1884,10 @@ async function handlePhotoSelected(id, inputEl){
   if(!file) return;
   toast('Adding photo…');
   try{
-    const blob = await compressImage(file, 900, 0.7);
+    // 1600px/0.85 quality — photos live in IndexedDB now (see PHOTO_STORE), which
+    // has far more headroom than localStorage ever did, so there's no need to
+    // compress as aggressively as when photos were squeezed into the same ~5MB pool.
+    const blob = await compressImage(file, 1600, 0.85);
     const photoId = uid();
     if(photoStorageAvailable){
       await idbSavePhoto(photoId, blob);
@@ -2936,7 +2940,10 @@ async function handleJobPhotoSelected(id, inputEl){
   if(!file) return;
   toast('Adding photo…');
   try{
-    const blob = await compressImage(file, 900, 0.7);
+    // 1600px/0.85 quality — photos live in IndexedDB now (see PHOTO_STORE), which
+    // has far more headroom than localStorage ever did, so there's no need to
+    // compress as aggressively as when photos were squeezed into the same ~5MB pool.
+    const blob = await compressImage(file, 1600, 0.85);
     const photoId = uid();
     const j = data.oneOffJobs.find(x=>x.id===id);
     j.photos = j.photos || [];
@@ -4769,7 +4776,7 @@ const FOCUSED_HELP = {
     title: 'Backup and restore',
     body: () => [
       helpP('Everything lives only on this phone. Back up regularly from the Backup icon — export a full backup, export to Excel, export everyone as a contacts file, restore from a backup file, or import customers from a spreadsheet (they land in a "Needs review" round until you check them over).'),
-      helpP('The storage bar at the top shows your customer/job records — the pool with a tight ~5-10MB limit. Photos are stored separately, with much more room, so a growing photo library can\'t threaten your actual records.')
+      helpP('Two bars at the top show storage used: customer/job records (a tight ~5-10MB pool) and photos (stored separately, using your phone\'s actual available space, so a growing photo library can\'t threaten your records).')
     ]
   },
   settings: {
@@ -4856,13 +4863,26 @@ function computeStorageStats(){
     logoBytes
   };
 }
+// Browser-reported estimate of how much space is actually available for photos
+// (IndexedDB) — an estimate rather than a hard number (browsers deliberately don't
+// guarantee precision here), but on modern iOS this reports a genuinely large
+// figure since Apple bases it on a share of the phone's total free disk space.
+async function getPhotoStorageEstimate(){
+  try{
+    if(navigator.storage && navigator.storage.estimate){
+      const {usage, quota} = await navigator.storage.estimate();
+      if(quota) return {usage, quota};
+    }
+  }catch(e){}
+  return null;
+}
 function formatBytes(bytes){
   if(bytes < 1024) return bytes + ' B';
   if(bytes < 1024*1024) return Math.round(bytes/1024) + ' KB';
   return (bytes/(1024*1024)).toFixed(1) + ' MB';
 }
 
-function openBackup(){
+async function openBackup(){
   const count = data.customers.length;
   const days = daysSinceBackup();
   const lastText = days === Infinity ? "You haven't backed up yet" : days === 0 ? "Backed up today" : `Last backup: ${days} day${days===1?'':'s'} ago`;
@@ -4872,6 +4892,14 @@ function openBackup(){
   const assumedLimitBytes = 5 * 1024 * 1024;
   const pctUsed = Math.min(100, Math.round((stats.totalBytes / assumedLimitBytes) * 100));
   const barColor = pctUsed>=80 ? 'var(--red)' : pctUsed>=50 ? 'var(--amber)' : 'var(--green)';
+
+  const photoEstimate = stats.photoCount ? await getPhotoStorageEstimate() : null;
+  let photoPct = null, photoBarColor = 'var(--green)';
+  if(photoEstimate){
+    photoPct = Math.min(100, Math.round((stats.photoBytes / photoEstimate.quota) * 100));
+    photoBarColor = photoPct>=80 ? 'var(--red)' : photoPct>=50 ? 'var(--amber)' : 'var(--green)';
+  }
+
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">Backup &amp; restore</h2>
@@ -4887,21 +4915,18 @@ function openBackup(){
         <span style="font-size:0.8125rem; font-weight:800; color:var(--ink);">Customer &amp; job data</span>
         <span style="font-size:0.9375rem; font-weight:800; color:var(--ink);">${formatBytes(stats.totalBytes)}</span>
       </div>
-      <div style="height:6px; background:var(--line); border-radius:3px; overflow:hidden; margin-bottom:10px;">
+      <div style="height:6px; background:var(--line); border-radius:3px; overflow:hidden;">
         <div style="height:100%; width:${pctUsed}%; background:${barColor}; border-radius:3px;"></div>
-      </div>
-      <div style="font-size:0.75rem; color:var(--ink-muted); line-height:1.55;">
-        This is the tight-limit pool (customer records, clean/payment history, settings) — browsers typically allow somewhere around 5–10MB here before storage runs out.
       </div>
     </div>
     ${stats.photoCount ? `<div style="background:var(--surface); border:1px solid #000; border-radius:12px; padding:14px; margin-bottom:16px;">
       <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px;">
         <span style="font-size:0.8125rem; font-weight:800; color:var(--ink);">Photos</span>
-        <span style="font-size:0.9375rem; font-weight:800; color:var(--ink);">${formatBytes(stats.photoBytes)}</span>
+        <span style="font-size:0.9375rem; font-weight:800; color:var(--ink);">${formatBytes(stats.photoBytes)}${photoEstimate ? ` of ${formatBytes(photoEstimate.quota)}` : ''}</span>
       </div>
-      <div style="font-size:0.75rem; color:var(--ink-muted); line-height:1.55;">
-        ${stats.photoCount} photo${stats.photoCount===1?'':'s'} — stored separately from the pool above, with much more room, so a growing photo library can't threaten your customer records.
-      </div>
+      ${photoPct!=null ? `<div style="height:6px; background:var(--line); border-radius:3px; overflow:hidden;">
+        <div style="height:100%; width:${photoPct}%; background:${photoBarColor}; border-radius:3px;"></div>
+      </div>` : ''}
     </div>` : ''}
     <button class="backup-btn" onclick="exportData()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
