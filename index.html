@@ -408,7 +408,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 53;
+const APP_VERSION = 54;
 function formatVersion(v){ return '1.' + v; }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
@@ -417,6 +417,7 @@ function formatVersion(v){ return '1.' + v; }
 // the most recent 10 entries (oldest ones can be left in the array or trimmed,
 // either is fine, since the display always slices to 10).
 const VERSION_HISTORY = [
+  {version: 54, changes: ['Every customer now has a unique account number, shown on their screen and on printed invoices/receipts — editable if you\'d rather set your own', 'Photos from a customer\'s linked one-off jobs now show up in that customer\'s own Photos section too']},
   {version: 53, changes: ['The directions and call buttons are now always blue and green, whichever colour scheme is chosen', 'The black outline around boxes and buttons now switches to white in dark mode, so it stays visible', 'Fixed the storage screen not showing gigabytes for larger figures']},
   {version: 52, changes: ['Photo storage now shows a real progress bar with your phone\'s actual available space, matching the customer data bar', 'Removed the explanatory text under both storage bars, keeping just the numbers', 'Photos are now saved at higher size and quality, since there\'s much more storage room available now']},
   {version: 51, changes: ['Photos now stored separately from your customer/job records, with far more room — a growing photo library can no longer risk running out of storage', 'Existing photos are automatically moved over the first time this version runs', 'Backup exports still include everything, including photos, in one file']},
@@ -570,6 +571,7 @@ function migrateData(parsed){
   if(parsed.settings.bankPayeeName == null) parsed.settings.bankPayeeName = '';
   if(parsed.settings.bankAccountNumber == null) parsed.settings.bankAccountNumber = '';
   if(parsed.settings.bankSortCode == null) parsed.settings.bankSortCode = '';
+  if(parsed.settings.nextAccountNumber == null) parsed.settings.nextAccountNumber = 1001;
   parsed.customers.forEach(c=>{
     if(c.pauseReason == null) c.pauseReason = '';
     if(c.pauseDate == null) c.pauseDate = '';
@@ -597,6 +599,13 @@ function migrateData(parsed){
     if(c.deferUntil === undefined) c.deferUntil = null;
     if(c.paymentReminderCount == null) c.paymentReminderCount = 0;
     if(!c.messageLog) c.messageLog = [];
+    // Every customer gets a permanent, unique account number the first time this
+    // runs for them — shown on invoices/receipts. Assigned once and never reused,
+    // even if the customer is later deleted, so numbers stay meaningful.
+    if(!c.accountNumber){
+      c.accountNumber = String(parsed.settings.nextAccountNumber);
+      parsed.settings.nextAccountNumber++;
+    }
   });
   return parsed;
 }
@@ -1530,6 +1539,8 @@ function openCustomerForm(existing){
     </div>
     <label>Notes</label>
     <textarea id="f_notes" rows="2" placeholder="Gate code, dog, access notes...">${escapeHtml(c.notes||'')}</textarea>
+    <label>Account number <span style="text-transform:none; font-weight:500; opacity:0.7;">(shown on invoices/receipts)</span></label>
+    <input type="text" id="f_accountNumber" value="${escapeAttr(c.accountNumber || (existing ? '' : String(data.settings.nextAccountNumber)))}" placeholder="e.g. 1001">
     <label style="display:flex; align-items:center; gap:8px; margin:10px 2px 0; text-transform:none; font-weight:600;">
       <input type="checkbox" id="f_textBefore" ${c.textBeforeVisit?'checked':''} style="width:18px; height:18px; margin:0;">
       Text before I arrive
@@ -1564,11 +1575,14 @@ function saveCustomerForm(id){
     notes: document.getElementById('f_notes').value.trim(),
     textBeforeVisit: document.getElementById('f_textBefore').checked
   };
+  const accountNumberEntered = document.getElementById('f_accountNumber').value.trim();
+  const dupeAccount = accountNumberEntered && data.customers.find(x=>x.id!==id && x.accountNumber===accountNumberEntered);
   if(id){
     const c = data.customers.find(x=>x.id===id);
     const oldPrice = c.price;
     const oldRound = c.round || 'Unassigned';
     Object.assign(c, payload);
+    if(accountNumberEntered) c.accountNumber = accountNumberEntered;
     if(oldPrice !== payload.price){
       c.priceHistory = c.priceHistory || [];
       c.priceHistory.push({date: todayISO(), price: payload.price});
@@ -1582,12 +1596,28 @@ function saveCustomerForm(id){
   } else {
     const roundCusts = data.customers.filter(x=>(x.round||'Unassigned')===(payload.round||'Unassigned'));
     const maxOrder = roundCusts.reduce((m,x)=>Math.max(m, x.order!=null?x.order:-1), -1);
+    let accountNumber = accountNumberEntered;
+    if(!accountNumber){
+      accountNumber = String(data.settings.nextAccountNumber);
+      data.settings.nextAccountNumber++;
+    } else if(/^\d+$/.test(accountNumber) && parseInt(accountNumber,10) >= data.settings.nextAccountNumber){
+      // Keeps the auto-numbering sequence sensible if someone manually enters a
+      // higher number than the next one due — future auto-assigned numbers pick
+      // up after whatever's actually been used.
+      data.settings.nextAccountNumber = parseInt(accountNumber,10) + 1;
+    }
     data.customers.push(Object.assign({
       id: uid(), cleanHistory: [], paymentHistory: [],
       priceHistory: [{date: todayISO(), price: payload.price}],
-      order: maxOrder + 1
+      order: maxOrder + 1, accountNumber
     }, payload));
     toast('Customer added');
+  }
+  if(dupeAccount){
+    // Fires after the "Customer added/updated" toast above (same reasoning as the
+    // storage-full warning) so this warning can't be silently overwritten before
+    // anyone reads it.
+    setTimeout(() => toast(`Note: account number ${accountNumberEntered} is already used by ${dupeAccount.name||dupeAccount.address||'another customer'}`), 1800);
   }
   saveData(); closeSheet(); render();
 }
@@ -1622,7 +1652,7 @@ function openCustomerDetail(id){
       <button class="sheet-close" style="flex-shrink:0;" onclick="closeSheet()">✕</button>
     </div>
     ${(c.name && c.address) ? `<div style="color:var(--ink); font-size:0.9375rem; font-weight:700; margin-bottom:2px;">${escapeHtml(c.name)}</div>` : ''}
-    <div style="color:var(--ink-muted); font-size:0.8125rem; margin-bottom:10px;">${escapeHtml(c.round||'Unassigned')} · ${money(c.price)} standard · every ${c.frequencyWeeks||4} week${(c.frequencyWeeks||4)===1?'':'s'}${c.paused?` · <span style="color:var(--ink-muted); font-weight:700;">Paused${c.pauseReason?' — '+escapeHtml(c.pauseReason):''}${c.pauseDate?' ('+fmtDate(c.pauseDate)+')':''}</span>`:''}</div>
+    <div style="color:var(--ink-muted); font-size:0.8125rem; margin-bottom:10px;">${escapeHtml(c.round||'Unassigned')} · ${money(c.price)} standard · every ${c.frequencyWeeks||4} week${(c.frequencyWeeks||4)===1?'':'s'}${c.accountNumber?` · Acct #${escapeHtml(c.accountNumber)}`:''}${c.paused?` · <span style="color:var(--ink-muted); font-weight:700;">Paused${c.pauseReason?' — '+escapeHtml(c.pauseReason):''}${c.pauseDate?' ('+fmtDate(c.pauseDate)+')':''}</span>`:''}</div>
     ${needsPriceReview(c) ? `<div style="color:var(--amber); font-size:0.75rem; font-weight:700; margin:-6px 2px 10px;">📈 12+ months since last price increase</div>` : ''}
     ${c.textBeforeVisit ? `<div style="color:var(--blue-deep); font-size:0.75rem; font-weight:700; margin:-6px 2px 10px;">📱 Text before you arrive</div>` : ''}
     ${c.notes?`<div style="background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:10px 12px; font-size:0.8438rem; margin-bottom:14px;">${escapeHtml(c.notes)}</div>`:''}
@@ -1712,14 +1742,16 @@ function openCustomerDetail(id){
       </div>
     </details>
 
-    <details class="cust-section"${(c.photos&&c.photos.length)?' open':''}>
-      <summary>Photos${(c.photos&&c.photos.length)?` (${c.photos.length})`:''} ${chev}</summary>
+    <details class="cust-section"${((c.photos&&c.photos.length) || linkedJobs.some(j=>j.photos&&j.photos.length))?' open':''}>
+      <summary>Photos${(() => { const total = (c.photos||[]).length + linkedJobs.reduce((sum,j)=>sum+(j.photos||[]).length,0); return total ? ` (${total})` : ''; })()} ${chev}</summary>
       <div class="cust-section-body">
         <div style="display:flex; flex-wrap:wrap; gap:8px;">
           ${(c.photos||[]).map(p=>`<img src="${photoUrlCache.get(p.id) || p.dataUrl || ''}" onclick="viewPhoto('${id}','${p.id}')" style="width:72px; height:72px; object-fit:cover; border-radius:10px; border:1px solid var(--line); cursor:pointer;">`).join('')}
+          ${linkedJobs.flatMap(j => (j.photos||[]).map(p=>`<img src="${photoUrlCache.get(p.id) || p.dataUrl || ''}" onclick="viewJobPhoto('${j.id}','${p.id}','customer:${id}')" style="width:72px; height:72px; object-fit:cover; border-radius:10px; border:1px solid var(--line); cursor:pointer;">`)).join('')}
           <button onclick="document.getElementById('photoInput_${id}').click()" style="width:72px; height:72px; border-radius:10px; border:2px dashed var(--line); background:none; color:var(--ink-muted); font-size:1.625rem; display:flex; align-items:center; justify-content:center;">+</button>
           <input type="file" accept="image/*" id="photoInput_${id}" style="display:none;" onchange="handlePhotoSelected('${id}', this)">
         </div>
+        ${linkedJobs.some(j=>j.photos&&j.photos.length) ? `<p style="color:var(--ink-muted); font-size:0.7188rem; margin:8px 2px 0;">Includes photos from this customer's one-off jobs.</p>` : ''}
       </div>
     </details>
 
@@ -2382,7 +2414,8 @@ function printReceipt(customerId, dateISO, amount){
   const billToLines = [
     c.name ? escapeHtml(c.name) : '',
     c.address ? escapeHtml(c.address) : '',
-    c.phone ? escapeHtml(c.phone) : ''
+    c.phone ? escapeHtml(c.phone) : '',
+    c.accountNumber ? `Account: ${escapeHtml(c.accountNumber)}` : ''
   ].filter(Boolean).map(l=>`<div>${l}</div>`).join('');
 
   const description = `Window cleaning — ${escapeHtml(c.round||'Round')}`;
@@ -2924,21 +2957,32 @@ function openJobForm(existing, prefill, returnTo){
   `, returnTo);
 }
 
-function viewJobPhoto(id, photoId){
+// Where to land when closing/deleting a job photo — the job form by default, or
+// back to a customer's screen when the photo was reached from there instead (a
+// linked one-off job's photos are shown inline in the customer's Photos section).
+function returnFromJobPhotoCtx(ctx, jobId){
+  if(ctx && ctx.indexOf('customer:') === 0){
+    openCustomerDetail(ctx.slice('customer:'.length));
+  } else {
+    openJobForm(data.oneOffJobs.find(x=>x.id===jobId));
+  }
+}
+function viewJobPhoto(id, photoId, ctx){
   const j = data.oneOffJobs.find(x=>x.id===id);
   const p = (j.photos||[]).find(x=>x.id===photoId);
   if(!p) return;
   const src = photoUrlCache.get(photoId) || p.dataUrl || '';
+  const ctxArg = ctx ? `'${ctx}'` : 'null';
   openSheet(`
     <div class="sheet-head">
       <h2>Photo</h2>
-      <button class="sheet-close" onclick="openJobForm(data.oneOffJobs.find(x=>x.id==='${id}'))">✕</button>
+      <button class="sheet-close" onclick="returnFromJobPhotoCtx(${ctxArg},'${id}')">✕</button>
     </div>
     <img src="${src}" style="width:100%; border-radius:12px; margin-bottom:6px;">
     <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 16px;">Added ${fmtDate(p.date)}</p>
     <div class="row2" style="margin-bottom:8px;">
       <button class="btn btn-clean" onclick="shareJobPhoto('${id}','${photoId}')">📤 Share</button>
-      <button class="btn" style="background:var(--red-dim); color:var(--red);" onclick="deleteJobPhoto('${id}','${photoId}')">Delete</button>
+      <button class="btn" style="background:var(--red-dim); color:var(--red);" onclick="deleteJobPhoto('${id}','${photoId}',${ctxArg})">Delete</button>
     </div>
     <p style="color:var(--ink-muted); font-size:0.7188rem; margin:0 2px; text-align:center;">Tip: you can also press and hold the photo to save or share it directly.</p>
   `);
@@ -2995,7 +3039,7 @@ async function shareJobPhoto(id, photoId){
   }
 }
 
-function deleteJobPhoto(id, photoId){
+function deleteJobPhoto(id, photoId, ctx){
   if(!confirm('Delete this photo?')) return;
   const j = data.oneOffJobs.find(x=>x.id===id);
   j.photos = (j.photos||[]).filter(p=>p.id!==photoId);
@@ -3004,7 +3048,7 @@ function deleteJobPhoto(id, photoId){
     idbDeletePhoto(photoId).then(()=>{}).catch(()=>{});
     uncachePhoto(photoId);
   }
-  openJobForm(j);
+  returnFromJobPhotoCtx(ctx, id);
 }
 
 function saveJobForm(id){
@@ -4252,6 +4296,7 @@ function printCustomerRecord(id){
 function printJobInvoice(id){
   const j = data.oneOffJobs.find(x=>x.id===id);
   if(!j) return;
+  const linkedCustomer = j.customerId ? data.customers.find(x=>x.id===j.customerId) : null;
   const invoiceNumber = 'INV-' + (j.date||todayISO()).replace(/-/g,'') + '-' + j.id.slice(-4).toUpperCase();
   const company = data.settings.companyName || '';
   const companyAddress = data.settings.companyAddress || '';
@@ -4270,7 +4315,8 @@ function printJobInvoice(id){
   const billToLines = [
     j.name ? escapeHtml(j.name) : '',
     j.address ? escapeHtml(j.address) : '',
-    j.phone ? escapeHtml(j.phone) : ''
+    j.phone ? escapeHtml(j.phone) : '',
+    linkedCustomer && linkedCustomer.accountNumber ? `Account: ${escapeHtml(linkedCustomer.accountNumber)}` : ''
   ].filter(Boolean).map(l=>`<div>${l}</div>`).join('');
 
   const description = j.notes ? escapeHtml(j.notes) : 'Window cleaning — one-off job';
@@ -4753,6 +4799,8 @@ const FOCUSED_HELP = {
       helpP('A "Messages" entry under History lists every text actually sent to that customer, newest first — a quick way to check whether someone\'s already been chased today.'),
       helpP('The small icon next to a customer\'s phone/email adds them straight to your phone\'s Contacts app.'),
       helpP('Tick "Text before I arrive" on a customer\'s edit screen to flag that they need a heads-up text before you turn up — it shows as a badge on their card and detail screen.'),
+      helpP('Every customer gets a unique account number automatically, shown on their screen and on printed invoices/receipts — editable from their edit screen if you\'d rather set your own.'),
+      helpP('The Photos section on a customer\'s screen also shows photos from any of their linked one-off jobs, all in one place — no need to open the job separately to see them.'),
       helpP('Pausing a customer asks for a reason — Holiday, Work being done, Cancelled, Moved out, or Other — and stamps the date. Paused customers are skipped from due reminders and round totals until resumed. Use Pause for a longer or indefinite break.'),
       helpP('"Defer due date 4 weeks" pushes a customer\'s next due date out without pausing them or touching their clean history — for a short, one-off delay like a holiday or bad weather. The exact date can be fine-tuned with "Edit date", and clears itself automatically the next time they\'re actually cleaned. The whole round can be deferred at once from the ⋯ menu on the round\'s own screen.'),
       helpP('The "Get a quote for this customer" button opens a new quote pre-filled with their details.'),
