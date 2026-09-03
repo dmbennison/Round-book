@@ -34,8 +34,16 @@
     --radius:14px;
     --emphasis:var(--navy);
     --card-tint:#EEF6FB;
+    --box-border:#000;
+    /* Fixed colours for the directions/call buttons — deliberately NOT theme
+       variables, so they stay the same blue/green whichever colour scheme is
+       chosen, rather than following --blue/--green like most of the app does. */
+    --fixed-blue:#2F9BDE;
+    --fixed-blue-deep:#1F7BB8;
+    --fixed-green:#2E9E5B;
   }
   body.dark{
+    --box-border:#fff;
     --bg:#0E1620;
     --surface:#16212C;
     --ink:#EAF1F6;
@@ -115,7 +123,7 @@
   .round-card{
     background:linear-gradient(to bottom, var(--surface), var(--card-tint));
     border-radius:var(--radius); padding:14px 16px; margin-bottom:10px;
-    border:1px solid #000; display:flex; align-items:center; justify-content:space-between; gap:10px;
+    border:1px solid var(--box-border); display:flex; align-items:center; justify-content:space-between; gap:10px;
     position:relative; overflow:hidden;
   }
   .round-card::before{
@@ -148,7 +156,7 @@
   .cust-card{
     background:linear-gradient(to bottom, var(--surface), var(--card-tint));
     border-radius:var(--radius); padding:14px 16px;
-    border:1px solid #000; position:relative; z-index:1; touch-action:pan-y; overflow:hidden;
+    border:1px solid var(--box-border); position:relative; z-index:1; touch-action:pan-y; overflow:hidden;
   }
   .cust-card::before{
     content:""; position:absolute; left:0; top:0; bottom:0; width:5px; background:var(--blue);
@@ -163,15 +171,15 @@
     width:26px; height:26px; border-radius:50%; border:none; color:#fff;
     display:flex; align-items:center; justify-content:center; padding:0; flex:0 0 auto;
   }
-  .dir-btn{background:var(--blue);}
-  .call-btn{background:var(--green);}
+  .dir-btn{background:var(--fixed-blue);}
+  .call-btn{background:var(--fixed-green);}
   .dir-btn svg, .call-btn svg{width:14px;height:14px;}
-  .dir-btn:active{background:var(--blue-deep);}
+  .dir-btn:active{background:var(--fixed-blue-deep);}
   .call-btn:active{filter:brightness(0.88);}
   .cust-meta{display:flex; gap:6px; flex-wrap:wrap; margin-top:10px;}
   .cust-actions{display:flex; gap:8px; margin-top:12px;}
   .btn{
-    flex:1; padding:10px 8px; border-radius:10px; border:1px solid #000; font-size:0.8438rem; font-weight:800;
+    flex:1; padding:10px 8px; border-radius:10px; border:1px solid var(--box-border); font-size:0.8438rem; font-weight:800;
     display:flex; align-items:center; justify-content:center; gap:6px;
   }
   .btn svg{width:15px;height:15px;}
@@ -226,7 +234,7 @@
   .row2{display:flex; gap:10px;}
   .row2 > div{flex:1;}
   .form-actions{display:flex; gap:10px; margin-top:20px;}
-  .btn-primary{background:var(--blue); color:#fff; padding:13px; border-radius:12px; border:1px solid #000; font-weight:800; font-size:0.9375rem; flex:1;}
+  .btn-primary{background:var(--blue); color:#fff; padding:13px; border-radius:12px; border:1px solid var(--box-border); font-weight:800; font-size:0.9375rem; flex:1;}
   .btn-primary:active{background:#2585c2;}
   .btn-danger-text{background:none; border:none; color:var(--red); font-weight:700; font-size:0.8438rem; padding:14px 2px 2px; width:100%; text-align:center;}
 
@@ -238,19 +246,19 @@
   .hist-list li:last-child{border-bottom:none;}
 
   .stat-row{display:flex; gap:8px; margin-bottom:16px;}
-  .stat{flex:1; background:var(--surface); border:1px solid #000; border-radius:12px; padding:12px; text-align:center;}
+  .stat{flex:1; background:var(--surface); border:1px solid var(--box-border); border-radius:12px; padding:12px; text-align:center;}
   .stat .num{font-size:1.1875rem; font-weight:800;}
   .stat .lbl{font-size:0.6562rem; color:var(--ink-muted); font-weight:700; text-transform:uppercase; letter-spacing:.03em; margin-top:2px;}
 
   .backup-btn{
-    display:flex; align-items:center; gap:12px; background:var(--surface); border:1px solid #000;
+    display:flex; align-items:center; gap:12px; background:var(--surface); border:1px solid var(--box-border);
     border-radius:12px; padding:14px; margin-bottom:10px; text-align:left; width:100%;
   }
   .backup-btn svg{width:20px;height:20px; color:var(--blue); flex-shrink:0;}
   .backup-btn .t1{font-size:0.9062rem; font-weight:700;}
   .backup-btn .t2{font-size:0.75rem; color:var(--ink-muted); margin-top:1px;}
 
-  .cust-section{border:1px solid #000; border-radius:12px; margin-bottom:12px; overflow:hidden; background:var(--surface);}
+  .cust-section{border:1px solid var(--box-border); border-radius:12px; margin-bottom:12px; overflow:hidden; background:var(--surface);}
   .cust-section summary{
     list-style:none; cursor:pointer; padding:13px 14px; font-weight:800; font-size:0.875rem; color:var(--ink);
     display:flex; align-items:center; justify-content:space-between; gap:8px;
@@ -272,7 +280,7 @@
 
   .seg-row{display:flex; gap:8px; margin-bottom:14px;}
   .seg-btn{
-    flex:1; padding:10px 6px; border-radius:11px; border:1px solid #000; background:var(--surface);
+    flex:1; padding:10px 6px; border-radius:11px; border:1px solid var(--box-border); background:var(--surface);
     font-size:0.8438rem; font-weight:800; color:var(--ink-muted); display:flex; align-items:center; justify-content:center; gap:6px;
   }
   .seg-btn.active{background:var(--navy); border-color:var(--navy); color:#fff;}
@@ -400,7 +408,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 52;
+const APP_VERSION = 53;
 function formatVersion(v){ return '1.' + v; }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
@@ -409,6 +417,7 @@ function formatVersion(v){ return '1.' + v; }
 // the most recent 10 entries (oldest ones can be left in the array or trimmed,
 // either is fine, since the display always slices to 10).
 const VERSION_HISTORY = [
+  {version: 53, changes: ['The directions and call buttons are now always blue and green, whichever colour scheme is chosen', 'The black outline around boxes and buttons now switches to white in dark mode, so it stays visible', 'Fixed the storage screen not showing gigabytes for larger figures']},
   {version: 52, changes: ['Photo storage now shows a real progress bar with your phone\'s actual available space, matching the customer data bar', 'Removed the explanatory text under both storage bars, keeping just the numbers', 'Photos are now saved at higher size and quality, since there\'s much more storage room available now']},
   {version: 51, changes: ['Photos now stored separately from your customer/job records, with far more room — a growing photo library can no longer risk running out of storage', 'Existing photos are automatically moved over the first time this version runs', 'Backup exports still include everything, including photos, in one file']},
   {version: 50, changes: ['Fixed the Time field on a one-off job appearing tiny instead of matching the Date field']},
@@ -1619,8 +1628,8 @@ function openCustomerDetail(id){
     ${c.notes?`<div style="background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:10px 12px; font-size:0.8438rem; margin-bottom:14px;">${escapeHtml(c.notes)}</div>`:''}
     ${(c.phone||c.email)?`<div style="display:flex; gap:8px; margin-bottom:14px;">
       ${c.phone?`<a href="tel:${escapeAttr(c.phone.replace(/\\s+/g,''))}" style="flex:1; text-decoration:none; background:var(--blue-dim); color:var(--blue-deep); border-radius:10px; padding:9px; font-size:0.8125rem; font-weight:700; text-align:center;">📞 ${escapeHtml(c.phone)}</a>`:''}
-      ${c.email?`<button onclick="emailCustomer('${id}')" style="flex:1; min-width:0; background:var(--bg); color:var(--ink); border:1px solid #000; border-radius:10px; padding:9px; font-size:0.8125rem; font-weight:700; text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">✉️ ${escapeHtml(c.email)}</button>`:''}
-      <button onclick="addToContacts('customer','${id}')" title="Add to Contacts" aria-label="Add to Contacts" style="flex:0 0 auto; width:40px; background:var(--bg); color:var(--ink); border:1px solid #000; border-radius:10px; display:flex; align-items:center; justify-content:center; padding:0;">${ADD_CONTACT_ICON.replace('viewBox="0 0 24 24"','viewBox="0 0 24 24" width="17" height="17"')}</button>
+      ${c.email?`<button onclick="emailCustomer('${id}')" style="flex:1; min-width:0; background:var(--bg); color:var(--ink); border:1px solid var(--box-border); border-radius:10px; padding:9px; font-size:0.8125rem; font-weight:700; text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">✉️ ${escapeHtml(c.email)}</button>`:''}
+      <button onclick="addToContacts('customer','${id}')" title="Add to Contacts" aria-label="Add to Contacts" style="flex:0 0 auto; width:40px; background:var(--bg); color:var(--ink); border:1px solid var(--box-border); border-radius:10px; display:flex; align-items:center; justify-content:center; padding:0;">${ADD_CONTACT_ICON.replace('viewBox="0 0 24 24"','viewBox="0 0 24 24" width="17" height="17"')}</button>
     </div>`:''}
 
     <div style="background:${s.owed?'var(--red-dim)':s.credit?'var(--green-dim)':'var(--green-dim)'}; color:${s.owed?'var(--red)':'var(--green)'}; border-radius:10px; padding:12px; font-weight:800; text-align:center; margin-bottom:14px;">
@@ -4635,12 +4644,12 @@ function openInfo(){
     <p style="color:var(--ink); font-size:0.875rem; line-height:1.6; margin:0 2px 16px;">
       Round Book is a simple, offline window cleaning round tracker — built to keep on top of customers, rounds, cleaning and payment dates, all stored privately on your own phone.
     </p>
-    <button onclick="openHelp()" style="display:flex; align-items:center; gap:10px; width:100%; text-align:left; background:var(--blue-dim); color:var(--blue-deep); border:1px solid #000; border-radius:12px; padding:13px 14px; font-weight:800; font-size:0.9375rem; margin-bottom:10px;">
+    <button onclick="openHelp()" style="display:flex; align-items:center; gap:10px; width:100%; text-align:left; background:var(--blue-dim); color:var(--blue-deep); border:1px solid var(--box-border); border-radius:12px; padding:13px 14px; font-weight:800; font-size:0.9375rem; margin-bottom:10px;">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px; height:20px; flex-shrink:0;"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
       <span style="flex:1;">User guide — how everything works</span>
       <span style="opacity:0.6;">›</span>
     </button>
-    <button onclick="shareRoundBook()" style="display:flex; align-items:center; gap:10px; width:100%; text-align:left; background:var(--surface); border:1px solid #000; color:var(--ink); border-radius:12px; padding:13px 14px; font-weight:800; font-size:0.9375rem; margin-bottom:16px;">
+    <button onclick="shareRoundBook()" style="display:flex; align-items:center; gap:10px; width:100%; text-align:left; background:var(--surface); border:1px solid var(--box-border); color:var(--ink); border-radius:12px; padding:13px 14px; font-weight:800; font-size:0.9375rem; margin-bottom:16px;">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px; height:20px; flex-shrink:0;"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
       <span style="flex:1;">Share Round Book</span>
       <span style="opacity:0.6;">›</span>
@@ -4804,7 +4813,7 @@ function openFocusedHelp(topic, explicitReturnTo){
       <button class="sheet-close" onclick="closeSheet()">✕</button>
     </div>
     ${h.body().join('')}
-    <button onclick="openHelp(helpReturnCallback)" style="display:flex; align-items:center; gap:10px; width:100%; text-align:left; background:var(--blue-dim); color:var(--blue-deep); border:1px solid #000; border-radius:12px; padding:12px 14px; font-weight:800; font-size:0.8438rem; margin-top:6px;">
+    <button onclick="openHelp(helpReturnCallback)" style="display:flex; align-items:center; gap:10px; width:100%; text-align:left; background:var(--blue-dim); color:var(--blue-deep); border:1px solid var(--box-border); border-radius:12px; padding:12px 14px; font-weight:800; font-size:0.8438rem; margin-top:6px;">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px; height:18px; flex-shrink:0;"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
       <span style="flex:1;">Full user guide</span>
       <span style="opacity:0.6;">›</span>
@@ -4879,7 +4888,8 @@ async function getPhotoStorageEstimate(){
 function formatBytes(bytes){
   if(bytes < 1024) return bytes + ' B';
   if(bytes < 1024*1024) return Math.round(bytes/1024) + ' KB';
-  return (bytes/(1024*1024)).toFixed(1) + ' MB';
+  if(bytes < 1024*1024*1024) return (bytes/(1024*1024)).toFixed(1) + ' MB';
+  return (bytes/(1024*1024*1024)).toFixed(1) + ' GB';
 }
 
 async function openBackup(){
@@ -4910,7 +4920,7 @@ async function openBackup(){
       Everything is stored only on this phone, in this browser. Nothing is sent anywhere. Export a backup regularly in case the app data is ever cleared.
     </p>
     <p style="color:${days>=BACKUP_REMINDER_DAYS?'var(--amber)':'var(--ink-muted)'}; font-size:0.7812rem; font-weight:700; margin:0 2px 16px;">${lastText}</p>
-    <div style="background:var(--surface); border:1px solid #000; border-radius:12px; padding:14px; margin-bottom:16px;">
+    <div style="background:var(--surface); border:1px solid var(--box-border); border-radius:12px; padding:14px; margin-bottom:16px;">
       <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px;">
         <span style="font-size:0.8125rem; font-weight:800; color:var(--ink);">Customer &amp; job data</span>
         <span style="font-size:0.9375rem; font-weight:800; color:var(--ink);">${formatBytes(stats.totalBytes)}</span>
@@ -4919,7 +4929,7 @@ async function openBackup(){
         <div style="height:100%; width:${pctUsed}%; background:${barColor}; border-radius:3px;"></div>
       </div>
     </div>
-    ${stats.photoCount ? `<div style="background:var(--surface); border:1px solid #000; border-radius:12px; padding:14px; margin-bottom:16px;">
+    ${stats.photoCount ? `<div style="background:var(--surface); border:1px solid var(--box-border); border-radius:12px; padding:14px; margin-bottom:16px;">
       <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px;">
         <span style="font-size:0.8125rem; font-weight:800; color:var(--ink);">Photos</span>
         <span style="font-size:0.9375rem; font-weight:800; color:var(--ink);">${formatBytes(stats.photoBytes)}${photoEstimate ? ` of ${formatBytes(photoEstimate.quota)}` : ''}</span>
