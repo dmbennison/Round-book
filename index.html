@@ -408,7 +408,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 54;
+const APP_VERSION = 55;
 function formatVersion(v){ return '1.' + v; }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
@@ -417,6 +417,7 @@ function formatVersion(v){ return '1.' + v; }
 // the most recent 10 entries (oldest ones can be left in the array or trimmed,
 // either is fine, since the display always slices to 10).
 const VERSION_HISTORY = [
+  {version: 55, changes: ['Account numbers now show on every report that lists a customer address, not just invoices and receipts', 'Added a search icon to the Rounds tab — searches name, address, phone, email, notes, round, and account number, with results shown as a tappable list']},
   {version: 54, changes: ['Every customer now has a unique account number, shown on their screen and on printed invoices/receipts — editable if you\'d rather set your own', 'Photos from a customer\'s linked one-off jobs now show up in that customer\'s own Photos section too']},
   {version: 53, changes: ['The directions and call buttons are now always blue and green, whichever colour scheme is chosen', 'The black outline around boxes and buttons now switches to white in dark mode, so it stays visible', 'Fixed the storage screen not showing gigabytes for larger figures']},
   {version: 52, changes: ['Photo storage now shows a real progress bar with your phone\'s actual available space, matching the customer data bar', 'Removed the explanatory text under both storage bars, keeping just the numbers', 'Photos are now saved at higher size and quality, since there\'s much more storage room available now']},
@@ -1104,6 +1105,9 @@ function renderRoundsList(main){
     const overallAvg = totalCustomers ? totalValue/totalCustomers : 0;
     html += `<div style="display:flex; align-items:center; justify-content:flex-end; gap:8px; margin-bottom:8px;">
       ${mainScreenHelpBtn('rounds', "()=>setTab('rounds')")}
+      <button class="btn-open" style="width:38px; height:38px; padding:0;" onclick="openCustomerSearch()" aria-label="Search customers">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      </button>
       <button class="btn-open" style="width:38px; height:38px; padding:0;" onclick="openRoundReports()" aria-label="Print reports">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
       </button>
@@ -3619,6 +3623,56 @@ function saveBusinessDetails(){
 // Small print menu specific to the Rounds tab overview — the reports here span
 // every round at once (unlike "Print this round" on a single round's own screen,
 // or the general Reports menu, which covers everything else).
+// Search across every customer's name, address, phone, email, notes, round, and
+// account number — results shown as a separate tappable list, not the normal
+// swipeable round-card style (swipe-to-clean/paid only works on the Rounds screen
+// itself, so a swipeable card here would look broken).
+function openCustomerSearch(){
+  openSheet(`
+    <div class="sheet-head">
+      <h2 style="flex:1; min-width:0;">Search customers</h2>
+      <button class="sheet-close" onclick="closeSheet()">✕</button>
+    </div>
+    <input type="text" id="search_input" placeholder="Name, address, phone, round, account no..." oninput="renderCustomerSearchResults()" style="margin-top:0; margin-bottom:14px;">
+    <div id="search_results"></div>
+  `, () => setTab('rounds'));
+  renderCustomerSearchResults();
+  setTimeout(() => { const el = document.getElementById('search_input'); if(el) el.focus(); }, 60);
+}
+function renderCustomerSearchResults(){
+  const inputEl = document.getElementById('search_input');
+  const resultsEl = document.getElementById('search_results');
+  if(!inputEl || !resultsEl) return;
+  const raw = inputEl.value.trim();
+  const q = raw.toLowerCase();
+  if(!q){
+    resultsEl.innerHTML = '<p style="color:var(--ink-muted); font-size:0.8438rem; text-align:center; margin-top:24px;">Start typing to search your customers.</p>';
+    return;
+  }
+  const matches = data.customers.filter(c=>{
+    const haystack = [c.name, c.address, c.phone, c.email, c.notes, c.round, c.accountNumber].filter(Boolean).join(' ').toLowerCase();
+    return haystack.includes(q);
+  }).sort((a,b)=>(a.address||'').localeCompare(b.address||''));
+  if(!matches.length){
+    resultsEl.innerHTML = `<p style="color:var(--ink-muted); font-size:0.8438rem; text-align:center; margin-top:24px;">No customers match "${escapeHtml(raw)}".</p>`;
+    return;
+  }
+  resultsEl.innerHTML = matches.map(c=>{
+    const subtitle = [c.name, c.round||'Unassigned', c.accountNumber?`Acct #${c.accountNumber}`:''].filter(Boolean).join(' · ');
+    return `<button class="backup-btn" onclick="searchResultTap('${c.id}')" style="margin-bottom:8px;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      <div style="flex:1; min-width:0;">
+        <div class="t1">${escapeHtml(c.address||'No address')}</div>
+        <div class="t2">${escapeHtml(subtitle)}</div>
+      </div>
+    </button>`;
+  }).join('');
+}
+function searchResultTap(id){
+  closeSheet();
+  openCustomerDetail(id);
+}
+
 function openRoundReports(){
   openSheet(`
     <div class="sheet-head">
@@ -4146,7 +4200,7 @@ function printWindowsDue(){
     const rows = custs.map(c=>{
       const s = custStatus(c);
       return `<tr>
-        <td>${escapeHtml(c.address||'')}${c.name?`<br><span style="color:#66798A">${escapeHtml(c.name)}</span>`:''}</td>
+        <td>${escapeHtml(c.address||'')}${c.name?`<br><span style="color:#66798A">${escapeHtml(c.name)}</span>`:''}${c.accountNumber?`<br><span style="color:#66798A">Acct #${escapeHtml(c.accountNumber)}</span>`:''}</td>
         <td>${fmtDate(s.lastClean)}</td>
         <td>${fmtDate(nextDueISO(c))}</td>
         <td class="rpt-flag due">${escapeHtml(s.cleanBadge.text)}</td>
@@ -4171,7 +4225,7 @@ function printMoneyOwed(){
       total += s.balance;
       rows += `<tr>
         <td style="font-weight:700;">${escapeHtml(rn)}</td>
-        <td>${escapeHtml(c.address||'')}${(c.name||c.phone)?`<br><span style="color:#66798A">${[escapeHtml(c.name||''), c.phone?escapeHtml(c.phone):''].filter(Boolean).join(' · ')}</span>`:''}</td>
+        <td>${escapeHtml(c.address||'')}${(c.name||c.phone)?`<br><span style="color:#66798A">${[escapeHtml(c.name||''), c.phone?escapeHtml(c.phone):''].filter(Boolean).join(' · ')}</span>`:''}${c.accountNumber?`<br><span style="color:#66798A">Acct #${escapeHtml(c.accountNumber)}</span>`:''}</td>
         <td>${fmtDate(s.lastPaid)}</td>
         <td class="rpt-flag overdue" style="text-align:right;">${money(s.balance)}</td>
       </tr>`;
@@ -4201,7 +4255,7 @@ function printFullRounds(){
     const rows = custs.map(c=>{
       roundTotal += Number(c.price||0);
       return `<tr>
-        <td>${escapeHtml(c.address||'')}${c.name?`<br><span style="color:#66798A">${escapeHtml(c.name)}</span>`:''}</td>
+        <td>${escapeHtml(c.address||'')}${c.name?`<br><span style="color:#66798A">${escapeHtml(c.name)}</span>`:''}${c.accountNumber?`<br><span style="color:#66798A">Acct #${escapeHtml(c.accountNumber)}</span>`:''}</td>
         ${spansMultipleDays ? `<td>Day ${c.visitDay||1}</td>` : ''}
         <td>${escapeHtml(c.phone||'')}${c.phone&&c.email?'<br>':''}${escapeHtml(c.email||'')}</td>
         <td>${money(c.price)}</td>
@@ -4234,7 +4288,7 @@ function printSingleRound(roundName){
     if(!c.paused){ roundTotal += Number(c.price||0); activeCount++; }
     const s = custStatus(c);
     return `<tr>
-      <td>${escapeHtml(c.address||'')}${c.name?`<br><span style="color:#66798A">${escapeHtml(c.name)}</span>`:''}</td>
+      <td>${escapeHtml(c.address||'')}${c.name?`<br><span style="color:#66798A">${escapeHtml(c.name)}</span>`:''}${c.accountNumber?`<br><span style="color:#66798A">Acct #${escapeHtml(c.accountNumber)}</span>`:''}</td>
       ${spansMultipleDays ? `<td>Day ${c.visitDay||1}</td>` : ''}
       <td>${escapeHtml(c.phone||'')}${c.phone&&c.email?'<br>':''}${escapeHtml(c.email||'')}</td>
       <td>${money(c.price)}</td>
@@ -4257,6 +4311,7 @@ function printCustomerRecord(id){
 
   const infoRows = [
     c.name ? ['Name', escapeHtml(c.name)] : null,
+    c.accountNumber ? ['Account no.', escapeHtml(c.accountNumber)] : null,
     ['Round', escapeHtml(c.round||'Unassigned')],
     ['Price', `${money(c.price)} · every ${c.frequencyWeeks||4} week${(c.frequencyWeeks||4)===1?'':'s'}`],
     c.phone ? ['Phone', escapeHtml(c.phone)] : null,
@@ -4373,10 +4428,12 @@ function printJobInvoice(id){
 function printJobRecord(id){
   const j = data.oneOffJobs.find(x=>x.id===id);
   if(!j) return;
+  const linkedCustomer = j.customerId ? data.customers.find(x=>x.id===j.customerId) : null;
   const infoRows = [
     ['Date', fmtDate(j.date)],
     j.name ? ['Name', escapeHtml(j.name)] : null,
     j.phone ? ['Phone', escapeHtml(j.phone)] : null,
+    linkedCustomer && linkedCustomer.accountNumber ? ['Account no.', escapeHtml(linkedCustomer.accountNumber)] : null,
     ['Price', money(j.price)],
     ['Done', j.done ? 'Yes' : 'No'],
     ['Paid', j.paid ? 'Yes' : 'No']
@@ -4404,9 +4461,10 @@ function printAllJobs(){
   let total = 0;
   const rows = jobs.map(j=>{
     total += Number(j.price||0);
+    const linkedCustomer = j.customerId ? data.customers.find(x=>x.id===j.customerId) : null;
     return `<tr>
       <td>${fmtDate(j.date)}</td>
-      <td>${escapeHtml(j.address||'')}${(j.name||j.phone)?`<br><span style="color:#66798A">${[escapeHtml(j.name||''), j.phone?escapeHtml(j.phone):''].filter(Boolean).join(' · ')}</span>`:''}</td>
+      <td>${escapeHtml(j.address||'')}${(j.name||j.phone)?`<br><span style="color:#66798A">${[escapeHtml(j.name||''), j.phone?escapeHtml(j.phone):''].filter(Boolean).join(' · ')}</span>`:''}${linkedCustomer&&linkedCustomer.accountNumber?`<br><span style="color:#66798A">Acct #${escapeHtml(linkedCustomer.accountNumber)}</span>`:''}</td>
       <td style="text-align:right;">${money(j.price)}</td>
       <td class="rpt-flag ${j.done?'':'due'}">${j.done?'Done':'Not done'}</td>
       <td class="rpt-flag ${j.paid?'':'overdue'}">${j.paid?'Paid':'Unpaid'}</td>
@@ -4474,7 +4532,7 @@ function printPriceReview(){
   }
 
   const rows = flagged.map(({c, lastIncrease, target})=>`<tr>
-    <td>${escapeHtml(c.address||'')}${c.name?`<br><span style="color:#66798A">${escapeHtml(c.name)}</span>`:''}</td>
+    <td>${escapeHtml(c.address||'')}${c.name?`<br><span style="color:#66798A">${escapeHtml(c.name)}</span>`:''}${c.accountNumber?`<br><span style="color:#66798A">Acct #${escapeHtml(c.accountNumber)}</span>`:''}</td>
     <td>${escapeHtml(c.round||'Unassigned')}</td>
     <td style="text-align:right;">${money(c.price)}</td>
     <td>${fmtDate(lastIncrease)}</td>
@@ -4772,6 +4830,7 @@ const FOCUSED_HELP = {
     body: () => [
       helpP('The Rounds tab shows every round, with a Rounds / Due / Owed switch. Open a round to see its customers, swipe a card right to mark cleaned or left to mark paid, and use Reorder to set your walking order.'),
       helpP('The printer icon above the summary numbers covers reports across every round at once — Windows due, Money owed, and Full round lists. A single round\'s own screen has its own separate Print option, just for that round.'),
+      helpP('The magnifying glass icon searches across every customer — name, address, phone, email, notes, round, or account number — with results shown as a tappable list.'),
       helpP('Marking someone cleaned doesn\'t remove them from the Due view straight away — they stay there for the rest of the day, so you can still see everyone you\'ve worked through. They drop off automatically the next day. The total at the bottom only counts what\'s still left to do.'),
       helpP('If a round takes more than one day, tap each customer\'s day badge in reorder mode to assign Day 1–5. A day switcher then appears above the customer list, and cards get a "Day N" badge.'),
       helpP('The ⋯ button on a round\'s screen opens Print, group marketing text, Defer whole round 4 weeks, and Help.'),
