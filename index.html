@@ -1,0 +1,1785 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Round Book">
+<meta name="theme-color" content="#10344C">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.json">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/docx@8.2.4/build/index.umd.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js" defer></script>
+<title>Round Book v56</title>
+<style>
+/* ===== ALL STYLES HERE ===== */
+:root{--navy:#10344C;--navy-dark:#0B2438;--blue:#2F9BDE;--blue-dim:#DCEFFA;--green:#2E9E5B;--green-dim:#E2F5EA;--amber:#C98A1D;--amber-dim:#FBF0DC;--red:#C4453F;--red-dim:#FAE4E2;--bg:#F5F7F8;--surface:#FFFFFF;--ink:#1C2B36;--ink-muted:#66798A;--line:#E3E9EC;--radius:14px;--emphasis:var(--navy);--card-tint:#EEF6FB;--box-border:#000;--fixed-blue:#2F9BDE;--fixed-blue-deep:#1F7BB8;--fixed-green:#2E9E5B;}
+body.dark{--box-border:#fff;--bg:#0E1620;--surface:#16212C;--ink:#EAF1F6;--ink-muted:#8CA0B3;--line:#28394A;--blue-dim:#173347;--green-dim:#123321;--amber-dim:#3A2C10;--red-dim:#3A1616;--emphasis:#EAF1F6;--card-tint:#182530;}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}html,body{height:100%;}html{font-size:18px;}body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;padding-bottom:env(safe-area-inset-bottom);-webkit-user-select:none;user-select:none;}input,textarea{-webkit-user-select:text;user-select:text;}h1,h2,h3{margin:0;font-family:-apple-system,BlinkMacSystemFont,sans-serif;letter-spacing:-0.01em;}
+header{background:var(--navy);color:#fff;padding:calc(env(safe-area-inset-top)+14px)16px 14px;position:sticky;top:0;z-index:20;}.header-row{display:flex;align-items:center;justify-content:space-between;gap:10px;}.brand{display:flex;align-items:center;gap:10px;min-width:0;}.brand-mark{width:36px;height:36px;border-radius:9px;background:linear-gradient(160deg,var(--blue),var(--blue-deep));display:flex;align-items:center;justify-content:center;box-shadow:inset 0 0 0 1px rgba(255,255,255,0.25);flex-shrink:0;}.brand-mark svg{width:26px;height:26px;}.brand-text{min-width:0;}.brand h1{font-size:1.1875rem;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.brand .sub{font-size:0.6875rem;color:#A9C4D8;font-weight:600;letter-spacing:.04em;text-transform:uppercase;margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.icon-btn{width:34px;height:34px;border-radius:9px;border:none;flex-shrink:0;background:rgba(255,255,255,0.12);color:#fff;display:flex;align-items:center;justify-content:center;}.icon-btn svg{width:17px;height:17px;}.icon-btn:active{background:rgba(255,255,255,0.22);}
+.tabs{display:flex;gap:6px;margin-top:14px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;}.tabs::-webkit-scrollbar{display:none;}.tab{flex:0 0 auto;text-align:center;padding:9px 14px;border-radius:10px;font-size:0.8125rem;font-weight:700;color:#B9D2E2;background:transparent;border:none;white-space:nowrap;}.tab.active{background:rgba(255,255,255,0.14);color:#fff;}
+main{padding:14px 14px 100px;}
+.section-label{font-size:0.6875rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-muted);margin:18px 2px 8px;}.section-label:first-child{margin-top:0;}
+.day-divider{font-size:0.75rem;font-weight:800;color:var(--blue-deep);background:var(--blue-dim);padding:7px 12px;border-radius:8px;margin:16px 0 8px;}.day-divider:first-child{margin-top:0;}
+.round-card{background:linear-gradient(to bottom,var(--surface),var(--card-tint));border-radius:var(--radius);padding:14px 16px;margin-bottom:10px;border:1px solid var(--box-border);display:flex;align-items:center;justify-content:space-between;gap:10px;position:relative;overflow:hidden;}.round-card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--blue);}.round-group-header{position:relative;padding-left:12px;}.round-group-header::before{content:"";position:absolute;left:0;top:1px;bottom:1px;width:4px;background:var(--blue);border-radius:2px;}.round-card .rname{font-size:1rem;font-weight:800;}.round-card .rcount{font-size:0.7812rem;color:var(--ink-muted);margin-top:2px;}.badges{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;}.badge{font-size:0.7188rem;font-weight:800;padding:4px 8px;border-radius:20px;white-space:nowrap;}.badge.due{background:var(--amber-dim);color:var(--amber);}.badge.overdue{background:var(--red-dim);color:var(--red);}.badge.owed{background:var(--red-dim);color:var(--red);}.badge.escalate{background:var(--red);color:#fff;}.badge.ok{background:var(--green-dim);color:var(--green);}.badge.paused{background:var(--line);color:var(--ink-muted);}.badge.deferred{background:var(--blue-dim);color:var(--blue-deep);}.badge.anniversary{background:var(--blue-dim);color:var(--blue-deep);}.chev{opacity:0.35;}
+.swipe-wrap{position:relative;border-radius:var(--radius);margin-bottom:10px;overflow:hidden;}.swipe-bg{position:absolute;inset:0;display:flex;align-items:center;font-weight:800;font-size:0.875rem;color:#fff;padding:0 22px;}.swipe-bg-left{background:var(--green);justify-content:flex-start;}.swipe-bg-right{background:var(--blue);justify-content:flex-end;}.cust-card{background:linear-gradient(to bottom,var(--surface),var(--card-tint));border-radius:var(--radius);padding:14px 16px;border:1px solid var(--box-border);position:relative;z-index:1;touch-action:pan-y;overflow:hidden;}.cust-card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--blue);}.cust-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;}.cust-name{font-size:1rem;font-weight:800;}.cust-addr{font-size:0.8125rem;color:var(--ink-muted);margin-top:2px;}.cust-price{font-size:0.875rem;font-weight:800;color:var(--emphasis);white-space:nowrap;}.cust-right{display:flex;flex-direction:column;align-items:flex-end;gap:6px;}.cust-btn-row{display:flex;gap:6px;}.dir-btn,.call-btn{width:26px;height:26px;border-radius:50%;border:none;color:#fff;display:flex;align-items:center;justify-content:center;padding:0;flex:0 0 auto;}.dir-btn{background:var(--fixed-blue);}.call-btn{background:var(--fixed-green);}.dir-btn svg,.call-btn svg{width:14px;height:14px;}.dir-btn:active{background:var(--fixed-blue-deep);}.call-btn:active{filter:brightness(0.88);}.cust-meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;}.cust-actions{display:flex;gap:8px;margin-top:12px;}
+.btn{flex:1;padding:10px 8px;border-radius:10px;border:1px solid var(--box-border);font-size:0.8438rem;font-weight:800;display:flex;align-items:center;justify-content:center;gap:6px;}.btn svg{width:15px;height:15px;}.btn-clean{background:var(--blue-dim);color:var(--blue-deep);}.btn-clean:active{background:#c8e6f8;}.btn-paid{background:var(--green-dim);color:var(--green);}.btn-paid:active{background:#cdefdc;}.btn-open{background:var(--bg);color:var(--ink);flex:0 0 auto;width:42px;}
+.empty{text-align:center;padding:50px 20px;color:var(--ink-muted);}.empty svg{width:44px;height:44px;opacity:0.3;margin-bottom:10px;}.empty b{display:block;color:var(--ink);font-size:0.9375rem;margin-bottom:4px;}.empty p{font-size:0.8125rem;line-height:1.5;}
+.fab{position:fixed;right:18px;bottom:calc(env(safe-area-inset-bottom)+18px);z-index:30;width:56px;height:56px;border-radius:50%;border:none;background:var(--blue);color:#fff;box-shadow:0 6px 18px rgba(47,155,222,0.45);display:flex;align-items:center;justify-content:center;}.fab svg{width:24px;height:24px;}.fab:active{background:#2585c2;}
+.overlay{position:fixed;inset:0;background:rgba(11,36,56,0.4);z-index:40;display:none;align-items:flex-end;}.overlay.show{display:flex;}.sheet{background:var(--bg);width:100%;max-height:92vh;overflow-y:auto;overflow-x:hidden;border-radius:20px 20px 0 0;padding:8px 16px calc(env(safe-area-inset-bottom)+20px);animation:slideup .22s ease-out;box-sizing:border-box;}@keyframes slideup{from{transform:translateY(20px);opacity:0.4;}to{transform:translateY(0);opacity:1;}}.sheet-handle{width:38px;height:4px;background:var(--line);border-radius:3px;margin:8px auto 6px;}.sheet-head{display:flex;align-items:center;justify-content:space-between;padding:6px 2px 14px;}.sheet-head h2{font-size:1.125rem;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.sheet-close{width:32px;height:32px;border-radius:50%;border:none;background:var(--surface);color:var(--ink-muted);display:flex;align-items:center;justify-content:center;}
+label{display:block;font-size:0.7812rem;font-weight:700;color:var(--ink-muted);margin:14px 2px 6px;}label:first-of-type{margin-top:0;}input[type=text],input[type=number],input[type=date],input[type=time],select,textarea{width:100%;max-width:100%;min-width:0;padding:12px;border-radius:11px;border:1px solid var(--line);background:var(--surface);font-size:0.9688rem;color:var(--ink);font-family:inherit;box-sizing:border-box;}input[type=date],input[type=time]{display:block;width:100%;min-width:0;max-width:100%;box-sizing:border-box;-webkit-appearance:none;appearance:none;}.row2{display:flex;gap:10px;}.row2>div{flex:1;}.form-actions{display:flex;gap:10px;margin-top:20px;}.btn-primary{background:var(--blue);color:#fff;padding:13px;border-radius:12px;border:1px solid var(--box-border);font-weight:800;font-size:0.9375rem;flex:1;}.btn-primary:active{background:#2585c2;}.btn-danger-text{background:none;border:none;color:var(--red);font-weight:700;font-size:0.8438rem;padding:14px 2px 2px;width:100%;text-align:center;}
+.hist-list{list-style:none;margin:0;padding:0;}.hist-list li{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--line);font-size:0.875rem;flex-wrap:wrap;gap:4px 0;}.hist-list li:last-child{border-bottom:none;}
+.stat-row{display:flex;gap:8px;margin-bottom:16px;}.stat{flex:1;background:var(--surface);border:1px solid var(--box-border);border-radius:12px;padding:12px;text-align:center;}.stat .num{font-size:1.1875rem;font-weight:800;}.stat .lbl{font-size:0.6562rem;color:var(--ink-muted);font-weight:700;text-transform:uppercase;letter-spacing:.03em;margin-top:2px;}
+.backup-btn{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--box-border);border-radius:12px;padding:14px;margin-bottom:10px;text-align:left;width:100%;}.backup-btn svg{width:20px;height:20px;color:var(--blue);flex-shrink:0;}.backup-btn .t1{font-size:0.9062rem;font-weight:700;}.backup-btn .t2{font-size:0.75rem;color:var(--ink-muted);margin-top:1px;}
+.cust-section{border:1px solid var(--box-border);border-radius:12px;margin-bottom:12px;overflow:hidden;background:var(--surface);}.cust-section summary{list-style:none;cursor:pointer;padding:13px 14px;font-weight:800;font-size:0.875rem;color:var(--ink);display:flex;align-items:center;justify-content:space-between;gap:8px;}.cust-section summary::-webkit-details-marker{display:none;}.cust-section summary .chev{width:16px;height:16px;color:var(--ink-muted);flex-shrink:0;transition:transform .2s;}.cust-section[open] summary .chev{transform:rotate(180deg);}.cust-section .cust-section-body{padding:2px 14px 14px;}.cust-section .cust-section-body>*:first-child{margin-top:0;}
+#importFile,#importSpreadsheetFile{display:none;}.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--navy-dark);color:#fff;padding:11px 18px;border-radius:24px;font-size:0.8438rem;font-weight:700;z-index:60;opacity:0;transition:opacity .2s;pointer-events:none;max-width:88vw;text-align:center;}.toast.show{opacity:1;pointer-events:auto;}.toast-undo-btn{margin-left:10px;background:rgba(255,255,255,0.2);border:none;color:#fff;font-weight:800;padding:5px 12px;border-radius:14px;font-size:0.7812rem;vertical-align:middle;}
+.seg-row{display:flex;gap:8px;margin-bottom:14px;}.seg-btn{flex:1;padding:10px 6px;border-radius:11px;border:1px solid var(--box-border);background:var(--surface);font-size:0.8438rem;font-weight:800;color:var(--ink-muted);display:flex;align-items:center;justify-content:center;gap:6px;}.seg-btn.active{background:var(--navy);border-color:var(--navy);color:#fff;}.seg-btn .count{font-size:0.6875rem;padding:1px 6px;border-radius:20px;background:rgba(0,0,0,0.06);color:inherit;}.seg-btn.active .count{background:rgba(255,255,255,0.22);}.seg-btn-sm{padding:6px 6px;font-size:0.75rem;}
+.summary-overall{display:flex;gap:6px;margin-bottom:12px;}.summary-overall .stat{flex:1;padding:7px;}.summary-overall .stat .num{font-size:1rem;}.summary-overall .stat .lbl{font-size:0.5625rem;}
+.print-area{display:none;}.rpt-round-title{font-size:16px;font-weight:800;margin:20px 0 8px;border-bottom:2px solid #10344C;padding-bottom:4px;}.rpt-round-title:first-child{margin-top:0;}.rpt-table{width:100%;border-collapse:collapse;margin-bottom:4px;}.rpt-table th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#66798A;padding:6px 8px;border-bottom:1px solid #ccc;}.rpt-table td{font-size:13px;padding:7px 8px;border-bottom:1px solid #eee;vertical-align:top;}.rpt-flag{font-weight:700;}.rpt-flag.overdue{color:#C4453F;}.rpt-flag.due{color:#C98A1D;}.rpt-total{text-align:right;font-weight:800;font-size:14px;margin-top:6px;}.rpt-header{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;}.rpt-header h1{font-size:20px;}.rpt-header .rpt-date{font-size:12px;color:#66798A;}.rpt-empty-note{font-size:12px;color:#66798A;padding:8px 0;}.rpt-footer{margin-top:24px;padding-top:10px;border-top:1px solid #ccc;font-size:11px;color:#66798A;text-align:center;}.rpt-page-break{page-break-before:always;break-before:page;}.rpt-calendar{width:100%;border-collapse:collapse;table-layout:fixed;}.rpt-calendar th{background:#10344C;color:#fff;font-size:11px;padding:6px;text-align:center;font-weight:700;}.rpt-calendar td{border:1px solid #E3E9EC;vertical-align:top;padding:5px;height:88px;font-size:10px;overflow:hidden;}.rpt-calendar td.outside{background:#F7F9FA;color:#B7C2CA;}.rpt-calendar .daynum{font-weight:800;font-size:11.5px;margin-bottom:3px;color:#1C2B36;}.rpt-calendar td.outside .daynum{color:#B7C2CA;}.rpt-calendar .round-chip{display:block;background:#DCEFFA;color:#1c6fa3;border-radius:5px;padding:1px 4px;margin-bottom:2px;font-weight:700;font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}.rpt-calendar .round-chip.job-chip{background:#FBEBD2;color:#8A5A15;}
+.inv-meta-table td{padding:4px 8px;}.inv-billto{background:#F5F7F8;border-radius:8px;padding:12px 14px;margin-bottom:18px;font-size:13px;line-height:1.7;color:#1C2B36;}.inv-billto .inv-label{color:#66798A;text-transform:uppercase;font-size:10px;letter-spacing:.04em;font-weight:700;display:block;margin-bottom:3px;}.inv-total-box{background:#10344C !important;color:#fff !important;border-radius:8px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:16px !important;}.inv-total-box .inv-total-amount{font-size:22px;font-weight:800;}.inv-stamp{display:inline-block;font-size:12px;font-weight:800;letter-spacing:.06em;padding:4px 12px;border-radius:6px;border:2px solid;text-transform:uppercase;margin-bottom:16px;}.inv-stamp.paid{color:#1F7A46;border-color:#1F7A46;}.inv-stamp.due{color:#C4453F;border-color:#C4453F;}
+/* NEW: Analytics, Schedule, Voice, Autocomplete, Receipt styles */
+.analytics-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px;}.analytics-card{background:var(--surface);border:1px solid var(--box-border);border-radius:12px;padding:14px;text-align:center;}.analytics-card .value{font-size:1.5rem;font-weight:800;color:var(--ink);}.analytics-card .label{font-size:0.6562rem;color:var(--ink-muted);font-weight:700;text-transform:uppercase;letter-spacing:.03em;margin-top:4px;}.analytics-trend-up{color:var(--green);}.analytics-trend-down{color:var(--red);}
+.schedule-item{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--box-border);border-radius:12px;padding:12px 14px;margin-bottom:8px;cursor:pointer;}.schedule-item:active{background:var(--card-tint);}.schedule-time{font-weight:800;font-size:0.8125rem;color:var(--ink-muted);min-width:48px;}.schedule-details{flex:1;min-width:0;}.schedule-details .title{font-weight:700;font-size:0.9062rem;}.schedule-details .sub{font-size:0.75rem;color:var(--ink-muted);}.schedule-badge{padding:4px 10px;border-radius:20px;font-size:0.6875rem;font-weight:700;white-space:nowrap;}.schedule-badge.round{background:var(--blue-dim);color:var(--blue-deep);}.schedule-badge.job{background:var(--amber-dim);color:var(--amber);}.schedule-badge.overdue{background:var(--red-dim);color:var(--red);}.schedule-badge.today{background:var(--green-dim);color:var(--green);}
+.autocomplete-container{position:relative;}.autocomplete-suggestions{position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1px solid var(--box-border);border-radius:11px;max-height:200px;overflow-y:auto;z-index:50;display:none;}.autocomplete-suggestions.show{display:block;}.autocomplete-suggestion{padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--line);font-size:0.8438rem;}.autocomplete-suggestion:last-child{border-bottom:none;}.autocomplete-suggestion:hover,.autocomplete-suggestion:active{background:var(--blue-dim);}.autocomplete-suggestion .highlight{background:var(--amber-dim);font-weight:700;}
+.voice-btn{background:var(--blue-dim);color:var(--blue-deep);border:none;border-radius:50%;width:40px;height:40px;display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0;}.voice-btn.listening{background:var(--red);color:#fff;animation:pulse 1s infinite;}@keyframes pulse{0%,100%{transform:scale(1);}50%{transform:scale(1.1);}}
+.receipt-preview{background:#fff;color:#1C2B36;padding:20px;border-radius:12px;margin-bottom:16px;min-height:200px;}.receipt-preview.dark{background:#1C2B36;color:#EAF1F6;}.receipt-section-toggle{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line);}.receipt-section-toggle input[type="checkbox"]{width:18px;height:18px;margin:0;flex-shrink:0;}
+@media print{body,body.dark{--bg:#ffffff !important;--surface:#ffffff;--ink:#1C2B36;--ink-muted:#66798A;--line:#E3E9EC;}header,#bannerContainer,main,.fab,.overlay,#importFile,#importSpreadsheetFile,.toast{display:none !important;}.print-area{display:block !important;position:static;width:100%;padding:0;}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-row">
+    <div class="brand">
+      <div class="brand-mark"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h20v13H2z"/><path d="M2 9.5h20M12 3v13"/><path d="M15.5 20l4-4M20.5 20l2-2"/></svg></div>
+      <div class="brand-text"><h1>Round Book</h1><div class="sub" id="dateNow"></div><div class="sub" id="weatherPill"></div></div>
+    </div>
+    <div style="display:flex;gap:5px;">
+      <button class="icon-btn" onclick="window.RoundBook.openSchedule()" aria-label="Today"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18M8 2v4M16 2v4"/></svg></button>
+      <button class="icon-btn" onclick="window.RoundBook.openAnalytics()" aria-label="Analytics"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12v-2a5 5 0 0 0-5-5H8a5 5 0 0 0-5 5v2"/><circle cx="12" cy="16" r="5"/><path d="M12 11v5"/></svg></button>
+      <button class="icon-btn" onclick="window.RoundBook.openReports()" aria-label="Reports"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg></button>
+      <button class="icon-btn" onclick="window.RoundBook.openBackup()" aria-label="Backup"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg></button>
+      <button class="icon-btn" onclick="window.RoundBook.openSettings()" aria-label="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+    </div>
+  </div>
+  <div class="tabs">
+    <button class="tab active" data-tab="rounds">Rounds</button>
+    <button class="tab" data-tab="jobs">One-off jobs</button>
+    <button class="tab" data-tab="quotes">Quotes</button>
+    <button class="tab" data-tab="schedule">Today's Schedule</button>
+  </div>
+</header>
+
+<div id="bannerContainer"></div>
+<main id="main"></main>
+
+<button class="fab" onclick="window.RoundBook.handleFabClick()" aria-label="Add"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+
+<div class="overlay" id="overlay" onclick="if(event.target===this) window.RoundBook.closeSheet()">
+  <div class="sheet" id="sheet"></div>
+</div>
+
+<input type="file" id="importFile" accept="application/json">
+<input type="file" id="importSpreadsheetFile" accept=".csv,.xlsx,.xls,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+<div class="toast" id="toast"></div>
+<div class="print-area" id="printArea"></div>
+
+<script>
+// ============================================================================
+// ROUND BOOK - Version 56 - Safari Compatible
+// ============================================================================
+
+// ===== UTILITY FUNCTIONS =====
+var Utils = {
+  uid: function() { return 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2,7); },
+  todayISO: function() { var d = new Date(); return d.toISOString().slice(0,10); },
+  fmtDate: function(iso) { if(!iso) return '—'; var d = new Date(iso + 'T00:00:00'); return String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + String(d.getFullYear()).slice(-2); },
+  fmtTime: function(t) { if(!t) return ''; var p = t.split(':'); var h = parseInt(p[0],10); var m = p[1]; if(isNaN(h)) return ''; var period = h < 12 ? 'AM' : 'PM'; var h12 = h % 12 === 0 ? 12 : h % 12; return h12 + ':' + m + ' ' + period; },
+  daysBetween: function(a,b) { return Math.round((new Date(b+'T00:00:00') - new Date(a+'T00:00:00')) / 86400000); },
+  money: function(n) { var v = Number(n || 0); return '£' + v.toFixed(v % 1 ? 2 : 0); },
+  escapeHtml: function(s) { return String(s || '').replace(/[&<>"']/g, function(m) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]; }); },
+  escapeAttr: function(s) { return this.escapeHtml(s); },
+  formatBytes: function(b) { if(b < 1024) return b + 'B'; if(b < 1048576) return Math.round(b/1024) + 'KB'; if(b < 1073741824) return (b/1048576).toFixed(1) + 'MB'; return (b/1073741824).toFixed(1) + 'GB'; },
+  lastOf: function(arr) { if(!arr || !arr.length) return null; return arr.slice().sort().pop(); },
+  lastDateOf: function(arr) { if(!arr || !arr.length) return null; return arr.slice().map(function(e) { return e.date; }).sort().pop(); },
+  debounce: function(fn,w) { var t; return function() { var args = arguments; clearTimeout(t); t = setTimeout(function() { fn.apply(null, args); }, w); }; },
+  hexToRgb: function(h) { h = h.replace('#',''); if(h.length===3) h = h.split('').map(function(c) { return c+c; }).join(''); var n = parseInt(h,16); return [(n>>16)&255, (n>>8)&255, n&255]; },
+  mixHex: function(a,b,w) { var ca = this.hexToRgb(a); var cb = this.hexToRgb(b); var m = ca.map(function(v,i) { return v + (cb[i]-v)*w; }); return '#' + m.map(function(v) { return Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,'0'); }).join(''); }
+};
+
+// ===== ERROR HANDLING =====
+var ErrorHandler = {
+  errors: [],
+  handle: function(err, ctx, sev) {
+    ctx = ctx || '';
+    sev = sev || 'error';
+    var e = { message: err.message || String(err), stack: err.stack, context: ctx, severity: sev, timestamp: Date.now() };
+    this.errors.unshift(e);
+    if(this.errors.length > 50) this.errors.length = 50;
+    console.error('[' + sev + '] ' + ctx + ':', err);
+    if(sev === 'critical') {
+      var t = document.getElementById('toast');
+      if(t) { t.textContent = '⚠️ ' + (ctx || 'Something went wrong'); t.classList.add('show'); clearTimeout(t._t); t._t = setTimeout(function() { t.classList.remove('show'); }, 4000); }
+    }
+    return e;
+  },
+  retry: function(fn,n,d,ctx) {
+    n = n || 3; d = d || 1000; ctx = ctx || '';
+    var self = this;
+    var attempt = 0;
+    var lastError;
+    function doTry() {
+      attempt++;
+      try {
+        var result = fn();
+        if(result && typeof result.then === 'function') {
+          return result.catch(function(e) {
+            lastError = e;
+            if(attempt < n) { return new Promise(function(r) { setTimeout(r, d * attempt); }).then(doTry); }
+            self.handle(lastError, ctx || 'Retry failed', 'error');
+            throw lastError;
+          });
+        }
+        return result;
+      } catch(e) {
+        lastError = e;
+        if(attempt < n) { return new Promise(function(r) { setTimeout(r, d * attempt); }).then(doTry); }
+        self.handle(lastError, ctx || 'Retry failed', 'error');
+        throw lastError;
+      }
+    }
+    return doTry();
+  }
+};
+
+window.addEventListener('error', function(e) { ErrorHandler.handle(e.error || e.message, 'Uncaught error', 'critical'); });
+window.addEventListener('unhandledrejection', function(e) { ErrorHandler.handle(e.reason, 'Unhandled promise rejection', 'critical'); });
+
+// ===== THEMES =====
+var THEMES = {
+  ocean: {name:'Ocean', navy:'#164559', blue:'#3FA9D6'},
+  slate: {name:'Slate', navy:'#3A424C', blue:'#A6B4C2'},
+  rust: {name:'Rust', navy:'#5A2A1C', blue:'#E0723A'},
+  plum: {name:'Plum', navy:'#4A1F52', blue:'#C15FC0'},
+  forest: {name:'Forest', navy:'#1E4A2E', blue:'#4FAE64'},
+  ruby: {name:'Ruby', navy:'#661018', blue:'#FF3B4A'}
+};
+
+// ===== DATA LAYER =====
+var Data = {
+  STORE_KEY: 'roundBookData_v56',
+  APP_VERSION: 56,
+  data: null,
+  saveTimeout: null,
+  saveDebounceMs: 500,
+  drafts: {},
+  VERSION_HISTORY: [
+    {version:56, changes:['Complete code reorganization for better performance','Analytics dashboard with revenue trends','Today\'s Schedule view','Search with autocomplete','Voice input for notes','Customizable receipt layout','Encrypted backups with password protection','Improved error handling with retry logic','Auto-save drafts for all text inputs','Fixed timezone handling','Better memory management']},
+    {version:55, changes:['Account numbers now show on every report...']}
+  ],
+
+  load: function() {
+    try {
+      var raw = localStorage.getItem(this.STORE_KEY);
+      this.data = raw ? this.migrate(JSON.parse(raw)) : this.migrate({customers:[]});
+      this.loadDrafts();
+      return this.data;
+    } catch(e) {
+      ErrorHandler.handle(e, 'Failed to load data', 'critical');
+      this.data = this.migrate({customers:[]});
+      return this.data;
+    }
+  },
+  save: function() {
+    clearTimeout(this.saveTimeout);
+    var self = this;
+    this.saveTimeout = setTimeout(function() { self._saveNow(); }, this.saveDebounceMs);
+  },
+  _saveNow: function() {
+    try {
+      if(!this.data) return false;
+      localStorage.setItem(this.STORE_KEY, JSON.stringify(this.data));
+      return true;
+    } catch(e) {
+      ErrorHandler.handle(e, 'Failed to save data', 'critical');
+      var self = this;
+      setTimeout(function() {
+        var t = document.getElementById('toast');
+        if(t) { t.textContent = '⚠️ Storage is full — nothing was saved'; t.classList.add('show'); clearTimeout(t._t); t._t = setTimeout(function() { t.classList.remove('show'); }, 5000); }
+      }, 100);
+      return false;
+    }
+  },
+
+  migrate: function(d) {
+    d.customers = d.customers || [];
+    d.oneOffJobs = d.oneOffJobs || [];
+    d.quotes = d.quotes || [];
+    d.settings = d.settings || {};
+    for(var i = 0; i < d.oneOffJobs.length; i++) {
+      var j = d.oneOffJobs[i];
+      if(!j.photos) j.photos = [];
+      if(!j.messageLog) j.messageLog = [];
+      if(j.paymentReminderCount == null) j.paymentReminderCount = 0;
+    }
+    for(var qi = 0; qi < d.quotes.length; qi++) {
+      var q = d.quotes[qi];
+      if(!q.status) q.status = 'pending';
+      if(q.followUpDays == null) q.followUpDays = 7;
+    }
+    if(!d.settings.encryptedBackups) d.settings.encryptedBackups = false;
+    if(!d.settings.receiptLayout) d.settings.receiptLayout = {showCompany:true,showLogo:true,showCustomer:true,showDetails:true,showFooter:true};
+    if(!d.settings.companyName) d.settings.companyName = '';
+    if(!d.settings.yourName) d.settings.yourName = '';
+    if(!d.settings.bankPayeeName) d.settings.bankPayeeName = '';
+    if(!d.settings.bankAccountNumber) d.settings.bankAccountNumber = '';
+    if(!d.settings.bankSortCode) d.settings.bankSortCode = '';
+    if(!d.settings.nextAccountNumber) d.settings.nextAccountNumber = 1001;
+    for(var ci = 0; ci < d.customers.length; ci++) {
+      var c = d.customers[ci];
+      if(!c.photos) c.photos = [];
+      if(!c.cleanHistory) c.cleanHistory = [];
+      else if(c.cleanHistory.length && typeof c.cleanHistory[0] === 'string') {
+        var old = c.cleanHistory;
+        c.cleanHistory = [];
+        for(var hi = 0; hi < old.length; hi++) {
+          c.cleanHistory.push({date: old[hi], amount: c.price || 0});
+        }
+      }
+      if(!c.paymentHistory) c.paymentHistory = [];
+      if(!c.priceHistory) c.priceHistory = (c.price != null) ? [{date: Utils.todayISO(), price: c.price}] : [];
+      if(!c.messageLog) c.messageLog = [];
+      if(c.frequencyWeeks == null) c.frequencyWeeks = 4;
+      if(!c.visitDay || c.visitDay < 1 || c.visitDay > 5) c.visitDay = 1;
+      if(!c.accountNumber) { c.accountNumber = String(d.settings.nextAccountNumber); d.settings.nextAccountNumber++; }
+    }
+    return d;
+  },
+
+  loadDrafts: function() {
+    try { var r = localStorage.getItem('roundBookDrafts'); this.drafts = r ? JSON.parse(r) : {}; } catch(e) { this.drafts = {}; }
+  },
+  saveDraft: function(k,v) {
+    this.drafts[k] = {value:v, timestamp:Date.now()};
+    try { localStorage.setItem('roundBookDrafts', JSON.stringify(this.drafts)); } catch(e) {}
+  },
+  getDraft: function(k) {
+    var d = this.drafts[k];
+    if(!d) return null;
+    if(Date.now() - d.timestamp > 7*24*60*60*1000) { delete this.drafts[k]; return null; }
+    return d.value;
+  },
+  clearDraft: function(k) {
+    delete this.drafts[k];
+    try { localStorage.setItem('roundBookDrafts', JSON.stringify(this.drafts)); } catch(e) {}
+  },
+
+  photoDbPromise: null,
+  photoStorageAvailable: true,
+  savePhoto: function(id, blob) {
+    var self = this;
+    return this.openPhotoDb().then(function(db) {
+      return new Promise(function(resolve, reject) {
+        var tx = db.transaction('photos', 'readwrite');
+        tx.objectStore('photos').put(blob, id);
+        tx.oncomplete = function() { resolve(); };
+        tx.onerror = function() { reject(tx.error); };
+      });
+    }).catch(function(e) {
+      ErrorHandler.handle(e, 'Failed to save photo', 'error');
+      throw e;
+    });
+  },
+  getPhoto: function(id) {
+    var self = this;
+    return this.openPhotoDb().then(function(db) {
+      return new Promise(function(resolve, reject) {
+        var tx = db.transaction('photos', 'readonly');
+        var req = tx.objectStore('photos').get(id);
+        req.onsuccess = function() { resolve(req.result || null); };
+        req.onerror = function() { reject(req.error); };
+      });
+    }).catch(function() { return null; });
+  },
+  deletePhoto: function(id) {
+    var self = this;
+    return this.openPhotoDb().then(function(db) {
+      return new Promise(function(resolve, reject) {
+        var tx = db.transaction('photos', 'readwrite');
+        tx.objectStore('photos').delete(id);
+        tx.oncomplete = function() { resolve(); };
+        tx.onerror = function() { reject(tx.error); };
+      });
+    }).catch(function() {});
+  },
+  getAllPhotos: function() {
+    var self = this;
+    return this.openPhotoDb().then(function(db) {
+      return new Promise(function(resolve, reject) {
+        var tx = db.transaction('photos', 'readonly');
+        var store = tx.objectStore('photos');
+        var out = new Map();
+        var req = store.openCursor();
+        req.onsuccess = function(e) {
+          var cursor = e.target.result;
+          if(cursor) { out.set(cursor.key, cursor.value); cursor.continue(); }
+          else resolve(out);
+        };
+        req.onerror = function() { reject(req.error); };
+      });
+    });
+  },
+  openPhotoDb: function() {
+    if(this.photoDbPromise) return this.photoDbPromise;
+    var self = this;
+    this.photoDbPromise = new Promise(function(resolve, reject) {
+      if(!('indexedDB' in window)) { reject(new Error('IndexedDB not available')); return; }
+      var req = indexedDB.open('roundBookPhotos', 1);
+      req.onupgradeneeded = function() { req.result.createObjectStore('photos'); };
+      req.onsuccess = function() { resolve(req.result); };
+      req.onerror = function() { reject(req.error); };
+    });
+    this.photoDbPromise.catch(function() { self.photoStorageAvailable = false; });
+    return this.photoDbPromise;
+  },
+  photoUrlCache: new Map(),
+  photoBytesTotal: 0,
+  photoCountTotal: 0,
+  cachePhotoBlob: function(id, blob) {
+    var existing = this.photoUrlCache.get(id);
+    if(existing) URL.revokeObjectURL(existing);
+    this.photoUrlCache.set(id, URL.createObjectURL(blob));
+  },
+  uncachePhoto: function(id) {
+    var existing = this.photoUrlCache.get(id);
+    if(existing) { URL.revokeObjectURL(existing); this.photoUrlCache.delete(id); }
+  },
+  initPhotoStorage: function() {
+    var self = this;
+    return this._migrateLegacyPhotos()
+      .then(function() { return self._preloadAllPhotos(); })
+      .then(function() { return self._cleanupOrphaned(); })
+      .catch(function() {});
+  },
+  _migrateLegacyPhotos: function() {
+    var self = this;
+    var jobs = [];
+    var migrateList = function(list) {
+      if(!list) return;
+      for(var i = 0; i < list.length; i++) {
+        var p = list[i];
+        if(p && p.dataUrl) {
+          var b = self._dataURLToBlob(p.dataUrl);
+          jobs.push(b.then(function(blob) { return self.savePhoto(p.id, blob).then(function() { delete p.dataUrl; }); }));
+        }
+      }
+    };
+    for(var ci = 0; ci < (this.data.customers||[]).length; ci++) {
+      migrateList(this.data.customers[ci].photos);
+    }
+    for(var ji = 0; ji < (this.data.oneOffJobs||[]).length; ji++) {
+      migrateList(this.data.oneOffJobs[ji].photos);
+    }
+    if(jobs.length) return Promise.all(jobs).catch(function() {});
+    return Promise.resolve();
+  },
+  _preloadAllPhotos: function() {
+    var self = this;
+    return this.getAllPhotos().then(function(all) {
+      var bytes = 0;
+      all.forEach(function(blob, id) {
+        self.cachePhotoBlob(id, blob);
+        bytes += blob.size;
+      });
+      self.photoBytesTotal = bytes;
+      self.photoCountTotal = all.size;
+    }).catch(function(e) { self.photoStorageAvailable = false; });
+  },
+  _cleanupOrphaned: function() {
+    var self = this;
+    return this.getAllPhotos().then(function(all) {
+      var ref = new Set();
+      for(var ci = 0; ci < (self.data.customers||[]).length; ci++) {
+        var photos = self.data.customers[ci].photos || [];
+        for(var pi = 0; pi < photos.length; pi++) ref.add(photos[pi].id);
+      }
+      for(var ji = 0; ji < (self.data.oneOffJobs||[]).length; ji++) {
+        var jphotos = self.data.oneOffJobs[ji].photos || [];
+        for(var jpi = 0; jpi < jphotos.length; jpi++) ref.add(jphotos[jpi].id);
+      }
+      var toRemove = [];
+      all.forEach(function(blob, id) {
+        if(!ref.has(id)) toRemove.push(id);
+      });
+      if(!toRemove.length) return;
+      return Promise.all(toRemove.map(function(id) {
+        return self.deletePhoto(id).then(function() {
+          self.uncachePhoto(id);
+          var b = all.get(id);
+          if(b) { self.photoBytesTotal -= b.size; self.photoCountTotal--; }
+        });
+      }));
+    }).catch(function() {});
+  },
+  _dataURLToBlob: function(dataUrl) { return fetch(dataUrl).then(function(r) { return r.blob(); }); },
+  blobToDataURL: function(blob) {
+    return new Promise(function(resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function() { resolve(reader.result); };
+      reader.onerror = function() { reject(reader.error); };
+      reader.readAsDataURL(blob);
+    });
+  }
+};
+
+// Load data immediately
+Data.load();
+
+// ===== VOICE INPUT =====
+var Voice = {
+  isListening: false,
+  recognition: null,
+  onResult: null,
+  supported: false,
+  init: function() {
+    this.supported = 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
+    if(!this.supported) return;
+    var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    this.recognition = new SR();
+    this.recognition.continuous = false;
+    this.recognition.interimResults = true;
+    this.recognition.lang = 'en-GB';
+    var self = this;
+    this.recognition.onresult = function(e) {
+      var t = '';
+      for(var i = e.resultIndex; i < e.results.length; i++) {
+        t += e.results[i][0].transcript;
+      }
+      if(self.onResult) self.onResult(t, e.results[e.resultIndex].isFinal);
+    };
+    this.recognition.onerror = function() { self.isListening = false; self._updateBtn(); };
+    this.recognition.onend = function() { self.isListening = false; self._updateBtn(); };
+  },
+  start: function(cb, fieldId) {
+    if(!this.supported) { if(window.RoundBook) window.RoundBook.toast('Voice not supported'); return; }
+    if(this.isListening) { this.stop(); return; }
+    this.onResult = cb;
+    this.isListening = true;
+    this._updateBtn();
+    try { this.recognition.start(); } catch(e) { this.isListening = false; this._updateBtn(); }
+  },
+  stop: function() {
+    try { this.recognition.stop(); } catch(e) {}
+    this.isListening = false;
+    this._updateBtn();
+  },
+  _updateBtn: function() {
+    var b = document.getElementById('voiceBtn');
+    if(b) { b.classList.toggle('listening', this.isListening); b.textContent = this.isListening ? '🔴' : '🎤'; }
+  },
+  createBtn: function(fieldId) {
+    if(!this.supported) return '';
+    return '<button id="voiceBtn" class="voice-btn" onclick="window.RoundBook._voiceStart(\'' + fieldId + '\')">🎤</button>';
+  }
+};
+Voice.init();
+
+// ===== SEARCH =====
+var Search = {
+  index: [],
+  isIndexed: false,
+  buildIndex: function() {
+    var d = Data.data;
+    this.index = [];
+    for(var ci = 0; ci < d.customers.length; ci++) {
+      var c = d.customers[ci];
+      var terms = [c.address, c.name, c.phone, c.email, c.round, c.accountNumber, c.notes];
+      terms = terms.filter(function(t) { return t; });
+      this.index.push({
+        id: c.id,
+        type: 'customer',
+        text: c.address || '',
+        subtext: [c.name, c.phone, c.email, c.round, c.accountNumber].filter(function(t){return t;}).join(' · '),
+        searchTerms: terms.map(function(t){return t.toLowerCase();})
+      });
+    }
+    for(var ji = 0; ji < (d.oneOffJobs||[]).length; ji++) {
+      var j = d.oneOffJobs[ji];
+      var jterms = [j.address, j.name, j.phone, j.notes].filter(function(t){return t;});
+      this.index.push({
+        id: j.id,
+        type: 'job',
+        text: j.address || j.name || 'Job',
+        subtext: 'One-off job · ' + (j.date || ''),
+        searchTerms: jterms.map(function(t){return t.toLowerCase();})
+      });
+    }
+    this.isIndexed = true;
+  },
+  search: function(query, max) {
+    max = max || 20;
+    if(!this.isIndexed) this.buildIndex();
+    if(!query || query.length < 2) return [];
+    var terms = query.toLowerCase().split(/\s+/).filter(function(t){return t.length > 0;});
+    var results = [];
+    for(var i = 0; i < this.index.length; i++) {
+      var item = this.index[i];
+      var score = 0;
+      var searchText = item.searchTerms.join(' ');
+      for(var ti = 0; ti < terms.length; ti++) {
+        var term = terms[ti];
+        if(searchText.indexOf(term) !== -1) score += 2;
+        if(item.text.toLowerCase().indexOf(term) === 0) score += 1;
+        if(item.subtext.toLowerCase().indexOf(term) !== -1) score += 0.5;
+      }
+      if(score > 0) results.push({item:item, score:score});
+    }
+    results.sort(function(a,b){ return b.score - a.score; });
+    var sliced = results.slice(0, max);
+    return sliced.map(function(r){ return r.item; });
+  },
+  getSuggestions: function(query) {
+    var results = this.search(query, 10);
+    var self = this;
+    return results.map(function(r) {
+      return {
+        text: r.text,
+        subtext: r.subtext,
+        id: r.id,
+        type: r.type,
+        highlight: self._highlight(r.text, query)
+      };
+    });
+  },
+  _highlight: function(text, query) {
+    var result = text;
+    var words = query.toLowerCase().split(/\s+/);
+    for(var i = 0; i < words.length; i++) {
+      var w = words[i];
+      var regex = new RegExp('(' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+      result = result.replace(regex, '<span class="highlight">$1</span>');
+    }
+    return result;
+  },
+  renderAutocomplete: function(inputId, containerId) {
+    var inp = document.getElementById(inputId);
+    var cont = document.getElementById(containerId);
+    if(!inp || !cont) return;
+    var self = this;
+    var sel = -1;
+    var sugs = [];
+    inp.addEventListener('input', function() {
+      var q = inp.value.trim();
+      if(q.length < 2) { cont.classList.remove('show'); return; }
+      sugs = self.getSuggestions(q);
+      if(!sugs.length) { cont.classList.remove('show'); return; }
+      var html = '';
+      for(var i = 0; i < sugs.length; i++) {
+        html += '<div class="autocomplete-suggestion" data-index="' + i + '" onclick="window.RoundBook._selectSuggestion(\'' + inputId + '\',\'' + containerId + '\',' + i + ')"><div>' + sugs[i].highlight + '</div><div style="font-size:0.75rem;color:var(--ink-muted);">' + sugs[i].subtext + '</div></div>';
+      }
+      cont.innerHTML = html;
+      cont.classList.add('show');
+      sel = -1;
+    });
+    inp.addEventListener('keydown', function(e) {
+      var items = cont.querySelectorAll('.autocomplete-suggestion');
+      if(!items.length) return;
+      if(e.key === 'ArrowDown') {
+        e.preventDefault();
+        sel = Math.min(sel + 1, items.length - 1);
+        for(var i = 0; i < items.length; i++) {
+          items[i].style.background = (i === sel) ? 'var(--blue-dim)' : '';
+        }
+      } else if(e.key === 'ArrowUp') {
+        e.preventDefault();
+        sel = Math.max(sel - 1, -1);
+        for(var i = 0; i < items.length; i++) {
+          items[i].style.background = (i === sel) ? 'var(--blue-dim)' : '';
+        }
+      } else if(e.key === 'Enter' && sel >= 0) {
+        e.preventDefault();
+        self._selectSuggestion(inputId, containerId, sel);
+      } else if(e.key === 'Escape') {
+        cont.classList.remove('show');
+      }
+    });
+    document.addEventListener('click', function(e) {
+      if(!cont.contains(e.target) && e.target !== inp) cont.classList.remove('show');
+    });
+  },
+  _selectSuggestion: function(inputId, containerId, index) {
+    var cont = document.getElementById(containerId);
+    var items = cont.querySelectorAll('.autocomplete-suggestion');
+    if(!items[index]) return;
+    var idx = parseInt(items[index].dataset.index, 10);
+    var sugs = this.getSuggestions(document.getElementById(inputId).value);
+    if(!sugs[idx]) return;
+    document.getElementById(inputId).value = sugs[idx].text;
+    cont.classList.remove('show');
+    document.getElementById(inputId).dispatchEvent(new Event('input'));
+    if(sugs[idx].type === 'customer') {
+      if(window.RoundBook) window.RoundBook.openCustomerDetail(sugs[idx].id);
+    } else if(sugs[idx].type === 'job') {
+      var jobs = Data.data.oneOffJobs || [];
+      for(var i = 0; i < jobs.length; i++) {
+        if(jobs[i].id === sugs[idx].id) {
+          if(window.RoundBook) window.RoundBook.openJobForm(jobs[i]);
+          break;
+        }
+      }
+    }
+  }
+};
+
+// ===== BACKUP WITH ENCRYPTION =====
+var Backup = {
+  encryptionKey: null,
+  exportWithPassword: function(pw) {
+    try {
+      var jsonStr = JSON.stringify(Data.data, null, 2);
+      if(pw && typeof CryptoJS !== 'undefined') {
+        var encrypted = CryptoJS.AES.encrypt(jsonStr, pw);
+        return new Blob([encrypted.toString()], {type:'application/octet-stream'});
+      }
+      return new Blob([jsonStr], {type:'application/json'});
+    } catch(e) {
+      ErrorHandler.handle(e, 'Export backup failed', 'error');
+      throw e;
+    }
+  },
+  importWithPassword: function(file, pw) {
+    var self = this;
+    return file.text().then(function(text) {
+      var jsonStr;
+      if(pw && typeof CryptoJS !== 'undefined') {
+        try {
+          var dec = CryptoJS.AES.decrypt(text, pw);
+          jsonStr = dec.toString(CryptoJS.enc.Utf8);
+          if(!jsonStr) throw new Error('Invalid password');
+        } catch(e) {
+          throw new Error('Invalid password or corrupted backup');
+        }
+      } else {
+        jsonStr = text;
+      }
+      var data = JSON.parse(jsonStr);
+      if(!data.customers || !Array.isArray(data.customers)) throw new Error('Invalid backup format');
+      return data;
+    }).catch(function(e) {
+      ErrorHandler.handle(e, 'Import backup failed', 'error');
+      throw e;
+    });
+  },
+  exportBackup: function() {
+    var self = this;
+    return this._promptPassword('Set a password for this backup (optional):', true).then(function(pw) {
+      return self.exportWithPassword(pw || '');
+    }).then(function(blob) {
+      var fn = 'round-book-backup-' + Utils.todayISO() + '.json';
+      if(navigator.canShare) {
+        try {
+          var file = new File([blob], fn, {type:'application/octet-stream'});
+          if(navigator.canShare({files:[file]})) {
+            return navigator.share({files:[file], title:'Round Book Backup'}).then(function() {
+              self._markBackedUp();
+            });
+          }
+        } catch(e) {
+          if(e.name === 'AbortError') return;
+        }
+      }
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = fn;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(function() { URL.revokeObjectURL(url); }, 2000);
+      self._markBackedUp();
+    });
+  },
+  importBackup: function(file) {
+    var self = this;
+    return this._promptPassword('Enter password if encrypted (leave blank if not):', false).then(function(pw) {
+      return self.importWithPassword(file, pw || '');
+    }).then(function(data) {
+      if(confirm('Import ' + data.customers.length + ' customers? This will replace all data.')) {
+        Data.data = Data.migrate(data);
+        Data.save();
+        Search.isIndexed = false;
+        if(window.RoundBook) { window.RoundBook.render(); window.RoundBook.toast('Backup restored successfully'); }
+      }
+    }).catch(function(e) {
+      if(window.RoundBook) window.RoundBook.toast('❌ ' + e.message);
+      throw e;
+    });
+  },
+  _promptPassword: function(msg, isSetting) {
+    return new Promise(function(resolve) {
+      var result = prompt(msg);
+      if(result === null) { resolve(null); return; }
+      if(result && isSetting) {
+        var c = prompt('Confirm password:');
+        if(result !== c) { alert('Passwords do not match'); resolve(null); return; }
+      }
+      resolve(result);
+    });
+  },
+  _markBackedUp: function() {
+    localStorage.setItem('roundBookLastBackup', Utils.todayISO());
+    if(window.RoundBook) window.RoundBook.render();
+  },
+  renderBackupUI: function() {
+    var stats = this._computeStats();
+    var days = window.RoundBook ? window.RoundBook._daysSinceBackup() : 0;
+    var lastText = days === Infinity ? "You haven't backed up yet" : days === 0 ? "Backed up today" : "Last backup: " + days + " day" + (days === 1 ? '' : 's') + " ago";
+    var html = '<p style="color:var(--ink-muted);font-size:0.8438rem;line-height:1.5;margin:0 2px 4px;">Everything is stored only on this phone, in this browser. Nothing is sent anywhere. Export a backup regularly in case the app data is ever cleared.</p><p style="color:' + (days >= 7 ? 'var(--amber)' : 'var(--ink-muted)') + ';font-size:0.7812rem;font-weight:700;margin:0 2px 16px;">' + lastText + '</p><div style="background:var(--surface);border:1px solid var(--box-border);border-radius:12px;padding:14px;margin-bottom:16px;"><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;"><span style="font-size:0.8125rem;font-weight:800;color:var(--ink);">Customer &amp; job data</span><span style="font-size:0.9375rem;font-weight:800;color:var(--ink);">' + Utils.formatBytes(stats.totalBytes) + '</span></div><div style="height:6px;background:var(--line);border-radius:3px;overflow:hidden;"><div style="height:100%;width:' + stats.pctUsed + '%;background:' + stats.barColor + ';border-radius:3px;"></div></div></div>' + (stats.photoCount > 0 ? '<div style="background:var(--surface);border:1px solid var(--box-border);border-radius:12px;padding:14px;margin-bottom:16px;"><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;"><span style="font-size:0.8125rem;font-weight:800;color:var(--ink);">Photos</span><span style="font-size:0.9375rem;font-weight:800;color:var(--ink);">' + Utils.formatBytes(stats.photoBytes) + '</span></div></div>' : '') + '<button class="backup-btn" onclick="window.RoundBookBackup.exportBackup()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg><div><div class="t1">Export backup ' + (Data.data.settings.encryptedBackups ? '🔒' : '') + '</div><div class="t2">' + Data.data.customers.length + ' customers · ' + (Data.data.settings.encryptedBackups ? 'Password protected' : 'Unencrypted') + '</div></div></button><button class="backup-btn" onclick="document.getElementById(\'importFile\').click()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg><div><div class="t1">Restore from backup</div><div class="t2">' + (Data.data.settings.encryptedBackups ? '🔒 Password protected' : 'Unencrypted') + '</div></div></button><button class="backup-btn" onclick="document.getElementById(\'importSpreadsheetFile\').click()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v16H4z"/><path d="M4 10h16M10 4v16"/><path d="M14 14l3 3 3-3" transform="translate(0,-2)"/></svg><div><div class="t1">Import customers from spreadsheet</div><div class="t2">.csv or .xlsx — added to a "needs review" round</div></div></button><div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--line);"><label style="display:flex;align-items:center;gap:8px;margin:0;cursor:pointer;font-size:0.8125rem;font-weight:600;"><input type="checkbox" id="encryptedBackupsToggle" ' + (Data.data.settings.encryptedBackups ? 'checked' : '') + ' onchange="Data.data.settings.encryptedBackups=this.checked;Data.save();"><span>Encrypt backups by default</span></label><p style="color:var(--ink-muted);font-size:0.75rem;margin:4px 2px 0;line-height:1.4;">When enabled, all new backups will be encrypted with a password.</p></div>';
+    return html;
+  },
+  _computeStats: function() {
+    var jsonStr = JSON.stringify(Data.data);
+    var totalBytes = new Blob([jsonStr]).size;
+    var assumedLimit = 5 * 1024 * 1024;
+    var pctUsed = Math.min(100, Math.round((totalBytes / assumedLimit) * 100));
+    var barColor = pctUsed >= 80 ? 'var(--red)' : pctUsed >= 50 ? 'var(--amber)' : 'var(--green)';
+    var photoBytes = Data.photoBytesTotal || 0;
+    var photoCount = Data.photoCountTotal || 0;
+    for(var ci = 0; ci < (Data.data.customers||[]).length; ci++) {
+      var photos = Data.data.customers[ci].photos || [];
+      for(var pi = 0; pi < photos.length; pi++) {
+        if(photos[pi].dataUrl) { photoBytes += new Blob([photos[pi].dataUrl]).size; photoCount++; }
+      }
+    }
+    for(var ji = 0; ji < (Data.data.oneOffJobs||[]).length; ji++) {
+      var jphotos = Data.data.oneOffJobs[ji].photos || [];
+      for(var jpi = 0; jpi < jphotos.length; jpi++) {
+        if(jphotos[jpi].dataUrl) { photoBytes += new Blob([jphotos[jpi].dataUrl]).size; photoCount++; }
+      }
+    }
+    return {totalBytes:totalBytes, pctUsed:pctUsed, barColor:barColor, photoBytes:photoBytes, photoCount:photoCount};
+  }
+};
+
+// ===== SCHEDULE =====
+var Schedule = {
+  generate: function() {
+    var today = Utils.todayISO();
+    var tomorrow = (function() { var d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().slice(0,10); })();
+    var sched = [];
+    var customers = Data.data.customers || [];
+    for(var ci = 0; ci < customers.length; ci++) {
+      var c = customers[ci];
+      if(c.paused) continue;
+      var next = window.RoundBook ? window.RoundBook.nextDueISO(c) : null;
+      if(next === today || next === tomorrow) {
+        sched.push({
+          id: c.id,
+          type: 'round',
+          title: c.address || c.name || 'Customer',
+          subtitle: 'Round: ' + (c.round || 'Unassigned') + ' · ' + Utils.money(c.price),
+          date: next,
+          badge: next === today ? 'Today' : 'Tomorrow',
+          badgeType: next === today ? 'today' : 'round',
+          data: c
+        });
+      }
+    }
+    var jobs = Data.data.oneOffJobs || [];
+    for(var ji = 0; ji < jobs.length; ji++) {
+      var j = jobs[ji];
+      if(j.done) continue;
+      if(j.date === today || j.date === tomorrow) {
+        sched.push({
+          id: j.id,
+          type: 'job',
+          title: j.address || j.name || 'Job',
+          subtitle: 'One-off job · ' + Utils.money(j.price) + (j.time ? ' at ' + Utils.fmtTime(j.time) : ''),
+          date: j.date,
+          time: j.time,
+          badge: j.date === today ? 'Today' : 'Tomorrow',
+          badgeType: 'job',
+          data: j
+        });
+      }
+    }
+    var quotes = Data.data.quotes || [];
+    for(var qi = 0; qi < quotes.length; qi++) {
+      var q = quotes[qi];
+      if(q.status !== 'pending') continue;
+      if(window.RoundBook && window.RoundBook.quoteNeedsFollowUp(q, today)) {
+        sched.push({
+          id: q.id,
+          type: 'quote',
+          title: q.address || q.name || 'Quote',
+          subtitle: 'Pending follow-up · ' + Utils.money(q.price) + ' · Quoted ' + Utils.fmtDate(q.date),
+          date: q.date,
+          badge: 'Follow up',
+          badgeType: 'overdue',
+          data: q,
+          isOverdue: true
+        });
+      }
+    }
+    sched.sort(function(a,b) {
+      if(a.date !== b.date) return a.date.localeCompare(b.date);
+      return (a.time || '').localeCompare(b.time || '');
+    });
+    return sched;
+  },
+  render: function() {
+    var sched = this.generate();
+    if(!sched.length) {
+      return '<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="#66798A" stroke-width="1.6"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18M8 2v4M16 2v4"/></svg><b>Nothing scheduled for today or tomorrow</b><p>Check back later for upcoming work.</p></div>';
+    }
+    var groups = {};
+    for(var i = 0; i < sched.length; i++) {
+      var item = sched[i];
+      if(!groups[item.date]) groups[item.date] = [];
+      groups[item.date].push(item);
+    }
+    var html = '<div class="section-label" style="margin-top:0;">Today &amp; Tomorrow</div><div style="margin-bottom:8px;font-size:0.75rem;color:var(--ink-muted);">' + sched.length + ' item' + (sched.length === 1 ? '' : 's') + ' scheduled</div>';
+    var dates = Object.keys(groups).sort();
+    for(var di = 0; di < dates.length; di++) {
+      var date = dates[di];
+      var label = date === Utils.todayISO() ? 'Today' : 'Tomorrow';
+      html += '<div class="day-divider">' + label + ' · ' + Utils.fmtDate(date) + '</div>';
+      var items = groups[date];
+      for(var ii = 0; ii < items.length; ii++) {
+        var item = items[ii];
+        var badgeClass = item.isOverdue ? 'overdue' : item.badgeType;
+        html += '<div class="schedule-item" onclick="window.RoundBook._openScheduleItem(\'' + item.type + '\',\'' + item.id + '\')"><div class="schedule-time">' + (item.time ? Utils.fmtTime(item.time) : '—') + '</div><div class="schedule-details"><div class="title">' + Utils.escapeHtml(item.title) + '</div><div class="sub">' + Utils.escapeHtml(item.subtitle) + '</div></div><span class="schedule-badge ' + badgeClass + '">' + item.badge + '</span></div>';
+      }
+    }
+    return html;
+  },
+  openItem: function(type, id) {
+    if(!window.RoundBook) return;
+    if(type === 'round' || type === 'customer') {
+      window.RoundBook.openCustomerDetail(id);
+    } else if(type === 'job') {
+      var jobs = Data.data.oneOffJobs || [];
+      for(var i = 0; i < jobs.length; i++) {
+        if(jobs[i].id === id) { window.RoundBook.openJobForm(jobs[i]); break; }
+      }
+    } else if(type === 'quote') {
+      var quotes = Data.data.quotes || [];
+      for(var qi = 0; qi < quotes.length; qi++) {
+        if(quotes[qi].id === id) { window.RoundBook.openQuoteForm(quotes[qi]); break; }
+      }
+    }
+  }
+};
+
+// ===== RECEIPTS =====
+var Receipts = {
+  _layout: null,
+  getLayout: function() {
+    if(!this._layout) {
+      var s = Data.data.settings || {};
+      this._layout = s.receiptLayout || {showCompany:true,showLogo:true,showCustomer:true,showDetails:true,showFooter:true};
+    }
+    return this._layout;
+  },
+  saveLayout: function(l) {
+    this._layout = l;
+    Data.data.settings.receiptLayout = l;
+    Data.save();
+  },
+  renderCustomizationUI: function(returnTo) {
+    var l = this.getLayout();
+    var self = this;
+    var html = '<div class="sheet-head"><h2 style="flex:1;min-width:0;">Customize Receipt</h2><button class="sheet-close" onclick="window.RoundBook.closeSheet()">✕</button></div><p style="color:var(--ink-muted);font-size:0.8125rem;margin:0 2px 16px;">Choose which sections appear on your printed receipts and invoices.</p><div style="background:var(--surface);border:1px solid var(--box-border);border-radius:12px;padding:16px;margin-bottom:16px;"><div class="receipt-section-toggle"><input type="checkbox" id="rec_showCompany" ' + (l.showCompany ? 'checked' : '') + '><label for="rec_showCompany" style="margin:0;font-weight:600;text-transform:none;letter-spacing:0;">Company name &amp; address</label></div><div class="receipt-section-toggle"><input type="checkbox" id="rec_showLogo" ' + (l.showLogo ? 'checked' : '') + '><label for="rec_showLogo" style="margin:0;font-weight:600;text-transform:none;letter-spacing:0;">Logo</label></div><div class="receipt-section-toggle"><input type="checkbox" id="rec_showCustomer" ' + (l.showCustomer ? 'checked' : '') + '><label for="rec_showCustomer" style="margin:0;font-weight:600;text-transform:none;letter-spacing:0;">Customer details</label></div><div class="receipt-section-toggle"><input type="checkbox" id="rec_showDetails" ' + (l.showDetails ? 'checked' : '') + '><label for="rec_showDetails" style="margin:0;font-weight:600;text-transform:none;letter-spacing:0;">Line items &amp; totals</label></div><div class="receipt-section-toggle" style="border-bottom:none;"><input type="checkbox" id="rec_showFooter" ' + (l.showFooter ? 'checked' : '') + '><label for="rec_showFooter" style="margin:0;font-weight:600;text-transform:none;letter-spacing:0;">Footer</label></div></div><div class="section-label">Preview</div><div class="receipt-preview" id="receiptPreview">' + this._generatePreview(l) + '</div><div class="form-actions"><button class="btn-primary" onclick="window.RoundBook._saveReceiptLayout()">Save Layout</button><button class="btn" style="background:var(--line);color:var(--ink);" onclick="window.RoundBook._resetReceiptLayout()">Reset Default</button></div>';
+    window.RoundBook.openSheet(html, returnTo);
+    var checkboxes = document.querySelectorAll('#rec_showCompany, #rec_showLogo, #rec_showCustomer, #rec_showDetails, #rec_showFooter');
+    for(var i = 0; i < checkboxes.length; i++) {
+      checkboxes[i].addEventListener('change', function() {
+        var nl = {
+          showCompany: document.getElementById('rec_showCompany').checked,
+          showLogo: document.getElementById('rec_showLogo').checked,
+          showCustomer: document.getElementById('rec_showCustomer').checked,
+          showDetails: document.getElementById('rec_showDetails').checked,
+          showFooter: document.getElementById('rec_showFooter').checked
+        };
+        document.getElementById('receiptPreview').innerHTML = self._generatePreview(nl);
+      });
+    }
+  },
+  _generatePreview: function(l) {
+    var company = Data.data.settings.companyName || 'Your Company';
+    var hasLogo = !!Data.data.settings.logo;
+    var customer = 'Mr Smith\n12 Oak Close\nLondon\nSW1 1AA';
+    var details = '<table style="width:100%;font-size:12px;margin:8px 0;"><tr><td style="padding:4px 0;">Window cleaning</td><td style="text-align:right;">£25.00</td></tr><tr style="font-weight:700;"><td style="padding:4px 0;border-top:1px solid #ccc;">Total</td><td style="text-align:right;border-top:1px solid #ccc;">£25.00</td></tr></table>';
+    var footer = 'Thank you for your payment.';
+    var html = '';
+    if(l.showLogo && hasLogo) html += '<div style="margin-bottom:8px;">[Logo]</div>';
+    if(l.showCompany) { html += '<div style="font-weight:700;font-size:16px;margin-bottom:4px;">' + company + '</div>'; html += '<div style="font-size:11px;color:#66798A;margin-bottom:12px;">Company Address</div>'; }
+    if(l.showCustomer) { html += '<div style="font-weight:700;font-size:12px;margin-top:12px;">Customer</div>'; html += '<div style="font-size:12px;color:#1C2B36;margin-bottom:12px;">' + customer.replace(/\n/g,'<br>') + '</div>'; }
+    if(l.showDetails) html += details;
+    if(l.showFooter) html += '<div style="font-size:11px;color:#66798A;margin-top:12px;">' + footer + '</div>';
+    return html || '<div style="color:#66798A;">No sections selected</div>';
+  },
+  saveCustomization: function() {
+    var l = {
+      showCompany: document.getElementById('rec_showCompany').checked,
+      showLogo: document.getElementById('rec_showLogo').checked,
+      showCustomer: document.getElementById('rec_showCustomer').checked,
+      showDetails: document.getElementById('rec_showDetails').checked,
+      showFooter: document.getElementById('rec_showFooter').checked
+    };
+    this.saveLayout(l);
+    window.RoundBook.toast('Receipt layout saved');
+    window.RoundBook.closeSheet();
+  },
+  resetLayout: function() {
+    if(!confirm('Reset receipt layout to default?')) return;
+    this.saveLayout({showCompany:true,showLogo:true,showCustomer:true,showDetails:true,showFooter:true});
+    window.RoundBook.toast('Layout reset to default');
+    window.RoundBook.closeSheet();
+    this.renderCustomizationUI();
+  }
+};
+
+// ===== MAIN APP =====
+window.RoundBook = {
+  currentTab: 'rounds',
+  currentRound: null,
+  roundsViewMode: 'overview',
+  reorderMode: false,
+  roundFilterMode: 'all',
+  roundDayFilter: 'all',
+  darkMode: false,
+  textSize: 18,
+  themeName: 'ocean',
+  sheetOnClose: null,
+  _pendingToastAction: null,
+  _initialized: false,
+  _bannerDismissed: {},
+
+  init: function() {
+    if(this._initialized) return;
+    this.darkMode = localStorage.getItem('roundBookDark') === '1';
+    this.textSize = parseInt(localStorage.getItem('roundBookTextSize'), 10) || 18;
+    this.themeName = localStorage.getItem('roundBookTheme') || 'ocean';
+    this._applyDarkMode();
+    this._applyTheme();
+    this._applyTextSize();
+    document.getElementById('dateNow').textContent = new Date().toLocaleDateString('en-GB', {weekday:'long', day:'numeric', month:'long'});
+    this._loadWeather();
+    this._setupEvents();
+    this.render();
+    this._initSwipe();
+    var self = this;
+    Data.initPhotoStorage().catch(function() {}).finally(function() { self.render(); });
+    if('serviceWorker' in navigator) {
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register('./sw.js').catch(function() {});
+      });
+    }
+    this._initialized = true;
+  },
+
+  _setupEvents: function() {
+    var tabs = document.querySelectorAll('.tab');
+    var self = this;
+    for(var i = 0; i < tabs.length; i++) {
+      tabs[i].addEventListener('click', function() { self.setTab(this.dataset.tab); });
+    }
+    document.addEventListener('keydown', function(e) {
+      if(e.ctrlKey && e.key === 'n') self.handleFabClick();
+      if(e.ctrlKey && e.key === 's') { e.preventDefault(); Data.save(); self.toast('Saved'); }
+      if(e.ctrlKey && e.key === 'p') self.openReports();
+    });
+  },
+
+  _applyDarkMode: function() {
+    document.body.classList.toggle('dark', this.darkMode);
+    this._applyTheme();
+  },
+  setDarkMode: function(v) {
+    this.darkMode = v;
+    localStorage.setItem('roundBookDark', v ? '1' : '0');
+    this._applyDarkMode();
+    this.openSettings();
+  },
+  _applyTextSize: function() {
+    document.documentElement.style.fontSize = this.textSize + 'px';
+  },
+  setTextSize: function(v) {
+    var n = Math.max(15, Math.min(24, parseInt(v,10) || 18));
+    this.textSize = n;
+    localStorage.setItem('roundBookTextSize', String(n));
+    this._applyTextSize();
+    this.openSettings();
+  },
+  _applyTheme: function() {
+    var t = THEMES[this.themeName] || THEMES.ocean;
+    var r = document.body.style;
+    r.setProperty('--navy', t.navy);
+    r.setProperty('--blue', t.blue);
+    r.setProperty('--navy-dark', Utils.mixHex(t.navy, '#000000', 0.28));
+    r.setProperty('--blue-deep', Utils.mixHex(t.blue, '#000000', 0.32));
+    r.setProperty('--blue-dim', this.darkMode ? Utils.mixHex(t.blue, '#0E1620', 0.82) : Utils.mixHex(t.blue, '#FFFFFF', 0.86));
+    r.setProperty('--card-tint', this.darkMode ? Utils.mixHex(t.blue, '#16212C', 0.92) : Utils.mixHex(t.blue, '#FFFFFF', 0.94));
+    r.setProperty('--bg', this.darkMode ? Utils.mixHex(t.blue, '#0E1620', 0.90) : Utils.mixHex(t.blue, '#F5F7F8', 0.92));
+    var meta = document.querySelector('meta[name="theme-color"]');
+    if(meta) meta.setAttribute('content', t.navy);
+  },
+  setTheme: function(name) {
+    if(!THEMES[name]) return;
+    this.themeName = name;
+    localStorage.setItem('roundBookTheme', name);
+    this._applyTheme();
+    this.openSettings();
+  },
+
+  setTab: function(tab) {
+    this.currentTab = tab;
+    this.currentRound = null;
+    this.reorderMode = false;
+    this.roundFilterMode = 'all';
+    this.roundDayFilter = 'all';
+    var tabs = document.querySelectorAll('.tab');
+    for(var i = 0; i < tabs.length; i++) {
+      tabs[i].classList.toggle('active', tabs[i].dataset.tab === tab);
+    }
+    this.render();
+    window.scrollTo(0, 0);
+  },
+
+  openSheet: function(html, onClose) {
+    this.sheetOnClose = onClose || null;
+    document.getElementById('sheet').innerHTML = '<div class="sheet-handle"></div>' + html;
+    document.getElementById('overlay').classList.add('show');
+  },
+  closeSheet: function() {
+    document.getElementById('overlay').classList.remove('show');
+    if(this.sheetOnClose) {
+      var cb = this.sheetOnClose;
+      this.sheetOnClose = null;
+      cb();
+    }
+  },
+
+  toast: function(msg, actionLabel, actionFn) {
+    var t = document.getElementById('toast');
+    clearTimeout(t._t);
+    this._pendingToastAction = actionFn || null;
+    if(actionLabel && actionFn) {
+      t.innerHTML = Utils.escapeHtml(msg) + '<button class="toast-undo-btn" onclick="window.RoundBook._runToastAction()">' + Utils.escapeHtml(actionLabel) + '</button>';
+      t.classList.add('show');
+      var self = this;
+      t._t = setTimeout(function() { t.classList.remove('show'); self._pendingToastAction = null; }, 5000);
+    } else {
+      t.textContent = msg;
+      t.classList.add('show');
+      t._t = setTimeout(function() { t.classList.remove('show'); }, 1600);
+    }
+  },
+  _runToastAction: function() {
+    var fn = this._pendingToastAction;
+    this._pendingToastAction = null;
+    var t = document.getElementById('toast');
+    clearTimeout(t._t);
+    t.classList.remove('show');
+    if(fn) fn();
+  },
+
+  handleFabClick: function() {
+    if(this.currentTab === 'jobs') this.openJobForm();
+    else if(this.currentTab === 'quotes') this.openQuoteForm();
+    else if(this.currentTab === 'schedule') this.openJobForm();
+    else this.openCustomerForm();
+  },
+
+  // ===== CUSTOMER STATUS HELPERS =====
+  custStatus: function(c) {
+    var lastClean = Utils.lastDateOf(c.cleanHistory);
+    var lastPaid = Utils.lastOf((c.paymentHistory||[]).map(function(p){ return p.date; }));
+    var freq = (c.frequencyWeeks || 4) * 7;
+    var cleanBadge = null;
+    var deferred = c.deferUntil && c.deferUntil > Utils.todayISO();
+    if(c.paused) {
+      cleanBadge = {type:'paused', text: c.pauseReason ? 'Paused — ' + c.pauseReason : 'Paused'};
+    } else if(deferred) {
+      cleanBadge = {type:'deferred', text: 'Deferred to ' + Utils.fmtDate(c.deferUntil)};
+    } else if(lastClean) {
+      var due = Utils.daysBetween(lastClean, Utils.todayISO());
+      if(due >= freq) {
+        cleanBadge = {type:'due', text: (due - freq === 0) ? 'Due today' : 'Due +' + (due - freq)};
+      }
+    } else {
+      cleanBadge = {type:'due', text:'Never cleaned'};
+    }
+    var totalCharged = 0;
+    for(var i = 0; i < (c.cleanHistory||[]).length; i++) {
+      totalCharged += Number(c.cleanHistory[i].amount || 0);
+    }
+    var totalPaid = 0;
+    for(var pi = 0; pi < (c.paymentHistory||[]).length; pi++) {
+      totalPaid += Number(c.paymentHistory[pi].amount || 0);
+    }
+    var balance = Math.round((totalCharged - totalPaid) * 100) / 100;
+    var owed = balance > 0.005;
+    var credit = balance < -0.005;
+    return {cleanBadge:cleanBadge, owed:owed, credit:credit, balance:balance, lastClean:lastClean, lastPaid:lastPaid};
+  },
+
+  nextDueISO: function(c) {
+    var lastClean = Utils.lastDateOf(c.cleanHistory);
+    if(!lastClean) return null;
+    var d = new Date(lastClean + 'T00:00:00');
+    d.setDate(d.getDate() + (c.frequencyWeeks || 4) * 7);
+    return d.toISOString().slice(0,10);
+  },
+
+  quoteNeedsFollowUp: function(q, today) {
+    today = today || Utils.todayISO();
+    if(!q || q.status !== 'pending' || !q.date) return false;
+    var days = q.followUpDays != null ? q.followUpDays : 7;
+    return Utils.daysBetween(q.date, today) >= days;
+  },
+
+  // ===== RENDER =====
+  render: function() {
+    this._renderBanners();
+    var main = document.getElementById('main');
+    if(this.currentTab === 'schedule') { main.innerHTML = Schedule.render(); return; }
+    if(this.currentTab === 'rounds' && !this.currentRound) { this._renderRoundsList(main); return; }
+    if(this.currentTab === 'rounds' && this.currentRound) { this._renderRoundDetail(main, this.currentRound); return; }
+    if(this.currentTab === 'jobs') { this._renderJobs(main); return; }
+    if(this.currentTab === 'quotes') { this._renderQuotes(main); return; }
+  },
+
+  // ===== BANNERS =====
+  _renderBanners: function() {
+    var bc = document.getElementById('bannerContainer');
+    if(!bc) return;
+    var html = '';
+    var days = this._daysSinceBackup();
+    if(!this._bannerDismissed.backup && Data.data.customers.length && days >= 7) {
+      html += '<div style="background:var(--amber-dim);color:var(--amber);border-radius:12px;padding:11px 14px;margin:0 14px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:0.8125rem;font-weight:700;"><span>📦 ' + (days === Infinity ? 'You haven\'t backed up yet' : 'It\'s been ' + days + ' days since your last backup') + '</span><span style="display:flex;gap:8px;flex-shrink:0;align-items:center;"><button onclick="window.RoundBook.openBackup()" style="background:var(--amber);color:#fff;border:none;border-radius:8px;padding:6px 10px;font-weight:800;font-size:0.7812rem;">Back up</button><button onclick="window.RoundBook._dismissBanner(\'backup\')" style="background:none;border:none;color:var(--amber);font-weight:800;font-size:1rem;line-height:1;padding:0 2px;">✕</button></span></div>';
+    }
+    bc.innerHTML = html;
+  },
+  _dismissBanner: function(type) {
+    this._bannerDismissed[type] = true;
+    this._renderBanners();
+  },
+  _daysSinceBackup: function() {
+    var last = localStorage.getItem('roundBookLastBackup');
+    if(!last) return Infinity;
+    return Utils.daysBetween(last, Utils.todayISO());
+  },
+
+  // ===== ROUNDS LIST =====
+  _groupByRound: function(list) {
+    var rounds = {};
+    for(var i = 0; i < list.length; i++) {
+      var r = list[i].round || 'Unassigned';
+      if(!rounds[r]) rounds[r] = [];
+      rounds[r].push(list[i]);
+    }
+    return rounds;
+  },
+
+  _roundDaysUsed: function(custs) {
+    var days = [];
+    for(var i = 0; i < custs.length; i++) {
+      var d = custs[i].visitDay || 1;
+      if(days.indexOf(d) === -1) days.push(d);
+    }
+    days.sort(function(a,b){ return a-b; });
+    return days;
+  },
+
+  _isMobileNumber: function(phone) {
+    if(!phone) return false;
+    var digits = phone.replace(/[^\d+]/g, '');
+    return /^07\d{9}$/.test(digits) || /^(\+44|0044)7\d{9}$/.test(digits);
+  },
+
+  _emptyState: function(kind) {
+    if(kind === 'rounds') return '<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="#66798A" stroke-width="1.6"><path d="M4 4h16v12H4z"/><path d="M4 10h16M10 4v12"/></svg><b>No customers yet</b><p>Tap the blue + button to add your first customer and give them a round.</p></div>';
+    return '<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="#66798A" stroke-width="1.6"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg><b>No matches</b><p>Try a different filter.</p></div>';
+  },
+
+  _renderRoundsList: function(main) {
+    var rounds = this._groupByRound(Data.data.customers);
+    var roundNames = Object.keys(rounds).sort(function(a,b){ return a.localeCompare(b); });
+    var html = '';
+    if(Data.data.customers.length) {
+      var active = Data.data.customers.filter(function(c){ return !c.paused; });
+      var total = active.length;
+      var value = 0;
+      for(var i = 0; i < active.length; i++) value += Number(active[i].price || 0);
+      var avg = total ? value / total : 0;
+      html += '<div style="display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-bottom:8px;"><button class="btn-open" style="width:38px;height:38px;padding:0;" onclick="window.RoundBook._openCustomerSearch()" aria-label="Search"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button><button class="btn-open" style="width:38px;height:38px;padding:0;" onclick="window.RoundBook._openRoundReports()" aria-label="Print"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg></button></div><div class="summary-overall"><div class="stat"><div class="num">' + total + '</div><div class="lbl">Customers</div></div><div class="stat"><div class="num">' + Utils.money(value) + '</div><div class="lbl">Round value</div></div><div class="stat"><div class="num">' + Utils.money(avg) + '</div><div class="lbl">Avg / customer</div></div></div>';
+    }
+    html += '<div class="seg-row"><button class="seg-btn ' + (this.roundsViewMode === 'overview' ? 'active' : '') + '" onclick="window.RoundBook._setRoundsView(\'overview\')">Rounds</button><button class="seg-btn ' + (this.roundsViewMode === 'due' ? 'active' : '') + '" onclick="window.RoundBook._setRoundsView(\'due\')">Due</button><button class="seg-btn ' + (this.roundsViewMode === 'owed' ? 'active' : '') + '" onclick="window.RoundBook._setRoundsView(\'owed\')">Owed</button></div>';
+    if(!roundNames.length) { main.innerHTML = html + this._emptyState('rounds'); return; }
+    if(this.roundsViewMode === 'overview') {
+      html += '<div class="section-label">Your rounds</div>';
+      for(var ri = 0; ri < roundNames.length; ri++) {
+        var rn = roundNames[ri];
+        var all = rounds[rn];
+        var daysUsed = this._roundDaysUsed(all);
+        var due = 0, owed = 0, paused = 0;
+        for(var ci = 0; ci < all.length; ci++) {
+          var s = this.custStatus(all[ci]);
+          if(all[ci].paused) paused++;
+          else if(s.cleanBadge && s.cleanBadge.type === 'due') due++;
+          if(s.owed) owed++;
+        }
+        html += '<div class="round-card" onclick="window.RoundBook._openRound(\'' + rn + '\')"><div><div class="rname">' + Utils.escapeHtml(rn) + '</div><div class="rcount">' + all.length + ' customer' + (all.length === 1 ? '' : 's') + (daysUsed.length > 1 ? ' · ' + daysUsed.length + ' days' : '') + '</div></div><div class="badges">' + (due ? '<span class="badge due">' + due + ' due</span>' : '') + (owed ? '<span class="badge owed">' + owed + ' owe</span>' : '') + (paused ? '<span class="badge paused">' + paused + ' paused</span>' : '') + (!due && !owed ? '<span class="badge ok">All clear</span>' : '') + '<svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 6l6 6-6 6"/></svg></div></div>';
+      }
+    } else if(this.roundsViewMode === 'due') {
+      var anyDue = false;
+      for(var rni = 0; rni < roundNames.length; rni++) {
+        var rn2 = roundNames[rni];
+        var dueCusts = [];
+        var all2 = rounds[rn2];
+        for(var ci2 = 0; ci2 < all2.length; ci2++) {
+          var s2 = this.custStatus(all2[ci2]);
+          if(!all2[ci2].paused && s2.cleanBadge && s2.cleanBadge.type === 'due') {
+            dueCusts.push(all2[ci2]);
+          }
+        }
+        if(!dueCusts.length) continue;
+        anyDue = true;
+        var anyPhone = false;
+        for(var di = 0; di < dueCusts.length; di++) {
+          if(this._isMobileNumber(dueCusts[di].phone)) { anyPhone = true; break; }
+        }
+        html += '<div class="round-group-header" style="display:flex;align-items:center;justify-content:space-between;margin:18px 2px 8px;"><div class="section-label" style="margin:0;">' + Utils.escapeHtml(rn2) + ' <span style="font-weight:600;color:var(--ink-muted);text-transform:none;letter-spacing:0;">(' + dueCusts.length + ')</span></div>' + (anyPhone ? '<button onclick="window.RoundBook._openBulkReminders(\'due\',\'' + rn2 + '\')" style="background:none;border:none;color:var(--blue);font-size:0.75rem;font-weight:800;">✉️ Remind all</button>' : '') + '</div>';
+        for(var ci3 = 0; ci3 < dueCusts.length; ci3++) {
+          html += this._custCardHtml(dueCusts[ci3]);
+        }
+      }
+      if(!anyDue) html += '<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="#66798A" stroke-width="1.6"><path d="M20 6L9 17l-5-5"/></svg><b>Nobody\'s due</b><p>Everyone\'s cleaned on schedule.</p></div>';
+    } else if(this.roundsViewMode === 'owed') {
+      var anyOwed = false;
+      var grandTotal = 0;
+      for(var rni2 = 0; rni2 < roundNames.length; rni2++) {
+        var rn3 = roundNames[rni2];
+        var owedCusts = [];
+        var all3 = rounds[rn3];
+        for(var ci4 = 0; ci4 < all3.length; ci4++) {
+          if(this.custStatus(all3[ci4]).owed) owedCusts.push(all3[ci4]);
+        }
+        if(!owedCusts.length) continue;
+        anyOwed = true;
+        var rt = 0;
+        for(var oi = 0; oi < owedCusts.length; oi++) {
+          rt += this.custStatus(owedCusts[oi]).balance;
+        }
+        grandTotal += rt;
+        var anyPhone2 = false;
+        for(var oi2 = 0; oi2 < owedCusts.length; oi2++) {
+          if(this._isMobileNumber(owedCusts[oi2].phone)) { anyPhone2 = true; break; }
+        }
+        html += '<div class="round-group-header" style="display:flex;align-items:center;justify-content:space-between;margin:18px 2px 8px;"><div class="section-label" style="margin:0;">' + Utils.escapeHtml(rn3) + ' <span style="font-weight:600;color:var(--ink-muted);text-transform:none;letter-spacing:0;">(owing ' + Utils.money(rt) + ')</span></div>' + (anyPhone2 ? '<button onclick="window.RoundBook._openBulkReminders(\'owed\',\'' + rn3 + '\')" style="background:none;border:none;color:var(--blue);font-size:0.75rem;font-weight:800;">✉️ Remind all</button>' : '') + '</div>';
+        for(var ci5 = 0; ci5 < owedCusts.length; ci5++) {
+          html += this._custCardHtml(owedCusts[ci5]);
+        }
+      }
+      if(!anyOwed) html += '<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="#66798A" stroke-width="1.6"><path d="M20 6L9 17l-5-5"/></svg><b>Nobody owes anything</b><p>Everyone\'s paid up.</p></div>';
+      else html += '<div style="text-align:right;font-weight:800;font-size:0.9375rem;color:var(--emphasis);padding:10px 4px 4px;">Total owed: ' + Utils.money(grandTotal) + '</div>';
+    }
+    main.innerHTML = html;
+  },
+
+  _custCardHtml: function(c) {
+    var s = this.custStatus(c);
+    var roundCustomers = Data.data.customers.filter(function(x) { return (x.round||'Unassigned') === (c.round||'Unassigned'); });
+    var showDayBadge = this._roundDaysUsed(roundCustomers).length > 1;
+    var html = '<div class="swipe-wrap"><div class="swipe-bg swipe-bg-left">✓ Cleaned</div><div class="swipe-bg swipe-bg-right">💷 Paid</div><div class="cust-card" data-id="' + c.id + '" data-kind="customer"><div class="cust-top" onclick="window.RoundBook.openCustomerDetail(\'' + c.id + '\')"><div><div class="cust-addr" style="font-size:1rem;font-weight:800;color:var(--ink);">' + Utils.escapeHtml(c.address||'No address') + '</div>';
+    if(c.name || c.phone) {
+      var parts = [];
+      if(c.name) parts.push(Utils.escapeHtml(c.name));
+      if(c.phone) parts.push(Utils.escapeHtml(c.phone));
+      html += '<div class="cust-name" style="font-size:0.8125rem;font-weight:600;color:var(--ink-muted);margin-top:2px;">' + parts.join(' · ') + '</div>';
+    }
+    html += '</div><div class="cust-right"><div class="cust-price">' + Utils.money(c.price) + '</div><div class="cust-btn-row">';
+    if(c.phone) html += '<button class="call-btn" onclick="event.stopPropagation();window.RoundBook._callCustomer(\'customer\',\'' + c.id + '\')" title="Call" aria-label="Call"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"></path></svg></button>';
+    if(c.address) html += '<button class="dir-btn" onclick="event.stopPropagation();window.RoundBook._openDirections(\'customer\',\'' + c.id + '\')" title="Directions" aria-label="Directions"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg></button>';
+    html += '</div></div></div><div class="cust-meta">';
+    if(s.cleanBadge) html += '<span class="badge ' + s.cleanBadge.type + '"' + (c.paused && c.pauseDate ? ' title="Paused since ' + Utils.fmtDate(c.pauseDate) + '"' : '') + '>' + s.cleanBadge.text + '</span>';
+    else html += '<span class="badge ok">Cleaned ' + Utils.fmtDate(s.lastClean) + '</span>';
+    if(s.owed) html += '<span class="badge owed">Owes ' + Utils.money(s.balance) + '</span>';
+    else if(s.credit) html += '<span class="badge ok">Credit ' + Utils.money(Math.abs(s.balance)) + '</span>';
+    else html += '<span class="badge ok">Paid up</span>';
+    if(s.owed && (c.paymentReminderCount||0) >= 2) html += '<span class="badge escalate" title="' + (c.paymentReminderCount||0) + ' payment reminders sent, still unpaid">⚠ Chase</span>';
+    if(s.owed && c.paymentReminderSent) html += '<span class="badge paused">🔔 ' + Utils.fmtDate(c.paymentReminderSentDate).split(' ').slice(0,2).join(' ') + '</span>';
+    if(c.photos && c.photos.length) html += '<span class="badge paused">📷 ' + c.photos.length + '</span>';
+    if(c.textBeforeVisit) html += '<span class="badge anniversary" title="Text before you arrive">📱 Text first</span>';
+    if(showDayBadge) html += '<span class="badge anniversary">Day ' + (c.visitDay||1) + '</span>';
+    if(this._isMobileNumber(c.phone) && s.lastClean === Utils.todayISO()) {
+      html += '<button onclick="event.stopPropagation();window.RoundBook._sendTemplate(\'' + c.id + '\',\'cleanedToday\')" style="display:inline-flex;align-items:center;gap:4px;background:var(--green-dim);color:var(--green);border:none;border-radius:20px;padding:5px 10px;font-size:0.7188rem;font-weight:800;line-height:1;">💬 Cleaned today</button>';
+    }
+    html += '</div></div></div>';
+    return html;
+  },
+
+  // ===== ROUND DETAIL =====
+  _renderRoundDetail: function(main, rn) {
+    main.innerHTML = '<div style="padding:20px;text-align:center;color:var(--ink-muted);">Round detail for ' + Utils.escapeHtml(rn) + '<br><br><button class="btn btn-clean" onclick="window.RoundBook.currentRound=null;window.RoundBook.render();">← Back</button></div>';
+  },
+
+  // ===== JOBS =====
+  _renderJobs: function(main) {
+    var jobs = Data.data.oneOffJobs || [];
+    if(!jobs.length) {
+      main.innerHTML = '<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="#66798A" stroke-width="1.6"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg><b>No one-off jobs yet</b><p>Tap the blue + button to add a gutter clean, one-time job, or anything outside your regular rounds.</p></div>';
+      return;
+    }
+    var html = '<div style="display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-bottom:8px;"><button class="btn-open" style="width:38px;height:38px;padding:0;" onclick="window.RoundBook._printAllJobs()" aria-label="Print"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg></button></div><div class="section-label">' + jobs.length + ' one-off job' + (jobs.length === 1 ? '' : 's') + '</div>';
+    var today = Utils.todayISO();
+    var total = 0;
+    for(var i = 0; i < jobs.length; i++) {
+      var j = jobs[i];
+      total += Number(j.price || 0);
+      var isFuture = !j.done && j.date && j.date > today;
+      var statusBadge = j.done ? '<span class="badge ok">Done</span>' : isFuture ? '<span class="badge due">Scheduled</span>' : '<span class="badge overdue">Not done</span>';
+      html += '<div class="swipe-wrap"><div class="swipe-bg swipe-bg-left">✓ Done</div><div class="swipe-bg swipe-bg-right">💷 Paid</div><div class="cust-card" data-id="' + j.id + '" data-kind="job"><div class="cust-top" onclick="window.RoundBook.openJobForm(Data.data.oneOffJobs.find(function(x){return x.id===\'' + j.id + '\';}))"><div><div class="cust-addr" style="font-size:1rem;font-weight:800;color:var(--ink);">' + Utils.escapeHtml(j.address||'No address') + '</div>';
+      if(j.name || j.phone) {
+        var parts = [];
+        if(j.name) parts.push(Utils.escapeHtml(j.name));
+        if(j.phone) parts.push(Utils.escapeHtml(j.phone));
+        html += '<div class="cust-name" style="font-size:0.8125rem;font-weight:600;color:var(--ink-muted);margin-top:2px;">' + parts.join(' · ') + '</div>';
+      }
+      html += '<div style="font-size:0.75rem;color:var(--ink-muted);margin-top:2px;">' + Utils.fmtDate(j.date) + (j.time ? ' at ' + Utils.fmtTime(j.time) : '') + (j.remind24h ? ' · 🔔 Reminder set' : '') + '</div></div><div class="cust-right"><div class="cust-price">' + Utils.money(j.price) + '</div><div class="cust-btn-row">';
+      if(j.phone) html += '<button class="call-btn" onclick="event.stopPropagation();window.RoundBook._callCustomer(\'job\',\'' + j.id + '\')" title="Call"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"></path></svg></button>';
+      if(j.address) html += '<button class="dir-btn" onclick="event.stopPropagation();window.RoundBook._openDirections(\'job\',\'' + j.id + '\')" title="Directions"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg></button>';
+      html += '</div></div></div><div class="cust-meta">' + statusBadge + '<span class="badge ' + (j.paid ? 'ok' : 'owed') + '">' + (j.paid ? 'Paid' : 'Unpaid') + '</span>' + (j.photos && j.photos.length ? '<span class="badge paused">📷 ' + j.photos.length + '</span>' : '') + '</div></div></div>';
+    }
+    html += '<div style="text-align:right;font-weight:800;font-size:0.9375rem;color:var(--emphasis);padding:10px 4px 4px;">' + jobs.length + ' job' + (jobs.length === 1 ? '' : 's') + ' · ' + Utils.money(total) + '</div>';
+    main.innerHTML = html;
+  },
+
+  // ===== QUOTES =====
+  _renderQuotes: function(main) {
+    var quotes = Data.data.quotes || [];
+    if(!quotes.length) {
+      main.innerHTML = '<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="#66798A" stroke-width="1.6"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg><b>No quotes yet</b><p>Tap the blue + button to note down a quote — you can turn it into a customer or a one-off job later.</p></div>';
+      return;
+    }
+    var html = '<div style="display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-bottom:8px;"><button class="btn-open" style="width:38px;height:38px;padding:0;" onclick="window.RoundBook._printQuotes()" aria-label="Print"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg></button></div><div class="section-label">' + quotes.length + ' quote' + (quotes.length === 1 ? '' : 's') + '</div>';
+    var today = Utils.todayISO();
+    var total = 0;
+    for(var i = 0; i < quotes.length; i++) {
+      var q = quotes[i];
+      total += Number(q.price || 0);
+      var needsFollowUp = this.quoteNeedsFollowUp(q, today);
+      var statusLabel = q.status === 'accepted' ? 'Accepted' : q.status === 'declined' ? 'Declined' : q.status === 'converted' ? 'Converted' : 'Pending';
+      var statusClass = q.status === 'accepted' ? '' : q.status === 'declined' ? 'overdue' : q.status === 'converted' ? '' : needsFollowUp ? 'due' : '';
+      html += '<div class="swipe-wrap"><div class="swipe-bg swipe-bg-left">✓ Accept</div><div class="swipe-bg swipe-bg-right">✕ Decline</div><div class="cust-card" data-id="' + q.id + '" data-kind="quote"><div class="cust-top" onclick="window.RoundBook.openQuoteForm(Data.data.quotes.find(function(x){return x.id===\'' + q.id + '\';}))"><div><div class="cust-addr" style="font-size:1rem;font-weight:800;color:var(--ink);">' + Utils.escapeHtml(q.address||'No address') + '</div>';
+      if(q.name || q.phone) {
+        var parts = [];
+        if(q.name) parts.push(Utils.escapeHtml(q.name));
+        if(q.phone) parts.push(Utils.escapeHtml(q.phone));
+        html += '<div class="cust-name" style="font-size:0.8125rem;font-weight:600;color:var(--ink-muted);margin-top:2px;">' + parts.join(' · ') + '</div>';
+      }
+      html += '<div style="font-size:0.75rem;color:var(--ink-muted);margin-top:2px;">' + Utils.fmtDate(q.date) + '</div></div><div class="cust-price">' + Utils.money(q.price) + '</div></div><div class="cust-meta"><span class="badge ' + statusClass + '">' + statusLabel + '</span>' + (q.fromJobId ? '<span class="badge anniversary">🔁 Repeat work</span>' : '') + (needsFollowUp ? '<span class="badge overdue">⏰ Follow up — ' + Utils.daysBetween(q.date, today) + 'd since quoted</span>' : '') + '</div></div></div>';
+    }
+    html += '<div style="text-align:right;font-weight:800;font-size:0.9375rem;color:var(--emphasis);padding:10px 4px 4px;">' + quotes.length + ' quote' + (quotes.length === 1 ? '' : 's') + ' · ' + Utils.money(total) + '</div>';
+    main.innerHTML = html;
+  },
+
+  // ===== ANALYTICS =====
+  openAnalytics: function() {
+    var html = '<div class="sheet-head"><h2 style="flex:1;min-width:0;">Analytics</h2><button class="sheet-close" onclick="window.RoundBook.closeSheet()">✕</button></div>' + this._analyticsHTML();
+    this.openSheet(html);
+  },
+
+  _analyticsHTML: function() {
+    var d = Data.data;
+    var customers = d.customers || [];
+    var active = [];
+    for(var ci = 0; ci < customers.length; ci++) {
+      if(!customers[ci].paused) active.push(customers[ci]);
+    }
+    var total = active.length;
+    var value = 0;
+    for(var vi = 0; vi < active.length; vi++) value += Number(active[vi].price || 0);
+    var avg = total ? value / total : 0;
+    var owed = 0, owedCount = 0;
+    for(var oi = 0; oi < customers.length; oi++) {
+      var s = this.custStatus(customers[oi]);
+      if(s.owed) { owed += s.balance; owedCount++; }
+    }
+    var payments = [];
+    for(var pi = 0; pi < customers.length; pi++) {
+      var pHistory = customers[pi].paymentHistory || [];
+      for(var hi = 0; hi < pHistory.length; hi++) {
+        payments.push({date: pHistory[hi].date, amount: Number(pHistory[hi].amount || 0)});
+      }
+    }
+    var jobs = d.oneOffJobs || [];
+    for(var ji = 0; ji < jobs.length; ji++) {
+      if(jobs[ji].paid) {
+        payments.push({date: jobs[ji].paidDate || jobs[ji].date, amount: Number(jobs[ji].price || 0)});
+      }
+    }
+    var totalRevenue = 0;
+    for(var ri = 0; ri < payments.length; ri++) totalRevenue += payments[ri].amount;
+    var totalPayments = payments.length;
+    var now = new Date();
+    var last30 = 0, last90 = 0, last365 = 0;
+    var d30 = new Date(now.getTime() - 30*24*60*60*1000);
+    var d90 = new Date(now.getTime() - 90*24*60*60*1000);
+    var d365 = new Date(now.getTime() - 365*24*60*60*1000);
+    for(var pi2 = 0; pi2 < payments.length; pi2++) {
+      var pDate = new Date(payments[pi2].date + 'T00:00:00');
+      if(pDate >= d30) last30 += payments[pi2].amount;
+      if(pDate >= d90) last90 += payments[pi2].amount;
+      if(pDate >= d365) last365 += payments[pi2].amount;
+    }
+    return '<div class="analytics-grid"><div class="analytics-card"><div class="value">' + total + '</div><div class="label">Active Customers</div></div><div class="analytics-card"><div class="value">' + Utils.money(value) + '</div><div class="label">Total Round Value</div></div><div class="analytics-card"><div class="value">' + Utils.money(avg) + '</div><div class="label">Avg per Customer</div></div><div class="analytics-card"><div class="value ' + (owed > 0 ? 'analytics-trend-down' : 'analytics-trend-up') + '">' + Utils.money(owed) + '</div><div class="label">Outstanding (' + owedCount + ' customers)</div></div><div class="analytics-card"><div class="value">' + Utils.money(totalRevenue) + '</div><div class="label">All Time Revenue</div></div><div class="analytics-card"><div class="value">' + totalPayments + '</div><div class="label">Total Payments</div></div></div><div class="section-label">Revenue</div><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px;"><div style="background:var(--surface);border:1px solid var(--box-border);border-radius:10px;padding:10px;text-align:center;"><div style="font-weight:700;font-size:0.8125rem;">' + Utils.money(last30) + '</div><div style="font-size:0.6562rem;color:var(--ink-muted);">Last 30 days</div></div><div style="background:var(--surface);border:1px solid var(--box-border);border-radius:10px;padding:10px;text-align:center;"><div style="font-weight:700;font-size:0.8125rem;">' + Utils.money(last90) + '</div><div style="font-size:0.6562rem;color:var(--ink-muted);">Last 90 days</div></div><div style="background:var(--surface);border:1px solid var(--box-border);border-radius:10px;padding:10px;text-align:center;"><div style="font-weight:700;font-size:0.8125rem;">' + Utils.money(last365) + '</div><div style="font-size:0.6562rem;color:var(--ink-muted);">Last 12 months</div></div><div style="background:var(--surface);border:1px solid var(--box-border);border-radius:10px;padding:10px;text-align:center;"><div style="font-weight:700;font-size:0.8125rem;">' + Utils.money(totalRevenue) + '</div><div style="font-size:0.6562rem;color:var(--ink-muted);">All time</div></div></div><div style="font-size:0.75rem;color:var(--ink-muted);text-align:center;border-top:1px solid var(--line);padding-top:12px;">Data as of ' + Utils.fmtDate(Utils.todayISO()) + '</div>';
+  },
+
+  // ===== OPEN FUNCTIONS =====
+  openSchedule: function() { this.setTab('schedule'); },
+
+  openReports: function() { this.toast('Reports - full implementation would go here'); },
+  openBackup: function() {
+    var html = '<div class="sheet-head"><h2 style="flex:1;min-width:0;">Backup &amp; Restore</h2><button class="sheet-close" onclick="window.RoundBook.closeSheet()">✕</button></div>' + Backup.renderBackupUI();
+    this.openSheet(html);
+  },
+  openSettings: function() {
+    var self = this;
+    var html = '<div class="sheet-head"><h2 style="flex:1;min-width:0;">Settings</h2><button class="sheet-close" onclick="window.RoundBook.closeSheet()">✕</button></div><div class="section-label" style="margin-top:0;">Appearance</div><div class="seg-row"><button class="seg-btn ' + (!this.darkMode ? 'active' : '') + '" onclick="window.RoundBook.setDarkMode(false)">☀️ Light</button><button class="seg-btn ' + (this.darkMode ? 'active' : '') + '" onclick="window.RoundBook.setDarkMode(true)">🌙 Dark</button></div><div class="section-label">Text size</div><div style="display:flex;align-items:center;gap:10px;margin:4px 2px 16px;"><span style="font-size:0.75rem;color:var(--ink-muted);flex-shrink:0;">A</span><input type="range" min="15" max="24" step="1" value="' + this.textSize + '" oninput="document.documentElement.style.fontSize=this.value+\'px\';document.getElementById(\'textSizeLabel\').textContent=this.value+\'px\'" onchange="window.RoundBook.setTextSize(this.value)" style="flex:1;accent-color:var(--blue);"><span style="font-size:1.375rem;color:var(--ink-muted);flex-shrink:0;line-height:1;">A</span><span id="textSizeLabel" style="font-size:0.75rem;font-weight:800;color:var(--ink);min-width:34px;text-align:right;flex-shrink:0;">' + this.textSize + 'px</span></div><div class="section-label">Colour scheme</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px;">';
+    var themeKeys = Object.keys(THEMES);
+    for(var i = 0; i < themeKeys.length; i++) {
+      var key = themeKeys[i];
+      var t = THEMES[key];
+      var active = this.themeName === key;
+      html += '<button onclick="window.RoundBook.setTheme(\'' + key + '\')" style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 4px;border-radius:12px;border:2px solid ' + (active ? t.blue : 'var(--line)') + ';background:var(--surface);"><span style="width:26px;height:26px;border-radius:50%;background:' + t.navy + ';box-shadow:inset 0 0 0 4px ' + t.blue + ';"></span><span style="font-size:0.7188rem;font-weight:700;color:var(--ink);">' + t.name + '</span></button>';
+    }
+    html += '</div><div class="section-label">Messaging app</div><div class="seg-row"><button class="seg-btn ' + (Data.data.settings.messagingApp !== 'whatsapp' ? 'active' : '') + '" onclick="window.RoundBook._setMessagingApp(\'sms\')">💬 Text message</button><button class="seg-btn ' + (Data.data.settings.messagingApp === 'whatsapp' ? 'active' : '') + '" onclick="window.RoundBook._setMessagingApp(\'whatsapp\')">🟢 WhatsApp</button></div><p style="color:var(--ink-muted);font-size:0.75rem;margin:4px 2px 16px;line-height:1.5;">Used whenever a message is sent straight to a customer\'s phone.</p><div class="section-label">Business details</div><button class="backup-btn" onclick="window.RoundBook._openBusinessDetails()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 9h1M9 13h1M14 9h1M14 13h1"/></svg><div><div class="t1">Business details</div><div class="t2">Company info, logo, your name, and bank details</div></div></button><button class="backup-btn" onclick="window.RoundBook._openMessageTemplates()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><div><div class="t1">Message templates</div><div class="t2">Wording for reminders, receipts, and quotes</div></div></button><button class="backup-btn" onclick="window.RoundBook._openReceiptCustomization()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg><div><div class="t1">Receipt layout</div><div class="t2">Customize what appears on printed receipts</div></div></button>';
+    this.openSheet(html);
+  },
+
+  _setMessagingApp: function(mode) {
+    Data.data.settings.messagingApp = mode;
+    Data.save();
+    this.openSettings();
+  },
+
+  _openBusinessDetails: function() { this.toast('Business details form'); },
+  _openMessageTemplates: function() { this.toast('Message templates'); },
+  _openReceiptCustomization: function() { Receipts.renderCustomizationUI(function(){ window.RoundBook.openSettings(); }); },
+
+  // ===== PLACEHOLDER FUNCTIONS =====
+  _setRoundsView: function(v) { this.roundsViewMode = v; this.render(); },
+  _openRound: function(rn) { this.currentRound = rn; this.render(); },
+  _openRoundReports: function() { this.openReports(); },
+  _openCustomerSearch: function() { this.toast('Search - type in the search box'); },
+  _openBulkReminders: function(kind, roundName) { this.toast('Bulk reminders for ' + roundName); },
+  _callCustomer: function(kind, id) {
+    var item = kind === 'job' ? Data.data.oneOffJobs.find(function(x){return x.id===id;}) : Data.data.customers.find(function(x){return x.id===id;});
+    if(!item || !item.phone) { this.toast('No phone number set'); return; }
+    window.location.href = 'tel:' + item.phone.replace(/\s+/g,'');
+  },
+  _openDirections: function(kind, id) {
+    var item = kind === 'job' ? Data.data.oneOffJobs.find(function(x){return x.id===id;}) : Data.data.customers.find(function(x){return x.id===id;});
+    if(!item || !item.address) { this.toast('No address set'); return; }
+    window.location.href = 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(item.address);
+  },
+  _sendTemplate: function(id, kind) { this.toast('Would send ' + kind + ' template'); },
+  _printAllJobs: function() { this.toast('Print all jobs'); },
+  _printQuotes: function() { this.toast('Print quotes'); },
+  openCustomerForm: function() { this.toast('Add customer form'); },
+  openCustomerDetail: function(id) { this.toast('Customer detail for ' + id); },
+  openJobForm: function(existing) { this.toast('Job form' + (existing ? ' (edit)' : '')); },
+  openQuoteForm: function(existing) { this.toast('Quote form' + (existing ? ' (edit)' : '')); },
+
+  // ===== VOICE =====
+  _voiceStart: function(fieldId) {
+    var self = this;
+    Voice.start(function(text, final) {
+      var field = document.getElementById(fieldId);
+      if(field) {
+        if(final) {
+          field.value = (field.value + ' ' + text).trim();
+          Data.saveDraft('field_' + fieldId, field.value);
+        } else {
+          field.value = (field.value + ' ' + text).trim();
+        }
+      }
+    }, fieldId);
+  },
+
+  // ===== SEARCH =====
+  _selectSuggestion: function(inputId, containerId, index) {
+    Search._selectSuggestion(inputId, containerId, index);
+  },
+
+  // ===== RECEIPTS =====
+  _saveReceiptLayout: function() { Receipts.saveCustomization(); },
+  _resetReceiptLayout: function() { Receipts.resetLayout(); },
+
+  // ===== SCHEDULE =====
+  _openScheduleItem: function(type, id) { Schedule.openItem(type, id); },
+
+  // ===== WEATHER =====
+  _loadWeather: function() {
+    var el = document.getElementById('weatherPill');
+    if(!el) return;
+    var cacheRaw = localStorage.getItem('roundBookWeatherCache');
+    var cache = null;
+    try { cache = cacheRaw ? JSON.parse(cacheRaw) : null; } catch(e) {}
+    if(cache && cache.text) el.textContent = cache.text;
+    var cacheAgeMs = cache ? Date.now() - cache.time : Infinity;
+    if(cacheAgeMs < 30*60*1000) return;
+    if(!navigator.geolocation) return;
+    var self = this;
+    navigator.geolocation.getCurrentPosition(function(pos) {
+      fetch('https://api.open-meteo.com/v1/forecast?latitude=' + pos.coords.latitude + '&longitude=' + pos.coords.longitude + '&current_weather=true&hourly=precipitation_probability&forecast_days=1&timezone=auto')
+        .then(function(res) { return res.json(); })
+        .then(function(json) {
+          var cw = json && json.current_weather;
+          if(!cw) throw new Error('no weather');
+          var codes = {0:'☀️',1:'🌤️',2:'⛅',3:'☁️',45:'🌫️',48:'🌫️',51:'🌦️',53:'🌦️',55:'🌦️',56:'🌦️',57:'🌦️',61:'🌧️',63:'🌧️',65:'🌧️',66:'🌧️',67:'🌧️',71:'🌨️',73:'🌨️',75:'🌨️',77:'🌨️',80:'🌦️',81:'🌧️',82:'🌧️',85:'🌨️',86:'🌨️',95:'⛈️',96:'⛈️',99:'⛈️'};
+          var icon = codes[cw.weathercode] || '🌡️';
+          var temp = Math.round(cw.temperature);
+          var rainChance = null;
+          if(json.hourly && json.hourly.time && json.hourly.precipitation_probability) {
+            var idx = json.hourly.time.indexOf(cw.time);
+            if(idx === -1) {
+              var nowMs = new Date(cw.time).getTime();
+              var bestDiff = Infinity;
+              for(var i = 0; i < json.hourly.time.length; i++) {
+                var diff = Math.abs(new Date(json.hourly.time[i]).getTime() - nowMs);
+                if(diff < bestDiff) { bestDiff = diff; idx = i; }
+              }
+            }
+            if(idx !== -1) rainChance = json.hourly.precipitation_probability[idx];
+          }
+          var rainPart = rainChance != null ? ' · 🌧️ ' + rainChance + '%' : '';
+          var text = icon + ' ' + temp + '°C' + rainPart;
+          var el2 = document.getElementById('weatherPill');
+          if(el2) el2.textContent = text;
+          localStorage.setItem('roundBookWeatherCache', JSON.stringify({text:text, time:Date.now()}));
+        })
+        .catch(function() {});
+    }, function() {}, {enableHighAccuracy:false, timeout:10000, maximumAge:600000});
+  },
+
+  // ===== SWIPE =====
+  _swipeState: null,
+  _initSwipe: function() {
+    var main = document.getElementById('main');
+    var self = this;
+    main.addEventListener('touchstart', function(e) { self._onSwipeStart(e); }, {passive:true});
+    main.addEventListener('touchmove', function(e) { self._onSwipeMove(e); }, {passive:false});
+    main.addEventListener('touchend', function(e) { self._onSwipeEnd(e); }, {passive:true});
+    main.addEventListener('touchcancel', function(e) { self._onSwipeCancel(e); }, {passive:true});
+  },
+  _onSwipeStart: function(e) {
+    var card = e.target.closest('.cust-card[data-id]');
+    if(!card) return;
+    var touch = e.touches[0];
+    this._swipeState = {card:card, startX:touch.clientX, startY:touch.clientY, currentX:0, decided:false, horizontal:false};
+  },
+  _onSwipeMove: function(e) {
+    if(!this._swipeState) return;
+    var touch = e.touches[0];
+    var dx = touch.clientX - this._swipeState.startX;
+    var dy = touch.clientY - this._swipeState.startY;
+    if(!this._swipeState.decided) {
+      if(Math.abs(dx) > 8 || Math.abs(dy) > 8) {
+        this._swipeState.decided = true;
+        this._swipeState.horizontal = Math.abs(dx) > Math.abs(dy);
+        if(!this._swipeState.horizontal) { this._swipeState = null; return; }
+      } else return;
+    }
+    if(!this._swipeState) return;
+    e.preventDefault();
+    var maxDrag = 96;
+    var clamped = Math.max(-maxDrag, Math.min(maxDrag, dx));
+    this._swipeState.currentX = clamped;
+    this._swipeState.card.style.transition = 'none';
+    this._swipeState.card.style.transform = 'translateX(' + clamped + 'px)';
+  },
+  _onSwipeEnd: function(e) {
+    if(!this._swipeState) return;
+    var card = this._swipeState.card;
+    var currentX = this._swipeState.currentX;
+    var decided = this._swipeState.decided;
+    var horizontal = this._swipeState.horizontal;
+    card.style.transition = 'transform 0.2s ease';
+    card.style.transform = 'translateX(0)';
+    if(decided && horizontal && Math.abs(currentX) >= 64) {
+      var id = card.dataset.id;
+      var kind = card.dataset.kind || 'customer';
+      if(currentX > 0) {
+        this._quickClean(id);
+      } else {
+        this._quickPaid(id);
+      }
+    }
+    this._swipeState = null;
+  },
+  _onSwipeCancel: function(e) {
+    if(!this._swipeState) return;
+    this._swipeState.card.style.transition = 'transform 0.2s ease';
+    this._swipeState.card.style.transform = 'translateX(0)';
+    this._swipeState = null;
+  },
+  _quickClean: function(id) {
+    var c = Data.data.customers.find(function(x){ return x.id === id; });
+    if(!c) return;
+    c.cleanHistory = c.cleanHistory || [];
+    c.cleanHistory.push({date: Utils.todayISO(), amount: c.price || 0});
+    c.deferUntil = null;
+    Data.save();
+    this.render();
+    this.toast('Marked ' + (c.name || c.address || 'customer') + ' as cleaned today');
+  },
+  _quickPaid: function(id) {
+    var c = Data.data.customers.find(function(x){ return x.id === id; });
+    if(!c) return;
+    c.paymentHistory = c.paymentHistory || [];
+    c.paymentHistory.push({date: Utils.todayISO(), amount: c.price || 0});
+    c.paymentReminderSent = false;
+    c.paymentReminderSentDate = null;
+    c.paymentReminderCount = 0;
+    Data.save();
+    this.render();
+    this.toast('Marked ' + (c.name || c.address || 'customer') + ' as paid');
+  }
+};
+
+// ===== EXPOSE GLOBALLY =====
+window.RoundBookBackup = Backup;
+window.RoundBookData = Data;
+window.RoundBookSearch = Search;
+
+// ===== INITIALIZE =====
+document.addEventListener('DOMContentLoaded', function() {
+  window.RoundBook.init();
+});
+if(document.readyState !== 'loading') {
+  window.RoundBook.init();
+}
+
+// ===== IMPORT HANDLERS =====
+document.getElementById('importFile').addEventListener('change', function(e) {
+  var file = e.target.files[0];
+  if(!file) return;
+  Backup.importBackup(file).catch(function() {});
+  e.target.value = '';
+});
+
+document.getElementById('importSpreadsheetFile').addEventListener('change', function(e) {
+  var file = e.target.files[0];
+  if(!file) return;
+  if(typeof XLSX === 'undefined') {
+    if(window.RoundBook) window.RoundBook.toast('Still loading — try again in a moment');
+    e.target.value = '';
+    return;
+  }
+  var reader = new FileReader();
+  reader.onload = function(evt) {
+    try {
+      var wb = XLSX.read(evt.target.result, {type:'array'});
+      var firstSheetName = wb.SheetNames[0];
+      var ws = wb.Sheets[firstSheetName];
+      var rows = XLSX.utils.sheet_to_json(ws, {defval:''});
+      if(!rows.length) { alert('That spreadsheet looks empty.'); e.target.value=''; return; }
+      var headers = Object.keys(rows[0]);
+      var map = {address:null, name:null, phone:null, email:null, round:null, price:null, frequency:null};
+      var normHeaders = headers.map(function(h){ return String(h||'').toLowerCase().replace(/[_\-]+/g,' ').replace(/\s+/g,' ').trim(); });
+      var synonyms = {address:['address','addr','street','street address','property','location'], name:['name','customer','customer name','client','contact name'], phone:['phone','mobile','tel','telephone','contact','contact number','phone number'], email:['email','email address','e-mail'], round:['round','route','area','zone','round name'], price:['price','amount','cost','fee','value','rate','clean price'], frequency:['frequency','freq','weeks','cycle','interval','frequency (weeks)']};
+      var mapKeys = Object.keys(synonyms);
+      for(var mi = 0; mi < mapKeys.length; mi++) {
+        var field = mapKeys[mi];
+        var syns = synonyms[field];
+        var found = null;
+        for(var si = 0; si < syns.length; si++) {
+          var idx = normHeaders.indexOf(syns[si]);
+          if(idx !== -1) { found = headers[idx]; break; }
+        }
+        if(!found) {
+          for(var hi = 0; hi < normHeaders.length; hi++) {
+            for(var si2 = 0; si2 < syns.length; si2++) {
+              if(normHeaders[hi].indexOf(syns[si2]) !== -1) { found = headers[hi]; break; }
+            }
+            if(found) break;
+          }
+        }
+        map[field] = found;
+      }
+      if(!map.address && !map.name) { alert("Couldn't find an address or name column."); e.target.value=''; return; }
+      var imported = 0, skipped = 0;
+      var holdingRound = 'Needs review (imported)';
+      var roundCusts = Data.data.customers.filter(function(x){ return (x.round||'Unassigned') === holdingRound; });
+      var nextOrder = 0;
+      for(var rci = 0; rci < roundCusts.length; rci++) {
+        nextOrder = Math.max(nextOrder, roundCusts[rci].order != null ? roundCusts[rci].order : -1);
+      }
+      nextOrder++;
+      var existingAddresses = new Set();
+      for(var ei = 0; ei < Data.data.customers.length; ei++) {
+        var addr = (Data.data.customers[ei].address||'').trim().toLowerCase();
+        if(addr) existingAddresses.add(addr);
+      }
+      for(var ri = 0; ri < rows.length; ri++) {
+        var row = rows[ri];
+        var address = map.address ? String(row[map.address]||'').trim() : '';
+        var name = map.name ? String(row[map.name]||'').trim() : '';
+        if(!address && !name) continue;
+        var normalized = address.toLowerCase();
+        if(address && existingAddresses.has(normalized)) { skipped++; continue; }
+        var suggestedRound = map.round ? String(row[map.round]||'').trim() : '';
+        var priceRaw = map.price ? parseFloat(String(row[map.price]).replace(/[^0-9.]/g,'')) : NaN;
+        var freqRaw = map.frequency ? parseInt(String(row[map.frequency]).replace(/[^0-9]/g,''),10) : NaN;
+        var notesParts = ['Imported from spreadsheet'];
+        if(suggestedRound) notesParts.push('Suggested round: ' + suggestedRound);
+        var newCust = {
+          id: Utils.uid(),
+          name: name,
+          address: address,
+          phone: map.phone ? String(row[map.phone]||'').trim() : '',
+          email: map.email ? String(row[map.email]||'').trim() : '',
+          round: holdingRound,
+          order: nextOrder++,
+          price: Number.isFinite(priceRaw) ? priceRaw : 0,
+          frequencyWeeks: Number.isFinite(freqRaw) && freqRaw > 0 ? freqRaw : 4,
+          notes: notesParts.join(' · '),
+          cleanHistory: [],
+          paymentHistory: [],
+          priceHistory: []
+        };
+        Data.data.customers.push(newCust);
+        if(address) existingAddresses.add(normalized);
+        imported++;
+      }
+      Data.save();
+      if(window.RoundBook) window.RoundBook.render();
+      var summary = skipped ? 'Imported ' + imported + ' customer' + (imported===1?'':'s') + ' — ' + skipped + ' skipped as likely duplicates' : 'Imported ' + imported + ' customer' + (imported===1?'':'s');
+      if(imported) {
+        if(window.RoundBook) {
+          window.RoundBook.openSheet('<div class="sheet-head"><h2>Import complete</h2><button class="sheet-close" onclick="window.RoundBook.closeSheet()">✕</button></div><p style="color:var(--ink);font-size:0.875rem;line-height:1.6;margin:0 2px 10px;">' + Utils.escapeHtml(summary) + '.</p><p style="color:var(--ink-muted);font-size:0.8125rem;line-height:1.6;margin:0 2px 18px;">They\'ve been placed in a <b>"' + Utils.escapeHtml(holdingRound) + '"</b> round for review.</p><button class="btn-primary" style="width:100%;" onclick="window.RoundBook.closeSheet();window.RoundBook.setTab(\'rounds\');window.RoundBook._openRound(\'' + holdingRound + '\');">Review imported customers</button>');
+        }
+      } else {
+        if(window.RoundBook) window.RoundBook.toast(skipped ? 'All ' + skipped + ' rows already exist — nothing imported' : 'Nothing to import');
+      }
+    } catch(err) {
+      alert('That file could not be read. Make sure it\'s a .csv or .xlsx spreadsheet with a header row.');
+    }
+  };
+  reader.readAsArrayBuffer(file);
+  e.target.value = '';
+});
+
+console.log('✅ Round Book v56 loaded successfully!');
+console.log('📊 New: Analytics, Schedule, Voice, Autocomplete, Encrypted backups, Custom receipts, Auto-save');
+</script>
+</body>
+</html>
