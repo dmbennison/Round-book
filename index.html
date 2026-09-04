@@ -409,7 +409,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 56;
+const APP_VERSION = 58;
 function formatVersion(v){ return '1.' + v; }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
@@ -418,6 +418,8 @@ function formatVersion(v){ return '1.' + v; }
 // the most recent 10 entries (oldest ones can be left in the array or trimmed,
 // either is fine, since the display always slices to 10).
 const VERSION_HISTORY = [
+  {version: 58, changes: ['Added Marketing responses — tracks who\'s been sent a marketing text, with a response status and a next action you set yourself, reachable via a new megaphone icon on the Rounds tab']},
+  {version: 57, changes: ['The backup reminder banner\'s "Back up" button now saves the backup file straight away, in one tap, instead of taking you to the Backup screen first']},
   {version: 56, changes: ['Search results now highlight the matching text as you type', 'Deleting a customer, job, or quote now shows a persistent "Undo" banner instead of a toast that disappears in a few seconds — stays until you act on it or dismiss it']},
   {version: 55, changes: ['Account numbers now show on every report that lists a customer address, not just invoices and receipts', 'Added a search icon to the Rounds tab — searches name, address, phone, email, notes, round, and account number, with results shown as a tappable list']},
   {version: 54, changes: ['Every customer now has a unique account number, shown on their screen and on printed invoices/receipts — editable if you\'d rather set your own', 'Photos from a customer\'s linked one-off jobs now show up in that customer\'s own Photos section too']},
@@ -602,6 +604,8 @@ function migrateData(parsed){
     if(c.deferUntil === undefined) c.deferUntil = null;
     if(c.paymentReminderCount == null) c.paymentReminderCount = 0;
     if(!c.messageLog) c.messageLog = [];
+    if(!c.marketingStatus) c.marketingStatus = 'awaiting';
+    if(!c.marketingNextAction) c.marketingNextAction = 'none';
     // Every customer gets a permanent, unique account number the first time this
     // runs for them — shown on invoices/receipts. Assigned once and never reused,
     // even if the customer is later deleted, so numbers stay meaningful.
@@ -968,7 +972,7 @@ function renderBackupBanner(){
   el.innerHTML = `<div style="background:var(--amber-dim); color:var(--amber); border-radius:12px; padding:11px 14px; margin:0 14px 14px; display:flex; align-items:center; justify-content:space-between; gap:10px; font-size:0.8125rem; font-weight:700;">
     <span>📦 ${lastText}</span>
     <span style="display:flex; gap:8px; flex-shrink:0; align-items:center;">
-      <button onclick="openBackup()" style="background:var(--amber); color:#fff; border:none; border-radius:8px; padding:6px 10px; font-weight:800; font-size:0.7812rem;">Back up</button>
+      <button onclick="exportData()" style="background:var(--amber); color:#fff; border:none; border-radius:8px; padding:6px 10px; font-weight:800; font-size:0.7812rem;">Back up</button>
       <button onclick="dismissBackupBanner()" style="background:none; border:none; color:var(--amber); font-weight:800; font-size:1rem; line-height:1; padding:0 2px;">✕</button>
     </span>
   </div>`;
@@ -1148,6 +1152,10 @@ function renderRoundsList(main){
       ${mainScreenHelpBtn('rounds', "()=>setTab('rounds')")}
       <button class="btn-open" style="width:38px; height:38px; padding:0;" onclick="openCustomerSearch()" aria-label="Search customers">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      </button>
+      <button class="btn-open" style="width:38px; height:38px; padding:0; position:relative;" onclick="openMarketingResponses()" aria-label="Marketing responses">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-5v12L3 13z"/><path d="M11.6 16.8a3 3 0 0 1-5.8-1.6"/></svg>
+        ${(() => { const n = marketingTrackedCustomers().filter(c=>c.marketingStatus==='awaiting').length; return n ? `<span style="position:absolute; top:-4px; right:-4px; background:var(--red); color:#fff; font-size:0.625rem; font-weight:800; border-radius:10px; min-width:16px; height:16px; display:flex; align-items:center; justify-content:center; padding:0 3px;">${n}</span>` : ''; })()}
       </button>
       <button class="btn-open" style="width:38px; height:38px; padding:0;" onclick="openRoundReports()" aria-label="Print reports">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
@@ -2268,6 +2276,22 @@ const MESSAGE_LOG_LABELS = {
   clean: 'Cleaning reminder', cleanedToday: 'Windows cleaned today', pay: 'Payment reminder',
   receipt: 'Receipt', quote: 'Quote', repeatQuote: 'Repeat work quote', marketing: 'Marketing text'
 };
+// Marketing response pipeline — tracked manually, since there's no way for the app
+// to see actual text replies (they land in the phone's own Messages/WhatsApp app).
+// This just gives a place to record what happened after checking those replies.
+const MARKETING_STATUS_OPTIONS = {
+  awaiting: {label: 'No response yet', color: 'due'},
+  interested: {label: 'Interested', color: 'ok'},
+  not_interested: {label: 'Not interested', color: 'overdue'},
+  booked: {label: 'Booked in', color: 'ok'}
+};
+const MARKETING_ACTION_OPTIONS = {
+  none: 'No action needed',
+  call: 'Follow up call',
+  quote: 'Send a quote',
+  text_again: 'Text again in a few days',
+  add_round: 'Add extra work to round'
+};
 // Records that a message actually went out, for the read-only message log on a
 // customer/job's screen. Capped so it can't grow forever on a long-standing customer.
 function logMessage(item, kind){
@@ -2705,6 +2729,10 @@ function sendMarketingText(id){
   const msg = applyTemplate(tpl, {name: firstName, company, yourname});
   sendPhoneMessage(c.phone, msg);
   logMessage(c, 'marketing');
+  // Each new send supersedes whatever the outcome of a previous one was — starts
+  // the "waiting to hear back" cycle over.
+  c.marketingStatus = 'awaiting';
+  c.marketingNextAction = 'none';
   saveData();
 }
 
@@ -3659,6 +3687,89 @@ function saveBusinessDetails(){
 // account number — results shown as a separate tappable list, not the normal
 // swipeable round-card style (swipe-to-clean/paid only works on the Rounds screen
 // itself, so a swipeable card here would look broken).
+// Marketing response pipeline — everyone who's actually been sent a marketing
+// text, with a manually-set status and next action. There's no way for the app to
+// see real replies (they land in the phone's own Messages/WhatsApp app), so this
+// exists purely as a place to record what happened after checking those yourself.
+function marketingTrackedCustomers(){
+  return data.customers.filter(c => (c.messageLog||[]).some(m=>m.kind==='marketing'));
+}
+function openMarketingResponses(){
+  const tracked = marketingTrackedCustomers();
+  const rowsHtml = tracked.length ? tracked
+    .map(c => {
+      const lastSent = (c.messageLog||[]).filter(m=>m.kind==='marketing').sort((a,b)=>b.time-a.time)[0];
+      return {c, lastSent: lastSent ? lastSent.date : null};
+    })
+    .sort((a,b) => {
+      // Needs-attention first (awaiting response), then most recently texted.
+      const aWaiting = a.c.marketingStatus === 'awaiting' ? 0 : 1;
+      const bWaiting = b.c.marketingStatus === 'awaiting' ? 0 : 1;
+      if(aWaiting !== bWaiting) return aWaiting - bWaiting;
+      return (b.lastSent||'').localeCompare(a.lastSent||'');
+    })
+    .map(({c, lastSent}) => {
+      const status = MARKETING_STATUS_OPTIONS[c.marketingStatus] || MARKETING_STATUS_OPTIONS.awaiting;
+      const actionLabel = MARKETING_ACTION_OPTIONS[c.marketingNextAction] || MARKETING_ACTION_OPTIONS.none;
+      return `<button class="backup-btn" style="text-align:left; align-items:flex-start;" onclick="openMarketingResponseEditor('${c.id}')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-top:2px;"><path d="M3 11l18-5v12L3 13z"/><path d="M11.6 16.8a3 3 0 0 1-5.8-1.6"/></svg>
+        <div style="flex:1; min-width:0;">
+          <div class="t1">${escapeHtml(c.address||c.name||'Customer')}</div>
+          <div class="t2">Texted ${fmtDate(lastSent)}</div>
+          <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:6px;">
+            <span class="badge ${status.color}">${status.label}</span>
+            ${c.marketingNextAction !== 'none' ? `<span class="badge due">${actionLabel}</span>` : ''}
+          </div>
+        </div>
+      </button>`;
+    }).join('') : `<p style="color:var(--ink-muted); font-size:0.8438rem; text-align:center; margin-top:24px;">Nobody's been sent a marketing text yet.</p>`;
+
+  openSheet(`
+    <div class="sheet-head">
+      <h2 style="flex:1; min-width:0;">Marketing responses</h2>
+      <button class="sheet-close" onclick="closeSheet()">✕</button>
+    </div>
+    <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 16px; line-height:1.5;">
+      Round Book can't see actual text replies — check your Messages/WhatsApp app yourself, then record what happened here.
+    </p>
+    ${rowsHtml}
+  `, () => setTab('rounds'));
+}
+function openMarketingResponseEditor(id){
+  const c = data.customers.find(x=>x.id===id);
+  if(!c) return;
+  const statusButtons = Object.entries(MARKETING_STATUS_OPTIONS).map(([key,opt])=>
+    `<button class="seg-btn ${c.marketingStatus===key?'active':''}" onclick="setMarketingStatus('${id}','${key}')" style="flex:0 0 auto; padding:9px 14px;">${opt.label}</button>`
+  ).join('');
+  const actionButtons = Object.entries(MARKETING_ACTION_OPTIONS).map(([key,label])=>
+    `<button class="seg-btn ${c.marketingNextAction===key?'active':''}" onclick="setMarketingAction('${id}','${key}')" style="flex:0 0 auto; padding:9px 14px;">${label}</button>`
+  ).join('');
+  openSheet(`
+    <div class="sheet-head">
+      <h2 style="flex:1; min-width:0;">${escapeHtml(c.address||c.name||'Customer')}</h2>
+      <button class="sheet-close" onclick="openMarketingResponses()">✕</button>
+    </div>
+    <label style="margin-top:0;">Response</label>
+    <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:18px;">${statusButtons}</div>
+    <label>Next action</label>
+    <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px;">${actionButtons}</div>
+  `, () => openMarketingResponses());
+}
+function setMarketingStatus(id, status){
+  const c = data.customers.find(x=>x.id===id);
+  if(!c || !MARKETING_STATUS_OPTIONS[status]) return;
+  c.marketingStatus = status;
+  saveData();
+  openMarketingResponseEditor(id);
+}
+function setMarketingAction(id, action){
+  const c = data.customers.find(x=>x.id===id);
+  if(!c || !MARKETING_ACTION_OPTIONS[action]) return;
+  c.marketingNextAction = action;
+  saveData();
+  openMarketingResponseEditor(id);
+}
+
 function openCustomerSearch(){
   openSheet(`
     <div class="sheet-head">
@@ -4879,6 +4990,7 @@ const FOCUSED_HELP = {
       helpP('The Rounds tab shows every round, with a Rounds / Due / Owed switch. Open a round to see its customers, swipe a card right to mark cleaned or left to mark paid, and use Reorder to set your walking order.'),
       helpP('The printer icon above the summary numbers covers reports across every round at once — Windows due, Money owed, and Full round lists. A single round\'s own screen has its own separate Print option, just for that round.'),
       helpP('The magnifying glass icon searches across every customer — name, address, phone, email, notes, round, or account number — with results shown as a tappable list, matches highlighted as you type.'),
+      helpP('The megaphone icon opens Marketing responses — everyone who\'s been sent a marketing text, with a response and next-action you set manually after checking your own Messages/WhatsApp app (the app has no way to see actual replies). A red count shows how many are still awaiting a response.'),
       helpP('Deleting a customer, job, or quote shows an "Undo" banner at the top of the app that stays until you act on it or dismiss it — not a toast that vanishes in a few seconds. Only the single most recent deletion can be undone this way.'),
       helpP('Marking someone cleaned doesn\'t remove them from the Due view straight away — they stay there for the rest of the day, so you can still see everyone you\'ve worked through. They drop off automatically the next day. The total at the bottom only counts what\'s still left to do.'),
       helpP('If a round takes more than one day, tap each customer\'s day badge in reorder mode to assign Day 1–5. A day switcher then appears above the customer list, and cards get a "Day N" badge.'),
