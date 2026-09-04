@@ -337,7 +337,7 @@
       --ink-muted:#66798A;
       --line:#E3E9EC;
     }
-    header, #backupBanner, #jobReminderBanner, #quoteFollowUpBanner, #jobAnniversaryBanner, #importReviewBanner, main, .fab, .overlay, #importFile, #importSpreadsheetFile, .toast{
+    header, #backupBanner, #lastActionBanner, #jobReminderBanner, #quoteFollowUpBanner, #jobAnniversaryBanner, #importReviewBanner, main, .fab, .overlay, #importFile, #importSpreadsheetFile, .toast{
       display:none !important;
     }
     .print-area{
@@ -386,6 +386,7 @@
 </header>
 
 <div id="backupBanner"></div>
+<div id="lastActionBanner"></div>
 <div id="jobReminderBanner"></div>
 <div id="quoteFollowUpBanner"></div>
 <div id="jobAnniversaryBanner"></div>
@@ -408,7 +409,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 55;
+const APP_VERSION = 56;
 function formatVersion(v){ return '1.' + v; }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
@@ -417,6 +418,7 @@ function formatVersion(v){ return '1.' + v; }
 // the most recent 10 entries (oldest ones can be left in the array or trimmed,
 // either is fine, since the display always slices to 10).
 const VERSION_HISTORY = [
+  {version: 56, changes: ['Search results now highlight the matching text as you type', 'Deleting a customer, job, or quote now shows a persistent "Undo" banner instead of a toast that disappears in a few seconds — stays until you act on it or dismiss it']},
   {version: 55, changes: ['Account numbers now show on every report that lists a customer address, not just invoices and receipts', 'Added a search icon to the Rounds tab — searches name, address, phone, email, notes, round, and account number, with results shown as a tappable list']},
   {version: 54, changes: ['Every customer now has a unique account number, shown on their screen and on printed invoices/receipts — editable if you\'d rather set your own', 'Photos from a customer\'s linked one-off jobs now show up in that customer\'s own Photos section too']},
   {version: 53, changes: ['The directions and call buttons are now always blue and green, whichever colour scheme is chosen', 'The black outline around boxes and buttons now switches to white in dark mode, so it stays visible', 'Fixed the storage screen not showing gigabytes for larger figures']},
@@ -918,6 +920,44 @@ function daysSinceBackup(){
   return daysBetween(last, todayISO());
 }
 function dismissBackupBanner(){ bannerDismissed = true; renderBackupBanner(); }
+// Tracks the single most recent delete (customer, job, or quote) so it can be
+// undone from a persistent banner, not just a toast that's easy to miss while busy
+// out on a round. Overwritten by whatever's deleted next, and cleared once
+// restored or dismissed. Kept in memory only (not saved to the backup file) —
+// it's a short-lived safety net for this session, not a permanent record.
+let lastAction = null;
+function recordLastAction(kind, item, index, label){
+  lastAction = { kind, item, index, label, at: Date.now() };
+  renderLastActionBanner();
+}
+function undoLastAction(){
+  if(!lastAction) return;
+  const { kind, item, index } = lastAction;
+  if(kind === 'customer') data.customers.splice(Math.min(index, data.customers.length), 0, item);
+  else if(kind === 'job') data.oneOffJobs.splice(Math.min(index, data.oneOffJobs.length), 0, item);
+  else if(kind === 'quote') data.quotes.splice(Math.min(index, data.quotes.length), 0, item);
+  lastAction = null;
+  saveData();
+  renderLastActionBanner();
+  render();
+  toast('Restored');
+}
+function dismissLastAction(){
+  lastAction = null;
+  renderLastActionBanner();
+}
+function renderLastActionBanner(){
+  const el = document.getElementById('lastActionBanner');
+  if(!el) return;
+  if(!lastAction){ el.innerHTML = ''; return; }
+  el.innerHTML = `<div style="background:var(--red-dim); color:var(--red); border-radius:12px; padding:11px 14px; margin:0 14px 14px; display:flex; align-items:center; justify-content:space-between; gap:10px; font-size:0.8125rem; font-weight:700;">
+    <span>🗑 Deleted ${escapeHtml(lastAction.label)}</span>
+    <span style="display:flex; gap:8px; flex-shrink:0; align-items:center;">
+      <button onclick="undoLastAction()" style="background:var(--red); color:#fff; border:none; border-radius:8px; padding:6px 10px; font-weight:800; font-size:0.7812rem;">Undo</button>
+      <button onclick="dismissLastAction()" style="background:none; border:none; color:var(--red); font-weight:800; font-size:1rem; line-height:1; padding:0 2px;">✕</button>
+    </span>
+  </div>`;
+}
 function renderBackupBanner(){
   const el = document.getElementById('backupBanner');
   if(!el) return;
@@ -1075,6 +1115,7 @@ function moveInRound(id, direction){
 /* ---------- rendering ---------- */
 function render(){
   renderBackupBanner();
+  renderLastActionBanner();
   renderJobReminderBanner();
   renderQuoteFollowUpBanner();
   renderJobAnniversaryBanner();
@@ -1633,11 +1674,8 @@ function deleteCustomer(id){
   if(!confirm(`Delete ${removed.address||removed.name||'this customer'}? This removes all their history too.`)) return;
   data.customers.splice(idx,1);
   saveData(); closeSheet(); render();
-  toast(`Deleted ${removed.address||removed.name||'customer'}`, 'Undo', ()=>{
-    data.customers.splice(idx,0,removed);
-    saveData(); render();
-    toast('Customer restored');
-  });
+  recordLastAction('customer', removed, idx, removed.address||removed.name||'customer');
+  toast(`Deleted ${removed.address||removed.name||'customer'}`);
 }
 
 function openCustomerDetail(id){
@@ -3095,11 +3133,8 @@ function deleteJob(id){
   if(!confirm(`Delete the job at ${removed.address||removed.name||'this address'}?`)) return;
   data.oneOffJobs.splice(idx,1);
   saveData(); closeSheet(); render();
-  toast(`Deleted job at ${removed.address||removed.name||'job'}`, 'Undo', ()=>{
-    data.oneOffJobs.splice(idx,0,removed);
-    saveData(); render();
-    toast('Job restored');
-  });
+  recordLastAction('job', removed, idx, `job at ${removed.address||removed.name||'this address'}`);
+  toast(`Deleted job at ${removed.address||removed.name||'job'}`);
 }
 
 /* ---------- quotes ---------- */
@@ -3278,11 +3313,8 @@ function deleteQuote(id){
   if(!confirm(`Delete the quote for ${removed.address||removed.name||'this customer'}?`)) return;
   data.quotes.splice(idx,1);
   saveData(); closeSheet(); render();
-  toast(`Deleted quote for ${removed.address||removed.name||'quote'}`, 'Undo', ()=>{
-    data.quotes.splice(idx,0,removed);
-    saveData(); render();
-    toast('Quote restored');
-  });
+  recordLastAction('quote', removed, idx, `quote for ${removed.address||removed.name||'this customer'}`);
+  toast(`Deleted quote for ${removed.address||removed.name||'quote'}`);
 }
 
 function convertQuoteToJob(quoteId){
@@ -3639,6 +3671,22 @@ function openCustomerSearch(){
   renderCustomerSearchResults();
   setTimeout(() => { const el = document.getElementById('search_input'); if(el) el.focus(); }, 60);
 }
+// Wraps the first matching occurrence of the search term in a highlight span —
+// makes the live, as-you-type results feel properly predictive rather than just a
+// plain filtered list.
+function highlightMatch(text, rawQuery){
+  if(!text) return '';
+  const escaped = escapeHtml(text);
+  const escapedQuery = escapeHtml(rawQuery);
+  if(!escapedQuery) return escaped;
+  const idx = escaped.toLowerCase().indexOf(escapedQuery.toLowerCase());
+  if(idx === -1) return escaped;
+  return escaped.slice(0,idx)
+    + '<mark style="background:var(--amber-dim); color:var(--ink); border-radius:3px; padding:0 1px;">'
+    + escaped.slice(idx, idx+escapedQuery.length)
+    + '</mark>'
+    + escaped.slice(idx+escapedQuery.length);
+}
 function renderCustomerSearchResults(){
   const inputEl = document.getElementById('search_input');
   const resultsEl = document.getElementById('search_results');
@@ -3662,8 +3710,8 @@ function renderCustomerSearchResults(){
     return `<button class="backup-btn" onclick="searchResultTap('${c.id}')" style="margin-bottom:8px;">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
       <div style="flex:1; min-width:0;">
-        <div class="t1">${escapeHtml(c.address||'No address')}</div>
-        <div class="t2">${escapeHtml(subtitle)}</div>
+        <div class="t1">${highlightMatch(c.address||'No address', raw)}</div>
+        <div class="t2">${highlightMatch(subtitle, raw)}</div>
       </div>
     </button>`;
   }).join('');
@@ -4830,7 +4878,8 @@ const FOCUSED_HELP = {
     body: () => [
       helpP('The Rounds tab shows every round, with a Rounds / Due / Owed switch. Open a round to see its customers, swipe a card right to mark cleaned or left to mark paid, and use Reorder to set your walking order.'),
       helpP('The printer icon above the summary numbers covers reports across every round at once — Windows due, Money owed, and Full round lists. A single round\'s own screen has its own separate Print option, just for that round.'),
-      helpP('The magnifying glass icon searches across every customer — name, address, phone, email, notes, round, or account number — with results shown as a tappable list.'),
+      helpP('The magnifying glass icon searches across every customer — name, address, phone, email, notes, round, or account number — with results shown as a tappable list, matches highlighted as you type.'),
+      helpP('Deleting a customer, job, or quote shows an "Undo" banner at the top of the app that stays until you act on it or dismiss it — not a toast that vanishes in a few seconds. Only the single most recent deletion can be undone this way.'),
       helpP('Marking someone cleaned doesn\'t remove them from the Due view straight away — they stay there for the rest of the day, so you can still see everyone you\'ve worked through. They drop off automatically the next day. The total at the bottom only counts what\'s still left to do.'),
       helpP('If a round takes more than one day, tap each customer\'s day badge in reorder mode to assign Day 1–5. A day switcher then appears above the customer list, and cards get a "Day N" badge.'),
       helpP('The ⋯ button on a round\'s screen opens Print, group marketing text, Defer whole round 4 weeks, and Help.'),
