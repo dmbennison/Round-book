@@ -409,7 +409,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 58;
+const APP_VERSION = 59;
 function formatVersion(v){ return '1.' + v; }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
@@ -418,6 +418,7 @@ function formatVersion(v){ return '1.' + v; }
 // the most recent 10 entries (oldest ones can be left in the array or trimmed,
 // either is fine, since the display always slices to 10).
 const VERSION_HISTORY = [
+  {version: 59, changes: ['Marketing responses now has its own search box', 'Added Call, Text, and Quote buttons directly on each marketing response entry']},
   {version: 58, changes: ['Added Marketing responses — tracks who\'s been sent a marketing text, with a response status and a next action you set yourself, reachable via a new megaphone icon on the Rounds tab']},
   {version: 57, changes: ['The backup reminder banner\'s "Back up" button now saves the backup file straight away, in one tap, instead of taking you to the Backup screen first']},
   {version: 56, changes: ['Search results now highlight the matching text as you type', 'Deleting a customer, job, or quote now shows a persistent "Undo" banner instead of a toast that disappears in a few seconds — stays until you act on it or dismiss it']},
@@ -2917,10 +2918,10 @@ function scheduleJobForCustomer(id){
   openJobForm(null, { address: c.address||'', name: c.name||'', phone: c.phone||'', price: c.price||0, customerId: c.id }, () => openCustomerDetail(id));
 }
 
-function quoteForCustomer(id){
+function quoteForCustomer(id, returnTo){
   const c = data.customers.find(x=>x.id===id);
   if(!c) return;
-  openQuoteForm(null, { address: c.address||'', name: c.name||'', phone: c.phone||'', email: c.email||'' }, () => openCustomerDetail(id));
+  openQuoteForm(null, { address: c.address||'', name: c.name||'', phone: c.phone||'', email: c.email||'' }, returnTo || (() => openCustomerDetail(id)));
 }
 
 function fillJobFromCustomer(id){
@@ -3695,8 +3696,37 @@ function marketingTrackedCustomers(){
   return data.customers.filter(c => (c.messageLog||[]).some(m=>m.kind==='marketing'));
 }
 function openMarketingResponses(){
-  const tracked = marketingTrackedCustomers();
-  const rowsHtml = tracked.length ? tracked
+  openSheet(`
+    <div class="sheet-head">
+      <h2 style="flex:1; min-width:0;">Marketing responses</h2>
+      <button class="sheet-close" onclick="closeSheet()">✕</button>
+    </div>
+    <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 16px; line-height:1.5;">
+      Round Book can't see actual text replies — check your Messages/WhatsApp app yourself, then record what happened here.
+    </p>
+    <input type="text" id="mkt_search_input" placeholder="Search these results..." oninput="renderMarketingResponseRows()" style="margin-top:0; margin-bottom:14px;">
+    <div id="mkt_response_rows"></div>
+  `, () => setTab('rounds'));
+  renderMarketingResponseRows();
+}
+function renderMarketingResponseRows(){
+  const rowsEl = document.getElementById('mkt_response_rows');
+  if(!rowsEl) return;
+  const searchEl = document.getElementById('mkt_search_input');
+  const raw = searchEl ? searchEl.value.trim() : '';
+  const q = raw.toLowerCase();
+  let tracked = marketingTrackedCustomers();
+  if(q){
+    tracked = tracked.filter(c=>{
+      const haystack = [c.name, c.address, c.phone, c.email, c.round, c.accountNumber].filter(Boolean).join(' ').toLowerCase();
+      return haystack.includes(q);
+    });
+  }
+  if(!tracked.length){
+    rowsEl.innerHTML = `<p style="color:var(--ink-muted); font-size:0.8438rem; text-align:center; margin-top:24px;">${q ? `No results match "${escapeHtml(raw)}".` : "Nobody's been sent a marketing text yet."}</p>`;
+    return;
+  }
+  rowsEl.innerHTML = tracked
     .map(c => {
       const lastSent = (c.messageLog||[]).filter(m=>m.kind==='marketing').sort((a,b)=>b.time-a.time)[0];
       return {c, lastSent: lastSent ? lastSent.date : null};
@@ -3711,7 +3741,8 @@ function openMarketingResponses(){
     .map(({c, lastSent}) => {
       const status = MARKETING_STATUS_OPTIONS[c.marketingStatus] || MARKETING_STATUS_OPTIONS.awaiting;
       const actionLabel = MARKETING_ACTION_OPTIONS[c.marketingNextAction] || MARKETING_ACTION_OPTIONS.none;
-      return `<button class="backup-btn" style="text-align:left; align-items:flex-start;" onclick="openMarketingResponseEditor('${c.id}')">
+      const canText = isMobileNumber(c.phone);
+      return `<div class="backup-btn" style="text-align:left; align-items:flex-start; cursor:pointer;" onclick="openMarketingResponseEditor('${c.id}')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-top:2px;"><path d="M3 11l18-5v12L3 13z"/><path d="M11.6 16.8a3 3 0 0 1-5.8-1.6"/></svg>
         <div style="flex:1; min-width:0;">
           <div class="t1">${escapeHtml(c.address||c.name||'Customer')}</div>
@@ -3720,20 +3751,28 @@ function openMarketingResponses(){
             <span class="badge ${status.color}">${status.label}</span>
             ${c.marketingNextAction !== 'none' ? `<span class="badge due">${actionLabel}</span>` : ''}
           </div>
+          <div style="display:flex; gap:8px; margin-top:10px;">
+            ${c.phone ? `<button onclick="event.stopPropagation(); callCustomer('customer','${c.id}')" class="call-btn" style="border-radius:8px; width:auto; height:32px; padding:0 12px; font-size:0.75rem; font-weight:800; display:flex; align-items:center; gap:6px;">${CALL_ICON.replace('viewBox="0 0 24 24"','viewBox="0 0 24 24" width="13" height="13"')} Call</button>` : ''}
+            ${canText ? `<button onclick="event.stopPropagation(); quickTextFromMarketing('${c.id}')" style="border-radius:8px; width:auto; height:32px; padding:0 12px; font-size:0.75rem; font-weight:800; display:flex; align-items:center; gap:6px; background:var(--blue-dim); color:var(--blue-deep); border:none;">💬 Text</button>` : ''}
+            <button onclick="event.stopPropagation(); quoteForCustomer('${c.id}', ()=>openMarketingResponses())" style="border-radius:8px; width:auto; height:32px; padding:0 12px; font-size:0.75rem; font-weight:800; display:flex; align-items:center; gap:6px; background:var(--amber-dim); color:var(--amber); border:none;">📝 Quote</button>
+          </div>
         </div>
-      </button>`;
-    }).join('') : `<p style="color:var(--ink-muted); font-size:0.8438rem; text-align:center; margin-top:24px;">Nobody's been sent a marketing text yet.</p>`;
-
-  openSheet(`
-    <div class="sheet-head">
-      <h2 style="flex:1; min-width:0;">Marketing responses</h2>
-      <button class="sheet-close" onclick="closeSheet()">✕</button>
-    </div>
-    <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 16px; line-height:1.5;">
-      Round Book can't see actual text replies — check your Messages/WhatsApp app yourself, then record what happened here.
-    </p>
-    ${rowsHtml}
-  `, () => setTab('rounds'));
+      </div>`;
+    }).join('');
+}
+// Ad-hoc follow-up text (not the marketing template) straight from a response
+// tile — opens a blank, editable message rather than a fixed script, since a
+// follow-up after a real reply is personal, not a broadcast.
+function quickTextFromMarketing(id){
+  const c = data.customers.find(x=>x.id===id);
+  if(!c || !isMobileNumber(c.phone)){ toast('No mobile number saved for this customer'); return; }
+  const afterSend = () => {
+    c.marketingStatus = 'awaiting';
+    c.marketingNextAction = 'none';
+    saveData();
+    render();
+  };
+  openMessagePreview(`Text ${c.name||c.address||'customer'}`, c.phone, '', afterSend, () => openMarketingResponses(), {item: c, kind: 'marketing'});
 }
 function openMarketingResponseEditor(id){
   const c = data.customers.find(x=>x.id===id);
@@ -4991,6 +5030,7 @@ const FOCUSED_HELP = {
       helpP('The printer icon above the summary numbers covers reports across every round at once — Windows due, Money owed, and Full round lists. A single round\'s own screen has its own separate Print option, just for that round.'),
       helpP('The magnifying glass icon searches across every customer — name, address, phone, email, notes, round, or account number — with results shown as a tappable list, matches highlighted as you type.'),
       helpP('The megaphone icon opens Marketing responses — everyone who\'s been sent a marketing text, with a response and next-action you set manually after checking your own Messages/WhatsApp app (the app has no way to see actual replies). A red count shows how many are still awaiting a response.'),
+      helpP('Marketing responses has its own search box for filtering that list, plus Call, Text, and Quote buttons right on each entry — Text opens a blank message to write your own reply, and Quote starts a new quote pre-filled with their details.'),
       helpP('Deleting a customer, job, or quote shows an "Undo" banner at the top of the app that stays until you act on it or dismiss it — not a toast that vanishes in a few seconds. Only the single most recent deletion can be undone this way.'),
       helpP('Marking someone cleaned doesn\'t remove them from the Due view straight away — they stay there for the rest of the day, so you can still see everyone you\'ve worked through. They drop off automatically the next day. The total at the bottom only counts what\'s still left to do.'),
       helpP('If a round takes more than one day, tap each customer\'s day badge in reorder mode to assign Day 1–5. A day switcher then appears above the customer list, and cards get a "Day N" badge.'),
