@@ -410,7 +410,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 61;
+const APP_VERSION = 62;
 function formatVersion(v){ return '1.' + v; }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
@@ -419,6 +419,7 @@ function formatVersion(v){ return '1.' + v; }
 // the most recent 10 entries (oldest ones can be left in the array or trimmed,
 // either is fine, since the display always slices to 10).
 const VERSION_HISTORY = [
+  {version: 62, changes: ['Photo gallery now also includes standalone one-off jobs (ones not linked to a customer) that have their own photos']},
   {version: 61, changes: ['Adding a new quote now keeps you on its screen afterwards, so you can send it by text or email straight away', 'Marketing response cards now show a ✓ once a pending action (like sending a quote) has been done', 'Fixed the ✕ button on a marketing response not closing the screen', 'Sending a PDF invoice or receipt via WhatsApp now jumps straight to that customer\'s own chat', 'Photos can now be swiped left/right to browse through the rest, instead of one at a time', 'Added a Photo gallery (photo icon on the Rounds tab) — every customer with photos, listed by address']},
   {version: 60, changes: ['Marketing moved to its own tab, next to Quotes', 'Group marketing texts can now be sent to several rounds at once, not just one', 'Response entries needing action are now sorted to the top, above ones still awaiting a reply', 'Anyone unresponded to for 30 days quietly drops off the list — nothing about them is deleted, and a fresh text brings them straight back']},
   {version: 59, changes: ['Marketing responses now has its own search box', 'Added Call, Text, and Quote buttons directly on each marketing response entry']},
@@ -4043,25 +4044,35 @@ function renderPhotoGallery(){
   if(!resultsEl) return;
   const raw = inputEl ? inputEl.value.trim() : '';
   const q = raw.toLowerCase();
-  let entries = data.customers
-    .map(c => ({c, list: buildCustomerPhotoList(c.id)}))
+  let custEntries = data.customers
+    .map(c => ({kind:'customer', id:c.id, address:c.address, name:c.name, list: buildCustomerPhotoList(c.id)}))
     .filter(({list}) => list.length);
+  // One-off jobs not linked to a customer get their own gallery card — linked jobs'
+  // photos already appear folded into that customer's own entry (buildCustomerPhotoList),
+  // so including them again here would show the same photos twice.
+  let jobEntries = (data.oneOffJobs||[])
+    .filter(j => !j.customerId)
+    .map(j => ({kind:'job', id:j.id, address:j.address, name:j.name, list: buildJobPhotoList(j.id)}))
+    .filter(({list}) => list.length);
+  let entries = [...custEntries, ...jobEntries];
   if(q){
-    entries = entries.filter(({c}) => {
-      const haystack = [c.name, c.address].filter(Boolean).join(' ').toLowerCase();
+    entries = entries.filter(({address, name}) => {
+      const haystack = [name, address].filter(Boolean).join(' ').toLowerCase();
       return haystack.includes(q);
     });
   }
-  entries.sort((a,b) => (a.c.address||a.c.name||'').localeCompare(b.c.address||b.c.name||''));
+  entries.sort((a,b) => (a.address||a.name||'').localeCompare(b.address||b.name||''));
   if(!entries.length){
-    resultsEl.innerHTML = `<p style="color:var(--ink-muted); font-size:0.8438rem; text-align:center; margin-top:24px;">${q ? `No customers match "${escapeHtml(raw)}".` : "No photos added yet — they'll show up here once you add some from a customer's screen."}</p>`;
+    resultsEl.innerHTML = `<p style="color:var(--ink-muted); font-size:0.8438rem; text-align:center; margin-top:24px;">${q ? `No matches for "${escapeHtml(raw)}".` : "No photos added yet — they'll show up here once you add some from a customer's or job's screen."}</p>`;
     return;
   }
-  resultsEl.innerHTML = entries.map(({c, list}) => `
+  resultsEl.innerHTML = entries.map(({kind, id, address, name, list}) => `
     <div style="margin-bottom:20px;">
-      <div class="t1" style="margin-bottom:8px;">${escapeHtml(c.address||c.name||'Customer')}${c.name && c.address ? `<span style="font-weight:500; color:var(--ink-muted);"> · ${escapeHtml(c.name)}</span>` : ''}</div>
+      <div class="t1" style="margin-bottom:8px;">${escapeHtml(address||name||'Customer')}${name && address ? `<span style="font-weight:500; color:var(--ink-muted);"> · ${escapeHtml(name)}</span>` : ''}${kind==='job' ? `<span style="font-weight:600; color:var(--ink-muted); font-size:0.6875rem; text-transform:uppercase; letter-spacing:0.02em;"> · One-off job</span>` : ''}</div>
       <div style="display:flex; flex-wrap:wrap; gap:8px;">
-        ${list.map((entry,i) => `<img src="${photoEntrySrc(entry)}" onclick="openPhotoViewerAt(buildCustomerPhotoList('${c.id}'), ${i}, () => openPhotoGalleryReturn())" style="width:72px; height:72px; object-fit:cover; border-radius:10px; border:1px solid var(--line); cursor:pointer;">`).join('')}
+        ${kind==='customer'
+          ? list.map((entry,i) => `<img src="${photoEntrySrc(entry)}" onclick="openPhotoViewerAt(buildCustomerPhotoList('${id}'), ${i}, () => openPhotoGalleryReturn())" style="width:72px; height:72px; object-fit:cover; border-radius:10px; border:1px solid var(--line); cursor:pointer;">`).join('')
+          : list.map((entry,i) => `<img src="${photoEntrySrc(entry)}" onclick="openPhotoViewerAt(buildJobPhotoList('${id}'), ${i}, () => openPhotoGalleryReturn())" style="width:72px; height:72px; object-fit:cover; border-radius:10px; border:1px solid var(--line); cursor:pointer;">`).join('')}
       </div>
     </div>
   `).join('');
@@ -5248,7 +5259,7 @@ const FOCUSED_HELP = {
       helpP('The Rounds tab shows every round, with a Rounds / Due / Owed switch. Open a round to see its customers, swipe a card right to mark cleaned or left to mark paid, and use Reorder to set your walking order.'),
       helpP('The printer icon above the summary numbers covers reports across every round at once — Windows due, Money owed, and Full round lists. A single round\'s own screen has its own separate Print option, just for that round.'),
       helpP('The magnifying glass icon searches across every customer — name, address, phone, email, notes, round, or account number — with results shown as a tappable list, matches highlighted as you type.'),
-      helpP('The photo icon opens the Photo gallery — every customer with at least one photo, address first then a thumbnail strip (including photos from their linked one-off jobs), searchable by address or name.'),
+      helpP('The photo icon opens the Photo gallery — every customer with at least one photo, address first then a thumbnail strip (including photos from their linked one-off jobs), searchable by address or name. Standalone one-off jobs (not linked to a customer) with their own photos get their own card too.'),
       helpP('Deleting a customer, job, or quote shows an "Undo" banner at the top of the app that stays until you act on it or dismiss it — not a toast that vanishes in a few seconds. Only the single most recent deletion can be undone this way.'),
       helpP('Marking someone cleaned doesn\'t remove them from the Due view straight away — they stay there for the rest of the day, so you can still see everyone you\'ve worked through. They drop off automatically the next day. The total at the bottom only counts what\'s still left to do.'),
       helpP('If a round takes more than one day, tap each customer\'s day badge in reorder mode to assign Day 1–5. A day switcher then appears above the customer list, and cards get a "Day N" badge.'),
