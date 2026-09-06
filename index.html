@@ -410,7 +410,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 62;
+const APP_VERSION = 63;
 function formatVersion(v){ return '1.' + v; }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
@@ -419,6 +419,7 @@ function formatVersion(v){ return '1.' + v; }
 // the most recent 10 entries (oldest ones can be left in the array or trimmed,
 // either is fine, since the display always slices to 10).
 const VERSION_HISTORY = [
+  {version: 63, changes: ['Fixed a bug where a single problem photo could silently drop every photo from a backup, or disable photo storage for the rest of the session — backups and restores now handle each photo on its own, and tell you if any couldn\'t be included or recovered']},
   {version: 62, changes: ['Photo gallery now also includes standalone one-off jobs (ones not linked to a customer) that have their own photos']},
   {version: 61, changes: ['Adding a new quote now keeps you on its screen afterwards, so you can send it by text or email straight away', 'Marketing response cards now show a ✓ once a pending action (like sending a quote) has been done', 'Fixed the ✕ button on a marketing response not closing the screen', 'Sending a PDF invoice or receipt via WhatsApp now jumps straight to that customer\'s own chat', 'Photos can now be swiped left/right to browse through the rest, instead of one at a time', 'Added a Photo gallery (photo icon on the Rounds tab) — every customer with photos, listed by address']},
   {version: 60, changes: ['Marketing moved to its own tab, next to Quotes', 'Group marketing texts can now be sent to several rounds at once, not just one', 'Response entries needing action are now sorted to the top, above ones still awaiting a reply', 'Anyone unresponded to for 30 days quietly drops off the list — nothing about them is deleted, and a fresh text brings them straight back']},
@@ -747,31 +748,45 @@ function uncachePhoto(id){
 // the first time this version runs, and any older backup file being restored) gets
 // decoded, stored in IndexedDB, and stripped down to just {id, date}. Safe to call
 // repeatedly — already-migrated photos are left untouched.
+// Each photo is handled independently (own try/catch) rather than one shared
+// Promise.all: a single corrupted/oversized photo failing must not take every other
+// photo in the migration down with it, and must not disable IndexedDB storage for
+// the rest of the session (photoStorageAvailable is reserved for when IndexedDB
+// itself is genuinely unusable, checked once via openPhotoDb() below). Returns the
+// number of photos that couldn't be migrated, so the caller can tell the user.
 async function migrateLegacyPhotosToIndexedDB(targetData){
-  const jobs = [];
-  const migrateList = (list) => {
-    (list||[]).forEach(p=>{
-      if(p && p.dataUrl){
-        const blob = dataURLToBlob(p.dataUrl);
-        jobs.push(blob.then(b => idbSavePhoto(p.id, b).then(()=>{ delete p.dataUrl; })));
-      }
-    });
-  };
-  (targetData.customers||[]).forEach(c => migrateList(c.photos));
-  (targetData.oneOffJobs||[]).forEach(j => migrateList(j.photos));
-  if(jobs.length) await Promise.all(jobs).catch(()=>{ photoStorageAvailable = false; });
+  const toMigrate = [];
+  const collect = (list) => (list||[]).forEach(p => { if(p && p.dataUrl) toMigrate.push(p); });
+  (targetData.customers||[]).forEach(c => collect(c.photos));
+  (targetData.oneOffJobs||[]).forEach(j => collect(j.photos));
+  if(!toMigrate.length) return 0;
+  try{ await openPhotoDb(); }catch(e){ return toMigrate.length; } // IndexedDB itself unavailable — nothing to do
+  let failed = 0;
+  await Promise.all(toMigrate.map(async p => {
+    try{
+      const blob = await dataURLToBlob(p.dataUrl);
+      await idbSavePhoto(p.id, blob);
+      delete p.dataUrl;
+    }catch(e){ failed++; } // this one photo stays embedded as dataUrl; everything else still migrates
+  }));
+  return failed;
 }
 // Decodes a bundled backup export's photo blobs (see exportData) back into
 // IndexedDB. Older backups (pre-dating this change) don't have this — their photos
 // are still embedded per-photo as `dataUrl` and are handled by the migration above
-// instead, since migrateData() runs on every import too.
+// instead, since migrateData() runs on every import too. Returns the number of
+// photos that couldn't be restored (each handled independently, so one bad entry
+// doesn't cost the rest of the backup its photos).
 async function restoreBundledPhotoBlobs(targetData){
-  if(!targetData._photoBlobs) return;
+  if(!targetData._photoBlobs) return 0;
   const entries = Object.entries(targetData._photoBlobs);
+  let failed = 0;
   await Promise.all(entries.map(async ([id, dataUrl]) => {
-    try{ const blob = await dataURLToBlob(dataUrl); await idbSavePhoto(id, blob); }catch(e){}
+    try{ const blob = await dataURLToBlob(dataUrl); await idbSavePhoto(id, blob); }
+    catch(e){ failed++; }
   }));
   delete targetData._photoBlobs;
+  return failed;
 }
 // Loads every stored photo into photoUrlCache and totals up real byte usage — run
 // once at startup (after migration) so every subsequent render in the session can
@@ -5513,18 +5528,24 @@ async function exportData(){
   // under `_photoBlobs` so a single backup file stays a complete, portable copy of
   // everything, exactly as it was before photos moved out of localStorage.
   const exportObj = JSON.parse(JSON.stringify(data)); // shallow-safe clone before mutating
+  let failedPhotoCount = 0;
   if(photoStorageAvailable){
-    try{
-      const referenced = new Set();
-      (exportObj.customers||[]).forEach(c => (c.photos||[]).forEach(p=>referenced.add(p.id)));
-      (exportObj.oneOffJobs||[]).forEach(j => (j.photos||[]).forEach(p=>referenced.add(p.id)));
-      const photoBlobs = {};
-      await Promise.all([...referenced].map(async id => {
+    const referenced = new Set();
+    (exportObj.customers||[]).forEach(c => (c.photos||[]).forEach(p=>referenced.add(p.id)));
+    (exportObj.oneOffJobs||[]).forEach(j => (j.photos||[]).forEach(p=>referenced.add(p.id)));
+    const photoBlobs = {};
+    // Each photo is read and encoded independently. This used to be one shared
+    // try/catch around the whole Promise.all — a single photo failing to read or
+    // convert threw before `_photoBlobs` was ever assigned, silently dropping every
+    // photo from the backup with no warning. Now one bad photo just gets skipped
+    // (and counted) while the rest of the backup, photos included, still goes out.
+    await Promise.all([...referenced].map(async id => {
+      try{
         const blob = await idbGetPhoto(id);
         if(blob) photoBlobs[id] = await blobToDataURL(blob);
-      }));
-      exportObj._photoBlobs = photoBlobs;
-    }catch(e){ /* export still proceeds without bundled photos rather than failing outright */ }
+      }catch(e){ failedPhotoCount++; }
+    }));
+    exportObj._photoBlobs = photoBlobs;
   }
   const jsonStr = JSON.stringify(exportObj, null, 2);
   const filename = `round-book-backup-${todayISO()}.json`;
@@ -5534,6 +5555,9 @@ async function exportData(){
     bannerDismissed = false;
     renderBackupBanner();
   };
+  const backedUpToast = (defaultMsg) => toast(failedPhotoCount
+    ? `Backup saved, but ${failedPhotoCount} photo${failedPhotoCount===1?'':'s'} couldn't be included`
+    : defaultMsg);
 
   if(navigator.canShare){
     try{
@@ -5541,7 +5565,7 @@ async function exportData(){
       if(navigator.canShare({files:[file]})){
         await navigator.share({files:[file], title:'Round Book Backup'});
         markBackedUp();
-        toast('Backup shared');
+        backedUpToast('Backup shared');
         return;
       }
     }catch(e){
@@ -5560,7 +5584,7 @@ async function exportData(){
   document.body.removeChild(a);
   setTimeout(()=>URL.revokeObjectURL(url), 2000);
   markBackedUp();
-  toast('Backup saved');
+  backedUpToast('Backup saved');
 }
 document.getElementById('importFile').addEventListener('change', function(e){
   const file = e.target.files[0];
@@ -5576,9 +5600,10 @@ document.getElementById('importFile').addEventListener('change', function(e){
         // Handles both a backup from this version (photos bundled under
         // _photoBlobs) and an older backup from before photos moved to IndexedDB
         // (photos still embedded per-entry as dataUrl, same as any legacy data
-        // already on the phone).
-        await restoreBundledPhotoBlobs(migrated);
-        await migrateLegacyPhotosToIndexedDB(migrated);
+        // already on the phone). Each returns how many photos it couldn't restore,
+        // so the user finds out rather than silently ending up with none.
+        const failedBundled = await restoreBundledPhotoBlobs(migrated);
+        const failedLegacy = await migrateLegacyPhotosToIndexedDB(migrated);
         data = migrated;
         saveData();
         // Replacing all data outright — start the photo URL cache fresh rather
@@ -5589,7 +5614,10 @@ document.getElementById('importFile').addEventListener('change', function(e){
         await cleanupOrphanedPhotos();
         closeSheet();
         render();
-        toast('Backup restored');
+        const failedPhotos = failedBundled + failedLegacy;
+        toast(failedPhotos
+          ? `Backup restored, but ${failedPhotos} photo${failedPhotos===1?'':'s'} couldn't be recovered`
+          : 'Backup restored');
       }
     }catch(err){
       alert('That file could not be read as a Round Book backup.');
