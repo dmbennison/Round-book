@@ -410,7 +410,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 60;
+const APP_VERSION = 61;
 function formatVersion(v){ return '1.' + v; }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
@@ -419,6 +419,7 @@ function formatVersion(v){ return '1.' + v; }
 // the most recent 10 entries (oldest ones can be left in the array or trimmed,
 // either is fine, since the display always slices to 10).
 const VERSION_HISTORY = [
+  {version: 61, changes: ['Adding a new quote now keeps you on its screen afterwards, so you can send it by text or email straight away', 'Marketing response cards now show a ✓ once a pending action (like sending a quote) has been done', 'Fixed the ✕ button on a marketing response not closing the screen', 'Sending a PDF invoice or receipt via WhatsApp now jumps straight to that customer\'s own chat', 'Photos can now be swiped left/right to browse through the rest, instead of one at a time', 'Added a Photo gallery (photo icon on the Rounds tab) — every customer with photos, listed by address']},
   {version: 60, changes: ['Marketing moved to its own tab, next to Quotes', 'Group marketing texts can now be sent to several rounds at once, not just one', 'Response entries needing action are now sorted to the top, above ones still awaiting a reply', 'Anyone unresponded to for 30 days quietly drops off the list — nothing about them is deleted, and a fresh text brings them straight back']},
   {version: 59, changes: ['Marketing responses now has its own search box', 'Added Call, Text, and Quote buttons directly on each marketing response entry']},
   {version: 58, changes: ['Added Marketing responses — tracks who\'s been sent a marketing text, with a response status and a next action you set yourself, reachable via a new megaphone icon on the Rounds tab']},
@@ -609,6 +610,7 @@ function migrateData(parsed){
     if(!c.messageLog) c.messageLog = [];
     if(!c.marketingStatus) c.marketingStatus = 'awaiting';
     if(!c.marketingNextAction) c.marketingNextAction = 'none';
+    if(c.marketingActionDone == null) c.marketingActionDone = false;
     // Every customer gets a permanent, unique account number the first time this
     // runs for them — shown on invoices/receipts. Assigned once and never reused,
     // even if the customer is later deleted, so numbers stay meaningful.
@@ -1157,6 +1159,9 @@ function renderRoundsList(main){
       ${mainScreenHelpBtn('rounds', "()=>setTab('rounds')")}
       <button class="btn-open" style="width:38px; height:38px; padding:0;" onclick="openCustomerSearch()" aria-label="Search customers">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      </button>
+      <button class="btn-open" style="width:38px; height:38px; padding:0;" onclick="openPhotoGallery()" aria-label="Photo gallery">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></svg>
       </button>
       <button class="btn-open" style="width:38px; height:38px; padding:0;" onclick="openRoundReports()" aria-label="Print reports">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
@@ -2003,24 +2008,147 @@ async function handlePhotoSelected(id, inputEl){
   inputEl.value = '';
 }
 
-function viewPhoto(id, photoId){
-  const c = data.customers.find(x=>x.id===id);
-  const p = (c.photos||[]).find(x=>x.id===photoId);
-  if(!p) return;
-  const src = photoUrlCache.get(photoId) || p.dataUrl || '';
+// Builds an ordered list of every photo shown on a customer's screen — their own
+// photos followed by photos from any linked one-off jobs, matching the same merge
+// order used when rendering that Photos section. Used to power swipe navigation
+// and the cross-customer photo gallery below.
+function buildCustomerPhotoList(customerId){
+  const c = data.customers.find(x=>x.id===customerId);
+  if(!c) return [];
+  const linkedJobs = (data.oneOffJobs||[]).filter(j=>j.customerId===customerId);
+  const list = (c.photos||[]).map(p => ({photoId:p.id, date:p.date, kind:'customer', ownerId:customerId}));
+  linkedJobs.forEach(j => {
+    (j.photos||[]).forEach(p => list.push({photoId:p.id, date:p.date, kind:'job', ownerId:j.id}));
+  });
+  return list;
+}
+function buildJobPhotoList(jobId){
+  const j = data.oneOffJobs.find(x=>x.id===jobId);
+  if(!j) return [];
+  return (j.photos||[]).map(p => ({photoId:p.id, date:p.date, kind:'job', ownerId:jobId}));
+}
+// Looks up the legacy embedded dataUrl fallback for an entry (see Photo storage —
+// photoUrlCache is the normal path, dataUrl only exists for un-migrated photos).
+function photoEntrySrc(entry){
+  const cached = photoUrlCache.get(entry.photoId);
+  if(cached) return cached;
+  const owner = entry.kind === 'customer'
+    ? data.customers.find(x=>x.id===entry.ownerId)
+    : data.oneOffJobs.find(x=>x.id===entry.ownerId);
+  const p = owner && (owner.photos||[]).find(x=>x.id===entry.photoId);
+  return (p && p.dataUrl) || '';
+}
+
+// Shared full-screen photo viewer with swipe/arrow navigation across a list of
+// photos, used by both a single customer's/job's Photos section and the cross-
+// customer Photo gallery. onClose is called once, when the viewer is dismissed
+// (any route — ✕, swiping past the ends does nothing, or after deleting the last
+// photo in the list).
+let photoViewerList = [];
+let photoViewerIndex = 0;
+let photoViewerOnClose = null;
+let photoViewerTouchStartX = null;
+let photoViewerTouchStartY = null;
+
+function openPhotoViewerAt(list, index, onClose){
+  if(!list.length || index < 0 || index >= list.length) return;
+  photoViewerList = list;
+  photoViewerIndex = index;
+  photoViewerOnClose = onClose || null;
+  renderPhotoViewer();
+}
+function renderPhotoViewer(){
+  const entry = photoViewerList[photoViewerIndex];
+  if(!entry){ closeSheet(); return; }
+  const src = photoEntrySrc(entry);
+  const hasPrev = photoViewerIndex > 0;
+  const hasNext = photoViewerIndex < photoViewerList.length - 1;
+  const counter = photoViewerList.length > 1
+    ? `<div style="text-align:center; color:var(--ink-muted); font-size:0.75rem; margin-bottom:8px;">${photoViewerIndex+1} of ${photoViewerList.length}</div>` : '';
+  const navBtn = (dir, symbol) => `<button onclick="navigatePhotoViewer(${dir})" aria-label="${dir<0?'Previous':'Next'} photo" style="position:absolute; ${dir<0?'left':'right'}:6px; top:50%; transform:translateY(-50%); width:36px; height:36px; border-radius:50%; border:none; background:rgba(0,0,0,0.45); color:#fff; font-size:1.25rem; line-height:1; display:flex; align-items:center; justify-content:center;">${symbol}</button>`;
   openSheet(`
     <div class="sheet-head">
       <h2>Photo</h2>
-      <button class="sheet-close" onclick="openCustomerDetail('${id}')">✕</button>
+      <button class="sheet-close" onclick="closeSheet()">✕</button>
     </div>
-    <img src="${src}" style="width:100%; border-radius:12px; margin-bottom:6px;">
-    <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 16px;">Added ${fmtDate(p.date)}</p>
+    ${counter}
+    <div style="position:relative;">
+      <img id="photoViewerImg" src="${src}" style="width:100%; border-radius:12px; margin-bottom:6px; touch-action:pan-y; display:block;">
+      ${hasPrev ? navBtn(-1,'‹') : ''}
+      ${hasNext ? navBtn(1,'›') : ''}
+    </div>
+    <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 16px;">Added ${fmtDate(entry.date)}</p>
     <div class="row2" style="margin-bottom:8px;">
-      <button class="btn btn-clean" onclick="sharePhoto('${id}','${photoId}')">📤 Share</button>
-      <button class="btn" style="background:var(--red-dim); color:var(--red);" onclick="deletePhoto('${id}','${photoId}')">Delete</button>
+      <button class="btn btn-clean" onclick="sharePhotoViewerEntry()">📤 Share</button>
+      <button class="btn" style="background:var(--red-dim); color:var(--red);" onclick="deletePhotoViewerEntry()">Delete</button>
     </div>
-    <p style="color:var(--ink-muted); font-size:0.7188rem; margin:0 2px; text-align:center;">Tip: you can also press and hold the photo to save or share it directly.</p>
-  `);
+    <p style="color:var(--ink-muted); font-size:0.7188rem; margin:0 2px; text-align:center;">${photoViewerList.length>1?'Swipe left or right to browse, or ':''}Press and hold the photo to save or share it directly.</p>
+  `, () => { if(photoViewerOnClose) photoViewerOnClose(); });
+  attachPhotoViewerSwipe();
+}
+function navigatePhotoViewer(delta){
+  const next = photoViewerIndex + delta;
+  if(next < 0 || next >= photoViewerList.length) return;
+  photoViewerIndex = next;
+  renderPhotoViewer();
+}
+function attachPhotoViewerSwipe(){
+  const img = document.getElementById('photoViewerImg');
+  if(!img) return;
+  photoViewerTouchStartX = null; photoViewerTouchStartY = null;
+  img.addEventListener('touchstart', (e) => {
+    if(e.touches.length !== 1) return;
+    photoViewerTouchStartX = e.touches[0].clientX;
+    photoViewerTouchStartY = e.touches[0].clientY;
+  }, {passive:true});
+  img.addEventListener('touchend', (e) => {
+    if(photoViewerTouchStartX == null) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - photoViewerTouchStartX;
+    const dy = t.clientY - photoViewerTouchStartY;
+    photoViewerTouchStartX = null; photoViewerTouchStartY = null;
+    // Require a clearly horizontal, decent-sized gesture so vertical scrolling
+    // inside the sheet never gets mistaken for a page-to-page swipe.
+    if(Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    navigatePhotoViewer(dx < 0 ? 1 : -1);
+  }, {passive:true});
+}
+function sharePhotoViewerEntry(){
+  const entry = photoViewerList[photoViewerIndex];
+  if(!entry) return;
+  if(entry.kind === 'customer') sharePhoto(entry.ownerId, entry.photoId);
+  else shareJobPhoto(entry.ownerId, entry.photoId);
+}
+function deletePhotoViewerEntry(){
+  const entry = photoViewerList[photoViewerIndex];
+  if(!entry) return;
+  if(!confirm('Delete this photo?')) return;
+  if(entry.kind === 'customer'){
+    const c = data.customers.find(x=>x.id===entry.ownerId);
+    if(c) c.photos = (c.photos||[]).filter(p=>p.id!==entry.photoId);
+  } else {
+    const j = data.oneOffJobs.find(x=>x.id===entry.ownerId);
+    if(j) j.photos = (j.photos||[]).filter(p=>p.id!==entry.photoId);
+  }
+  saveData();
+  if(photoStorageAvailable){
+    idbDeletePhoto(entry.photoId).then(()=>{}).catch(()=>{});
+    uncachePhoto(entry.photoId);
+  }
+  photoViewerList.splice(photoViewerIndex, 1);
+  if(photoViewerIndex >= photoViewerList.length) photoViewerIndex = photoViewerList.length - 1;
+  if(photoViewerList.length){
+    renderPhotoViewer();
+  } else {
+    closeSheet();
+  }
+}
+
+function viewPhoto(id, photoId){
+  const list = buildCustomerPhotoList(id);
+  const index = list.findIndex(e => e.kind==='customer' && e.photoId===photoId);
+  if(index === -1) return;
+  openPhotoViewerAt(list, index, () => openCustomerDetail(id));
 }
 
 async function sharePhoto(id, photoId){
@@ -2041,19 +2169,6 @@ async function sharePhoto(id, photoId){
     if(e && e.name === 'AbortError') return;
     toast('Could not share that photo — press and hold it instead');
   }
-}
-
-function deletePhoto(id, photoId){
-  if(!confirm('Delete this photo?')) return;
-  const c = data.customers.find(x=>x.id===id);
-  c.photos = (c.photos||[]).filter(p=>p.id!==photoId);
-  saveData();
-  if(photoStorageAvailable){
-    idbDeletePhoto(photoId).then(()=>{}).catch(()=>{});
-    uncachePhoto(photoId);
-  }
-  openCustomerDetail(id);
-  render();
 }
 
 function editHistAmount(id, kind, dateKey){
@@ -2523,7 +2638,7 @@ function printReceipt(customerId, dateISO, amount){
       Thank you for your payment.${fromLine ? '<br>' + escapeHtml(fromLine) : ''}
     </div>
   `;
-  runPrint(`Receipt — ${c.address || c.name || receiptNumber}`, body, true, true, () => openReceiptOptions(customerId, dateISO, amount));
+  runPrint(`Receipt — ${c.address || c.name || receiptNumber}`, body, true, true, () => openReceiptOptions(customerId, dateISO, amount), c.phone);
 }
 
 
@@ -2750,6 +2865,7 @@ function sendMarketingText(id){
   // the "waiting to hear back" cycle over.
   c.marketingStatus = 'awaiting';
   c.marketingNextAction = 'none';
+  c.marketingActionDone = false;
   saveData();
 }
 
@@ -2938,7 +3054,7 @@ function scheduleJobForCustomer(id){
 function quoteForCustomer(id, returnTo){
   const c = data.customers.find(x=>x.id===id);
   if(!c) return;
-  openQuoteForm(null, { address: c.address||'', name: c.name||'', phone: c.phone||'', email: c.email||'' }, returnTo || (() => openCustomerDetail(id)));
+  openQuoteForm(null, { address: c.address||'', name: c.name||'', phone: c.phone||'', email: c.email||'', marketingCustomerId: c.id }, returnTo || (() => openCustomerDetail(id)));
 }
 
 function fillJobFromCustomer(id){
@@ -3045,35 +3161,19 @@ function openJobForm(existing, prefill, returnTo){
   `, returnTo);
 }
 
-// Where to land when closing/deleting a job photo — the job form by default, or
-// back to a customer's screen when the photo was reached from there instead (a
-// linked one-off job's photos are shown inline in the customer's Photos section).
-function returnFromJobPhotoCtx(ctx, jobId){
-  if(ctx && ctx.indexOf('customer:') === 0){
-    openCustomerDetail(ctx.slice('customer:'.length));
-  } else {
-    openJobForm(data.oneOffJobs.find(x=>x.id===jobId));
-  }
-}
 function viewJobPhoto(id, photoId, ctx){
-  const j = data.oneOffJobs.find(x=>x.id===id);
-  const p = (j.photos||[]).find(x=>x.id===photoId);
-  if(!p) return;
-  const src = photoUrlCache.get(photoId) || p.dataUrl || '';
-  const ctxArg = ctx ? `'${ctx}'` : 'null';
-  openSheet(`
-    <div class="sheet-head">
-      <h2>Photo</h2>
-      <button class="sheet-close" onclick="returnFromJobPhotoCtx(${ctxArg},'${id}')">✕</button>
-    </div>
-    <img src="${src}" style="width:100%; border-radius:12px; margin-bottom:6px;">
-    <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 16px;">Added ${fmtDate(p.date)}</p>
-    <div class="row2" style="margin-bottom:8px;">
-      <button class="btn btn-clean" onclick="shareJobPhoto('${id}','${photoId}')">📤 Share</button>
-      <button class="btn" style="background:var(--red-dim); color:var(--red);" onclick="deleteJobPhoto('${id}','${photoId}',${ctxArg})">Delete</button>
-    </div>
-    <p style="color:var(--ink-muted); font-size:0.7188rem; margin:0 2px; text-align:center;">Tip: you can also press and hold the photo to save or share it directly.</p>
-  `);
+  if(ctx && ctx.indexOf('customer:') === 0){
+    const customerId = ctx.slice('customer:'.length);
+    const list = buildCustomerPhotoList(customerId);
+    const index = list.findIndex(e => e.kind==='job' && e.ownerId===id && e.photoId===photoId);
+    if(index === -1) return;
+    openPhotoViewerAt(list, index, () => openCustomerDetail(customerId));
+  } else {
+    const list = buildJobPhotoList(id);
+    const index = list.findIndex(e => e.photoId===photoId);
+    if(index === -1) return;
+    openPhotoViewerAt(list, index, () => openJobForm(data.oneOffJobs.find(x=>x.id===id)));
+  }
 }
 
 async function handleJobPhotoSelected(id, inputEl){
@@ -3125,18 +3225,6 @@ async function shareJobPhoto(id, photoId){
     if(e && e.name === 'AbortError') return;
     toast('Could not share that photo — press and hold it instead');
   }
-}
-
-function deleteJobPhoto(id, photoId, ctx){
-  if(!confirm('Delete this photo?')) return;
-  const j = data.oneOffJobs.find(x=>x.id===id);
-  j.photos = (j.photos||[]).filter(p=>p.id!==photoId);
-  saveData();
-  if(photoStorageAvailable){
-    idbDeletePhoto(photoId).then(()=>{}).catch(()=>{});
-    uncachePhoto(photoId);
-  }
-  returnFromJobPhotoCtx(ctx, id);
 }
 
 function saveJobForm(id){
@@ -3273,6 +3361,7 @@ function openQuoteForm(existing, prefill, returnTo){
       <button class="sheet-close" onclick="closeSheet()">✕</button>
     </div>
     <input type="hidden" id="q_fromJobId" value="${escapeAttr((prefill&&prefill.fromJobId)||'')}">
+    <input type="hidden" id="q_marketingCustomerId" value="${escapeAttr((existing&&existing.marketingCustomerId)||(prefill&&prefill.marketingCustomerId)||'')}">
     ${prefill&&prefill.fromJobId?`<p style="color:var(--green); font-size:0.75rem; font-weight:700; margin:0 2px 14px;">✅ New quote for repeat work — prefilled from a past job</p>`:''}
     <label style="margin-top:0">Address</label>
     <input type="text" id="q_address" value="${escapeAttr(q.address||'')}" placeholder="e.g. 5 Oak Close">
@@ -3330,6 +3419,7 @@ function saveQuoteForm(id){
   const name = document.getElementById('q_name').value.trim();
   if(!address && !name){ toast('Please enter at least an address or a name'); return; }
   const fromJobField = document.getElementById('q_fromJobId');
+  const marketingCustomerField = document.getElementById('q_marketingCustomerId');
   const payload = {
     address, name,
     phone: document.getElementById('q_phone').value.trim(),
@@ -3344,12 +3434,26 @@ function saveQuoteForm(id){
     const q = data.quotes.find(x=>x.id===id);
     Object.assign(q, payload);
     toast('Quote updated');
+    saveData(); closeSheet(); render();
   } else {
     if(fromJobField && fromJobField.value) payload.fromJobId = fromJobField.value;
-    data.quotes.push(Object.assign({id: uid()}, payload));
+    if(marketingCustomerField && marketingCustomerField.value) payload.marketingCustomerId = marketingCustomerField.value;
+    const newQuote = Object.assign({id: uid()}, payload);
+    data.quotes.push(newQuote);
+    // If this quote was started from a marketing response card's "Quote" button,
+    // creating it counts as having done that pending action — reflect that on the card.
+    if(newQuote.marketingCustomerId){
+      const mktC = data.customers.find(x=>x.id===newQuote.marketingCustomerId);
+      if(mktC && mktC.marketingNextAction === 'quote') mktC.marketingActionDone = true;
+    }
     toast('Quote added');
+    // Stay on the quote screen (now in edit mode) so the quote can be sent by text/email right away.
+    // sheetOnClose still holds whatever returnTo was passed to the original openQuoteForm() call,
+    // since we deliberately don't call closeSheet() in this branch.
+    const returnTo = sheetOnClose;
+    saveData(); render();
+    openQuoteForm(newQuote, null, returnTo);
   }
-  saveData(); closeSheet(); render();
 }
 
 function deleteQuote(id){
@@ -3783,7 +3887,7 @@ function renderMarketingResponseRows(){
           <div class="t2">Texted ${fmtDate(lastSent)}</div>
           <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:6px;">
             <span class="badge ${status.color}">${status.label}</span>
-            ${c.marketingNextAction !== 'none' ? `<span class="badge due">${actionLabel}</span>` : ''}
+            ${c.marketingNextAction !== 'none' ? (c.marketingActionDone ? `<span class="badge ok">✓ ${actionLabel}</span>` : `<span class="badge due">${actionLabel}</span>`) : ''}
           </div>
           <div style="display:flex; gap:8px; margin-top:10px;">
             ${c.phone ? `<button onclick="event.stopPropagation(); callCustomer('customer','${c.id}')" class="call-btn" style="border-radius:8px; width:auto; height:32px; padding:0 12px; font-size:0.75rem; font-weight:800; display:flex; align-items:center; gap:6px;">${CALL_ICON.replace('viewBox="0 0 24 24"','viewBox="0 0 24 24" width="13" height="13"')} Call</button>` : ''}
@@ -3803,6 +3907,7 @@ function quickTextFromMarketing(id){
   const afterSend = () => {
     c.marketingStatus = 'awaiting';
     c.marketingNextAction = 'none';
+    c.marketingActionDone = false;
     saveData();
     render();
   };
@@ -3817,15 +3922,19 @@ function openMarketingResponseEditor(id){
   const actionButtons = Object.entries(MARKETING_ACTION_OPTIONS).map(([key,label])=>
     `<button class="seg-btn ${c.marketingNextAction===key?'active':''}" onclick="setMarketingAction('${id}','${key}')" style="flex:0 0 auto; padding:9px 14px;">${label}</button>`
   ).join('');
+  const actionLabel = MARKETING_ACTION_OPTIONS[c.marketingNextAction] || MARKETING_ACTION_OPTIONS.none;
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">${escapeHtml(c.address||c.name||'Customer')}</h2>
-      <button class="sheet-close" onclick="openMarketingResponses()">✕</button>
+      <button class="sheet-close" onclick="closeSheet()">✕</button>
     </div>
     <label style="margin-top:0;">Response</label>
     <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:18px;">${statusButtons}</div>
     <label>Next action</label>
     <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px;">${actionButtons}</div>
+    ${c.marketingNextAction !== 'none' ? `
+      <button class="btn" style="width:100%; margin-top:14px; ${c.marketingActionDone ? 'background:var(--green-dim); color:var(--green);' : 'background:var(--amber-dim); color:var(--amber);'}" onclick="toggleMarketingActionDone('${id}')">${c.marketingActionDone ? `✅ Done — ${actionLabel}` : `Mark "${actionLabel}" as done`}</button>
+    ` : ''}
   `, () => openMarketingResponses());
 }
 function setMarketingStatus(id, status){
@@ -3839,8 +3948,17 @@ function setMarketingAction(id, action){
   const c = data.customers.find(x=>x.id===id);
   if(!c || !MARKETING_ACTION_OPTIONS[action]) return;
   c.marketingNextAction = action;
+  c.marketingActionDone = false; // a newly set (or re-set) action starts as not-yet-done
   saveData();
   openMarketingResponseEditor(id);
+}
+function toggleMarketingActionDone(id){
+  const c = data.customers.find(x=>x.id===id);
+  if(!c || c.marketingNextAction === 'none') return;
+  c.marketingActionDone = !c.marketingActionDone;
+  saveData();
+  openMarketingResponseEditor(id);
+  render();
 }
 
 function openCustomerSearch(){
@@ -3903,6 +4021,56 @@ function renderCustomerSearchResults(){
 function searchResultTap(id){
   closeSheet();
   openCustomerDetail(id);
+}
+
+// Photo gallery — every customer with at least one photo (their own, or from a
+// linked one-off job), address first then a thumbnail grid, so photos can be
+// browsed across the whole customer base rather than one customer at a time.
+function openPhotoGallery(){
+  openSheet(`
+    <div class="sheet-head">
+      <h2 style="flex:1; min-width:0;">Photo gallery</h2>
+      <button class="sheet-close" onclick="closeSheet()">✕</button>
+    </div>
+    <input type="text" id="gallery_search_input" placeholder="Filter by address or name..." oninput="renderPhotoGallery()" style="margin-top:0; margin-bottom:14px;">
+    <div id="gallery_results"></div>
+  `, () => setTab('rounds'));
+  renderPhotoGallery();
+}
+function renderPhotoGallery(){
+  const inputEl = document.getElementById('gallery_search_input');
+  const resultsEl = document.getElementById('gallery_results');
+  if(!resultsEl) return;
+  const raw = inputEl ? inputEl.value.trim() : '';
+  const q = raw.toLowerCase();
+  let entries = data.customers
+    .map(c => ({c, list: buildCustomerPhotoList(c.id)}))
+    .filter(({list}) => list.length);
+  if(q){
+    entries = entries.filter(({c}) => {
+      const haystack = [c.name, c.address].filter(Boolean).join(' ').toLowerCase();
+      return haystack.includes(q);
+    });
+  }
+  entries.sort((a,b) => (a.c.address||a.c.name||'').localeCompare(b.c.address||b.c.name||''));
+  if(!entries.length){
+    resultsEl.innerHTML = `<p style="color:var(--ink-muted); font-size:0.8438rem; text-align:center; margin-top:24px;">${q ? `No customers match "${escapeHtml(raw)}".` : "No photos added yet — they'll show up here once you add some from a customer's screen."}</p>`;
+    return;
+  }
+  resultsEl.innerHTML = entries.map(({c, list}) => `
+    <div style="margin-bottom:20px;">
+      <div class="t1" style="margin-bottom:8px;">${escapeHtml(c.address||c.name||'Customer')}${c.name && c.address ? `<span style="font-weight:500; color:var(--ink-muted);"> · ${escapeHtml(c.name)}</span>` : ''}</div>
+      <div style="display:flex; flex-wrap:wrap; gap:8px;">
+        ${list.map((entry,i) => `<img src="${photoEntrySrc(entry)}" onclick="openPhotoViewerAt(buildCustomerPhotoList('${c.id}'), ${i}, () => openPhotoGalleryReturn())" style="width:72px; height:72px; object-fit:cover; border-radius:10px; border:1px solid var(--line); cursor:pointer;">`).join('')}
+      </div>
+    </div>
+  `).join('');
+}
+// Reopens the gallery (preserving nothing fancier than a fresh, unfiltered list)
+// after closing a photo that was opened from it — mirrors the pattern used for
+// customer search results returning to the search screen.
+function openPhotoGalleryReturn(){
+  openPhotoGallery();
 }
 
 function openRoundReports(){
@@ -3981,11 +4149,13 @@ function reportDate(){
 let pendingReportTitle = '';
 let pendingReportBody = '';
 let pendingReportHideCompany = false;
+let pendingReportPhone = '';
 
-function runPrint(titleHtml, bodyHtml, hideCompanyHeader, allowPdfShare, returnTo){
+function runPrint(titleHtml, bodyHtml, hideCompanyHeader, allowPdfShare, returnTo, phone){
   pendingReportTitle = titleHtml;
   pendingReportBody = bodyHtml;
   pendingReportHideCompany = !!hideCompanyHeader;
+  pendingReportPhone = phone || '';
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">${titleHtml}</h2>
@@ -4078,13 +4248,23 @@ async function generatePendingReportPdfBlob(){
 
 // Shares a PDF Blob via the native share sheet (WhatsApp is one of the apps offered
 // there on both Android and iOS) when the browser supports sharing files. Where it
-// doesn't — mainly desktop browsers — the PDF is downloaded instead and WhatsApp Web
-// opens so it can be attached by hand.
-async function sharePdfBlob(blob, filename){
+// doesn't — mainly desktop browsers — the PDF is downloaded instead and WhatsApp opens
+// so it can be attached by hand. Either way, if a customer/job phone number is known
+// and WhatsApp is the chosen messaging app, we jump straight to that customer's own
+// chat (rather than a blank WhatsApp Web screen) since the share sheet's own app/contact
+// picker doesn't accept a phone number from the web — this is the closest practical
+// equivalent, same as the addToContacts hand-off elsewhere in the app.
+async function sharePdfBlob(blob, filename, phone){
+  const canJumpToChat = phone && isMobileNumber(phone) && data.settings.messagingApp === 'whatsapp';
+  const openCustomerChat = () => { window.location.href = `https://wa.me/${normalizePhoneForWhatsApp(phone)}`; };
   try{
     const file = new File([blob], filename, {type:'application/pdf'});
     if(navigator.canShare && navigator.canShare({files:[file]})){
       await navigator.share({files:[file], title: filename});
+      // The OS share sheet's own app/contact picker already handled attaching the
+      // file — this just makes sure the customer's specific chat ends up open too,
+      // in case the picker only got as far as WhatsApp's own contact list.
+      if(canJumpToChat) setTimeout(openCustomerChat, 600);
       return true;
     }
   }catch(e){
@@ -4095,8 +4275,13 @@ async function sharePdfBlob(blob, filename){
   a.href = url; a.download = filename;
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   setTimeout(()=>URL.revokeObjectURL(url), 60000);
-  toast('PDF downloaded — attach it in WhatsApp');
-  window.open('https://wa.me/', '_blank');
+  if(canJumpToChat){
+    toast('PDF downloaded — attach it in WhatsApp');
+    openCustomerChat();
+  } else {
+    toast('PDF downloaded — attach it in WhatsApp');
+    window.open('https://wa.me/', '_blank');
+  }
   return true;
 }
 
@@ -4107,7 +4292,7 @@ async function sendPendingReportPdf(){
   try{
     const blob = await generatePendingReportPdfBlob();
     closeSheet();
-    await sharePdfBlob(blob, sanitizeFilename(pendingReportTitle) + '.pdf');
+    await sharePdfBlob(blob, sanitizeFilename(pendingReportTitle) + '.pdf', pendingReportPhone);
   }catch(e){
     toast('Could not create the PDF — try Print instead');
     if(btn){ btn.style.opacity = ''; btn.style.pointerEvents = ''; }
@@ -4654,7 +4839,7 @@ function printJobInvoice(id){
   // Always suppress the generic report header's company-name subtitle for invoices — the
   // letterhead block above already covers name/logo/address/phone, so showing both would
   // duplicate the company name under itself when there's no logo.
-  runPrint(`Invoice — ${j.address || j.name || invoiceNumber}`, body, true, true, () => openJobForm(data.oneOffJobs.find(x=>x.id===id)));
+  runPrint(`Invoice — ${j.address || j.name || invoiceNumber}`, body, true, true, () => openJobForm(data.oneOffJobs.find(x=>x.id===id)), j.phone);
 }
 
 function printJobRecord(id){
@@ -5063,6 +5248,7 @@ const FOCUSED_HELP = {
       helpP('The Rounds tab shows every round, with a Rounds / Due / Owed switch. Open a round to see its customers, swipe a card right to mark cleaned or left to mark paid, and use Reorder to set your walking order.'),
       helpP('The printer icon above the summary numbers covers reports across every round at once — Windows due, Money owed, and Full round lists. A single round\'s own screen has its own separate Print option, just for that round.'),
       helpP('The magnifying glass icon searches across every customer — name, address, phone, email, notes, round, or account number — with results shown as a tappable list, matches highlighted as you type.'),
+      helpP('The photo icon opens the Photo gallery — every customer with at least one photo, address first then a thumbnail strip (including photos from their linked one-off jobs), searchable by address or name.'),
       helpP('Deleting a customer, job, or quote shows an "Undo" banner at the top of the app that stays until you act on it or dismiss it — not a toast that vanishes in a few seconds. Only the single most recent deletion can be undone this way.'),
       helpP('Marking someone cleaned doesn\'t remove them from the Due view straight away — they stay there for the rest of the day, so you can still see everyone you\'ve worked through. They drop off automatically the next day. The total at the bottom only counts what\'s still left to do.'),
       helpP('If a round takes more than one day, tap each customer\'s day badge in reorder mode to assign Day 1–5. A day switcher then appears above the customer list, and cards get a "Day N" badge.'),
@@ -5092,7 +5278,7 @@ const FOCUSED_HELP = {
       helpP('The small icon next to a customer\'s phone/email adds them straight to your phone\'s Contacts app.'),
       helpP('Tick "Text before I arrive" on a customer\'s edit screen to flag that they need a heads-up text before you turn up — it shows as a badge on their card and detail screen.'),
       helpP('Every customer gets a unique account number automatically, shown on their screen and on printed invoices/receipts — editable from their edit screen if you\'d rather set your own.'),
-      helpP('The Photos section on a customer\'s screen also shows photos from any of their linked one-off jobs, all in one place — no need to open the job separately to see them.'),
+      helpP('The Photos section on a customer\'s screen also shows photos from any of their linked one-off jobs, all in one place — no need to open the job separately to see them. Open any photo and swipe left/right (or use the arrows) to browse through the rest.'),
       helpP('Pausing a customer asks for a reason — Holiday, Work being done, Cancelled, Moved out, or Other — and stamps the date. Paused customers are skipped from due reminders and round totals until resumed. Use Pause for a longer or indefinite break.'),
       helpP('"Defer due date 4 weeks" pushes a customer\'s next due date out without pausing them or touching their clean history — for a short, one-off delay like a holiday or bad weather. The exact date can be fine-tuned with "Edit date", and clears itself automatically the next time they\'re actually cleaned. The whole round can be deferred at once from the ⋯ menu on the round\'s own screen.'),
       helpP('The "Get a quote for this customer" button opens a new quote pre-filled with their details.'),
@@ -5102,7 +5288,7 @@ const FOCUSED_HELP = {
   quotes: {
     title: 'Quotes',
     body: () => [
-      helpP('Swipe right to accept, left to decline. Accepted quotes convert straight into a job or customer. Send a quote by text or email from its edit screen. Quotes left Pending past their follow-up window (7 days by default) get flagged automatically.'),
+      helpP('Swipe right to accept, left to decline. Accepted quotes convert straight into a job or customer. Adding a new quote keeps you on its screen afterwards so you can send it straight away by text or email. Quotes left Pending past their follow-up window (7 days by default) get flagged automatically.'),
       helpP('You can also start a quote straight from an existing customer\'s screen using "Get a quote for this customer" — their name, address, phone and email come pre-filled.'),
       helpP('The printer icon at the top of this screen prints every quote, with status and total value.')
     ]
@@ -5112,7 +5298,7 @@ const FOCUSED_HELP = {
     body: () => [
       helpP('"Send group marketing text" lets you tick one or more rounds, edit the message, then tap Send for each customer in turn — it opens Messages/WhatsApp pre-filled and ready to go, one at a time, since a phone can only hand off to one recipient at a time.'),
       helpP('Everyone sent a marketing text appears below, with a search box to filter the list. Round Book can\'t see actual replies — check your own Messages/WhatsApp app, then record what happened here: a response (No response yet / Interested / Not interested / Booked in) and a next action (No action needed / Follow up call / Send a quote / Text again in a few days / Add extra work to round).'),
-      helpP('Call, Text, and Quote buttons sit right on each entry — Text opens a blank message to write your own personal reply (not the marketing script), and Quote starts a new quote pre-filled with their details.'),
+      helpP('Call, Text, and Quote buttons sit right on each entry — Text opens a blank message to write your own personal reply (not the marketing script), and Quote starts a new quote pre-filled with their details. Sending a quote this way automatically marks that action as done on the card; other actions (like a follow-up call) can be marked done by hand from the entry\'s Response screen.'),
       helpP('Anyone who\'s had a response, with a next action still to do, is sorted to the very top. Below that come people still awaiting a response, then anything already resolved with nothing left to do.'),
       helpP('If nobody\'s responded within 30 days, they quietly drop off this list — nothing about the customer is deleted, and sending them a fresh marketing text brings them straight back.')
     ]
