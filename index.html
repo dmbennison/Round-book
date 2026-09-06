@@ -410,7 +410,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 63;
+const APP_VERSION = 64;
 function formatVersion(v){ return '1.' + v; }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
@@ -419,6 +419,7 @@ function formatVersion(v){ return '1.' + v; }
 // the most recent 10 entries (oldest ones can be left in the array or trimmed,
 // either is fine, since the display always slices to 10).
 const VERSION_HISTORY = [
+  {version: 64, changes: ['All customer/job/quote data now lives in the same storage as photos, so the only real limit is your phone\'s own free space rather than a tight ~5-10MB pool', 'Removed the two storage bars on the Backup screen — a warning only appears there if storage is actually getting close to full']},
   {version: 63, changes: ['Fixed a bug where a single problem photo could silently drop every photo from a backup, or disable photo storage for the rest of the session — backups and restores now handle each photo on its own, and tell you if any couldn\'t be included or recovered']},
   {version: 62, changes: ['Photo gallery now also includes standalone one-off jobs (ones not linked to a customer) that have their own photos']},
   {version: 61, changes: ['Adding a new quote now keeps you on its screen afterwards, so you can send it by text or email straight away', 'Marketing response cards now show a ✓ once a pending action (like sending a quote) has been done', 'Fixed the ✕ button on a marketing response not closing the screen', 'Sending a PDF invoice or receipt via WhatsApp now jumps straight to that customer\'s own chat', 'Photos can now be swiped left/right to browse through the rest, instead of one at a time', 'Added a Photo gallery (photo icon on the Rounds tab) — every customer with photos, listed by address']},
@@ -623,46 +624,85 @@ function migrateData(parsed){
   });
   return parsed;
 }
-function loadData(){
+// Loads the main data object — normally from IndexedDB (idbLoadAppData), with a
+// same-page fallback to a legacy localStorage copy for anyone upgrading from
+// before this moved, or if IndexedDB itself is ever unavailable. Only ever
+// called once, during startup (see initStorage below).
+async function loadData(){
+  try{
+    const stored = await idbLoadAppData();
+    if(stored) return migrateData(stored);
+  }catch(e){}
   try{
     const raw = localStorage.getItem(STORE_KEY);
     if(raw) return migrateData(JSON.parse(raw));
   }catch(e){}
   return migrateData({ customers: [] });
 }
-function saveData(){
+// Persists the in-memory `data` object. Callers mutate `data` and call this
+// synchronously right before re-rendering from that same already-mutated object,
+// so the write itself can safely happen in the background without the caller
+// waiting on it — same fire-and-forget pattern already used for photo saves.
+// The 3 call sites that DO need to know whether the save actually succeeded
+// (logo/photo uploads, which only navigate onward on success) `await` it instead.
+async function saveData(){
   try{
-    localStorage.setItem(STORE_KEY, JSON.stringify(data));
+    await idbSaveAppData(data);
+    // Once IndexedDB genuinely holds the current data, drop any stale localStorage
+    // fallback copy — otherwise it just sits there out of sync, eating into
+    // localStorage's own much tighter quota for no reason.
+    try{ localStorage.removeItem(STORE_KEY); }catch(e){}
     return true;
   }catch(e){
-    // The screen that called saveData() almost always shows its own toast right
-    // after this returns (e.g. "Saved", "Customer updated") — since they share the
-    // same toast element, that call would instantly overwrite this warning before
-    // anyone could read it, making a failed save look identical to a successful one.
-    // The change stays visible for the rest of this session (it's already applied
-    // to the in-memory `data` object) but silently reverts on the next app reload,
-    // since it was never actually written to storage. Delaying this warning by a
-    // beat means it always fires last and wins, so it can never be hidden that way.
-    setTimeout(() => toast('Storage is full — nothing was saved. Free up space, then try again.', 'Open Backup', () => openBackup()), 60);
-    return false;
+    // IndexedDB unavailable or the write itself failed — fall back to the old
+    // localStorage save path so nothing is silently lost. Its own (much smaller)
+    // quota can still in theory be hit here, hence the same warning as before.
+    try{
+      localStorage.setItem(STORE_KEY, JSON.stringify(data));
+      return true;
+    }catch(e2){
+      // The screen that called saveData() almost always shows its own toast right
+      // after this returns (e.g. "Saved", "Customer updated") — since they share
+      // the same toast element, that call would instantly overwrite this warning
+      // before anyone could read it, making a failed save look identical to a
+      // successful one. The change stays visible for the rest of this session
+      // (it's already applied to the in-memory `data` object) but silently
+      // reverts on the next app reload, since it was never actually written to
+      // storage. Delaying this warning by a beat means it always fires last and
+      // wins, so it can never be hidden that way.
+      setTimeout(() => toast('Storage is full — nothing was saved. Free up space, then try again.', 'Open Backup', () => openBackup()), 60);
+      return false;
+    }
   }
 }
-/* ---------- photo storage (IndexedDB) ----------
-   Photos (customer/job) are stored as compressed Blobs in IndexedDB, not embedded
-   in the main `data` object — IndexedDB's storage limit is dramatically larger than
-   localStorage's ~5-10MB, so a growing photo library can no longer threaten the
-   customer/job records that actually run the business. Only a photo's {id, date}
-   lives in `data`; the pixels live here, referenced by id. */
+/* ---------- storage (IndexedDB) ----------
+   Everything — customer/job/quote data AND photos — lives in IndexedDB, not
+   localStorage. localStorage caps out around 5-10MB on most browsers (iOS Safari
+   included), which a growing customer list plus photos could realistically hit;
+   IndexedDB's limit is a share of the phone's actual free disk space instead, so
+   in practice storage stops being a concern anyone needs to think about. A tiny
+   localStorage copy of the main data is still kept as a same-page emergency
+   fallback (see saveData/loadData) for the rare case IndexedDB itself is
+   unavailable — everything else (photos, the normal save path) requires it. */
 const PHOTO_DB_NAME = 'roundBookPhotos';
 const PHOTO_STORE = 'photos';
+const APP_DATA_STORE = 'appData';
+const APP_DATA_KEY = 'main';
 let photoDbPromise = null;
 let photoStorageAvailable = true;
 function openPhotoDb(){
   if(photoDbPromise) return photoDbPromise;
   photoDbPromise = new Promise((resolve, reject)=>{
     if(!('indexedDB' in window)){ reject(new Error('IndexedDB not available')); return; }
-    const req = indexedDB.open(PHOTO_DB_NAME, 1);
-    req.onupgradeneeded = ()=>{ req.result.createObjectStore(PHOTO_STORE); };
+    const req = indexedDB.open(PHOTO_DB_NAME, 2);
+    req.onupgradeneeded = ()=>{
+      const db = req.result;
+      // Guarded with contains() rather than assuming a fresh DB: this fires both for
+      // a brand-new install (going straight to v2) and for an existing v1 database
+      // upgrading (which already has PHOTO_STORE and must keep it untouched).
+      if(!db.objectStoreNames.contains(PHOTO_STORE)) db.createObjectStore(PHOTO_STORE);
+      if(!db.objectStoreNames.contains(APP_DATA_STORE)) db.createObjectStore(APP_DATA_STORE);
+    };
     req.onsuccess = ()=> resolve(req.result);
     req.onerror = ()=> reject(req.error);
   });
@@ -696,6 +736,28 @@ async function idbDeletePhoto(id){
     tx.onerror = ()=>reject(tx.error);
   });
 }
+// Whole-app data (customers, jobs, quotes, settings — everything in the `data`
+// object) as a single record, stored directly via structured clone rather than a
+// JSON string — IndexedDB handles plain objects/arrays natively, no
+// stringify/parse step needed the way localStorage required.
+async function idbSaveAppData(obj){
+  const db = await openPhotoDb();
+  return new Promise((resolve, reject)=>{
+    const tx = db.transaction(APP_DATA_STORE, 'readwrite');
+    tx.objectStore(APP_DATA_STORE).put(obj, APP_DATA_KEY);
+    tx.oncomplete = ()=>resolve();
+    tx.onerror = ()=>reject(tx.error);
+  });
+}
+async function idbLoadAppData(){
+  const db = await openPhotoDb();
+  return new Promise((resolve, reject)=>{
+    const tx = db.transaction(APP_DATA_STORE, 'readonly');
+    const req = tx.objectStore(APP_DATA_STORE).get(APP_DATA_KEY);
+    req.onsuccess = ()=>resolve(req.result || null);
+    req.onerror = ()=>reject(req.error);
+  });
+}
 // Returns a Map<id, Blob> of every stored photo — used for startup preload, the
 // storage-used figures, and bundling photos into a portable backup export.
 async function idbGetAllPhotos(){
@@ -727,11 +789,9 @@ async function dataURLToBlob(dataUrl){
 }
 
 // id -> object URL, resolved once per session. Every screen that shows a photo reads
-// from this synchronously (populated ahead of time — see initPhotoStorage below) so
+// from this synchronously (populated ahead of time — see initStorage below) so
 // none of the existing render code needs to become async just to show a thumbnail.
 let photoUrlCache = new Map();
-let photoBytesTotal = 0;
-let photoCountTotal = 0;
 
 function cachePhotoBlob(id, blob){
   const existing = photoUrlCache.get(id);
@@ -788,16 +848,13 @@ async function restoreBundledPhotoBlobs(targetData){
   delete targetData._photoBlobs;
   return failed;
 }
-// Loads every stored photo into photoUrlCache and totals up real byte usage — run
-// once at startup (after migration) so every subsequent render in the session can
-// just read photoUrlCache.get(id) synchronously, same as everything else in this app.
+// Loads every stored photo into photoUrlCache — run once at startup (after
+// migration) so every subsequent render in the session can just read
+// photoUrlCache.get(id) synchronously, same as everything else in this app.
 async function preloadAllPhotoUrls(){
   try{
     const all = await idbGetAllPhotos();
-    let bytes = 0;
-    all.forEach((blob, id) => { cachePhotoBlob(id, blob); bytes += blob.size; });
-    photoBytesTotal = bytes;
-    photoCountTotal = all.size;
+    all.forEach((blob, id) => cachePhotoBlob(id, blob));
   }catch(e){ photoStorageAvailable = false; }
 }
 // Removes any IndexedDB photo blob no longer referenced by a customer or job — e.g.
@@ -813,22 +870,31 @@ async function cleanupOrphanedPhotos(){
     const all = await idbGetAllPhotos();
     const toRemove = [...all.keys()].filter(id => !referenced.has(id));
     if(!toRemove.length) return;
-    await Promise.all(toRemove.map(id => idbDeletePhoto(id).then(()=>{
-      uncachePhoto(id);
-      const blob = all.get(id);
-      if(blob){ photoBytesTotal -= blob.size; photoCountTotal--; }
-    })));
+    await Promise.all(toRemove.map(id => idbDeletePhoto(id).then(()=> uncachePhoto(id))));
   }catch(e){}
 }
-async function initPhotoStorage(){
+// Loads everything the app needs before its first render: the main data object
+// (itself in IndexedDB now, not localStorage — see loadData/saveData above) plus
+// every photo, so no screen ever needs to go async just to show something already
+// on the phone. Renders once this settles either way — see the boot call at the
+// bottom of this file — rather than risking a stuck blank screen if IndexedDB is
+// ever unavailable or slow.
+async function initStorage(){
+  data = await loadData();
+  // seed a couple of example customers on very first run so the app isn't blank —
+  // moved here (rather than run right after the old synchronous loadData() call)
+  // now that loading data is itself an async step
+  if(data.customers.length === 0 && !localStorage.getItem('roundBookSeeded')){
+    localStorage.setItem('roundBookSeeded','1');
+  }
   await migrateLegacyPhotosToIndexedDB(data);
-  saveData(); // persist the now-slimmed-down data — this is what actually frees up
-              // localStorage space for anyone upgrading with existing photos
+  await saveData(); // persists the now-migrated data — completes the move off
+                     // localStorage for anyone upgrading with existing data/photos
   await preloadAllPhotoUrls();
   await cleanupOrphanedPhotos();
 }
 
-let data = loadData();
+let data = migrateData({ customers: [] }); // safe placeholder until initStorage() (called at the bottom of this file) loads the real thing
 
 /* ---------- helpers ---------- */
 function uid(){ return 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
@@ -1971,7 +2037,7 @@ async function handleLogoSelected(inputEl){
   try{
     const dataUrl = await compressLogo(file, 500);
     data.settings.logo = dataUrl;
-    if(saveData()){
+    if(await saveData()){
       openBusinessDetails();
       toast('Logo added');
     }
@@ -1993,15 +2059,14 @@ async function handlePhotoSelected(id, inputEl){
   if(!file) return;
   toast('Adding photo…');
   try{
-    // 1600px/0.85 quality — photos live in IndexedDB now (see PHOTO_STORE), which
-    // has far more headroom than localStorage ever did, so there's no need to
-    // compress as aggressively as when photos were squeezed into the same ~5MB pool.
+    // 1600px/0.85 quality — photos live in IndexedDB (see PHOTO_STORE), which uses
+    // the phone's actual available storage rather than a tight fixed pool, so
+    // there's no need to compress aggressively.
     const blob = await compressImage(file, 1600, 0.85);
     const photoId = uid();
     if(photoStorageAvailable){
       await idbSavePhoto(photoId, blob);
       cachePhotoBlob(photoId, blob);
-      photoBytesTotal += blob.size; photoCountTotal++;
       const c = data.customers.find(x=>x.id===id);
       c.photos = c.photos || [];
       c.photos.push({id: photoId, date: todayISO()});
@@ -2013,7 +2078,7 @@ async function handlePhotoSelected(id, inputEl){
       c.photos = c.photos || [];
       c.photos.push({id: photoId, dataUrl, date: todayISO()});
     }
-    if(saveData()){
+    if(await saveData()){
       openCustomerDetail(id);
       render();
       toast('Photo added');
@@ -3197,9 +3262,9 @@ async function handleJobPhotoSelected(id, inputEl){
   if(!file) return;
   toast('Adding photo…');
   try{
-    // 1600px/0.85 quality — photos live in IndexedDB now (see PHOTO_STORE), which
-    // has far more headroom than localStorage ever did, so there's no need to
-    // compress as aggressively as when photos were squeezed into the same ~5MB pool.
+    // 1600px/0.85 quality — photos live in IndexedDB (see PHOTO_STORE), which uses
+    // the phone's actual available storage rather than a tight fixed pool, so
+    // there's no need to compress aggressively.
     const blob = await compressImage(file, 1600, 0.85);
     const photoId = uid();
     const j = data.oneOffJobs.find(x=>x.id===id);
@@ -3207,13 +3272,12 @@ async function handleJobPhotoSelected(id, inputEl){
     if(photoStorageAvailable){
       await idbSavePhoto(photoId, blob);
       cachePhotoBlob(photoId, blob);
-      photoBytesTotal += blob.size; photoCountTotal++;
       j.photos.push({id: photoId, date: todayISO()});
     } else {
       const dataUrl = await blobToDataURL(blob);
       j.photos.push({id: photoId, dataUrl, date: todayISO()});
     }
-    if(saveData()){
+    if(await saveData()){
       openJobForm(j);
       toast('Photo added');
     }
@@ -5347,7 +5411,7 @@ const FOCUSED_HELP = {
     title: 'Backup and restore',
     body: () => [
       helpP('Everything lives only on this phone. Back up regularly from the Backup icon — export a full backup, export to Excel, export everyone as a contacts file, restore from a backup file, or import customers from a spreadsheet (they land in a "Needs review" round until you check them over).'),
-      helpP('Two bars at the top show storage used: customer/job records (a tight ~5-10MB pool) and photos (stored separately, using your phone\'s actual available space, so a growing photo library can\'t threaten your records).')
+      helpP('Everything — customer/job records and photos alike — uses your phone\'s actual available storage rather than a small fixed pool, so a growing customer list or photo library won\'t threaten your data. A warning only appears here if that storage is genuinely getting close to full.')
     ]
   },
   settings: {
@@ -5406,39 +5470,13 @@ function openHelp(returnTo){
   `, returnTo);
 }
 
-// Rough byte size of the actual localStorage footprint (customers/jobs/quotes/
-// settings — the pool with the tight ~5-10MB browser limit), plus photo storage
-// tracked separately, since photos now live in IndexedDB with a much larger limit.
-function computeStorageStats(){
-  const jsonStr = JSON.stringify(data);
-  const totalBytes = new Blob([jsonStr]).size;
-  // Normally all photos live in IndexedDB (see photoBytesTotal, tracked at startup
-  // and kept in sync on add/delete) — but if IndexedDB was ever unavailable, some
-  // may still be embedded here as a fallback, so those get counted in too.
-  let legacyPhotoBytes = 0, legacyPhotoCount = 0;
-  (data.customers||[]).forEach(c=>{
-    (c.photos||[]).forEach(p=>{
-      if(p.dataUrl){ legacyPhotoBytes += new Blob([p.dataUrl]).size; legacyPhotoCount++; }
-    });
-  });
-  (data.oneOffJobs||[]).forEach(j=>{
-    (j.photos||[]).forEach(p=>{
-      if(p.dataUrl){ legacyPhotoBytes += new Blob([p.dataUrl]).size; legacyPhotoCount++; }
-    });
-  });
-  const logoBytes = (data.settings && data.settings.logo) ? new Blob([data.settings.logo]).size : 0;
-  return {
-    totalBytes,
-    photoBytes: photoBytesTotal + legacyPhotoBytes,
-    photoCount: photoCountTotal + legacyPhotoCount,
-    logoBytes
-  };
-}
-// Browser-reported estimate of how much space is actually available for photos
-// (IndexedDB) — an estimate rather than a hard number (browsers deliberately don't
+// Browser-reported estimate of how much of the phone's storage this app is
+// actually using, out of what it could use — covers everything now (customer/job
+// data and photos both live in IndexedDB), so a single figure is meaningful.
+// It's an estimate rather than a hard number (browsers deliberately don't
 // guarantee precision here), but on modern iOS this reports a genuinely large
-// figure since Apple bases it on a share of the phone's total free disk space.
-async function getPhotoStorageEstimate(){
+// quota since Apple bases it on a share of the phone's total free disk space.
+async function getStorageEstimate(){
   try{
     if(navigator.storage && navigator.storage.estimate){
       const {usage, quota} = await navigator.storage.estimate();
@@ -5458,18 +5496,21 @@ async function openBackup(){
   const count = data.customers.length;
   const days = daysSinceBackup();
   const lastText = days === Infinity ? "You haven't backed up yet" : days === 0 ? "Backed up today" : `Last backup: ${days} day${days===1?'':'s'} ago`;
-  const stats = computeStorageStats();
-  // 5MB is the tightest common browser quota (iOS Safari) — a conservative baseline
-  // so the bar turns amber/red before anyone actually hits a "storage full" error.
-  const assumedLimitBytes = 5 * 1024 * 1024;
-  const pctUsed = Math.min(100, Math.round((stats.totalBytes / assumedLimitBytes) * 100));
-  const barColor = pctUsed>=80 ? 'var(--red)' : pctUsed>=50 ? 'var(--amber)' : 'var(--green)';
 
-  const photoEstimate = stats.photoCount ? await getPhotoStorageEstimate() : null;
-  let photoPct = null, photoBarColor = 'var(--green)';
-  if(photoEstimate){
-    photoPct = Math.min(100, Math.round((stats.photoBytes / photoEstimate.quota) * 100));
-    photoBarColor = photoPct>=80 ? 'var(--red)' : photoPct>=50 ? 'var(--amber)' : 'var(--green)';
+  // Storage itself isn't worth showing day-to-day — everything lives in
+  // IndexedDB now, and typical phone storage is large enough that nobody needs
+  // to think about it. A warning only appears here once it's actually relevant
+  // (getting close to full), rather than a running total nobody asked for.
+  const estimate = await getStorageEstimate();
+  let storageWarning = '';
+  if(estimate){
+    const pctUsed = Math.round((estimate.usage / estimate.quota) * 100);
+    if(pctUsed >= 80){
+      const isCritical = pctUsed >= 95;
+      storageWarning = `<div style="background:${isCritical?'var(--red-dim)':'var(--amber-dim)'}; border-radius:12px; padding:12px 14px; margin-bottom:16px; font-size:0.8125rem; font-weight:700; color:${isCritical?'var(--red)':'var(--amber)'}; line-height:1.5;">
+        ⚠️ Storage is ${pctUsed}% full (${formatBytes(estimate.usage)} of ${formatBytes(estimate.quota)} available on this phone). Back up now, and consider deleting some old photos to free up space.
+      </div>`;
+    }
   }
 
   openSheet(`
@@ -5482,24 +5523,7 @@ async function openBackup(){
       Everything is stored only on this phone, in this browser. Nothing is sent anywhere. Export a backup regularly in case the app data is ever cleared.
     </p>
     <p style="color:${days>=BACKUP_REMINDER_DAYS?'var(--amber)':'var(--ink-muted)'}; font-size:0.7812rem; font-weight:700; margin:0 2px 16px;">${lastText}</p>
-    <div style="background:var(--surface); border:1px solid var(--box-border); border-radius:12px; padding:14px; margin-bottom:16px;">
-      <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px;">
-        <span style="font-size:0.8125rem; font-weight:800; color:var(--ink);">Customer &amp; job data</span>
-        <span style="font-size:0.9375rem; font-weight:800; color:var(--ink);">${formatBytes(stats.totalBytes)}</span>
-      </div>
-      <div style="height:6px; background:var(--line); border-radius:3px; overflow:hidden;">
-        <div style="height:100%; width:${pctUsed}%; background:${barColor}; border-radius:3px;"></div>
-      </div>
-    </div>
-    ${stats.photoCount ? `<div style="background:var(--surface); border:1px solid var(--box-border); border-radius:12px; padding:14px; margin-bottom:16px;">
-      <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px;">
-        <span style="font-size:0.8125rem; font-weight:800; color:var(--ink);">Photos</span>
-        <span style="font-size:0.9375rem; font-weight:800; color:var(--ink);">${formatBytes(stats.photoBytes)}${photoEstimate ? ` of ${formatBytes(photoEstimate.quota)}` : ''}</span>
-      </div>
-      ${photoPct!=null ? `<div style="height:6px; background:var(--line); border-radius:3px; overflow:hidden;">
-        <div style="height:100%; width:${photoPct}%; background:${photoBarColor}; border-radius:3px;"></div>
-      </div>` : ''}
-    </div>` : ''}
+    ${storageWarning}
     <button class="backup-btn" onclick="exportData()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
       <div><div class="t1">Export backup</div><div class="t2">${count} customer${count===1?'':'s'} · saves a .json file</div></div>
@@ -5993,17 +6017,14 @@ function loadWeather(){
 }
 loadWeather();
 
-/* seed a couple of example customers on very first run so the app isn't blank */
-if(data.customers.length === 0 && !localStorage.getItem('roundBookSeeded')){
-  localStorage.setItem('roundBookSeeded','1');
-}
+/* seed a couple of example customers on very first run so the app isn't blank —
+   handled inside initStorage() below, once data has actually finished loading */
 
-// Photos need to be migrated out of localStorage / preloaded from IndexedDB before
-// the first render, so every screen can rely on photoUrlCache being ready — same
-// approach as the rest of the app (data is fully ready before render() runs), just
-// with one unavoidable async step first. Renders immediately either way rather than
-// risking a stuck blank screen if IndexedDB is ever unavailable or slow.
-initPhotoStorage().catch(()=>{}).finally(()=>{
+// Data and photos both need to finish loading from IndexedDB before the first
+// render, so every screen can rely on both `data` and photoUrlCache being ready —
+// this is the one unavoidable async step at startup. Renders immediately either
+// way rather than risking a stuck blank screen if IndexedDB is ever unavailable or slow.
+initStorage().catch(()=>{}).finally(()=>{
   render();
   initSwipeHandlers();
 });
