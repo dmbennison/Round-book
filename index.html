@@ -337,7 +337,7 @@
       --ink-muted:#66798A;
       --line:#E3E9EC;
     }
-    header, #backupBanner, #lastActionBanner, #jobReminderBanner, #quoteFollowUpBanner, #jobAnniversaryBanner, #importReviewBanner, main, .fab, .overlay, #importFile, #importSpreadsheetFile, .toast{
+    header, #backupBanner, #lastActionBanner, #jobReminderBanner, #quoteFollowUpBanner, #marketingFollowUpBanner, #jobAnniversaryBanner, #importReviewBanner, main, .fab, .overlay, #importFile, #importSpreadsheetFile, .toast{
       display:none !important;
     }
     .print-area{
@@ -390,6 +390,7 @@
 <div id="lastActionBanner"></div>
 <div id="jobReminderBanner"></div>
 <div id="quoteFollowUpBanner"></div>
+<div id="marketingFollowUpBanner"></div>
 <div id="jobAnniversaryBanner"></div>
 <div id="importReviewBanner"></div>
 <main id="main"></main>
@@ -410,7 +411,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 64;
+const APP_VERSION = 65;
 function formatVersion(v){ return '1.' + v; }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
@@ -419,6 +420,7 @@ function formatVersion(v){ return '1.' + v; }
 // the most recent 10 entries (oldest ones can be left in the array or trimmed,
 // either is fine, since the display always slices to 10).
 const VERSION_HISTORY = [
+  {version: 65, changes: ['Marketing texts now support several named campaigns (general offer, ask for a referral, win back lapsed customers, seasonal reminder, or your own) instead of one fixed message — manage them from the Marketing tab', 'Group sends can now skip anyone already Interested/Booked in, or anyone texted recently, and can target paused/lapsed customers as their own group', 'A follow-up call or text can be given a target date, with a reminder banner once it\'s due', 'The Marketing tab shows which campaign each response belongs to, filter chips once more than one is in use, and a quick sent/responded/booked count', 'Added an optional "Referred by" note on a customer\'s own screen']},
   {version: 64, changes: ['All customer/job/quote data now lives in the same storage as photos, so the only real limit is your phone\'s own free space rather than a tight ~5-10MB pool', 'Removed the two storage bars on the Backup screen — a warning only appears there if storage is actually getting close to full']},
   {version: 63, changes: ['Fixed a bug where a single problem photo could silently drop every photo from a backup, or disable photo storage for the rest of the session — backups and restores now handle each photo on its own, and tell you if any couldn\'t be included or recovered']},
   {version: 62, changes: ['Photo gallery now also includes standalone one-off jobs (ones not linked to a customer) that have their own photos']},
@@ -527,6 +529,21 @@ const DEFAULT_RECEIPT_TEMPLATE = "Hi {name}, thank you for your payment of {amou
 const DEFAULT_QUOTE_TEMPLATE = "Hi {name}, thanks for your enquiry. I'd quote {amount} for the following work: {work}\nLet me know if you'd like to go ahead.\nThanks,\n{yourname}\n{company}";
 const DEFAULT_REPEAT_QUOTE_TEMPLATE = "Hi {name}, hope you're well! I cleaned your windows for you before and wondered if you'd like the same job done again? I'd quote {amount} for the following work: {work}\n\nJust let me know and I'll get you booked back in.\n\nThanks,\n{yourname}\n{company}";
 const DEFAULT_MARKETING_TEMPLATE = "Hi {name}, just letting you know we also offer gutter clearing and fascia cleaning alongside your window clean — let me know if you'd like a quote.\n\nThanks,\n{yourname}\n{company}";
+const DEFAULT_REFERRAL_TEMPLATE = "Hi {name}, hope you're happy with your window cleaning! If you know anyone nearby who'd like a regular clean too, we'd really appreciate a mention — just get them to say your name when they get in touch.\n\nThanks,\n{yourname}\n{company}";
+const DEFAULT_WINBACK_TEMPLATE = "Hi {name}, it's been a while since we last cleaned your windows — just checking in to see if you'd like to start up again. Let me know and I'll get you back on the round.\n\nThanks,\n{yourname}\n{company}";
+const DEFAULT_SEASONAL_TEMPLATE = "Hi {name}, with the seasons changing it's a good time to get your gutters cleared before they cause problems — let me know if you'd like a quote alongside your usual window clean.\n\nThanks,\n{yourname}\n{company}";
+// Marketing "campaigns" — named, reusable templates picked at send time (see
+// openGroupMarketingText). Seeded once in migrateData below, from then on fully
+// user-editable (add/rename/edit/delete) via openMarketingCampaigns. Deliberately
+// separate from the single-template TEMPLATE_DEFS system used for reminders/
+// receipts/quotes, since marketing is the one message type where running several
+// different campaigns side by side is actually useful.
+const DEFAULT_MARKETING_CAMPAIGNS = [
+  { id: 'general', name: 'General offer', body: DEFAULT_MARKETING_TEMPLATE },
+  { id: 'referral', name: 'Ask for a referral', body: DEFAULT_REFERRAL_TEMPLATE },
+  { id: 'winback', name: "We've missed you", body: DEFAULT_WINBACK_TEMPLATE },
+  { id: 'seasonal', name: 'Seasonal reminder', body: DEFAULT_SEASONAL_TEMPLATE }
+];
 const DEFAULT_CLEANED_TODAY_TEMPLATE = "Hi {name}, your windows have been cleaned today! The cost for this clean is {amount}.\n\n{bankdetails}Thanks,\n{yourname}\n{company}";
 function migrateData(parsed){
   parsed.customers = parsed.customers || [];
@@ -574,6 +591,15 @@ function migrateData(parsed){
   if(!parsed.settings.quoteTemplate || OLD_QUOTE_TEMPLATES.includes(parsed.settings.quoteTemplate)) parsed.settings.quoteTemplate = DEFAULT_QUOTE_TEMPLATE;
   if(!parsed.settings.repeatQuoteTemplate || OLD_REPEAT_QUOTE_TEMPLATES.includes(parsed.settings.repeatQuoteTemplate)) parsed.settings.repeatQuoteTemplate = DEFAULT_REPEAT_QUOTE_TEMPLATE;
   if(!parsed.settings.marketingTemplate) parsed.settings.marketingTemplate = DEFAULT_MARKETING_TEMPLATE;
+  if(!Array.isArray(parsed.settings.marketingCampaigns) || !parsed.settings.marketingCampaigns.length){
+    // First time running this version: seed the campaign list, carrying over
+    // whatever custom wording was already saved as the single "marketingTemplate"
+    // (pre-dating campaigns) into the "General offer" slot, so nobody's own
+    // customisation is lost in the switch to multiple campaigns.
+    parsed.settings.marketingCampaigns = DEFAULT_MARKETING_CAMPAIGNS.map(camp =>
+      camp.id === 'general' ? Object.assign({}, camp, { body: parsed.settings.marketingTemplate }) : Object.assign({}, camp)
+    );
+  }
   if(!parsed.settings.cleanedTodayTemplate || OLD_CLEANED_TODAY_TEMPLATES.includes(parsed.settings.cleanedTodayTemplate)) parsed.settings.cleanedTodayTemplate = DEFAULT_CLEANED_TODAY_TEMPLATE;
   if(parsed.settings.messagingApp !== 'whatsapp') parsed.settings.messagingApp = 'sms';
   if(parsed.settings.companyName == null) parsed.settings.companyName = '';
@@ -614,6 +640,9 @@ function migrateData(parsed){
     if(!c.marketingStatus) c.marketingStatus = 'awaiting';
     if(!c.marketingNextAction) c.marketingNextAction = 'none';
     if(c.marketingActionDone == null) c.marketingActionDone = false;
+    if(c.marketingCampaign == null) c.marketingCampaign = '';
+    if(c.marketingFollowUpDate == null) c.marketingFollowUpDate = '';
+    if(c.referredBy == null) c.referredBy = '';
     // Every customer gets a permanent, unique account number the first time this
     // runs for them — shown on invoices/receipts. Assigned once and never reused,
     // even if the customer is later deleted, so numbers stay meaningful.
@@ -1000,6 +1029,7 @@ let textSize = (()=>{ const v = parseInt(localStorage.getItem('roundBookTextSize
 let bannerDismissed = false;
 let jobReminderDismissed = false;
 let quoteFollowUpDismissed = false;
+let marketingFollowUpDismissed = false;
 let jobAnniversaryDismissed = false;
 let importReviewDismissed = false;
 const IMPORT_HOLDING_ROUND = 'Needs review (imported)';
@@ -1120,6 +1150,37 @@ function renderQuoteFollowUpBanner(){
   </div>`;
 }
 
+// A pending marketing action (a call to make, a text to send again) is only
+// "due" for the banner once it has a follow-up date that's arrived — an action
+// with no date set (or already marked done) doesn't nag until one is actually due.
+function marketingFollowUpsDue(){
+  const today = todayISO();
+  return data.customers.filter(c =>
+    c.marketingNextAction !== 'none' && !c.marketingActionDone &&
+    c.marketingFollowUpDate && c.marketingFollowUpDate <= today
+  );
+}
+function dismissMarketingFollowUp(){ marketingFollowUpDismissed = true; renderMarketingFollowUpBanner(); }
+function renderMarketingFollowUpBanner(){
+  const el = document.getElementById('marketingFollowUpBanner');
+  if(!el) return;
+  if(marketingFollowUpDismissed){ el.innerHTML = ''; return; }
+  const due = marketingFollowUpsDue();
+  if(!due.length){ el.innerHTML = ''; return; }
+  const first = due[0];
+  const actionLabel = (MARKETING_ACTION_OPTIONS[first.marketingNextAction] || '').toLowerCase();
+  const label = due.length === 1
+    ? `📣 Follow up with ${first.address||first.name||'a customer'} — ${actionLabel}`
+    : `📣 ${due.length} marketing follow-ups are due`;
+  el.innerHTML = `<div style="background:var(--blue-dim); color:var(--blue-deep); border-radius:12px; padding:11px 14px; margin:0 14px 14px; display:flex; align-items:center; justify-content:space-between; gap:10px; font-size:0.8125rem; font-weight:700;">
+    <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(label)}</span>
+    <span style="display:flex; gap:8px; flex-shrink:0; align-items:center;">
+      <button onclick="setTab('marketing'); dismissMarketingFollowUp();" style="background:var(--blue-deep); color:#fff; border:none; border-radius:8px; padding:6px 10px; font-weight:800; font-size:0.7812rem;">View</button>
+      <button onclick="dismissMarketingFollowUp()" style="background:none; border:none; color:var(--blue-deep); font-weight:800; font-size:1rem; line-height:1; padding:0 2px;">✕</button>
+    </span>
+  </div>`;
+}
+
 function jobAnniversariesToday(){
   const today = todayISO();
   return (data.oneOffJobs||[]).map(j=>{
@@ -1209,6 +1270,7 @@ function render(){
   renderLastActionBanner();
   renderJobReminderBanner();
   renderQuoteFollowUpBanner();
+  renderMarketingFollowUpBanner();
   renderJobAnniversaryBanner();
   renderImportReviewBanner();
   const main = document.getElementById('main');
@@ -1676,6 +1738,8 @@ function openCustomerForm(existing){
     </div>
     <label>Notes</label>
     <textarea id="f_notes" rows="2" placeholder="Gate code, dog, access notes...">${escapeHtml(c.notes||'')}</textarea>
+    <label>Referred by <span style="text-transform:none; font-weight:500; opacity:0.7;">(optional)</span></label>
+    <input type="text" id="f_referredBy" value="${escapeAttr(c.referredBy||'')}" placeholder="e.g. Mrs Patterson, 12 Elm Grove">
     <label>Account number <span style="text-transform:none; font-weight:500; opacity:0.7;">(shown on invoices/receipts)</span></label>
     <input type="text" id="f_accountNumber" value="${escapeAttr(c.accountNumber || (existing ? '' : String(data.settings.nextAccountNumber)))}" placeholder="e.g. 1001">
     <label style="display:flex; align-items:center; gap:8px; margin:10px 2px 0; text-transform:none; font-weight:600;">
@@ -1710,6 +1774,7 @@ function saveCustomerForm(id){
     price: parseFloat(document.getElementById('f_price').value) || 0,
     frequencyWeeks: parseInt(document.getElementById('f_freq').value) || 4,
     notes: document.getElementById('f_notes').value.trim(),
+    referredBy: document.getElementById('f_referredBy').value.trim(),
     textBeforeVisit: document.getElementById('f_textBefore').checked
   };
   const accountNumberEntered = document.getElementById('f_accountNumber').value.trim();
@@ -1789,6 +1854,7 @@ function openCustomerDetail(id){
     <div style="color:var(--ink-muted); font-size:0.8125rem; margin-bottom:10px;">${escapeHtml(c.round||'Unassigned')} · ${money(c.price)} standard · every ${c.frequencyWeeks||4} week${(c.frequencyWeeks||4)===1?'':'s'}${c.accountNumber?` · Acct #${escapeHtml(c.accountNumber)}`:''}${c.paused?` · <span style="color:var(--ink-muted); font-weight:700;">Paused${c.pauseReason?' — '+escapeHtml(c.pauseReason):''}${c.pauseDate?' ('+fmtDate(c.pauseDate)+')':''}</span>`:''}</div>
     ${needsPriceReview(c) ? `<div style="color:var(--amber); font-size:0.75rem; font-weight:700; margin:-6px 2px 10px;">📈 12+ months since last price increase</div>` : ''}
     ${c.textBeforeVisit ? `<div style="color:var(--blue-deep); font-size:0.75rem; font-weight:700; margin:-6px 2px 10px;">📱 Text before you arrive</div>` : ''}
+    ${c.referredBy ? `<div style="color:var(--ink-muted); font-size:0.75rem; font-weight:700; margin:-6px 2px 10px;">🤝 Referred by ${escapeHtml(c.referredBy)}</div>` : ''}
     ${c.notes?`<div style="background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:10px 12px; font-size:0.8438rem; margin-bottom:14px;">${escapeHtml(c.notes)}</div>`:''}
     ${(c.phone||c.email)?`<div style="display:flex; gap:8px; margin-bottom:14px;">
       ${c.phone?`<a href="tel:${escapeAttr(c.phone.replace(/\\s+/g,''))}" style="flex:1; text-decoration:none; background:var(--blue-dim); color:var(--blue-deep); border-radius:10px; padding:9px; font-size:0.8125rem; font-weight:700; text-align:center;">📞 ${escapeHtml(c.phone)}</a>`:''}
@@ -2487,10 +2553,12 @@ const MARKETING_ACTION_OPTIONS = {
 };
 // Records that a message actually went out, for the read-only message log on a
 // customer/job's screen. Capped so it can't grow forever on a long-standing customer.
-function logMessage(item, kind){
+// `extra` merges in additional fields for that one entry — currently just used to
+// tag which marketing campaign a send belonged to (see sendMarketingText).
+function logMessage(item, kind, extra){
   if(!item) return;
   if(!item.messageLog) item.messageLog = [];
-  item.messageLog.unshift({kind, date: todayISO(), time: Date.now()});
+  item.messageLog.unshift(Object.assign({kind, date: todayISO(), time: Date.now()}, extra||{}));
   if(item.messageLog.length > 30) item.messageLog.length = 30;
 }
 function applyTemplate(tpl, tokens){
@@ -2885,16 +2953,71 @@ function markReminderSent(id){
 }
 
 let marketingSelectedRounds = new Set();
+let marketingSelectedCampaignId = null; // remembers the last campaign picked, for this session
+let marketingSkipResponded = true; // skip anyone already marked Interested/Booked in
+let marketingSkipRecentDays = 14; // skip anyone texted (any campaign) within this many days; 0 = off
 function toggleMarketingRound(rn, checked){
   if(checked) marketingSelectedRounds.add(rn); else marketingSelectedRounds.delete(rn);
   openGroupMarketingText();
 }
+function setMarketingSkipResponded(checked){
+  marketingSkipResponded = checked;
+  openGroupMarketingText();
+}
+function setMarketingSkipRecentDaysEnabled(checked){
+  marketingSkipRecentDays = checked ? 14 : 0;
+  openGroupMarketingText();
+}
+function setMarketingSkipRecentDaysValue(val){
+  marketingSkipRecentDays = Math.max(1, parseInt(val,10) || 14);
+  // Deliberately not re-rendering the whole screen on every keystroke here (unlike
+  // the other filters) — that would steal focus from the number input mid-type.
+  // The candidate list below just reflects the latest value next time it renders.
+}
+function selectMarketingCampaign(id){
+  marketingSelectedCampaignId = id;
+  openGroupMarketingText();
+}
+// Candidates for a group send: everyone with a mobile number in the selected
+// rounds/groups, minus anyone the current filters say to skip. Paused/lapsed
+// customers are offered as an extra selectable group alongside the real rounds
+// (like a virtual round), since a "we've missed you" campaign specifically wants
+// exactly that list and nothing else.
+function marketingCandidateList(){
+  const rounds = groupByRound(data.customers.filter(c=>!c.paused));
+  let list = Object.keys(rounds).filter(rn=>marketingSelectedRounds.has(rn)).flatMap(rn=>(rounds[rn]||[]));
+  if(marketingSelectedRounds.has('__paused__')){
+    list = list.concat(data.customers.filter(c=>c.paused));
+  }
+  list = list.filter(c=>isMobileNumber(c.phone));
+  if(marketingSkipResponded){
+    list = list.filter(c => c.marketingStatus !== 'interested' && c.marketingStatus !== 'booked');
+  }
+  if(marketingSkipRecentDays > 0){
+    const today = todayISO();
+    list = list.filter(c=>{
+      const lastSent = (c.messageLog||[]).filter(m=>m.kind==='marketing').sort((a,b)=>b.time-a.time)[0];
+      return !lastSent || daysBetween(lastSent.date, today) >= marketingSkipRecentDays;
+    });
+  }
+  return list;
+}
 function openGroupMarketingText(){
-  const rounds = groupByRound(data.customers);
+  const campaigns = (data.settings.marketingCampaigns && data.settings.marketingCampaigns.length) ? data.settings.marketingCampaigns : DEFAULT_MARKETING_CAMPAIGNS;
+  if(!marketingSelectedCampaignId || !campaigns.some(c=>c.id===marketingSelectedCampaignId)){
+    marketingSelectedCampaignId = campaigns[0].id;
+  }
+  const activeCampaign = campaigns.find(c=>c.id===marketingSelectedCampaignId);
+  const rounds = groupByRound(data.customers.filter(c=>!c.paused));
   const roundNames = Object.keys(rounds).sort((a,b)=>a.localeCompare(b));
-  // Preserve whatever's currently typed if this re-renders from a checkbox toggle,
-  // rather than resetting back to the template each time.
-  const tpl = document.getElementById('mkt_msg') ? document.getElementById('mkt_msg').value : (data.settings.marketingTemplate || DEFAULT_MARKETING_TEMPLATE);
+  const pausedCount = data.customers.filter(c=>c.paused && isMobileNumber(c.phone)).length;
+
+  // Preserve whatever's currently typed if this re-renders from a round/filter
+  // toggle, rather than resetting back to the campaign's saved wording each time —
+  // EXCEPT when the campaign dropdown itself was just switched, where loading that
+  // campaign's own wording is exactly what's expected.
+  const campaignJustSwitched = document.getElementById('mkt_msg_campaign_id') && document.getElementById('mkt_msg_campaign_id').value !== marketingSelectedCampaignId;
+  const tpl = (document.getElementById('mkt_msg') && !campaignJustSwitched) ? document.getElementById('mkt_msg').value : (activeCampaign ? activeCampaign.body : DEFAULT_MARKETING_TEMPLATE);
 
   const roundCheckboxes = roundNames.map(rn=>{
     const count = (rounds[rn]||[]).filter(c=>isMobileNumber(c.phone)).length;
@@ -2903,22 +3026,42 @@ function openGroupMarketingText(){
       <span style="flex:1; font-weight:700;">${escapeHtml(rn)}</span>
       <span style="color:var(--ink-muted); font-size:0.75rem;">${count} with mobile</span>
     </label>`;
-  }).join('');
+  }).join('') + (pausedCount ? `<label style="display:flex; align-items:center; gap:10px; padding:11px 4px; border-bottom:1px solid var(--line);">
+      <input type="checkbox" ${marketingSelectedRounds.has('__paused__')?'checked':''} onchange="toggleMarketingRound('__paused__', this.checked)" style="width:18px; height:18px;">
+      <span style="flex:1; font-weight:700;">⏸ Paused/lapsed customers</span>
+      <span style="color:var(--ink-muted); font-size:0.75rem;">${pausedCount} with mobile</span>
+    </label>` : '');
 
-  const list = roundNames.filter(rn=>marketingSelectedRounds.has(rn)).flatMap(rn=>(rounds[rn]||[]).filter(c=>isMobileNumber(c.phone)));
+  const list = marketingCandidateList();
 
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">Send group text</h2>
       <button class="sheet-close" onclick="closeSheet()">✕</button>
     </div>
-    <label style="margin-top:0;">Rounds to include</label>
+    <label style="margin-top:0;">Campaign</label>
+    <select id="mkt_msg_campaign_id" onchange="selectMarketingCampaign(this.value)" style="margin-bottom:6px;">
+      ${campaigns.map(c=>`<option value="${c.id}" ${c.id===marketingSelectedCampaignId?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}
+    </select>
+    <button type="button" onclick="openMarketingCampaigns()" style="background:none; border:none; color:var(--blue); font-size:0.7812rem; font-weight:700; padding:2px; margin-bottom:14px;">Manage campaigns</button>
+    <label>Rounds / groups to include</label>
     <div style="margin-bottom:16px;">${roundCheckboxes || '<p style="color:var(--ink-muted); font-size:0.8438rem;">No rounds yet.</p>'}</div>
-    <label>Message <span style="text-transform:none; font-weight:500; opacity:0.7;">({name}, {company}, {yourname})</span></label>
+    <label style="display:flex; align-items:center; gap:8px; margin-top:14px; text-transform:none; font-weight:600;">
+      <input type="checkbox" ${marketingSkipResponded?'checked':''} onchange="setMarketingSkipResponded(this.checked)" style="width:18px; height:18px; margin:0; flex-shrink:0;">
+      Skip anyone already marked Interested or Booked in
+    </label>
+    <label style="display:flex; align-items:center; gap:8px; margin-top:10px; text-transform:none; font-weight:600; flex-wrap:wrap;">
+      <input type="checkbox" ${marketingSkipRecentDays>0?'checked':''} onchange="setMarketingSkipRecentDaysEnabled(this.checked)" style="width:18px; height:18px; margin:0; flex-shrink:0;">
+      <span>Skip anyone texted in the last</span>
+      <input type="number" min="1" value="${marketingSkipRecentDays||14}" ${marketingSkipRecentDays>0?'':'disabled'} oninput="setMarketingSkipRecentDaysValue(this.value)" style="width:56px; margin:0; padding:6px 8px; text-align:center;">
+      <span>days</span>
+    </label>
+    <label style="margin-top:16px;">Message <span style="text-transform:none; font-weight:500; opacity:0.7;">({name}, {company}, {yourname})</span></label>
     <textarea id="mkt_msg" rows="4">${escapeHtml(tpl)}</textarea>
     <p style="color:var(--ink-muted); font-size:0.7812rem; margin:10px 2px 14px; line-height:1.5;">
       Tap Send for each customer — it opens ${data.settings.messagingApp==='whatsapp'?'WhatsApp':'Messages'} pre-filled and ready to go. Come back here for the next one.
     </p>
+    <div style="color:var(--ink-muted); font-size:0.75rem; font-weight:700; margin:0 2px 8px;">${list.length} customer${list.length===1?'':'s'} to send to</div>
     ${list.length ? list.map(c=>{
       return `<div class="cust-card" id="bulkrow-${c.id}" style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
         <div style="min-width:0;">
@@ -2927,26 +3070,97 @@ function openGroupMarketingText(){
         </div>
         <button class="btn btn-clean" style="flex:0 0 auto; padding:9px 16px;" onclick="sendMarketingText('${c.id}'); markReminderSent('${c.id}')">Send</button>
       </div>`;
-    }).join('') : `<p style="color:var(--ink-muted); font-size:0.8438rem; margin:0 2px;">${marketingSelectedRounds.size ? 'No one in the selected rounds has a mobile number saved.' : 'Select at least one round above.'}</p>`}
+    }).join('') : `<p style="color:var(--ink-muted); font-size:0.8438rem; margin:0 2px;">${marketingSelectedRounds.size ? 'Nobody matches the selected rounds/groups and filters.' : 'Select at least one round or group above.'}</p>`}
   `, () => setTab('marketing'));
+}
+
+function openMarketingCampaigns(){
+  const campaigns = (data.settings.marketingCampaigns && data.settings.marketingCampaigns.length) ? data.settings.marketingCampaigns : DEFAULT_MARKETING_CAMPAIGNS;
+  openSheet(`
+    <div class="sheet-head">
+      <h2 style="flex:1; min-width:0;">Marketing campaigns</h2>
+      <button class="sheet-close" onclick="closeSheet()">✕</button>
+    </div>
+    <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 12px; line-height:1.5;">Save different wording for different kinds of marketing text — a general offer, asking for referrals, winning back lapsed customers, seasonal reminders, or anything else. Pick one each time you send a group text.</p>
+    ${campaigns.map(camp => `
+      <button class="backup-btn" onclick="openEditMarketingCampaign('${camp.id}')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <div style="flex:1; min-width:0;"><div class="t1">${escapeHtml(camp.name)}</div><div class="t2" style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml((camp.body||'').replace(/\s+/g,' ').trim())}</div></div>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px; color:var(--ink-muted); flex-shrink:0;"><path d="M9 18l6-6-6-6"/></svg>
+      </button>
+    `).join('')}
+    <button class="btn btn-clean" style="width:100%; margin-top:8px;" onclick="addMarketingCampaign()">+ Add a campaign</button>
+  `, () => openGroupMarketingText());
+}
+function openEditMarketingCampaign(id){
+  const campaigns = data.settings.marketingCampaigns || [];
+  const camp = campaigns.find(c=>c.id===id);
+  if(!camp) return;
+  openSheet(`
+    <div class="sheet-head">
+      <h2 style="flex:1; min-width:0;">Edit campaign</h2>
+      <button class="sheet-close" onclick="closeSheet()">✕</button>
+    </div>
+    <label style="margin-top:0;">Name</label>
+    <input type="text" id="camp_name" value="${escapeAttr(camp.name)}" placeholder="e.g. Spring gutter offer">
+    <label>Message <span style="text-transform:none; font-weight:500; opacity:0.7;">({name}, {company}, {yourname})</span></label>
+    <textarea id="camp_body" rows="6">${escapeHtml(camp.body||'')}</textarea>
+    <div class="form-actions">
+      <button class="btn-primary" onclick="saveMarketingCampaign('${id}')">Save</button>
+    </div>
+    ${campaigns.length > 1 ? `<button class="btn-danger-text" onclick="deleteMarketingCampaign('${id}')">Delete this campaign</button>` : ''}
+  `, () => openMarketingCampaigns());
+}
+function saveMarketingCampaign(id){
+  const camp = (data.settings.marketingCampaigns||[]).find(c=>c.id===id);
+  if(!camp) return;
+  const name = document.getElementById('camp_name').value.trim();
+  if(!name){ toast('Please enter a campaign name'); return; }
+  camp.name = name;
+  camp.body = document.getElementById('camp_body').value.trim() || camp.body;
+  saveData();
+  toast('Campaign saved');
+  openMarketingCampaigns();
+}
+function addMarketingCampaign(){
+  data.settings.marketingCampaigns = data.settings.marketingCampaigns || [];
+  const camp = { id: uid(), name: 'New campaign', body: DEFAULT_MARKETING_TEMPLATE };
+  data.settings.marketingCampaigns.push(camp);
+  saveData();
+  openEditMarketingCampaign(camp.id);
+}
+function deleteMarketingCampaign(id){
+  const list = data.settings.marketingCampaigns || [];
+  if(list.length <= 1){ toast('Keep at least one campaign'); return; }
+  const camp = list.find(c=>c.id===id);
+  if(!camp) return;
+  if(!confirm(`Delete "${camp.name}"? This can't be undone.`)) return;
+  data.settings.marketingCampaigns = list.filter(c=>c.id!==id);
+  saveData();
+  toast('Campaign deleted');
+  openMarketingCampaigns();
 }
 
 function sendMarketingText(id){
   const c = data.customers.find(x=>x.id===id);
   if(!c || !isMobileNumber(c.phone)){ toast('No mobile number saved for this customer'); return; }
+  const campaigns = (data.settings.marketingCampaigns && data.settings.marketingCampaigns.length) ? data.settings.marketingCampaigns : DEFAULT_MARKETING_CAMPAIGNS;
+  const activeCampaign = campaigns.find(c=>c.id===marketingSelectedCampaignId) || campaigns[0];
   const msgField = document.getElementById('mkt_msg');
-  const tpl = msgField ? msgField.value : (data.settings.marketingTemplate || DEFAULT_MARKETING_TEMPLATE);
+  const tpl = msgField ? msgField.value : (activeCampaign ? activeCampaign.body : DEFAULT_MARKETING_TEMPLATE);
   const firstName = c.name ? c.name.trim().split(' ')[0] : '';
   const company = data.settings.companyName || '';
   const yourname = data.settings.yourName || '';
   const msg = applyTemplate(tpl, {name: firstName, company, yourname});
   sendPhoneMessage(c.phone, msg);
-  logMessage(c, 'marketing');
+  logMessage(c, 'marketing', activeCampaign ? {campaign: activeCampaign.id} : null);
   // Each new send supersedes whatever the outcome of a previous one was — starts
   // the "waiting to hear back" cycle over.
   c.marketingStatus = 'awaiting';
   c.marketingNextAction = 'none';
   c.marketingActionDone = false;
+  c.marketingFollowUpDate = '';
+  c.marketingCampaign = activeCampaign ? activeCampaign.id : '';
   saveData();
 }
 
@@ -3748,14 +3962,16 @@ function openSettings(){
 
 // Each entry drives one row on the Message Templates screen and its edit dialog —
 // add a template here and it gets a button, an editor, and reset support for free.
+// Marketing text is deliberately NOT here — it now has several named campaigns
+// rather than one fixed wording, managed from the Marketing tab instead (see
+// openMarketingCampaigns).
 const TEMPLATE_DEFS = [
   { key: 'cleanTemplate', label: 'Cleaning reminder', default: DEFAULT_CLEAN_TEMPLATE },
   { key: 'payTemplate', label: 'Payment reminder', default: DEFAULT_PAY_TEMPLATE },
   { key: 'cleanedTodayTemplate', label: 'Windows cleaned today', default: DEFAULT_CLEANED_TODAY_TEMPLATE },
   { key: 'receiptTemplate', label: 'Receipt', default: DEFAULT_RECEIPT_TEMPLATE },
   { key: 'quoteTemplate', label: 'Quote (new enquiry)', default: DEFAULT_QUOTE_TEMPLATE },
-  { key: 'repeatQuoteTemplate', label: 'Quote (repeat work)', default: DEFAULT_REPEAT_QUOTE_TEMPLATE },
-  { key: 'marketingTemplate', label: 'Marketing text (group texts)', default: DEFAULT_MARKETING_TEMPLATE }
+  { key: 'repeatQuoteTemplate', label: 'Quote (repeat work)', default: DEFAULT_REPEAT_QUOTE_TEMPLATE }
 ];
 
 function openMessageTemplates(){
@@ -3774,6 +3990,7 @@ function openMessageTemplates(){
       </button>`;
     }).join('')}
     <button class="btn-danger-text" onclick="resetAllTemplates()">Reset all message wording to default</button>
+    <p style="color:var(--ink-muted); font-size:0.75rem; margin:16px 2px 0; line-height:1.5;">Looking for marketing text wording? That's now managed as campaigns from the Marketing tab, since you can save more than one.</p>
   `, () => openSettings());
 }
 
@@ -3904,16 +4121,24 @@ function renderMarketing(main){
   html += `<div style="display:flex; align-items:center; justify-content:flex-end; gap:8px; margin-bottom:8px;">
     ${mainScreenHelpBtn('marketing', "()=>setTab('marketing')")}
   </div>`;
-  html += `<button class="btn-primary" style="width:100%; margin-bottom:16px; display:flex; align-items:center; justify-content:center; gap:8px;" onclick="openGroupMarketingText()">
+  html += `<button class="btn-primary" style="width:100%; margin-bottom:10px; display:flex; align-items:center; justify-content:center; gap:8px;" onclick="openGroupMarketingText()">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M3 11l18-5v12L3 13z"/><path d="M11.6 16.8a3 3 0 0 1-5.8-1.6"/></svg>
     Send group marketing text
   </button>`;
+  html += `<button type="button" onclick="openMarketingCampaigns()" style="display:block; margin:0 auto 16px; background:none; border:none; color:var(--blue); font-size:0.7812rem; font-weight:700; padding:2px;">Manage campaigns</button>`;
   html += `<p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 14px; line-height:1.5;">
     Round Book can't see actual text replies — check your Messages/WhatsApp app yourself, then record what happened below.
   </p>`;
-  html += `<input type="text" id="mkt_search_input" placeholder="Search responses..." oninput="renderMarketingResponseRows()" style="margin-top:0; margin-bottom:14px;">`;
+  html += `<input type="text" id="mkt_search_input" placeholder="Search responses..." oninput="renderMarketingResponseRows()" style="margin-top:0; margin-bottom:10px;">`;
+  html += `<div id="mkt_campaign_filter"></div>`;
+  html += `<div id="mkt_stats"></div>`;
   html += `<div id="mkt_response_rows"></div>`;
   main.innerHTML = html;
+  renderMarketingResponseRows();
+}
+let marketingCampaignFilter = ''; // '' = all campaigns
+function setMarketingCampaignFilter(id){
+  marketingCampaignFilter = id;
   renderMarketingResponseRows();
 }
 function renderMarketingResponseRows(){
@@ -3923,6 +4148,8 @@ function renderMarketingResponseRows(){
   const raw = searchEl ? searchEl.value.trim() : '';
   const q = raw.toLowerCase();
   const today = todayISO();
+  const campaigns = (data.settings.marketingCampaigns && data.settings.marketingCampaigns.length) ? data.settings.marketingCampaigns : DEFAULT_MARKETING_CAMPAIGNS;
+  const campaignName = (id) => (campaigns.find(c=>c.id===id) || {}).name || '';
   let tracked = marketingTrackedCustomers()
     .map(c => {
       const lastSent = (c.messageLog||[]).filter(m=>m.kind==='marketing').sort((a,b)=>b.time-a.time)[0];
@@ -3932,6 +4159,38 @@ function renderMarketingResponseRows(){
     // doesn't touch the customer's own data, just stops surfacing a stale lead here.
     // A fresh marketing send resets the clock and brings them straight back.
     .filter(({c, lastSent}) => !(c.marketingStatus === 'awaiting' && lastSent && daysBetween(lastSent, today) >= 30));
+
+  // Campaign filter chips — only shown once more than one campaign has actually
+  // been used, so a single-campaign setup isn't cluttered with a filter row that
+  // would only ever have one real option.
+  const filterEl = document.getElementById('mkt_campaign_filter');
+  const usedCampaignIds = [...new Set(tracked.map(({c}) => c.marketingCampaign).filter(Boolean))];
+  if(filterEl){
+    if(usedCampaignIds.length > 1){
+      const chips = [{id:'', label:'All'}].concat(usedCampaignIds.map(id=>({id, label: campaignName(id) || 'Other'})));
+      filterEl.innerHTML = `<div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;">${chips.map(ch=>
+        `<button onclick="setMarketingCampaignFilter('${ch.id}')" class="seg-btn ${marketingCampaignFilter===ch.id?'active':''}" style="flex:0 0 auto; padding:7px 12px; font-size:0.75rem;">${escapeHtml(ch.label)}</button>`
+      ).join('')}</div>`;
+    } else {
+      filterEl.innerHTML = '';
+      marketingCampaignFilter = '';
+    }
+  }
+  if(marketingCampaignFilter){
+    tracked = tracked.filter(({c}) => c.marketingCampaign === marketingCampaignFilter);
+  }
+
+  // Simple headline numbers for whatever's currently in view — respects the
+  // campaign filter (that's the whole point of it) but not the free-text search,
+  // since a search is about finding one customer rather than narrowing the count.
+  const statsEl = document.getElementById('mkt_stats');
+  if(statsEl){
+    const sentCount = tracked.length;
+    const respondedCount = tracked.filter(({c}) => c.marketingStatus !== 'awaiting').length;
+    const bookedCount = tracked.filter(({c}) => c.marketingStatus === 'booked').length;
+    statsEl.innerHTML = sentCount ? `<p style="color:var(--ink-muted); font-size:0.75rem; font-weight:700; margin:0 2px 12px;">${sentCount} sent · ${respondedCount} responded · ${bookedCount} booked</p>` : '';
+  }
+
   if(q){
     tracked = tracked.filter(({c})=>{
       const haystack = [c.name, c.address, c.phone, c.email, c.round, c.accountNumber].filter(Boolean).join(' ').toLowerCase();
@@ -3960,14 +4219,15 @@ function renderMarketingResponseRows(){
       const status = MARKETING_STATUS_OPTIONS[c.marketingStatus] || MARKETING_STATUS_OPTIONS.awaiting;
       const actionLabel = MARKETING_ACTION_OPTIONS[c.marketingNextAction] || MARKETING_ACTION_OPTIONS.none;
       const canText = isMobileNumber(c.phone);
+      const campName = campaignName(c.marketingCampaign);
       return `<div class="backup-btn" style="text-align:left; align-items:flex-start; cursor:pointer;" onclick="openMarketingResponseEditor('${c.id}')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-top:2px;"><path d="M3 11l18-5v12L3 13z"/><path d="M11.6 16.8a3 3 0 0 1-5.8-1.6"/></svg>
         <div style="flex:1; min-width:0;">
           <div class="t1">${escapeHtml(c.address||c.name||'Customer')}</div>
-          <div class="t2">Texted ${fmtDate(lastSent)}</div>
+          <div class="t2">Texted ${fmtDate(lastSent)}${campName ? ` · ${escapeHtml(campName)}` : ''}</div>
           <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:6px;">
             <span class="badge ${status.color}">${status.label}</span>
-            ${c.marketingNextAction !== 'none' ? (c.marketingActionDone ? `<span class="badge ok">✓ ${actionLabel}</span>` : `<span class="badge due">${actionLabel}</span>`) : ''}
+            ${c.marketingNextAction !== 'none' ? (c.marketingActionDone ? `<span class="badge ok">✓ ${actionLabel}</span>` : `<span class="badge due">${actionLabel}${c.marketingFollowUpDate ? ` (${fmtDate(c.marketingFollowUpDate)})` : ''}</span>`) : ''}
           </div>
           <div style="display:flex; gap:8px; margin-top:10px;">
             ${c.phone ? `<button onclick="event.stopPropagation(); callCustomer('customer','${c.id}')" class="call-btn" style="border-radius:8px; width:auto; height:32px; padding:0 12px; font-size:0.75rem; font-weight:800; display:flex; align-items:center; gap:6px;">${CALL_ICON.replace('viewBox="0 0 24 24"','viewBox="0 0 24 24" width="13" height="13"')} Call</button>` : ''}
@@ -3988,6 +4248,7 @@ function quickTextFromMarketing(id){
     c.marketingStatus = 'awaiting';
     c.marketingNextAction = 'none';
     c.marketingActionDone = false;
+    c.marketingFollowUpDate = '';
     saveData();
     render();
   };
@@ -4003,6 +4264,10 @@ function openMarketingResponseEditor(id){
     `<button class="seg-btn ${c.marketingNextAction===key?'active':''}" onclick="setMarketingAction('${id}','${key}')" style="flex:0 0 auto; padding:9px 14px;">${label}</button>`
   ).join('');
   const actionLabel = MARKETING_ACTION_OPTIONS[c.marketingNextAction] || MARKETING_ACTION_OPTIONS.none;
+  // A target date only makes sense for the two actions that are genuinely a
+  // "come back to this on a certain day" reminder — a quote already has its own
+  // follow-up tracking, and "add to round" has no natural date of its own.
+  const showFollowUpDate = c.marketingNextAction === 'call' || c.marketingNextAction === 'text_again';
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">${escapeHtml(c.address||c.name||'Customer')}</h2>
@@ -4012,6 +4277,10 @@ function openMarketingResponseEditor(id){
     <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:18px;">${statusButtons}</div>
     <label>Next action</label>
     <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px;">${actionButtons}</div>
+    ${showFollowUpDate ? `
+      <label>Follow up on</label>
+      <input type="date" value="${escapeAttr(c.marketingFollowUpDate||'')}" onchange="setMarketingFollowUpDate('${id}', this.value)">
+    ` : ''}
     ${c.marketingNextAction !== 'none' ? `
       <button class="btn" style="width:100%; margin-top:14px; ${c.marketingActionDone ? 'background:var(--green-dim); color:var(--green);' : 'background:var(--amber-dim); color:var(--amber);'}" onclick="toggleMarketingActionDone('${id}')">${c.marketingActionDone ? `✅ Done — ${actionLabel}` : `Mark "${actionLabel}" as done`}</button>
     ` : ''}
@@ -4029,8 +4298,27 @@ function setMarketingAction(id, action){
   if(!c || !MARKETING_ACTION_OPTIONS[action]) return;
   c.marketingNextAction = action;
   c.marketingActionDone = false; // a newly set (or re-set) action starts as not-yet-done
+  // Suggest a sensible default follow-up date for the two action types that use
+  // one — the user can still change it. Anything else (quote/add to round/none)
+  // has no target date, since a quote already tracks its own follow-up.
+  if(action === 'call'){
+    const d = new Date(); d.setDate(d.getDate() + 2);
+    c.marketingFollowUpDate = d.toISOString().slice(0,10);
+  } else if(action === 'text_again'){
+    const d = new Date(); d.setDate(d.getDate() + 3);
+    c.marketingFollowUpDate = d.toISOString().slice(0,10);
+  } else {
+    c.marketingFollowUpDate = '';
+  }
   saveData();
   openMarketingResponseEditor(id);
+}
+function setMarketingFollowUpDate(id, dateStr){
+  const c = data.customers.find(x=>x.id===id);
+  if(!c) return;
+  c.marketingFollowUpDate = dateStr || '';
+  saveData();
+  renderMarketingFollowUpBanner();
 }
 function toggleMarketingActionDone(id){
   const c = data.customers.find(x=>x.id===id);
@@ -5367,6 +5655,7 @@ const FOCUSED_HELP = {
       helpP('A "Messages" entry under History lists every text actually sent to that customer, newest first — a quick way to check whether someone\'s already been chased today.'),
       helpP('The small icon next to a customer\'s phone/email adds them straight to your phone\'s Contacts app.'),
       helpP('Tick "Text before I arrive" on a customer\'s edit screen to flag that they need a heads-up text before you turn up — it shows as a badge on their card and detail screen.'),
+      helpP('"Referred by" on a customer\'s edit screen is just a note for your own reference — handy for keeping track of who\'s sending you work, especially after a "Ask for a referral" marketing text.'),
       helpP('Every customer gets a unique account number automatically, shown on their screen and on printed invoices/receipts — editable from their edit screen if you\'d rather set your own.'),
       helpP('The Photos section on a customer\'s screen also shows photos from any of their linked one-off jobs, all in one place — no need to open the job separately to see them. Open any photo and swipe left/right (or use the arrows) to browse through the rest.'),
       helpP('Pausing a customer asks for a reason — Holiday, Work being done, Cancelled, Moved out, or Other — and stamps the date. Paused customers are skipped from due reminders and round totals until resumed. Use Pause for a longer or indefinite break.'),
@@ -5386,11 +5675,13 @@ const FOCUSED_HELP = {
   marketing: {
     title: 'Marketing',
     body: () => [
-      helpP('"Send group marketing text" lets you tick one or more rounds, edit the message, then tap Send for each customer in turn — it opens Messages/WhatsApp pre-filled and ready to go, one at a time, since a phone can only hand off to one recipient at a time.'),
-      helpP('Everyone sent a marketing text appears below, with a search box to filter the list. Round Book can\'t see actual replies — check your own Messages/WhatsApp app, then record what happened here: a response (No response yet / Interested / Not interested / Booked in) and a next action (No action needed / Follow up call / Send a quote / Text again in a few days / Add extra work to round).'),
-      helpP('Call, Text, and Quote buttons sit right on each entry — Text opens a blank message to write your own personal reply (not the marketing script), and Quote starts a new quote pre-filled with their details. Sending a quote this way automatically marks that action as done on the card; other actions (like a follow-up call) can be marked done by hand from the entry\'s Response screen.'),
-      helpP('Anyone who\'s had a response, with a next action still to do, is sorted to the very top. Below that come people still awaiting a response, then anything already resolved with nothing left to do.'),
-      helpP('If nobody\'s responded within 30 days, they quietly drop off this list — nothing about the customer is deleted, and sending them a fresh marketing text brings them straight back.')
+      helpP('Tap "Send group marketing text" to send to a batch of customers at once. Pick a campaign, tick the rounds (or paused/lapsed customers) to include, then tap Send for each customer in turn — it opens Messages/WhatsApp pre-filled and ready to go, one at a time, since a phone can only hand off to one recipient at a time.'),
+      helpP('Two optional filters help avoid re-pestering people: skip anyone already marked Interested or Booked in, and skip anyone texted within a set number of days.'),
+      helpP('"Manage campaigns" lets you save different wording for different kinds of send — a general offer, asking for referrals, winning back lapsed customers, a seasonal reminder, or anything else — and add, edit, or delete your own. Pick whichever one fits each time you send.'),
+      helpP('Everyone sent a marketing text appears below, with a search box to filter the list, and — once more than one campaign has actually been used — filter chips to show just one campaign at a time, plus a quick sent/responded/booked count.'),
+      helpP('Round Book can\'t see actual replies — check your own Messages/WhatsApp app, then record what happened here: a response (No response yet / Interested / Not interested / Booked in) and a next action (No action needed / Follow up call / Send a quote / Text again in a few days / Add extra work to round). A follow-up call or text can be given a target date, and you\'ll get a reminder banner once it\'s due.'),
+      helpP('Call, Text, and Quote buttons sit right on each entry — Text opens a blank message to write your own personal reply (not the marketing script), and Quote starts a new quote pre-filled with their details. Sending a quote this way automatically marks that action as done; other actions (like a follow-up call) can be marked done by hand from the entry\'s Response screen.'),
+      helpP('Anyone who\'s had a response, with a next action still to do, is sorted to the very top. Below that come people still awaiting a response, then anything already resolved with nothing left to do. If nobody\'s responded within 30 days, they quietly drop off this list — nothing about the customer is deleted, and sending them a fresh marketing text brings them straight back.')
     ]
   },
   reports: {
