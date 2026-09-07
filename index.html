@@ -411,7 +411,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 65;
+const APP_VERSION = 66;
 function formatVersion(v){ return '1.' + v; }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
@@ -420,6 +420,7 @@ function formatVersion(v){ return '1.' + v; }
 // the most recent 10 entries (oldest ones can be left in the array or trimmed,
 // either is fine, since the display always slices to 10).
 const VERSION_HISTORY = [
+  {version: 66, changes: ['Added a "Don\'t send marketing texts to this customer" tick box on a customer\'s own screen — they\'re then always excluded from group marketing sends, on every campaign', 'Fixed a bug where switching campaigns on the group send screen didn\'t update the message text at the bottom']},
   {version: 65, changes: ['Marketing texts now support several named campaigns (general offer, ask for a referral, win back lapsed customers, seasonal reminder, or your own) instead of one fixed message — manage them from the Marketing tab', 'Group sends can now skip anyone already Interested/Booked in, or anyone texted recently, and can target paused/lapsed customers as their own group', 'A follow-up call or text can be given a target date, with a reminder banner once it\'s due', 'The Marketing tab shows which campaign each response belongs to, filter chips once more than one is in use, and a quick sent/responded/booked count', 'Added an optional "Referred by" note on a customer\'s own screen']},
   {version: 64, changes: ['All customer/job/quote data now lives in the same storage as photos, so the only real limit is your phone\'s own free space rather than a tight ~5-10MB pool', 'Removed the two storage bars on the Backup screen — a warning only appears there if storage is actually getting close to full']},
   {version: 63, changes: ['Fixed a bug where a single problem photo could silently drop every photo from a backup, or disable photo storage for the rest of the session — backups and restores now handle each photo on its own, and tell you if any couldn\'t be included or recovered']},
@@ -643,6 +644,7 @@ function migrateData(parsed){
     if(c.marketingCampaign == null) c.marketingCampaign = '';
     if(c.marketingFollowUpDate == null) c.marketingFollowUpDate = '';
     if(c.referredBy == null) c.referredBy = '';
+    if(c.marketingOptOut == null) c.marketingOptOut = false;
     // Every customer gets a permanent, unique account number the first time this
     // runs for them — shown on invoices/receipts. Assigned once and never reused,
     // even if the customer is later deleted, so numbers stay meaningful.
@@ -1746,6 +1748,10 @@ function openCustomerForm(existing){
       <input type="checkbox" id="f_textBefore" ${c.textBeforeVisit?'checked':''} style="width:18px; height:18px; margin:0;">
       Text before I arrive
     </label>
+    <label style="display:flex; align-items:center; gap:8px; margin:10px 2px 0; text-transform:none; font-weight:600;">
+      <input type="checkbox" id="f_marketingOptOut" ${c.marketingOptOut?'checked':''} style="width:18px; height:18px; margin:0;">
+      Don't send marketing texts to this customer
+    </label>
     <div class="form-actions">
       <button class="btn-primary" onclick="saveCustomerForm('${existing?existing.id:''}')">${existing?'Save changes':'Add customer'}</button>
     </div>
@@ -1775,7 +1781,8 @@ function saveCustomerForm(id){
     frequencyWeeks: parseInt(document.getElementById('f_freq').value) || 4,
     notes: document.getElementById('f_notes').value.trim(),
     referredBy: document.getElementById('f_referredBy').value.trim(),
-    textBeforeVisit: document.getElementById('f_textBefore').checked
+    textBeforeVisit: document.getElementById('f_textBefore').checked,
+    marketingOptOut: document.getElementById('f_marketingOptOut').checked
   };
   const accountNumberEntered = document.getElementById('f_accountNumber').value.trim();
   const dupeAccount = accountNumberEntered && data.customers.find(x=>x.id!==id && x.accountNumber===accountNumberEntered);
@@ -1855,6 +1862,7 @@ function openCustomerDetail(id){
     ${needsPriceReview(c) ? `<div style="color:var(--amber); font-size:0.75rem; font-weight:700; margin:-6px 2px 10px;">📈 12+ months since last price increase</div>` : ''}
     ${c.textBeforeVisit ? `<div style="color:var(--blue-deep); font-size:0.75rem; font-weight:700; margin:-6px 2px 10px;">📱 Text before you arrive</div>` : ''}
     ${c.referredBy ? `<div style="color:var(--ink-muted); font-size:0.75rem; font-weight:700; margin:-6px 2px 10px;">🤝 Referred by ${escapeHtml(c.referredBy)}</div>` : ''}
+    ${c.marketingOptOut ? `<div style="color:var(--red); font-size:0.75rem; font-weight:700; margin:-6px 2px 10px;">🚫 Opted out of marketing texts</div>` : ''}
     ${c.notes?`<div style="background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:10px 12px; font-size:0.8438rem; margin-bottom:14px;">${escapeHtml(c.notes)}</div>`:''}
     ${(c.phone||c.email)?`<div style="display:flex; gap:8px; margin-bottom:14px;">
       ${c.phone?`<a href="tel:${escapeAttr(c.phone.replace(/\\s+/g,''))}" style="flex:1; text-decoration:none; background:var(--blue-dim); color:var(--blue-deep); border-radius:10px; padding:9px; font-size:0.8125rem; font-weight:700; text-align:center;">📞 ${escapeHtml(c.phone)}</a>`:''}
@@ -2979,15 +2987,15 @@ function selectMarketingCampaign(id){
   openGroupMarketingText();
 }
 // Candidates for a group send: everyone with a mobile number in the selected
-// rounds/groups, minus anyone the current filters say to skip. Paused/lapsed
-// customers are offered as an extra selectable group alongside the real rounds
-// (like a virtual round), since a "we've missed you" campaign specifically wants
-// exactly that list and nothing else.
+// rounds/groups, minus anyone opted out and anyone the current filters say to
+// skip. Paused/lapsed customers are offered as an extra selectable group
+// alongside the real rounds (like a virtual round), since a "we've missed you"
+// campaign specifically wants exactly that list and nothing else.
 function marketingCandidateList(){
-  const rounds = groupByRound(data.customers.filter(c=>!c.paused));
+  const rounds = groupByRound(data.customers.filter(c=>!c.paused && !c.marketingOptOut));
   let list = Object.keys(rounds).filter(rn=>marketingSelectedRounds.has(rn)).flatMap(rn=>(rounds[rn]||[]));
   if(marketingSelectedRounds.has('__paused__')){
-    list = list.concat(data.customers.filter(c=>c.paused));
+    list = list.concat(data.customers.filter(c=>c.paused && !c.marketingOptOut));
   }
   list = list.filter(c=>isMobileNumber(c.phone));
   if(marketingSkipResponded){
@@ -3002,22 +3010,30 @@ function marketingCandidateList(){
   }
   return list;
 }
+// Tracks which campaign's wording was actually loaded into the textarea last time
+// this screen rendered, so a genuine campaign switch (via the dropdown) can be told
+// apart from a re-render triggered by something else (a round/filter checkbox) —
+// comparing against marketingSelectedCampaignId directly doesn't work here, since
+// that's already been updated to the new value by the time this runs.
+let marketingLastRenderedCampaignId = null;
 function openGroupMarketingText(){
   const campaigns = (data.settings.marketingCampaigns && data.settings.marketingCampaigns.length) ? data.settings.marketingCampaigns : DEFAULT_MARKETING_CAMPAIGNS;
   if(!marketingSelectedCampaignId || !campaigns.some(c=>c.id===marketingSelectedCampaignId)){
     marketingSelectedCampaignId = campaigns[0].id;
   }
   const activeCampaign = campaigns.find(c=>c.id===marketingSelectedCampaignId);
-  const rounds = groupByRound(data.customers.filter(c=>!c.paused));
+  const rounds = groupByRound(data.customers.filter(c=>!c.paused && !c.marketingOptOut));
   const roundNames = Object.keys(rounds).sort((a,b)=>a.localeCompare(b));
-  const pausedCount = data.customers.filter(c=>c.paused && isMobileNumber(c.phone)).length;
+  const pausedCount = data.customers.filter(c=>c.paused && !c.marketingOptOut && isMobileNumber(c.phone)).length;
+  const optedOutCount = data.customers.filter(c=>c.marketingOptOut && isMobileNumber(c.phone)).length;
 
   // Preserve whatever's currently typed if this re-renders from a round/filter
   // toggle, rather than resetting back to the campaign's saved wording each time —
   // EXCEPT when the campaign dropdown itself was just switched, where loading that
   // campaign's own wording is exactly what's expected.
-  const campaignJustSwitched = document.getElementById('mkt_msg_campaign_id') && document.getElementById('mkt_msg_campaign_id').value !== marketingSelectedCampaignId;
+  const campaignJustSwitched = marketingLastRenderedCampaignId !== null && marketingLastRenderedCampaignId !== marketingSelectedCampaignId;
   const tpl = (document.getElementById('mkt_msg') && !campaignJustSwitched) ? document.getElementById('mkt_msg').value : (activeCampaign ? activeCampaign.body : DEFAULT_MARKETING_TEMPLATE);
+  marketingLastRenderedCampaignId = marketingSelectedCampaignId;
 
   const roundCheckboxes = roundNames.map(rn=>{
     const count = (rounds[rn]||[]).filter(c=>isMobileNumber(c.phone)).length;
@@ -3046,6 +3062,7 @@ function openGroupMarketingText(){
     <button type="button" onclick="openMarketingCampaigns()" style="background:none; border:none; color:var(--blue); font-size:0.7812rem; font-weight:700; padding:2px; margin-bottom:14px;">Manage campaigns</button>
     <label>Rounds / groups to include</label>
     <div style="margin-bottom:16px;">${roundCheckboxes || '<p style="color:var(--ink-muted); font-size:0.8438rem;">No rounds yet.</p>'}</div>
+    ${optedOutCount ? `<p style="color:var(--ink-muted); font-size:0.75rem; margin:-10px 2px 16px;">🚫 ${optedOutCount} customer${optedOutCount===1?'':'s'} opted out of marketing texts — always excluded, on every campaign.</p>` : ''}
     <label style="display:flex; align-items:center; gap:8px; margin-top:14px; text-transform:none; font-weight:600;">
       <input type="checkbox" ${marketingSkipResponded?'checked':''} onchange="setMarketingSkipResponded(this.checked)" style="width:18px; height:18px; margin:0; flex-shrink:0;">
       Skip anyone already marked Interested or Booked in
@@ -3144,6 +3161,7 @@ function deleteMarketingCampaign(id){
 function sendMarketingText(id){
   const c = data.customers.find(x=>x.id===id);
   if(!c || !isMobileNumber(c.phone)){ toast('No mobile number saved for this customer'); return; }
+  if(c.marketingOptOut){ toast("This customer has opted out of marketing texts"); return; }
   const campaigns = (data.settings.marketingCampaigns && data.settings.marketingCampaigns.length) ? data.settings.marketingCampaigns : DEFAULT_MARKETING_CAMPAIGNS;
   const activeCampaign = campaigns.find(c=>c.id===marketingSelectedCampaignId) || campaigns[0];
   const msgField = document.getElementById('mkt_msg');
@@ -5656,6 +5674,7 @@ const FOCUSED_HELP = {
       helpP('The small icon next to a customer\'s phone/email adds them straight to your phone\'s Contacts app.'),
       helpP('Tick "Text before I arrive" on a customer\'s edit screen to flag that they need a heads-up text before you turn up — it shows as a badge on their card and detail screen.'),
       helpP('"Referred by" on a customer\'s edit screen is just a note for your own reference — handy for keeping track of who\'s sending you work, especially after a "Ask for a referral" marketing text.'),
+      helpP('Tick "Don\'t send marketing texts to this customer" to opt them out — they\'re then always left out of a group marketing send, on every campaign, no matter which rounds are ticked. This doesn\'t affect calls, quotes, or your normal cleaning/payment reminders — just marketing.'),
       helpP('Every customer gets a unique account number automatically, shown on their screen and on printed invoices/receipts — editable from their edit screen if you\'d rather set your own.'),
       helpP('The Photos section on a customer\'s screen also shows photos from any of their linked one-off jobs, all in one place — no need to open the job separately to see them. Open any photo and swipe left/right (or use the arrows) to browse through the rest.'),
       helpP('Pausing a customer asks for a reason — Holiday, Work being done, Cancelled, Moved out, or Other — and stamps the date. Paused customers are skipped from due reminders and round totals until resumed. Use Pause for a longer or indefinite break.'),
@@ -5676,7 +5695,7 @@ const FOCUSED_HELP = {
     title: 'Marketing',
     body: () => [
       helpP('Tap "Send group marketing text" to send to a batch of customers at once. Pick a campaign, tick the rounds (or paused/lapsed customers) to include, then tap Send for each customer in turn — it opens Messages/WhatsApp pre-filled and ready to go, one at a time, since a phone can only hand off to one recipient at a time.'),
-      helpP('Two optional filters help avoid re-pestering people: skip anyone already marked Interested or Booked in, and skip anyone texted within a set number of days.'),
+      helpP('Two optional filters help avoid re-pestering people: skip anyone already marked Interested or Booked in, and skip anyone texted within a set number of days. Anyone opted out of marketing (from their own customer screen) is always excluded, on every campaign, regardless of these filters.'),
       helpP('"Manage campaigns" lets you save different wording for different kinds of send — a general offer, asking for referrals, winning back lapsed customers, a seasonal reminder, or anything else — and add, edit, or delete your own. Pick whichever one fits each time you send.'),
       helpP('Everyone sent a marketing text appears below, with a search box to filter the list, and — once more than one campaign has actually been used — filter chips to show just one campaign at a time, plus a quick sent/responded/booked count.'),
       helpP('Round Book can\'t see actual replies — check your own Messages/WhatsApp app, then record what happened here: a response (No response yet / Interested / Not interested / Booked in) and a next action (No action needed / Follow up call / Send a quote / Text again in a few days / Add extra work to round). A follow-up call or text can be given a target date, and you\'ll get a reminder banner once it\'s due.'),
