@@ -411,7 +411,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 67;
+const APP_VERSION = 68;
 function formatVersion(v){ return '1.' + v; }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
@@ -420,6 +420,7 @@ function formatVersion(v){ return '1.' + v; }
 // the most recent 10 entries (oldest ones can be left in the array or trimmed,
 // either is fine, since the display always slices to 10).
 const VERSION_HISTORY = [
+  {version: 68, changes: ['Round value now adds on anything currently owed and subtracts anything currently in credit, rather than just adding up normal prices — a truer picture of what a round is actually worth right now. Credit only ever cancels out one clean\'s worth per customer, so someone who\'s paid several months ahead doesn\'t make a round look emptier than it is']},
   {version: 67, changes: ['Each round on the Rounds tab now shows its value (price per clean, added up) alongside the customer count — paused customers are left out of both, but anyone owing or in credit is still counted at their normal price']},
   {version: 66, changes: ['Added a "Don\'t send marketing texts to this customer" tick box on a customer\'s own screen — they\'re then always excluded from group marketing sends, on every campaign', 'Fixed a bug where switching campaigns on the group send screen didn\'t update the message text at the bottom']},
   {version: 65, changes: ['Marketing texts now support several named campaigns (general offer, ask for a referral, win back lapsed customers, seasonal reminder, or your own) instead of one fixed message — manage them from the Marketing tab', 'Group sends can now skip anyone already Interested/Booked in, or anyone texted recently, and can target paused/lapsed customers as their own group', 'A follow-up call or text can be given a target date, with a reminder banner once it\'s due', 'The Marketing tab shows which campaign each response belongs to, filter chips once more than one is in use, and a quick sent/responded/booked count', 'Added an optional "Referred by" note on a customer\'s own screen']},
@@ -957,6 +958,13 @@ function daysBetween(a,b){
 function lastOf(arr){ if(!arr||!arr.length) return null; return [...arr].sort().slice(-1)[0]; }
 function lastDateOf(arr){ if(!arr||!arr.length) return null; return [...arr.map(e=>e.date)].sort().slice(-1)[0]; }
 function money(n){ const v=Number(n||0); return '£'+v.toFixed(v%1?2:0); }
+// Same as money(), but puts a leading minus before the £ symbol for a negative
+// total rather than after it (money(-12.5) reads "£-12.50"; this reads "-£12.50").
+// Only needed where a single combined figure could plausibly go negative, like a
+// round's net value once outstanding credit is subtracted — money() itself is
+// left as-is everywhere else, since owed/credit amounts are otherwise always
+// shown as a positive figure paired with its own "Owes"/"Credit" label.
+function moneySigned(n){ const v=Number(n||0); return v<0 ? '-'+money(-v) : money(v); }
 let pendingToastAction = null;
 function toast(msg, actionLabel, actionFn){
   const t=document.getElementById('toast');
@@ -1017,6 +1025,20 @@ function custStatus(c){
   const owed = balance > 0.005;
   const credit = balance < -0.005;
   return {cleanBadge, owed, credit, balance, lastClean, lastPaid};
+}
+// A customer's contribution to "round value" (see renderRoundsList): their normal
+// price, plus anything they currently owe on top (that money hasn't come in yet,
+// so it's still genuinely worth counting), minus any credit — but credit is only
+// ever allowed to cancel out one clean's worth of price, never more. Someone who's
+// paid several months ahead still only reduces the round's value by a single
+// clean, the same as someone who's paid exactly one month ahead — the rest of
+// their credit is simply future cleans already covered, not a reason for the
+// round to look emptier today.
+function roundValueContribution(c){
+  const price = Number(c.price||0);
+  const balance = custStatus(c).balance;
+  const cappedBalance = balance > 0 ? balance : Math.max(balance, -price);
+  return price + cappedBalance;
 }
 
 /* ---------- state ---------- */
@@ -1300,7 +1322,10 @@ function renderRoundsList(main){
   if(data.customers.length){
     const activeCustomers = data.customers.filter(c=>!c.paused);
     const totalCustomers = activeCustomers.length;
-    const totalValue = activeCustomers.reduce((sum,c)=>sum+Number(c.price||0),0);
+    // Price per clean, plus what's genuinely still outstanding right now: owed
+    // balances add on top (that money hasn't come in yet), credit subtracts but
+    // never by more than one clean's price (see roundValueContribution).
+    const totalValue = activeCustomers.reduce((sum,c)=>sum+roundValueContribution(c),0);
     const overallAvg = totalCustomers ? totalValue/totalCustomers : 0;
     html += `<div style="display:flex; align-items:center; justify-content:flex-end; gap:8px; margin-bottom:8px;">
       ${mainScreenHelpBtn('rounds', "()=>setTab('rounds')")}
@@ -1316,8 +1341,8 @@ function renderRoundsList(main){
     </div>
     <div class="summary-overall">
       <div class="stat"><div class="num">${totalCustomers}</div><div class="lbl">Customers</div></div>
-      <div class="stat"><div class="num">${money(totalValue)}</div><div class="lbl">Round value</div></div>
-      <div class="stat"><div class="num">${money(overallAvg)}</div><div class="lbl">Avg / customer</div></div>
+      <div class="stat"><div class="num">${moneySigned(totalValue)}</div><div class="lbl">Round value</div></div>
+      <div class="stat"><div class="num">${moneySigned(overallAvg)}</div><div class="lbl">Avg / customer</div></div>
     </div>`;
   }
   html += `<div class="seg-row">
@@ -1337,21 +1362,23 @@ function renderRoundsList(main){
     roundNames.forEach(rn=>{
       const all = rounds[rn];
       const activeAll = all.filter(c=>!c.paused);
-      const activeValue = activeAll.reduce((sum,c)=>sum+Number(c.price||0),0);
+      let activeValue = 0, due=0, owed=0, paused=0;
+      all.forEach(c=>{
+        const s = custStatus(c);
+        if(c.paused){ paused++; return; }
+        // Price per clean, plus what's genuinely still outstanding right now — same
+        // formula as the overall summary above (see roundValueContribution).
+        activeValue += roundValueContribution(c);
+        if(s.cleanBadge && s.cleanBadge.type==='due') due++;
+        if(s.owed) owed++;
+      });
       grandCustomers += activeAll.length;
       grandValue += activeValue;
       const daysUsed = roundDaysUsed(all);
-      let due=0, owed=0, paused=0;
-      all.forEach(c=>{
-        const s = custStatus(c);
-        if(c.paused) paused++;
-        else if(s.cleanBadge && s.cleanBadge.type==='due') due++;
-        if(s.owed) owed++;
-      });
       html += `<div class="round-card" onclick="openRound('${escapeAttr(rn)}')">
         <div>
           <div class="rname">${escapeHtml(rn)}</div>
-          <div class="rcount">${activeAll.length} customer${activeAll.length===1?'':'s'} · ${money(activeValue)}${daysUsed.length>1?` · ${daysUsed.length} days`:''}</div>
+          <div class="rcount">${activeAll.length} customer${activeAll.length===1?'':'s'} · ${moneySigned(activeValue)}${daysUsed.length>1?` · ${daysUsed.length} days`:''}</div>
         </div>
         <div class="badges">
           ${due?`<span class="badge due">${due} due</span>`:''}
@@ -1362,7 +1389,7 @@ function renderRoundsList(main){
         </div>
       </div>`;
     });
-    html += listTotalHtml(`${roundNames.length} round${roundNames.length===1?'':'s'} · ${grandCustomers} customer${grandCustomers===1?'':'s'} · ${money(grandValue)}`);
+    html += listTotalHtml(`${roundNames.length} round${roundNames.length===1?'':'s'} · ${grandCustomers} customer${grandCustomers===1?'':'s'} · ${moneySigned(grandValue)}`);
   } else if(roundsViewMode === 'due'){
     let anyDue = false;
     let dueGrandCount = 0, dueGrandValue = 0;
@@ -5644,7 +5671,7 @@ const FOCUSED_HELP = {
     title: 'Rounds',
     body: () => [
       helpP('The Rounds tab shows every round, with a Rounds / Due / Owed switch. Open a round to see its customers, swipe a card right to mark cleaned or left to mark paid, and use Reorder to set your walking order.'),
-      helpP('Each round card shows its active customer count and value (price per clean, added up) — paused customers are left out of both, though anyone currently owing or in credit is still counted at their normal price. Badges show how many are due, owe money, or are paused.'),
+      helpP('Each round card shows its active customer count and value — price per clean added up, plus anything currently owed on top, minus anything in credit (capped at one clean\'s price each, so someone who\'s paid several months ahead doesn\'t make the round look emptier than it is). Paused customers are left out entirely. Badges show how many are due, owe money, or are paused.'),
       helpP('The printer icon above the summary numbers covers reports across every round at once — Windows due, Money owed, and Full round lists. A single round\'s own screen has its own separate Print option, just for that round.'),
       helpP('The magnifying glass icon searches across every customer — name, address, phone, email, notes, round, or account number — with results shown as a tappable list, matches highlighted as you type.'),
       helpP('The photo icon opens the Photo gallery — every customer with at least one photo, address first then a thumbnail strip (including photos from their linked one-off jobs), searchable by address or name. Standalone one-off jobs (not linked to a customer) with their own photos get their own card too.'),
