@@ -411,7 +411,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 66;
+const APP_VERSION = 67;
 function formatVersion(v){ return '1.' + v; }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
@@ -420,6 +420,7 @@ function formatVersion(v){ return '1.' + v; }
 // the most recent 10 entries (oldest ones can be left in the array or trimmed,
 // either is fine, since the display always slices to 10).
 const VERSION_HISTORY = [
+  {version: 67, changes: ['Each round on the Rounds tab now shows its value (price per clean, added up) alongside the customer count — paused customers are left out of both, but anyone owing or in credit is still counted at their normal price']},
   {version: 66, changes: ['Added a "Don\'t send marketing texts to this customer" tick box on a customer\'s own screen — they\'re then always excluded from group marketing sends, on every campaign', 'Fixed a bug where switching campaigns on the group send screen didn\'t update the message text at the bottom']},
   {version: 65, changes: ['Marketing texts now support several named campaigns (general offer, ask for a referral, win back lapsed customers, seasonal reminder, or your own) instead of one fixed message — manage them from the Marketing tab', 'Group sends can now skip anyone already Interested/Booked in, or anyone texted recently, and can target paused/lapsed customers as their own group', 'A follow-up call or text can be given a target date, with a reminder banner once it\'s due', 'The Marketing tab shows which campaign each response belongs to, filter chips once more than one is in use, and a quick sent/responded/booked count', 'Added an optional "Referred by" note on a customer\'s own screen']},
   {version: 64, changes: ['All customer/job/quote data now lives in the same storage as photos, so the only real limit is your phone\'s own free space rather than a tight ~5-10MB pool', 'Removed the two storage bars on the Backup screen — a warning only appears there if storage is actually getting close to full']},
@@ -1336,8 +1337,9 @@ function renderRoundsList(main){
     roundNames.forEach(rn=>{
       const all = rounds[rn];
       const activeAll = all.filter(c=>!c.paused);
+      const activeValue = activeAll.reduce((sum,c)=>sum+Number(c.price||0),0);
       grandCustomers += activeAll.length;
-      grandValue += activeAll.reduce((sum,c)=>sum+Number(c.price||0),0);
+      grandValue += activeValue;
       const daysUsed = roundDaysUsed(all);
       let due=0, owed=0, paused=0;
       all.forEach(c=>{
@@ -1349,7 +1351,7 @@ function renderRoundsList(main){
       html += `<div class="round-card" onclick="openRound('${escapeAttr(rn)}')">
         <div>
           <div class="rname">${escapeHtml(rn)}</div>
-          <div class="rcount">${all.length} customer${all.length===1?'':'s'}${daysUsed.length>1?` · ${daysUsed.length} days`:''}</div>
+          <div class="rcount">${activeAll.length} customer${activeAll.length===1?'':'s'} · ${money(activeValue)}${daysUsed.length>1?` · ${daysUsed.length} days`:''}</div>
         </div>
         <div class="badges">
           ${due?`<span class="badge due">${due} due</span>`:''}
@@ -5642,6 +5644,7 @@ const FOCUSED_HELP = {
     title: 'Rounds',
     body: () => [
       helpP('The Rounds tab shows every round, with a Rounds / Due / Owed switch. Open a round to see its customers, swipe a card right to mark cleaned or left to mark paid, and use Reorder to set your walking order.'),
+      helpP('Each round card shows its active customer count and value (price per clean, added up) — paused customers are left out of both, though anyone currently owing or in credit is still counted at their normal price. Badges show how many are due, owe money, or are paused.'),
       helpP('The printer icon above the summary numbers covers reports across every round at once — Windows due, Money owed, and Full round lists. A single round\'s own screen has its own separate Print option, just for that round.'),
       helpP('The magnifying glass icon searches across every customer — name, address, phone, email, notes, round, or account number — with results shown as a tappable list, matches highlighted as you type.'),
       helpP('The photo icon opens the Photo gallery — every customer with at least one photo, address first then a thumbnail strip (including photos from their linked one-off jobs), searchable by address or name. Standalone one-off jobs (not linked to a customer) with their own photos get their own card too.'),
