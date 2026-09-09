@@ -411,7 +411,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 68;
+const APP_VERSION = 69;
 function formatVersion(v){ return '1.' + v; }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
@@ -420,6 +420,7 @@ function formatVersion(v){ return '1.' + v; }
 // the most recent 10 entries (oldest ones can be left in the array or trimmed,
 // either is fine, since the display always slices to 10).
 const VERSION_HISTORY = [
+  {version: 69, changes: ['Payment reminders and "windows cleaned today" texts now include the customer\'s address as a payment reference alongside your bank details, so it\'s easy to see who a bank transfer\'s from once it lands in your account']},
   {version: 68, changes: ['Round value now adds on anything currently owed and subtracts anything currently in credit, rather than just adding up normal prices — a truer picture of what a round is actually worth right now. Credit only ever cancels out one clean\'s worth per customer, so someone who\'s paid several months ahead doesn\'t make a round look emptier than it is']},
   {version: 67, changes: ['Each round on the Rounds tab now shows its value (price per clean, added up) alongside the customer count — paused customers are left out of both, but anyone owing or in credit is still counted at their normal price']},
   {version: 66, changes: ['Added a "Don\'t send marketing texts to this customer" tick box on a customer\'s own screen — they\'re then always excluded from group marketing sends, on every campaign', 'Fixed a bug where switching campaigns on the group send screen didn\'t update the message text at the bottom']},
@@ -2557,14 +2558,19 @@ function nudgeRoundDue(rn){
 // Builds the "pay by bank transfer" block used by the {bankdetails} token — empty
 // string if no bank details are saved yet, so templates render cleanly either way.
 // Just the details themselves, no lead-in sentence and no extra blank line — the
-// surrounding template text supplies whatever framing/spacing it needs.
-function bankDetailsBlock(){
+// surrounding template text supplies whatever framing/spacing it needs. Includes
+// the customer/job's address as a payment reference when one's passed in, so an
+// incoming transfer can be matched back to who it's from at a glance — a house
+// number and road is something a customer can read off and type in without
+// needing to remember an account number.
+function bankDetailsBlock(address){
   const s = data.settings || {};
   if(!s.bankPayeeName && !s.bankAccountNumber && !s.bankSortCode) return '';
   const lines = [];
   if(s.bankPayeeName) lines.push(`Payee Name: ${s.bankPayeeName}`);
   if(s.bankAccountNumber) lines.push(`Account Number: ${s.bankAccountNumber}`);
   if(s.bankSortCode) lines.push(`Sort Code: ${s.bankSortCode}`);
+  if(address) lines.push(`Reference: ${address}`);
   return lines.join('\n') + '\n';
 }
 // Human-readable labels for the message log shown on a customer/job's screen.
@@ -2606,7 +2612,7 @@ function applyTemplate(tpl, tokens){
     .replace(/\{date\}/g, tokens.date || '')
     .replace(/\{yourname\}/g, tokens.yourname || '')
     .replace(/\{work\}/g, tokens.work || 'your window cleaning')
-    .replace(/\{bankdetails\}/g, bankDetailsBlock());
+    .replace(/\{bankdetails\}/g, bankDetailsBlock(tokens.address));
 }
 
 // Normalizes a UK-style phone number into the digits-only, country-code-prefixed
@@ -2849,7 +2855,7 @@ function sendJobPaymentReminder(id){
   const company = data.settings.companyName || '';
   const yourname = data.settings.yourName || '';
   const msg = applyTemplate(data.settings.payTemplate, {
-    name: firstName, amount: Number(j.price||0), company, yourname
+    name: firstName, amount: Number(j.price||0), company, yourname, address: j.address
   });
   const afterSend = () => {
     j.paymentReminderSent = true;
@@ -2892,12 +2898,12 @@ function sendTemplate(id, kind, returnTo){
     msg = applyTemplate(data.settings.cleanTemplate, {name: firstName, company, yourname});
     title = 'Cleaning reminder';
   } else if(kind === 'cleanedToday'){
-    msg = applyTemplate(data.settings.cleanedTodayTemplate, {name: firstName, amount: c.price, company, yourname});
+    msg = applyTemplate(data.settings.cleanedTodayTemplate, {name: firstName, amount: c.price, company, yourname, address: c.address});
     title = 'Windows cleaned today';
   } else {
     const s = custStatus(c);
     const amt = s.owed ? s.balance : c.price;
-    msg = applyTemplate(data.settings.payTemplate, {name: firstName, amount: amt, company, yourname});
+    msg = applyTemplate(data.settings.payTemplate, {name: firstName, amount: amt, company, yourname, address: c.address});
     title = 'Payment reminder';
     afterSend = () => {
       c.paymentReminderSent = true;
@@ -2964,7 +2970,7 @@ function sendBulkReminder(id, kind){
     const s = custStatus(c);
     amt = s.owed ? s.balance : c.price;
   }
-  const msg = applyTemplate(tpl, {name: firstName, amount: amt, company, yourname});
+  const msg = applyTemplate(tpl, {name: firstName, amount: amt, company, yourname, address: c.address});
   sendPhoneMessage(c.phone, msg);
   logMessage(c, kind === 'owed' ? 'pay' : 'clean');
   if(kind === 'owed'){
@@ -4120,7 +4126,7 @@ function openBusinessDetails(){
     <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 10px; line-height:1.5;">Used to sign off texts more personally — available as the <b>{yourname}</b> token.</p>
     <input type="text" id="yourNameInput" value="${escapeAttr(data.settings.yourName||'')}" placeholder="e.g. Dave">
     <div class="section-label">Bank details</div>
-    <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 10px; line-height:1.5;">Added automatically to payment reminders and "windows cleaned today" texts via the <b>{bankdetails}</b> token, so customers can pay by bank transfer. Left blank, that token just disappears.</p>
+    <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 10px; line-height:1.5;">Added automatically to payment reminders and "windows cleaned today" texts via the <b>{bankdetails}</b> token, so customers can pay by bank transfer. Their address is included as a payment reference, so it's easy to see who a transfer's from once it lands in your bank. Left blank, that token just disappears.</p>
     <label style="margin-top:0;">Payee Name</label>
     <input type="text" id="bankPayeeInput" value="${escapeAttr(data.settings.bankPayeeName||'')}" placeholder="e.g. D Bennison">
     <label>Account Number</label>
