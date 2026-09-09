@@ -411,7 +411,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 69;
+const APP_VERSION = 70;
 function formatVersion(v){ return '1.' + v; }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
@@ -420,6 +420,7 @@ function formatVersion(v){ return '1.' + v; }
 // the most recent 10 entries (oldest ones can be left in the array or trimmed,
 // either is fine, since the display always slices to 10).
 const VERSION_HISTORY = [
+  {version: 70, changes: ['Fixed the payment reference added to bank details in messages — now shows just the house number and road, not the whole address, for anyone who\'s stored a fuller address with town/postcode']},
   {version: 69, changes: ['Payment reminders and "windows cleaned today" texts now include the customer\'s address as a payment reference alongside your bank details, so it\'s easy to see who a bank transfer\'s from once it lands in your account']},
   {version: 68, changes: ['Round value now adds on anything currently owed and subtracts anything currently in credit, rather than just adding up normal prices — a truer picture of what a round is actually worth right now. Credit only ever cancels out one clean\'s worth per customer, so someone who\'s paid several months ahead doesn\'t make a round look emptier than it is']},
   {version: 67, changes: ['Each round on the Rounds tab now shows its value (price per clean, added up) alongside the customer count — paused customers are left out of both, but anyone owing or in credit is still counted at their normal price']},
@@ -2560,9 +2561,12 @@ function nudgeRoundDue(rn){
 // Just the details themselves, no lead-in sentence and no extra blank line — the
 // surrounding template text supplies whatever framing/spacing it needs. Includes
 // the customer/job's address as a payment reference when one's passed in, so an
-// incoming transfer can be matched back to who it's from at a glance — a house
-// number and road is something a customer can read off and type in without
-// needing to remember an account number.
+// incoming transfer can be matched back to who it's from at a glance — just the
+// first line (house number and road), not the whole address, since that's plenty
+// to identify who it's from and is quicker for a customer to read off and type.
+function addressFirstLine(address){
+  return (address||'').split(',')[0].trim();
+}
 function bankDetailsBlock(address){
   const s = data.settings || {};
   if(!s.bankPayeeName && !s.bankAccountNumber && !s.bankSortCode) return '';
@@ -2570,7 +2574,8 @@ function bankDetailsBlock(address){
   if(s.bankPayeeName) lines.push(`Payee Name: ${s.bankPayeeName}`);
   if(s.bankAccountNumber) lines.push(`Account Number: ${s.bankAccountNumber}`);
   if(s.bankSortCode) lines.push(`Sort Code: ${s.bankSortCode}`);
-  if(address) lines.push(`Reference: ${address}`);
+  const ref = addressFirstLine(address);
+  if(ref) lines.push(`Reference: ${ref}`);
   return lines.join('\n') + '\n';
 }
 // Human-readable labels for the message log shown on a customer/job's screen.
