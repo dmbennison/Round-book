@@ -411,7 +411,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 70;
+const APP_VERSION = 71;
 function formatVersion(v){ return '1.' + v; }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
@@ -420,6 +420,7 @@ function formatVersion(v){ return '1.' + v; }
 // the most recent 10 entries (oldest ones can be left in the array or trimmed,
 // either is fine, since the display always slices to 10).
 const VERSION_HISTORY = [
+  {version: 71, changes: ['Added round optimisation and route planning, from the ⋯ menu on any round: "Start round" opens Google Maps with every stop already queued up in one go, and "Suggest a route order" works out a shorter visiting order to review before applying (using a free address lookup the first time, then remembered after that)']},
   {version: 70, changes: ['Fixed the payment reference added to bank details in messages — now shows just the house number and road, not the whole address, for anyone who\'s stored a fuller address with town/postcode']},
   {version: 69, changes: ['Payment reminders and "windows cleaned today" texts now include the customer\'s address as a payment reference alongside your bank details, so it\'s easy to see who a bank transfer\'s from once it lands in your account']},
   {version: 68, changes: ['Round value now adds on anything currently owed and subtracts anything currently in credit, rather than just adding up normal prices — a truer picture of what a round is actually worth right now. Credit only ever cancels out one clean\'s worth per customer, so someone who\'s paid several months ahead doesn\'t make a round look emptier than it is']},
@@ -1291,6 +1292,181 @@ function moveInRound(id, direction){
   saveData(); render();
 }
 
+/* ---------- route order suggestion ----------
+   A free, on-device alternative to a paid routing API: geocode each customer's
+   address once (cached on the customer forever after — see c.lat/c.lng) via
+   OpenStreetMap's free Nominatim service (the same one already used elsewhere
+   for "use my current location"), then work out a good visiting order using
+   straight-line distance between those points, entirely in JavaScript with no
+   further network calls. This can't know about one-way streets, rivers, or
+   which roads actually connect two addresses, so it's a good starting
+   suggestion to review, not a guaranteed-shortest route. */
+
+// Straight-line ("as the crow flies") distance between two points in km.
+function haversineKm(lat1, lng1, lat2, lng2){
+  const R = 6371;
+  const dLat = (lat2-lat1) * Math.PI/180;
+  const dLng = (lng2-lng1) * Math.PI/180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+// Looks up an address's coordinates via Nominatim. Returns {lat,lng} or null if
+// nothing matched or the request failed. Restricted to Great Britain, matching
+// the UK-specific assumptions already made elsewhere in the app (phone number
+// handling, currency). Callers must space consecutive calls out themselves (see
+// suggestRouteOrder) — Nominatim's fair-use policy caps free use at 1 request/sec.
+async function geocodeAddress(address){
+  try{
+    const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=gb&q=${encodeURIComponent(address)}`;
+    const res = await fetch(url);
+    if(!res.ok) return null;
+    const results = await res.json();
+    if(!results || !results.length) return null;
+    return { lat: parseFloat(results[0].lat), lng: parseFloat(results[0].lon) };
+  }catch(e){ return null; }
+}
+// Nearest-neighbour route starting from points[startIdx], refined with a 2-opt
+// pass (repeatedly reversing a stretch of the route if doing so shortens it) —
+// a cheap, well-known way to get a genuinely decent stop order for a modest
+// number of points. Returns an array of indices into `points`, in visiting order.
+function computeRouteOrder(points, startIdx){
+  const n = points.length;
+  if(n <= 1) return points.map((_,i)=>i);
+  // Still respect the requested starting point even with nothing to optimise —
+  // with exactly 2 stops there's only one possible order once you fix which one
+  // comes first, but which one that is still matters (e.g. whichever's closer
+  // to the current location).
+  if(n === 2) return startIdx === 0 ? [0,1] : [1,0];
+  const visited = new Array(n).fill(false);
+  const order = [startIdx];
+  visited[startIdx] = true;
+  for(let step=1; step<n; step++){
+    const last = points[order[order.length-1]];
+    let bestIdx = -1, bestDist = Infinity;
+    for(let i=0;i<n;i++){
+      if(visited[i]) continue;
+      const d = haversineKm(last.lat,last.lng,points[i].lat,points[i].lng);
+      if(d < bestDist){ bestDist = d; bestIdx = i; }
+    }
+    order.push(bestIdx);
+    visited[bestIdx] = true;
+  }
+  let improved = true, guard = 0;
+  while(improved && guard < 40){
+    improved = false; guard++;
+    for(let i=1;i<order.length-2;i++){
+      for(let j=i+1;j<order.length-1;j++){
+        const before = haversineKm(points[order[i-1]].lat,points[order[i-1]].lng,points[order[i]].lat,points[order[i]].lng)
+                      + haversineKm(points[order[j]].lat,points[order[j]].lng,points[order[j+1]].lat,points[order[j+1]].lng);
+        const after = haversineKm(points[order[i-1]].lat,points[order[i-1]].lng,points[order[j]].lat,points[order[j]].lng)
+                     + haversineKm(points[order[i]].lat,points[order[i]].lng,points[order[j+1]].lat,points[order[j+1]].lng);
+        if(after + 1e-9 < before){
+          let lo=i, hi=j;
+          while(lo<hi){ const t=order[lo]; order[lo]=order[hi]; order[hi]=t; lo++; hi--; }
+          improved = true;
+        }
+      }
+    }
+  }
+  return order;
+}
+// Entry point from the round actions menu. Geocodes whatever isn't already
+// cached (one request at a time, a beat apart), then previews a suggested
+// order for review — nothing about the round actually changes until the user
+// taps "Use this order".
+async function suggestRouteOrder(rn){
+  let custs = sortByRoute(data.customers.filter(c=>(c.round||'Unassigned')===rn && !c.paused));
+  const days = roundDaysUsed(custs);
+  if(days.length > 1){
+    if(roundDayFilter === 'all'){
+      toast('This round spans multiple days — pick a day above first');
+      return;
+    }
+    custs = custs.filter(c=>(c.visitDay||1) === roundDayFilter);
+  }
+  const withAddress = custs.filter(c=>c.address);
+  const withoutAddress = custs.filter(c=>!c.address);
+  if(withAddress.length < 2){ toast('Need at least 2 addresses to suggest an order'); return; }
+  closeSheet();
+
+  const toGeocode = withAddress.filter(c=>c.lat==null || c.lng==null);
+  for(let i=0;i<toGeocode.length;i++){
+    toast(`Locating addresses… ${i+1} of ${toGeocode.length}`);
+    const coords = await geocodeAddress(toGeocode[i].address);
+    if(coords){ toGeocode[i].lat = coords.lat; toGeocode[i].lng = coords.lng; }
+    if(i < toGeocode.length-1) await new Promise(r=>setTimeout(r, 1100));
+  }
+  if(toGeocode.length) saveData(); // cache whatever was found, even if this suggestion isn't applied
+
+  const located = withAddress.filter(c=>c.lat!=null && c.lng!=null);
+  const notLocated = withAddress.filter(c=>c.lat==null || c.lng==null).concat(withoutAddress);
+  if(located.length < 2){ toast('Could not locate enough addresses to suggest an order'); return; }
+
+  // Start from wherever the phone currently is, if it'll share that — makes the
+  // suggestion "best order from here" rather than an arbitrary starting point.
+  let startIdx = 0;
+  const gotLocation = await new Promise(resolve=>{
+    if(!navigator.geolocation){ resolve(null); return; }
+    const timer = setTimeout(()=>resolve(null), 4000);
+    navigator.geolocation.getCurrentPosition(pos=>{
+      clearTimeout(timer);
+      resolve({lat:pos.coords.latitude, lng:pos.coords.longitude});
+    }, ()=>{ clearTimeout(timer); resolve(null); }, {enableHighAccuracy:true, timeout:3500});
+  });
+  if(gotLocation){
+    let bestDist = Infinity;
+    located.forEach((c,i)=>{
+      const d = haversineKm(gotLocation.lat, gotLocation.lng, c.lat, c.lng);
+      if(d < bestDist){ bestDist = d; startIdx = i; }
+    });
+  }
+
+  const points = located.map(c=>({lat:c.lat, lng:c.lng}));
+  const order = computeRouteOrder(points, startIdx);
+  renderSuggestedRoutePreview(rn, order.map(i=>located[i]), notLocated, !!gotLocation);
+}
+let suggestedRouteState = null;
+function renderSuggestedRoutePreview(rn, orderedCusts, notLocated, usedCurrentLocation){
+  suggestedRouteState = { rn, orderedIds: orderedCusts.map(c=>c.id), notLocatedIds: notLocated.map(c=>c.id) };
+  openSheet(`
+    <div class="sheet-head">
+      <h2 style="flex:1; min-width:0;">Suggested order</h2>
+      <button class="sheet-close" onclick="suggestedRouteState=null; closeSheet();">✕</button>
+    </div>
+    <p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 14px; line-height:1.5;">
+      ${usedCurrentLocation ? 'Worked out from your current location, based' : 'Based'} on straight-line distance between addresses — a good starting point, but it can't know about one-way streets or which roads actually connect two places, so use your own judgement too.
+    </p>
+    ${orderedCusts.map((c,i)=>`
+      <div class="cust-card" style="display:flex; align-items:center; gap:10px;">
+        <div style="width:26px; height:26px; border-radius:50%; background:var(--blue-dim); color:var(--blue-deep); display:flex; align-items:center; justify-content:center; font-weight:800; font-size:0.8125rem; flex-shrink:0;">${i+1}</div>
+        <div class="cust-addr" style="font-weight:800; font-size:0.9062rem; min-width:0;">${escapeHtml(c.address||c.name||'Customer')}</div>
+      </div>
+    `).join('')}
+    ${notLocated.length ? `<p style="color:var(--ink-muted); font-size:0.75rem; margin:14px 2px 0; line-height:1.5;">${notLocated.length} customer${notLocated.length===1?'':'s'} couldn't be placed (no address, or the address couldn't be found) — they'll be added to the end of the order, unchanged otherwise.</p>` : ''}
+    <div class="form-actions">
+      <button class="btn-primary" onclick="applySuggestedRouteOrder()">Use this order</button>
+    </div>
+  `, () => { suggestedRouteState = null; openRound(rn); });
+}
+function applySuggestedRouteOrder(){
+  if(!suggestedRouteState) return;
+  const { rn, orderedIds, notLocatedIds } = suggestedRouteState;
+  let i = 0;
+  orderedIds.forEach(id=>{
+    const c = data.customers.find(x=>x.id===id);
+    if(c) c.order = i++;
+  });
+  // Anyone who couldn't be placed keeps their relative order among themselves
+  // (same address-alphabetical fallback sortByRoute already uses) but goes at
+  // the very end, so the round stays complete rather than losing them.
+  sortByRoute(notLocatedIds.map(id=>data.customers.find(x=>x.id===id)).filter(Boolean)).forEach(c=>{ c.order = i++; });
+  suggestedRouteState = null;
+  saveData();
+  closeSheet();
+  openRound(rn);
+  toast('New route order applied');
+}
+
 /* ---------- rendering ---------- */
 function render(){
   renderBackupBanner();
@@ -1466,6 +1642,14 @@ function openRoundActionsMenu(rn){
       <h2 style="flex:1; min-width:0;">${escapeHtml(rn)}</h2>
       <button class="sheet-close" onclick="closeSheet()">✕</button>
     </div>
+    <button class="backup-btn" onclick="startRoundDirections('${escapeAttr(rn)}')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+      <div><div class="t1">Start round — directions</div><div class="t2">Opens Google Maps with every stop queued up, in your current order</div></div>
+    </button>
+    <button class="backup-btn" onclick="suggestRouteOrder('${escapeAttr(rn)}')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h8a4 4 0 0 0 4-4V7a4 4 0 0 0-4-4H8"/></svg>
+      <div><div class="t1">Suggest a route order</div><div class="t2">Works out a shorter visiting order — review before it changes anything</div></div>
+    </button>
     <button class="backup-btn" onclick="printSingleRound('${escapeAttr(rn)}')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
       <div><div class="t1">Print this round</div><div class="t2">Customer list with contact details and prices</div></div>
@@ -2659,6 +2843,66 @@ function openDirections(kind, id){
     : data.customers.find(x=>x.id===id);
   if(!item || !item.address){ toast('No address set'); return; }
   window.location.href = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(item.address)}`;
+}
+
+// Google's free "dir/?api=1" share-link scheme (no API key, no cost) supports at
+// most 9 waypoints plus a final destination — 10 stops per link. A round with
+// more stops than that gets split into consecutive legs instead (see
+// startRoundDirections), each opened once the last one's finished.
+const MAPS_LINK_MAX_STOPS = 10;
+// No origin is set on purpose — Google Maps then uses the phone's current
+// location as the starting point automatically, which is what you want when
+// setting off on a round rather than routing from a fixed address.
+function buildMapsLink(addrs){
+  const destination = addrs[addrs.length-1];
+  const waypoints = addrs.slice(0,-1);
+  let url = `https://www.google.com/maps/dir/?api=1&travelmode=driving&destination=${encodeURIComponent(destination)}`;
+  if(waypoints.length) url += `&waypoints=${waypoints.map(encodeURIComponent).join('%7C')}`;
+  return url;
+}
+// Opens turn-by-turn directions through every stop in a round, in whichever
+// order Reorder (or Suggest route order) has set — one tap instead of routing to
+// each customer one at a time. For a round spanning multiple days, a specific
+// day has to be selected first (via the Day tabs), since a route can't sensibly
+// mix stops that aren't actually visited on the same trip.
+function startRoundDirections(rn){
+  let custs = sortByRoute(data.customers.filter(c=>(c.round||'Unassigned')===rn && !c.paused));
+  const days = roundDaysUsed(custs);
+  if(days.length > 1){
+    if(roundDayFilter === 'all'){
+      toast('This round spans multiple days — pick a day above first');
+      return;
+    }
+    custs = custs.filter(c=>(c.visitDay||1) === roundDayFilter);
+  }
+  const addrs = custs.filter(c=>c.address).map(c=>c.address);
+  if(!addrs.length){ toast('No addresses to get directions to'); return; }
+
+  const batches = [];
+  for(let i=0;i<addrs.length;i+=MAPS_LINK_MAX_STOPS) batches.push(addrs.slice(i,i+MAPS_LINK_MAX_STOPS));
+
+  if(batches.length === 1){
+    closeSheet();
+    window.location.href = buildMapsLink(batches[0]);
+    return;
+  }
+  // More stops than one link can hold — offer each leg separately, to be opened
+  // in turn as you physically make your way through the round.
+  openSheet(`
+    <div class="sheet-head">
+      <h2 style="flex:1; min-width:0;">${escapeHtml(rn)} — directions</h2>
+      <button class="sheet-close" onclick="closeSheet()">✕</button>
+    </div>
+    <p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 16px; line-height:1.5;">
+      Google Maps can only queue up ${MAPS_LINK_MAX_STOPS} stops in one link, so this round's split into ${batches.length} legs — open the next one once you're nearing the end of the last.
+    </p>
+    ${batches.map((batch,i)=>`
+      <button class="backup-btn" onclick="closeSheet(); window.location.href='${buildMapsLink(batch)}';">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        <div><div class="t1">Leg ${i+1} of ${batches.length}</div><div class="t2">${batch.length} stop${batch.length===1?'':'s'}</div></div>
+      </button>
+    `).join('')}
+  `, () => openRound(rn));
 }
 
 // Dials a customer/job's saved number via the device's phone app. Unlike the
@@ -5689,7 +5933,9 @@ const FOCUSED_HELP = {
       helpP('Deleting a customer, job, or quote shows an "Undo" banner at the top of the app that stays until you act on it or dismiss it — not a toast that vanishes in a few seconds. Only the single most recent deletion can be undone this way.'),
       helpP('Marking someone cleaned doesn\'t remove them from the Due view straight away — they stay there for the rest of the day, so you can still see everyone you\'ve worked through. They drop off automatically the next day. The total at the bottom only counts what\'s still left to do.'),
       helpP('If a round takes more than one day, tap each customer\'s day badge in reorder mode to assign Day 1–5. A day switcher then appears above the customer list, and cards get a "Day N" badge.'),
-      helpP('The ⋯ button on a round\'s screen opens Print, Defer whole round 4 weeks, and Help.'),
+      helpP('The ⋯ button on a round\'s screen opens Start round (directions for every stop in one go), Suggest a route order, Print, Defer whole round 4 weeks, and Help.'),
+      helpP('Start round opens Google Maps with every stop in the round queued up, in whatever order is currently set — no need to route to each customer one at a time. A round with more than 10 stops gets split into a few legs, opened one after another as you work through them. For a round split across several days, pick a day first so it only routes through that day\'s stops.'),
+      helpP('Suggest a route order works out a shorter visiting order for a round and shows it to you before changing anything — nothing\'s applied unless you tap "Use this order". The first time it\'s used on a round, it looks up each address\'s location via a free map lookup (a moment or two per customer, faster on repeat runs since it\'s remembered afterwards) and works out a sensible order from straight-line distance — a good starting point, though it can\'t know about one-way streets or which roads actually connect two places, so it\'s worth a sanity check before setting off.'),
       helpP('A "Cleaned today" button appears on a customer\'s card once they have a clean logged for today and a phone number saved — tap it to text them that it\'s done.'),
       helpP('The small green phone button on a customer\'s card calls them; the small blue compass button opens directions to their address in your phone\'s map app.'),
       helpP('If a customer\'s had 2 or more payment reminders sent with no payment logged, a red "⚠ Chase" badge appears on their card — a sign it\'s worth a phone call rather than another text.')
