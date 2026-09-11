@@ -411,7 +411,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 71;
+const APP_VERSION = 72;
 function formatVersion(v){ return '1.' + v; }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
@@ -420,6 +420,7 @@ function formatVersion(v){ return '1.' + v; }
 // the most recent 10 entries (oldest ones can be left in the array or trimmed,
 // either is fine, since the display always slices to 10).
 const VERSION_HISTORY = [
+  {version: 72, changes: ['Round totals (on each round card, and at the top of the Rounds tab) now show as price/owed — the plain round value, followed by what\'s currently outstanding in red, instead of one blended figure', 'Added wind speed to the weather banner', 'Editing a customer now asks whether to save if you close the screen with unsaved changes, however you close it']},
   {version: 71, changes: ['Added round optimisation and route planning, from the ⋯ menu on any round: "Start round" opens Google Maps with every stop already queued up in one go, and "Suggest a route order" works out a shorter visiting order to review before applying (using a free address lookup the first time, then remembered after that)']},
   {version: 70, changes: ['Fixed the payment reference added to bank details in messages — now shows just the house number and road, not the whole address, for anyone who\'s stored a fuller address with town/postcode']},
   {version: 69, changes: ['Payment reminders and "windows cleaned today" texts now include the customer\'s address as a payment reference alongside your bank details, so it\'s easy to see who a bank transfer\'s from once it lands in your account']},
@@ -961,13 +962,6 @@ function daysBetween(a,b){
 function lastOf(arr){ if(!arr||!arr.length) return null; return [...arr].sort().slice(-1)[0]; }
 function lastDateOf(arr){ if(!arr||!arr.length) return null; return [...arr.map(e=>e.date)].sort().slice(-1)[0]; }
 function money(n){ const v=Number(n||0); return '£'+v.toFixed(v%1?2:0); }
-// Same as money(), but puts a leading minus before the £ symbol for a negative
-// total rather than after it (money(-12.5) reads "£-12.50"; this reads "-£12.50").
-// Only needed where a single combined figure could plausibly go negative, like a
-// round's net value once outstanding credit is subtracted — money() itself is
-// left as-is everywhere else, since owed/credit amounts are otherwise always
-// shown as a positive figure paired with its own "Owes"/"Credit" label.
-function moneySigned(n){ const v=Number(n||0); return v<0 ? '-'+money(-v) : money(v); }
 let pendingToastAction = null;
 function toast(msg, actionLabel, actionFn){
   const t=document.getElementById('toast');
@@ -1029,19 +1023,14 @@ function custStatus(c){
   const credit = balance < -0.005;
   return {cleanBadge, owed, credit, balance, lastClean, lastPaid};
 }
-// A customer's contribution to "round value" (see renderRoundsList): their normal
-// price, plus anything they currently owe on top (that money hasn't come in yet,
-// so it's still genuinely worth counting), minus any credit — but credit is only
-// ever allowed to cancel out one clean's worth of price, never more. Someone who's
-// paid several months ahead still only reduces the round's value by a single
-// clean, the same as someone who's paid exactly one month ahead — the rest of
-// their credit is simply future cleans already covered, not a reason for the
-// round to look emptier today.
-function roundValueContribution(c){
-  const price = Number(c.price||0);
-  const balance = custStatus(c).balance;
-  const cappedBalance = balance > 0 ? balance : Math.max(balance, -price);
-  return price + cappedBalance;
+// "£value/£owed" — the format used everywhere a round's worth is shown: the
+// plain price total for its active (non-paused) customers, followed by however
+// much of that is currently outstanding, in red so it's clearly distinguished
+// from the round's normal earning potential. Muted (not red) when nothing's
+// owed, so a healthy round doesn't read as if something's wrong.
+function roundValueOwedHtml(value, owed){
+  const owedColor = owed > 0.005 ? 'var(--red)' : 'inherit';
+  return `${money(value)}/<span style="color:${owedColor};">${money(owed)}</span>`;
 }
 
 /* ---------- state ---------- */
@@ -1500,10 +1489,8 @@ function renderRoundsList(main){
   if(data.customers.length){
     const activeCustomers = data.customers.filter(c=>!c.paused);
     const totalCustomers = activeCustomers.length;
-    // Price per clean, plus what's genuinely still outstanding right now: owed
-    // balances add on top (that money hasn't come in yet), credit subtracts but
-    // never by more than one clean's price (see roundValueContribution).
-    const totalValue = activeCustomers.reduce((sum,c)=>sum+roundValueContribution(c),0);
+    const totalValue = activeCustomers.reduce((sum,c)=>sum+Number(c.price||0),0);
+    const totalOwed = activeCustomers.reduce((sum,c)=>{ const s=custStatus(c); return sum + (s.owed ? s.balance : 0); },0);
     const overallAvg = totalCustomers ? totalValue/totalCustomers : 0;
     html += `<div style="display:flex; align-items:center; justify-content:flex-end; gap:8px; margin-bottom:8px;">
       ${mainScreenHelpBtn('rounds', "()=>setTab('rounds')")}
@@ -1519,8 +1506,8 @@ function renderRoundsList(main){
     </div>
     <div class="summary-overall">
       <div class="stat"><div class="num">${totalCustomers}</div><div class="lbl">Customers</div></div>
-      <div class="stat"><div class="num">${moneySigned(totalValue)}</div><div class="lbl">Round value</div></div>
-      <div class="stat"><div class="num">${moneySigned(overallAvg)}</div><div class="lbl">Avg / customer</div></div>
+      <div class="stat"><div class="num">${roundValueOwedHtml(totalValue, totalOwed)}</div><div class="lbl">Round value</div></div>
+      <div class="stat"><div class="num">${money(overallAvg)}</div><div class="lbl">Avg / customer</div></div>
     </div>`;
   }
   html += `<div class="seg-row">
@@ -1536,27 +1523,27 @@ function renderRoundsList(main){
 
   if(roundsViewMode === 'overview'){
     html += `<div class="section-label">Your rounds</div>`;
-    let grandCustomers = 0, grandValue = 0;
+    let grandCustomers = 0, grandValue = 0, grandOwed = 0;
     roundNames.forEach(rn=>{
       const all = rounds[rn];
       const activeAll = all.filter(c=>!c.paused);
-      let activeValue = 0, due=0, owed=0, paused=0;
+      let activeValue = 0, activeOwed = 0, due=0, owed=0, paused=0;
       all.forEach(c=>{
         const s = custStatus(c);
         if(c.paused){ paused++; return; }
-        // Price per clean, plus what's genuinely still outstanding right now — same
-        // formula as the overall summary above (see roundValueContribution).
-        activeValue += roundValueContribution(c);
+        activeValue += Number(c.price||0);
+        if(s.owed) activeOwed += s.balance;
         if(s.cleanBadge && s.cleanBadge.type==='due') due++;
         if(s.owed) owed++;
       });
       grandCustomers += activeAll.length;
       grandValue += activeValue;
+      grandOwed += activeOwed;
       const daysUsed = roundDaysUsed(all);
       html += `<div class="round-card" onclick="openRound('${escapeAttr(rn)}')">
         <div>
           <div class="rname">${escapeHtml(rn)}</div>
-          <div class="rcount">${activeAll.length} customer${activeAll.length===1?'':'s'} · ${moneySigned(activeValue)}${daysUsed.length>1?` · ${daysUsed.length} days`:''}</div>
+          <div class="rcount">${activeAll.length} customer${activeAll.length===1?'':'s'} · ${roundValueOwedHtml(activeValue, activeOwed)}${daysUsed.length>1?` · ${daysUsed.length} days`:''}</div>
         </div>
         <div class="badges">
           ${due?`<span class="badge due">${due} due</span>`:''}
@@ -1567,7 +1554,7 @@ function renderRoundsList(main){
         </div>
       </div>`;
     });
-    html += listTotalHtml(`${roundNames.length} round${roundNames.length===1?'':'s'} · ${grandCustomers} customer${grandCustomers===1?'':'s'} · ${moneySigned(grandValue)}`);
+    html += listTotalHtml(`${roundNames.length} round${roundNames.length===1?'':'s'} · ${grandCustomers} customer${grandCustomers===1?'':'s'} · ${roundValueOwedHtml(grandValue, grandOwed)}`);
   } else if(roundsViewMode === 'due'){
     let anyDue = false;
     let dueGrandCount = 0, dueGrandValue = 0;
@@ -1897,16 +1884,28 @@ function useCurrentLocation(){
 
 /* ---------- sheets ---------- */
 let sheetOnClose = null;
+// Lets a sheet intercept an attempt to close it — set to a function that returns
+// true once it's safe to actually close, or false if it's decided to handle the
+// close itself (e.g. after showing its own confirm dialog) and closeSheet()
+// shouldn't proceed on this call. null (the default) means no interception at
+// all, which is what almost every sheet wants. See openCustomerForm for the one
+// current use — warning about unsaved changes — which works no matter how the
+// sheet is being closed (✕ button, tapping outside it, or anything else), since
+// every close path funnels through here.
+let sheetCloseGuard = null;
 // onClose lets a sheet redirect back to another screen (e.g. a customer's history
 // list returning to that customer's detail screen) no matter how it's dismissed —
 // the ✕ button, tapping outside the sheet, or any other close path all funnel
 // through closeSheet(), so this only needs to be handled in one place.
 function openSheet(html, onClose){
   sheetOnClose = onClose || null;
+  sheetCloseGuard = null; // each new sheet starts unguarded; set one after opening if needed
   document.getElementById('sheet').innerHTML = `<div class="sheet-handle"></div>` + html;
   document.getElementById('overlay').classList.add('show');
 }
 function closeSheet(){
+  if(sheetCloseGuard && !sheetCloseGuard()) return;
+  sheetCloseGuard = null;
   document.getElementById('overlay').classList.remove('show');
   if(sheetOnClose){
     const cb = sheetOnClose;
@@ -1972,6 +1971,49 @@ function openCustomerForm(existing){
     </div>
     ${existing?`<button class="btn-danger-text" onclick="deleteCustomer('${existing.id}')">Delete customer</button>`:''}
   `, existing ? (() => openCustomerDetail(existing.id)) : null);
+  customerFormSnapshot = JSON.stringify(readCustomerFormFields());
+  sheetCloseGuard = () => confirmCustomerFormClose(existing ? existing.id : '');
+}
+// Plain field values, read fresh — used only to detect whether the form's been
+// edited since it opened (see openCustomerForm/confirmCustomerFormClose).
+// saveCustomerForm does its own separate reading with its own parsing/validation,
+// left untouched to avoid risking its already-working behaviour.
+function readCustomerFormFields(){
+  return {
+    name: document.getElementById('f_name').value.trim(),
+    address: document.getElementById('f_address').value.trim(),
+    phone: document.getElementById('f_phone').value.trim(),
+    email: document.getElementById('f_email').value.trim(),
+    round: document.getElementById('f_round').value.trim(),
+    price: document.getElementById('f_price').value,
+    frequencyWeeks: document.getElementById('f_freq').value,
+    notes: document.getElementById('f_notes').value.trim(),
+    referredBy: document.getElementById('f_referredBy').value.trim(),
+    textBeforeVisit: document.getElementById('f_textBefore').checked,
+    marketingOptOut: document.getElementById('f_marketingOptOut').checked,
+    accountNumber: document.getElementById('f_accountNumber').value.trim()
+  };
+}
+let customerFormSnapshot = null;
+// The sheetCloseGuard for the customer form (see openSheet/closeSheet) — returns
+// true to let the close go ahead untouched, or handles things itself (asking to
+// save, then either saving-and-closing or discarding-and-closing) and returns
+// false so closeSheet() doesn't also try to close on the same call.
+function confirmCustomerFormClose(id){
+  const current = JSON.stringify(readCustomerFormFields());
+  if(current === customerFormSnapshot) return true;
+  sheetCloseGuard = null; // avoid re-triggering this guard when the choice below calls closeSheet() itself
+  if(confirm('You have unsaved changes. Save them before closing?')){
+    saveCustomerForm(id);
+    if(document.getElementById('overlay').classList.contains('show')){
+      // saveCustomerForm didn't end up closing (e.g. validation failed) — restore
+      // the guard so unsaved changes are still protected on the next attempt too.
+      sheetCloseGuard = () => confirmCustomerFormClose(id);
+    }
+  } else {
+    closeSheet();
+  }
+  return false;
 }
 
 function saveCustomerForm(id){
@@ -5926,7 +5968,7 @@ const FOCUSED_HELP = {
     title: 'Rounds',
     body: () => [
       helpP('The Rounds tab shows every round, with a Rounds / Due / Owed switch. Open a round to see its customers, swipe a card right to mark cleaned or left to mark paid, and use Reorder to set your walking order.'),
-      helpP('Each round card shows its active customer count and value — price per clean added up, plus anything currently owed on top, minus anything in credit (capped at one clean\'s price each, so someone who\'s paid several months ahead doesn\'t make the round look emptier than it is). Paused customers are left out entirely. Badges show how many are due, owe money, or are paused.'),
+      helpP('Each round card shows its active customer count, then its value as price/owed — the plain price per clean added up, followed by whatever\'s currently outstanding across those customers, shown in red. Paused customers are left out of both entirely. Badges show how many are due, owe money, or are paused.'),
       helpP('The printer icon above the summary numbers covers reports across every round at once — Windows due, Money owed, and Full round lists. A single round\'s own screen has its own separate Print option, just for that round.'),
       helpP('The magnifying glass icon searches across every customer — name, address, phone, email, notes, round, or account number — with results shown as a tappable list, matches highlighted as you type.'),
       helpP('The photo icon opens the Photo gallery — every customer with at least one photo, address first then a thumbnail strip (including photos from their linked one-off jobs), searchable by address or name. Standalone one-off jobs (not linked to a customer) with their own photos get their own card too.'),
@@ -5955,6 +5997,7 @@ const FOCUSED_HELP = {
     title: 'Customers',
     body: () => [
       helpP('A customer\'s screen shows their round, standard price, frequency, balance, and any notes at the top. Below that, Actions, History, and Photos each collapse into their own section — tap a heading to open or close it.'),
+      helpP('If you\'ve made changes on a customer\'s edit screen and try to close it without saving — the ✕ button or tapping outside it — you\'ll be asked whether to save first, so nothing\'s lost by accident.'),
       helpP('"Add a clean" and "Add a payment" open a small pop-up for the date and amount. Tapping an entry in Clean history, Payment history, or Price history opens a menu with Edit, Remove, and (for payments) Send receipt.'),
       helpP('Texts (cleaning/payment reminders, receipts, quotes, "cleaned today") only offer to send to a mobile number — landlines are skipped — and always open a preview you can edit before it goes out.'),
       helpP('A "Messages" entry under History lists every text actually sent to that customer, newest first — a quick way to check whether someone\'s already been chased today.'),
@@ -6580,7 +6623,7 @@ function loadWeather(){
   navigator.geolocation.getCurrentPosition(async (pos)=>{
     try{
       const { latitude, longitude } = pos.coords;
-      const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true&hourly=precipitation_probability&forecast_days=1&timezone=auto`);
+      const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true&hourly=precipitation_probability&forecast_days=1&timezone=auto&windspeed_unit=mph`);
       if(!res.ok) throw new Error('bad response');
       const json = await res.json();
       const cw = json && json.current_weather;
@@ -6605,7 +6648,8 @@ function loadWeather(){
         if(idx !== -1) rainChance = json.hourly.precipitation_probability[idx];
       }
       const rainPart = (rainChance != null) ? ` · 🌧️ ${rainChance}%` : '';
-      const text = `${icon} ${temp}°C${rainPart}`;
+      const windPart = (cw.windspeed != null) ? ` · 💨 ${Math.round(cw.windspeed)}mph` : '';
+      const text = `${icon} ${temp}°C${rainPart}${windPart}`;
       const el2 = document.getElementById('weatherPill');
       if(el2) el2.textContent = text;
       localStorage.setItem('roundBookWeatherCache', JSON.stringify({ text, time: Date.now() }));
