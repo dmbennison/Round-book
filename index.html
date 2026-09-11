@@ -411,7 +411,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 72;
+const APP_VERSION = 73;
 function formatVersion(v){ return '1.' + v; }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
@@ -420,6 +420,7 @@ function formatVersion(v){ return '1.' + v; }
 // the most recent 10 entries (oldest ones can be left in the array or trimmed,
 // either is fine, since the display always slices to 10).
 const VERSION_HISTORY = [
+  {version: 73, changes: ['The price/owed round value format now also shows on an individual round\'s own screen, not just the Rounds tab overview']},
   {version: 72, changes: ['Round totals (on each round card, and at the top of the Rounds tab) now show as price/owed — the plain round value, followed by what\'s currently outstanding in red, instead of one blended figure', 'Added wind speed to the weather banner', 'Editing a customer now asks whether to save if you close the screen with unsaved changes, however you close it']},
   {version: 71, changes: ['Added round optimisation and route planning, from the ⋯ menu on any round: "Start round" opens Google Maps with every stop already queued up in one go, and "Suggest a route order" works out a shorter visiting order to review before applying (using a free address lookup the first time, then remembered after that)']},
   {version: 70, changes: ['Fixed the payment reference added to bank details in messages — now shows just the house number and road, not the whole address, for anyone who\'s stored a fuller address with town/postcode']},
@@ -1696,10 +1697,11 @@ function renderRoundDetail(main, rn){
   if(allInRound.length){
     const activeInRound = allInRound.filter(c=>!c.paused);
     const roundTotal = activeInRound.reduce((sum,c)=>sum+Number(c.price||0),0);
+    const roundOwed = activeInRound.reduce((sum,c)=>{ const s=custStatus(c); return sum + (s.owed ? s.balance : 0); },0);
     const roundAvg = activeInRound.length ? roundTotal / activeInRound.length : 0;
     shellHtml += `<div class="summary-overall">
       <div class="stat"><div class="num">${activeInRound.length}</div><div class="lbl">Customers</div></div>
-      <div class="stat"><div class="num">${money(roundTotal)}</div><div class="lbl">Round value</div></div>
+      <div class="stat"><div class="num">${roundValueOwedHtml(roundTotal, roundOwed)}</div><div class="lbl">Round value</div></div>
       <div class="stat"><div class="num">${money(roundAvg)}</div><div class="lbl">Avg / customer</div></div>
     </div>`;
   }
