@@ -411,7 +411,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 74;
+const APP_VERSION = 75;
 function formatVersion(v){ return '1.' + v; }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
@@ -420,6 +420,7 @@ function formatVersion(v){ return '1.' + v; }
 // the most recent 10 entries (oldest ones can be left in the array or trimmed,
 // either is fine, since the display always slices to 10).
 const VERSION_HISTORY = [
+  {version: 75, changes: ['"Suggest a route order" now tries real road-based routing first (via free OSRM/Valhalla services), only falling back to the straight-line estimate if neither is reachable — the suggestion screen says which one was actually used']},
   {version: 74, changes: ['Fixed the ✕ button not working when editing a customer with unsaved changes — the save/discard prompt now uses the app\'s own screen instead of the phone\'s native pop-up, which could fail silently on some devices', 'Added a "✓ Text sent" flag once the windows-cleaned-today text has actually been sent, so it\'s clear at a glance who\'s been told — tap it again any time to resend']},
   {version: 73, changes: ['The price/owed round value format now also shows on an individual round\'s own screen, not just the Rounds tab overview']},
   {version: 72, changes: ['Round totals (on each round card, and at the top of the Rounds tab) now show as price/owed — the plain round value, followed by what\'s currently outstanding in red, instead of one blended figure', 'Added wind speed to the weather banner', 'Editing a customer now asks whether to save if you close the screen with unsaved changes, however you close it']},
@@ -1366,6 +1367,61 @@ function computeRouteOrder(points, startIdx){
 // cached (one request at a time, a beat apart), then previews a suggested
 // order for review — nothing about the round actually changes until the user
 // taps "Use this order".
+// Real road-based route ordering via OSRM's public Trip service — solves the
+// visiting-order problem itself using actual OpenStreetMap road data, so it's
+// tried first as the most accurate free option available. Free public demo
+// server (no API key), fair-use only — same policy shape as Nominatim above:
+// reasonable personal-scale use, no uptime guarantee, may be withdrawn at any
+// time. Points are reordered so the desired start is always sent first, since
+// OSRM's `source=first` only pins whichever coordinate is literally first in
+// the request — the response is then mapped back to the original indices.
+// Returns an array of indices into `points` in visiting order, or null if the
+// service couldn't be reached, timed out, or didn't return a usable answer.
+async function getOsrmTripOrder(points, startIdx){
+  try{
+    const reordered = [startIdx, ...points.map((_,i)=>i).filter(i=>i!==startIdx)];
+    const coordStr = reordered.map(i=>`${points[i].lng},${points[i].lat}`).join(';');
+    const url = `https://router.project-osrm.org/trip/v1/driving/${coordStr}?source=first&roundtrip=false&overview=false`;
+    const controller = new AbortController();
+    const timer = setTimeout(()=>controller.abort(), 8000);
+    const res = await fetch(url, {signal: controller.signal});
+    clearTimeout(timer);
+    if(!res.ok) return null;
+    const data = await res.json();
+    if(data.code !== 'Ok' || !data.waypoints || !data.waypoints.length) return null;
+    // Each returned waypoint corresponds, in order, to a coordinate we sent
+    // (`reordered`); its own waypoint_index says where that stop falls in the
+    // route OSRM worked out.
+    const withRank = data.waypoints.map((wp,sentPos)=>({origIdx: reordered[sentPos], rank: wp.waypoint_index}));
+    withRank.sort((a,b)=>a.rank-b.rank);
+    return withRank.map(w=>w.origIdx);
+  }catch(e){ return null; }
+}
+// Second choice if OSRM's demo server is unreachable — Valhalla's public demo
+// server, also free and fair-use only, also hosted by the FOSSGIS project,
+// offering an equivalent "work out the order for me" endpoint over real roads.
+async function getValhallaTripOrder(points, startIdx){
+  try{
+    const reordered = [startIdx, ...points.map((_,i)=>i).filter(i=>i!==startIdx)];
+    const locations = reordered.map(i=>({lat:points[i].lat, lon:points[i].lng}));
+    const controller = new AbortController();
+    const timer = setTimeout(()=>controller.abort(), 8000);
+    const res = await fetch('https://valhalla1.openstreetmap.de/optimized_route', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({locations, costing:'auto'}),
+      signal: controller.signal
+    });
+    clearTimeout(timer);
+    if(!res.ok) return null;
+    const data = await res.json();
+    const locs = data && data.trip && data.trip.locations;
+    if(!locs || !locs.length) return null;
+    // Valhalla returns locations already in the order it worked out, each
+    // carrying the position it originally came from in our request.
+    return locs.map(l => reordered[l.original_index]);
+  }catch(e){ return null; }
+}
 async function suggestRouteOrder(rn){
   let custs = sortByRoute(data.customers.filter(c=>(c.round||'Unassigned')===rn && !c.paused));
   const days = roundDaysUsed(custs);
@@ -1414,19 +1470,32 @@ async function suggestRouteOrder(rn){
   }
 
   const points = located.map(c=>({lat:c.lat, lng:c.lng}));
-  const order = computeRouteOrder(points, startIdx);
-  renderSuggestedRoutePreview(rn, order.map(i=>located[i]), notLocated, !!gotLocation);
+  toast('Working out the best route…');
+  let order = await getOsrmTripOrder(points, startIdx);
+  let method = 'osrm';
+  if(!order){
+    order = await getValhallaTripOrder(points, startIdx);
+    method = 'valhalla';
+  }
+  if(!order){
+    order = computeRouteOrder(points, startIdx);
+    method = 'straight-line';
+  }
+  renderSuggestedRoutePreview(rn, order.map(i=>located[i]), notLocated, !!gotLocation, method);
 }
 let suggestedRouteState = null;
-function renderSuggestedRoutePreview(rn, orderedCusts, notLocated, usedCurrentLocation){
+function renderSuggestedRoutePreview(rn, orderedCusts, notLocated, usedCurrentLocation, method){
   suggestedRouteState = { rn, orderedIds: orderedCusts.map(c=>c.id), notLocatedIds: notLocated.map(c=>c.id) };
+  const methodText = method === 'straight-line'
+    ? `${usedCurrentLocation ? 'Worked out from your current location, based' : 'Based'} on straight-line distance between addresses — the road-routing service wasn't reachable just now, so this is a fallback estimate. It can't know about one-way streets or which roads actually connect two places, so use your own judgement too.`
+    : `Worked out ${usedCurrentLocation ? 'from your current location, ' : ''}using real road distances via ${method==='osrm'?'OSRM':'Valhalla'} (a free OpenStreetMap-based routing service) — more accurate than a straight-line guess, though still worth a sanity check before setting off.`;
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">Suggested order</h2>
       <button class="sheet-close" onclick="suggestedRouteState=null; closeSheet();">✕</button>
     </div>
     <p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 14px; line-height:1.5;">
-      ${usedCurrentLocation ? 'Worked out from your current location, based' : 'Based'} on straight-line distance between addresses — a good starting point, but it can't know about one-way streets or which roads actually connect two places, so use your own judgement too.
+      ${methodText}
     </p>
     ${orderedCusts.map((c,i)=>`
       <div class="cust-card" style="display:flex; align-items:center; gap:10px;">
@@ -6033,7 +6102,7 @@ const FOCUSED_HELP = {
       helpP('If a round takes more than one day, tap each customer\'s day badge in reorder mode to assign Day 1–5. A day switcher then appears above the customer list, and cards get a "Day N" badge.'),
       helpP('The ⋯ button on a round\'s screen opens Start round (directions for every stop in one go), Suggest a route order, Print, Defer whole round 4 weeks, and Help.'),
       helpP('Start round opens Google Maps with every stop in the round queued up, in whatever order is currently set — no need to route to each customer one at a time. A round with more than 10 stops gets split into a few legs, opened one after another as you work through them. For a round split across several days, pick a day first so it only routes through that day\'s stops.'),
-      helpP('Suggest a route order works out a shorter visiting order for a round and shows it to you before changing anything — nothing\'s applied unless you tap "Use this order". The first time it\'s used on a round, it looks up each address\'s location via a free map lookup (a moment or two per customer, faster on repeat runs since it\'s remembered afterwards) and works out a sensible order from straight-line distance — a good starting point, though it can\'t know about one-way streets or which roads actually connect two places, so it\'s worth a sanity check before setting off.'),
+      helpP('Suggest a route order works out a shorter visiting order for a round and shows it to you before changing anything — nothing\'s applied unless you tap "Use this order". The first time it\'s used on a round, it looks up each address\'s location via a free map lookup (a moment or two per customer, faster on repeat runs since it\'s remembered afterwards), then works out an order using real road distances via a free routing service where possible. If that\'s not reachable, it falls back to a straight-line estimate instead — either way, it\'s a good starting point, but still worth a sanity check before setting off.'),
       helpP('A "Cleaned today" button appears on a customer\'s card once they have a clean logged for today and a phone number saved — tap it to text them that it\'s done. Once sent, it changes to "✓ Text sent" so you can see at a glance who\'s already been told — tap it again any time if you need to resend.'),
       helpP('The small green phone button on a customer\'s card calls them; the small blue compass button opens directions to their address in your phone\'s map app.'),
       helpP('If a customer\'s had 2 or more payment reminders sent with no payment logged, a red "⚠ Chase" badge appears on their card — a sign it\'s worth a phone call rather than another text.')
