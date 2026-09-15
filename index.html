@@ -74,7 +74,7 @@
   header{
     background:var(--navy);
     color:#fff;
-    padding:calc(env(safe-area-inset-top) + 14px) 16px 14px;
+    padding:calc(env(safe-area-inset-top) + 10px) 16px 10px;
     position:sticky; top:0; z-index:20;
   }
   .header-row{display:flex; align-items:center; justify-content:space-between; gap:10px;}
@@ -90,7 +90,7 @@
   .brand-text{min-width:0;}
   .brand h1{font-size:1.1875rem; font-weight:800; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
   .brand .sub{font-size:0.6875rem; color:#A9C4D8; font-weight:600; letter-spacing:.04em; text-transform:uppercase; margin-top:1px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
-  #weatherPill{text-transform:none;}
+  #weatherPill{text-transform:none; margin-top:8px; white-space:normal;}
   .icon-btn{
     width:34px;height:34px;border-radius:9px;border:none; flex-shrink:0;
     background:rgba(255,255,255,0.12); color:#fff; display:flex;align-items:center;justify-content:center;
@@ -360,7 +360,6 @@
       <div class="brand-text">
         <h1>Round Book</h1>
         <div class="sub" id="dateNow"></div>
-        <div class="sub" id="weatherPill"></div>
       </div>
     </div>
     <div style="display:flex; gap:5px;">
@@ -378,6 +377,7 @@
       </button>
     </div>
   </div>
+  <div class="sub" id="weatherPill" style="padding-left:46px;"></div>
   <div class="tabs">
     <button class="tab active" data-tab="rounds" onclick="setTab('rounds')">Rounds</button>
     <button class="tab" data-tab="jobs" onclick="setTab('jobs')">One-off jobs</button>
@@ -411,7 +411,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 75;
+const APP_VERSION = 76;
 function formatVersion(v){ return '1.' + v; }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
@@ -420,6 +420,7 @@ function formatVersion(v){ return '1.' + v; }
 // the most recent 10 entries (oldest ones can be left in the array or trimmed,
 // either is fine, since the display always slices to 10).
 const VERSION_HISTORY = [
+  {version: 76, changes: ['Fixed the ✕ button not working after saving changes on a customer\'s edit screen — saving could leave the unsaved-changes prompt stuck showing on the next close attempt', 'Moved the weather info to its own line so it has room to show in full underneath the top buttons, which sit slightly higher now']},
   {version: 75, changes: ['"Suggest a route order" now tries real road-based routing first (via free OSRM/Valhalla services), only falling back to the straight-line estimate if neither is reachable — the suggestion screen says which one was actually used']},
   {version: 74, changes: ['Fixed the ✕ button not working when editing a customer with unsaved changes — the save/discard prompt now uses the app\'s own screen instead of the phone\'s native pop-up, which could fail silently on some devices', 'Added a "✓ Text sent" flag once the windows-cleaned-today text has actually been sent, so it\'s clear at a glance who\'s been told — tap it again any time to resend']},
   {version: 73, changes: ['The price/owed round value format now also shows on an individual round\'s own screen, not just the Rounds tab overview']},
@@ -2202,7 +2203,7 @@ function saveCustomerForm(id){
     // anyone reads it.
     setTimeout(() => toast(`Note: account number ${accountNumberEntered} is already used by ${dupeAccount.name||dupeAccount.address||'another customer'}`), 1800);
   }
-  saveData(); closeSheet(); render();
+  saveData(); sheetCloseGuard = null; closeSheet(); render();
 }
 
 function deleteCustomer(id){
