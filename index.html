@@ -411,7 +411,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 77;
+const APP_VERSION = 78;
 function formatVersion(v){ return '1.' + v; }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
@@ -420,6 +420,7 @@ function formatVersion(v){ return '1.' + v; }
 // the most recent 10 entries (oldest ones can be left in the array or trimmed,
 // either is fine, since the display always slices to 10).
 const VERSION_HISTORY = [
+  {version: 78, changes: ['Fixed the ✕ button still not working in one specific case — saving from the "unsaved changes" prompt when closing a customer\'s edit screen could leave the next screen\'s ✕ silently broken', 'Added a "Property types" report — houses and average price by property type, with a total and a breakdown for each round']},
   {version: 77, changes: ['Converting a quote to a one-off job now automatically links it to an existing customer if the address matches, so it shows up in that customer\'s history', 'Added property type (detached/semi-detached/terraced/bungalow), add-ons (conservatory, extension, garage door, or other), and a "fronts only" tick box — recorded on customers, quotes and one-off jobs, and carried across automatically when a quote becomes a job or customer']},
   {version: 76, changes: ['Fixed the ✕ button not working after saving changes on a customer\'s edit screen — saving could leave the unsaved-changes prompt stuck showing on the next close attempt', 'Moved the weather info to its own line so it has room to show in full underneath the top buttons, which sit slightly higher now']},
   {version: 75, changes: ['"Suggest a route order" now tries real road-based routing first (via free OSRM/Valhalla services), only falling back to the straight-line estimate if neither is reachable — the suggestion screen says which one was actually used']},
@@ -2157,6 +2158,11 @@ let customerFormSnapshot = null;
 // prompt to save, then either saving-and-closing or discarding-and-closing) and
 // returns false so closeSheet() doesn't also try to close on the same call.
 function confirmCustomerFormClose(id){
+  // Defensive: if this guard is ever left set while some other sheet is showing
+  // (shouldn't happen, but the consequence of it happening was exactly this bug),
+  // the form's own fields won't be present — treat that as nothing to guard
+  // rather than throwing and leaving the ✕ button looking dead.
+  if(!document.getElementById('f_name')) return true;
   const current = JSON.stringify(readCustomerFormFields());
   if(current === customerFormSnapshot) return true;
   sheetCloseGuard = null; // avoid re-triggering this guard when a choice below calls closeSheet() itself
@@ -2201,28 +2207,39 @@ function unsavedChangesPromptKeepEditing(id){
 }
 function unsavedChangesPromptSave(id){
   removeUnsavedChangesPrompt();
-  saveCustomerForm(id); // reads straight from the still-open form's own fields
-  if(document.getElementById('overlay').classList.contains('show')){
-    // saveCustomerForm didn't end up closing (e.g. validation failed) — restore
-    // the guard so unsaved changes are still protected on the next attempt too.
+  const saved = saveCustomerForm(id); // reads straight from the still-open form's own fields
+  if(!saved){
+    // saveCustomerForm didn't end up saving (e.g. validation failed, or a
+    // duplicate-address warning was declined) — restore the guard so unsaved
+    // changes are still protected on the next attempt too.
     sheetCloseGuard = () => confirmCustomerFormClose(id);
   }
+  // If it did save, saveCustomerForm has already closed this form (and cleared
+  // the guard) — whatever sheet is open now, if any, is unrelated and must be
+  // left alone. Checking the overlay's visibility here would be wrong: a
+  // successful save can itself reopen another sheet (e.g. back to the
+  // customer's detail screen), which leaves the overlay showing too and would
+  // look identical to a failed save that never closed.
 }
 function unsavedChangesPromptDiscard(){
   removeUnsavedChangesPrompt();
   closeSheet();
 }
 
+// Returns true if the customer was actually saved (and the form closed), or
+// false if it stopped short of saving (missing name/address, or a declined
+// duplicate-address warning) — see unsavedChangesPromptSave, the one caller
+// that needs to tell the difference.
 function saveCustomerForm(id){
   const name = document.getElementById('f_name').value.trim();
   const address = document.getElementById('f_address').value.trim();
-  if(!name && !address){ toast('Please enter at least a name or an address'); return; }
+  if(!name && !address){ toast('Please enter at least a name or an address'); return false; }
   if(address){
     const normalized = address.toLowerCase();
     const dupe = data.customers.find(x=> x.id!==id && (x.address||'').trim().toLowerCase()===normalized);
     if(dupe){
       const proceed = confirm(`This address is already saved for ${dupe.name || 'another customer'} (${dupe.round||'Unassigned'} round). Add it again anyway?`);
-      if(!proceed) return;
+      if(!proceed) return false;
     }
   }
   const payload = {
@@ -2284,6 +2301,7 @@ function saveCustomerForm(id){
     setTimeout(() => toast(`Note: account number ${accountNumberEntered} is already used by ${dupeAccount.name||dupeAccount.address||'another customer'}`), 1800);
   }
   saveData(); sheetCloseGuard = null; closeSheet(); render();
+  return true;
 }
 
 function deleteCustomer(id){
@@ -5086,6 +5104,10 @@ function openReports(){
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
       <div><div class="t1">Price review due</div><div class="t2">12+ months since last price increase, by next clean</div></div>
     </button>
+    <button class="backup-btn" onclick="printPropertyTypesReport()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9.5"/></svg>
+      <div><div class="t1">Property types</div><div class="t2">Houses and average price by property type, total and by round</div></div>
+    </button>
   `);
 }
 
@@ -5920,6 +5942,51 @@ function printPriceReview(){
     <p style="font-size:11px; color:#66798A; margin-top:12px;">Shows customers where it will have been 12 months or more since their last price increase by their next scheduled clean. Customers with no price history are not included.</p>
   `;
   runPrint('Price Review Due', body, false, false, () => openReports());
+}
+
+function printPropertyTypesReport(){
+  // Paused customers are left out, matching how round counts/values are worked
+  // out everywhere else (e.g. the Rounds tab, the exported summary sheet).
+  const active = data.customers.filter(c=>!c.paused);
+  if(!active.length){
+    runPrint('Property Types Report', '<div class="rpt-empty-note">No customers recorded yet.</div>', false, false, () => openReports());
+    return;
+  }
+  // "Not recorded" catches anyone with no property type set — since the field
+  // is optional, silently dropping them would make counts add up to less than
+  // the round/total customer count, which would be confusing on a report.
+  const categories = [...PROPERTY_TYPES, 'Not recorded'];
+  function breakdown(list){
+    return categories.map(cat=>{
+      const inCat = list.filter(c => (c.propertyType || 'Not recorded') === cat);
+      const total = inCat.reduce((sum,c)=>sum+Number(c.price||0),0);
+      return { cat, count: inCat.length, avg: inCat.length ? total/inCat.length : 0 };
+    }).filter(row => row.count > 0);
+  }
+  function tableHtml(list){
+    const rows = breakdown(list);
+    const totalCount = list.length;
+    const totalValue = list.reduce((sum,c)=>sum+Number(c.price||0),0);
+    const totalAvg = totalCount ? totalValue/totalCount : 0;
+    const bodyRows = rows.map(r=>`<tr><td>${escapeHtml(r.cat)}</td><td style="text-align:right;">${r.count}</td><td style="text-align:right;">${money(r.avg)}</td></tr>`).join('');
+    return `<table class="rpt-table"><thead><tr><th>Property type</th><th style="text-align:right;">Houses</th><th style="text-align:right;">Average price</th></tr></thead><tbody>${bodyRows}
+      <tr style="font-weight:800;"><td>All</td><td style="text-align:right;">${totalCount}</td><td style="text-align:right;">${money(totalAvg)}</td></tr>
+    </tbody></table>`;
+  }
+
+  const rounds = groupByRound(active);
+  const roundNames = Object.keys(rounds).sort((a,b)=>a.localeCompare(b));
+  const roundSections = roundNames.map(rn =>
+    `<div class="rpt-round-title">${escapeHtml(rn)}</div>${tableHtml(rounds[rn])}`
+  ).join('');
+
+  const body = `
+    <div class="rpt-round-title" style="margin-top:0;">All rounds — total</div>
+    ${tableHtml(active)}
+    ${roundSections}
+    <p style="font-size:11px; color:#66798A; margin-top:12px;">Paused customers are not included. "Not recorded" covers customers with no property type set yet.</p>
+  `;
+  runPrint('Property Types Report', body, false, false, () => openReports());
 }
 
 function printEarnings(){
