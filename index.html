@@ -411,7 +411,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 78;
+const APP_VERSION = 79;
 function formatVersion(v){ return '1.' + v; }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
@@ -420,6 +420,7 @@ function formatVersion(v){ return '1.' + v; }
 // the most recent 10 entries (oldest ones can be left in the array or trimmed,
 // either is fine, since the display always slices to 10).
 const VERSION_HISTORY = [
+  {version: 79, changes: ['Backup reminder now triggers 48 hours after any un-backed-up change, instead of a fixed 7-day gap regardless of whether anything actually changed', 'Photos can now be annotated — circle, arrow, and freehand draw tools, in a choice of colours — saved as a new photo alongside the original from the "Annotate" button in the photo viewer']},
   {version: 78, changes: ['Fixed the ✕ button still not working in one specific case — saving from the "unsaved changes" prompt when closing a customer\'s edit screen could leave the next screen\'s ✕ silently broken', 'Added a "Property types" report — houses and average price by property type, with a total and a breakdown for each round']},
   {version: 77, changes: ['Converting a quote to a one-off job now automatically links it to an existing customer if the address matches, so it shows up in that customer\'s history', 'Added property type (detached/semi-detached/terraced/bungalow), add-ons (conservatory, extension, garage door, or other), and a "fronts only" tick box — recorded on customers, quotes and one-off jobs, and carried across automatically when a quote becomes a job or customer']},
   {version: 76, changes: ['Fixed the ✕ button not working after saving changes on a customer\'s edit screen — saving could leave the unsaved-changes prompt stuck showing on the next close attempt', 'Moved the weather info to its own line so it has room to show in full underneath the top buttons, which sit slightly higher now']},
@@ -696,6 +697,7 @@ async function saveData(){
     // fallback copy — otherwise it just sits there out of sync, eating into
     // localStorage's own much tighter quota for no reason.
     try{ localStorage.removeItem(STORE_KEY); }catch(e){}
+    markPendingBackupChange();
     return true;
   }catch(e){
     // IndexedDB unavailable or the write itself failed — fall back to the old
@@ -703,6 +705,7 @@ async function saveData(){
     // quota can still in theory be hit here, hence the same warning as before.
     try{
       localStorage.setItem(STORE_KEY, JSON.stringify(data));
+      markPendingBackupChange();
       return true;
     }catch(e2){
       // The screen that called saveData() almost always shows its own toast right
@@ -1057,12 +1060,34 @@ let marketingFollowUpDismissed = false;
 let jobAnniversaryDismissed = false;
 let importReviewDismissed = false;
 const IMPORT_HOLDING_ROUND = 'Needs review (imported)';
-const BACKUP_REMINDER_DAYS = 7;
+const BACKUP_REMINDER_DAYS = 7; // still used for the "last backup: X days ago" wording in the Backup screen
+const BACKUP_REMINDER_HOURS = 48;
 
 function daysSinceBackup(){
   const last = localStorage.getItem('roundBookLastBackup');
   if(!last) return Infinity;
   return daysBetween(last, todayISO());
+}
+// Marks the moment data first became un-backed-up. Called from saveData() on
+// every successful save, but only starts the clock once — it doesn't reset on
+// every subsequent change, or someone using the app daily (which is everyone)
+// would never sit un-backed-up for 48 hours and the reminder would never fire.
+function markPendingBackupChange(){
+  if(!localStorage.getItem('roundBookPendingChangeAt')){
+    localStorage.setItem('roundBookPendingChangeAt', String(Date.now()));
+  }
+}
+function clearPendingBackupChange(){
+  localStorage.removeItem('roundBookPendingChangeAt');
+}
+// The actual reminder trigger: true once there's been at least one change that
+// still isn't reflected in any backup file, and it's been sitting that way for
+// 48+ hours. No pending change (fully backed up) never triggers, no matter how
+// many days go by with the app untouched.
+function backupReminderDue(){
+  const pending = localStorage.getItem('roundBookPendingChangeAt');
+  if(!pending) return false;
+  return (Date.now() - Number(pending)) >= BACKUP_REMINDER_HOURS * 3600000;
 }
 function dismissBackupBanner(){ bannerDismissed = true; renderBackupBanner(); }
 // Tracks the single most recent delete (customer, job, or quote) so it can be
@@ -1107,9 +1132,8 @@ function renderBackupBanner(){
   const el = document.getElementById('backupBanner');
   if(!el) return;
   if(bannerDismissed || !data.customers.length){ el.innerHTML = ''; return; }
-  const days = daysSinceBackup();
-  if(days < BACKUP_REMINDER_DAYS){ el.innerHTML = ''; return; }
-  const lastText = days === Infinity ? "You haven't backed up yet" : `It's been ${days} days since your last backup`;
+  if(!backupReminderDue()){ el.innerHTML = ''; return; }
+  const lastText = "You've made changes that haven't been backed up in over 48 hours";
   el.innerHTML = `<div style="background:var(--amber-dim); color:var(--amber); border-radius:12px; padding:11px 14px; margin:0 14px 14px; display:flex; align-items:center; justify-content:space-between; gap:10px; font-size:0.8125rem; font-weight:700;">
     <span>📦 ${lastText}</span>
     <span style="display:flex; gap:8px; flex-shrink:0; align-items:center;">
@@ -2708,6 +2732,7 @@ function renderPhotoViewer(){
     </div>
     <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 16px;">Added ${fmtDate(entry.date)}</p>
     <div class="row2" style="margin-bottom:8px;">
+      <button class="btn btn-clean" onclick="openPhotoAnnotator()">✏️ Annotate</button>
       <button class="btn btn-clean" onclick="sharePhotoViewerEntry()">📤 Share</button>
       <button class="btn" style="background:var(--red-dim); color:var(--red);" onclick="deletePhotoViewerEntry()">Delete</button>
     </div>
@@ -2778,6 +2803,208 @@ function viewPhoto(id, photoId){
   const index = list.findIndex(e => e.kind==='customer' && e.photoId===photoId);
   if(index === -1) return;
   openPhotoViewerAt(list, index, () => openCustomerDetail(id));
+}
+
+/* ---------- photo annotation (circle / arrow / freehand draw) ----------
+   Opened from the photo viewer's "Annotate" button. Draws over a canvas sized
+   to the photo's own pixel dimensions (so lines stay crisp and a consistent
+   thickness regardless of screen size), then saves the result as a brand new
+   photo alongside the original — nothing here ever overwrites or loses the
+   original photo. */
+const ANNOTATE_COLORS = ['#e11d2e', '#f4a300', '#2563eb', '#16a34a', '#ffffff'];
+let annotateEntry = null;   // the photo-viewer entry being annotated
+let annotateImg = null;     // loaded Image backing the canvas
+let annotateTool = 'circle';
+let annotateColor = ANNOTATE_COLORS[0];
+let annotateStrokes = [];   // finished shapes: {type, color, ...}
+let annotateDrawing = null; // the in-progress shape while a finger/pointer is down
+let annotatePointerId = null;
+
+function openPhotoAnnotator(){
+  const entry = photoViewerList[photoViewerIndex];
+  if(!entry) return;
+  const src = photoEntrySrc(entry);
+  if(!src){ toast('Photo not available to annotate'); return; }
+  annotateEntry = entry;
+  annotateStrokes = [];
+  annotateDrawing = null;
+  annotateTool = 'circle';
+  annotateColor = ANNOTATE_COLORS[0];
+  const img = new Image();
+  img.onload = () => { annotateImg = img; renderPhotoAnnotator(); };
+  img.onerror = () => toast('Could not load that photo to annotate');
+  img.src = src;
+}
+function cancelPhotoAnnotation(){
+  annotateEntry = null; annotateImg = null; annotateStrokes = []; annotateDrawing = null;
+  renderPhotoViewer(); // back to the plain viewer for the same photo, nothing saved
+}
+function renderPhotoAnnotator(){
+  openSheet(`
+    <div class="sheet-head">
+      <h2>Annotate photo</h2>
+      <button class="sheet-close" onclick="cancelPhotoAnnotation()">✕</button>
+    </div>
+    <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 10px; line-height:1.4;">Circle or draw around anything worth flagging. Saved as a new photo — the original is kept as-is.</p>
+    <div style="position:relative; background:#000; border-radius:12px; overflow:hidden; margin-bottom:12px;">
+      <canvas id="annotateCanvas" style="width:100%; display:block; touch-action:none;"></canvas>
+    </div>
+    <div class="seg-row">
+      <button class="seg-btn ${annotateTool==='circle'?'active':''}" onclick="setAnnotateTool('circle')">⭕ Circle</button>
+      <button class="seg-btn ${annotateTool==='arrow'?'active':''}" onclick="setAnnotateTool('arrow')">➚ Arrow</button>
+      <button class="seg-btn ${annotateTool==='pen'?'active':''}" onclick="setAnnotateTool('pen')">✏️ Draw</button>
+    </div>
+    <div style="display:flex; gap:10px; align-items:center; margin:2px 2px 14px;">
+      ${ANNOTATE_COLORS.map(c=>`<button onclick="setAnnotateColor('${c}')" aria-label="Colour" style="width:30px; height:30px; border-radius:50%; background:${c}; border:3px solid ${annotateColor===c?'var(--ink)':'transparent'}; box-shadow:0 0 0 1px rgba(0,0,0,0.15); padding:0;"></button>`).join('')}
+    </div>
+    <div class="row2" style="margin-bottom:8px;">
+      <button class="btn btn-clean" onclick="undoAnnotationStroke()">Undo</button>
+      <button class="btn" style="background:var(--red-dim); color:var(--red);" onclick="clearAnnotationStrokes()">Clear all</button>
+    </div>
+    <button class="btn btn-paid" style="width:100%;" onclick="savePhotoAnnotation()">Save as new photo</button>
+  `, () => renderPhotoViewer());
+  initAnnotateCanvas();
+}
+function setAnnotateTool(tool){ annotateTool = tool; renderPhotoAnnotator(); }
+function setAnnotateColor(color){ annotateColor = color; renderPhotoAnnotator(); }
+function undoAnnotationStroke(){
+  if(!annotateStrokes.length) return;
+  annotateStrokes.pop();
+  redrawAnnotateCanvas();
+}
+function clearAnnotationStrokes(){
+  if(!annotateStrokes.length) return;
+  if(!confirm('Clear all annotations on this photo?')) return;
+  annotateStrokes = [];
+  redrawAnnotateCanvas();
+}
+function initAnnotateCanvas(){
+  const canvas = document.getElementById('annotateCanvas');
+  if(!canvas || !annotateImg) return;
+  canvas.width = annotateImg.naturalWidth;
+  canvas.height = annotateImg.naturalHeight;
+  redrawAnnotateCanvas();
+  attachAnnotateCanvasEvents(canvas);
+}
+function annotateLineWidth(canvasWidth){
+  // Scales with the photo's own resolution so the line reads clearly whether
+  // it's a small compressed photo or a large one, rather than a fixed pixel
+  // width that could vanish or overwhelm depending on the source image.
+  return Math.max(5, Math.round(canvasWidth * 0.007));
+}
+function drawAnnotateStroke(ctx, s, canvasWidth){
+  ctx.save();
+  ctx.strokeStyle = s.color;
+  ctx.lineWidth = annotateLineWidth(canvasWidth);
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  if(s.type === 'pen'){
+    ctx.beginPath();
+    s.points.forEach((p,i)=> i===0 ? ctx.moveTo(p.x,p.y) : ctx.lineTo(p.x,p.y));
+    ctx.stroke();
+  } else if(s.type === 'circle'){
+    const cx = (s.x0+s.x1)/2, cy = (s.y0+s.y1)/2;
+    const rx = Math.max(Math.abs(s.x1-s.x0)/2, 6), ry = Math.max(Math.abs(s.y1-s.y0)/2, 6);
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI*2);
+    ctx.stroke();
+  } else if(s.type === 'arrow'){
+    const headLen = ctx.lineWidth * 4.5;
+    const angle = Math.atan2(s.y1-s.y0, s.x1-s.x0);
+    ctx.beginPath(); ctx.moveTo(s.x0,s.y0); ctx.lineTo(s.x1,s.y1); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(s.x1,s.y1);
+    ctx.lineTo(s.x1 - headLen*Math.cos(angle-Math.PI/6), s.y1 - headLen*Math.sin(angle-Math.PI/6));
+    ctx.moveTo(s.x1,s.y1);
+    ctx.lineTo(s.x1 - headLen*Math.cos(angle+Math.PI/6), s.y1 - headLen*Math.sin(angle+Math.PI/6));
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+function redrawAnnotateCanvas(){
+  const canvas = document.getElementById('annotateCanvas');
+  if(!canvas || !annotateImg) return;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.drawImage(annotateImg, 0, 0, canvas.width, canvas.height);
+  const all = annotateDrawing ? [...annotateStrokes, annotateDrawing] : annotateStrokes;
+  all.forEach(s => drawAnnotateStroke(ctx, s, canvas.width));
+}
+function canvasPointFromEvent(canvas, e){
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / (rect.width || canvas.width);
+  const scaleY = canvas.height / (rect.height || canvas.height);
+  return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
+}
+function attachAnnotateCanvasEvents(canvas){
+  canvas.onpointerdown = (e) => {
+    e.preventDefault();
+    annotatePointerId = e.pointerId;
+    if(canvas.setPointerCapture){ try{ canvas.setPointerCapture(e.pointerId); }catch(err){} }
+    const pt = canvasPointFromEvent(canvas, e);
+    annotateDrawing = annotateTool === 'pen'
+      ? {type:'pen', color:annotateColor, points:[pt]}
+      : {type:annotateTool, color:annotateColor, x0:pt.x, y0:pt.y, x1:pt.x, y1:pt.y};
+    redrawAnnotateCanvas();
+  };
+  canvas.onpointermove = (e) => {
+    if(annotatePointerId === null || e.pointerId !== annotatePointerId || !annotateDrawing) return;
+    e.preventDefault();
+    const pt = canvasPointFromEvent(canvas, e);
+    if(annotateDrawing.type === 'pen') annotateDrawing.points.push(pt);
+    else { annotateDrawing.x1 = pt.x; annotateDrawing.y1 = pt.y; }
+    redrawAnnotateCanvas();
+  };
+  const finish = (e) => {
+    if(annotatePointerId === null || e.pointerId !== annotatePointerId) return;
+    annotatePointerId = null;
+    if(annotateDrawing){
+      // Drop accidental taps that never actually moved, rather than littering
+      // the photo with invisible zero-size shapes.
+      const meaningful = annotateDrawing.type === 'pen'
+        ? annotateDrawing.points.length > 1
+        : (Math.abs(annotateDrawing.x1-annotateDrawing.x0) > 4 || Math.abs(annotateDrawing.y1-annotateDrawing.y0) > 4);
+      if(meaningful) annotateStrokes.push(annotateDrawing);
+      annotateDrawing = null;
+      redrawAnnotateCanvas();
+    }
+  };
+  canvas.onpointerup = finish;
+  canvas.onpointercancel = finish;
+  canvas.onpointerleave = finish;
+}
+async function savePhotoAnnotation(){
+  if(!annotateStrokes.length){ toast('Add at least one annotation first'); return; }
+  const canvas = document.getElementById('annotateCanvas');
+  const entry = annotateEntry;
+  if(!canvas || !entry) return;
+  toast('Saving annotated photo…');
+  canvas.toBlob(async (blob) => {
+    if(!blob){ toast('Could not save that annotation — try again'); return; }
+    const photoId = uid();
+    const owner = entry.kind === 'customer'
+      ? data.customers.find(x=>x.id===entry.ownerId)
+      : data.oneOffJobs.find(x=>x.id===entry.ownerId);
+    if(!owner){ toast('Could not find the photo\'s customer or job'); return; }
+    owner.photos = owner.photos || [];
+    if(photoStorageAvailable){
+      await idbSavePhoto(photoId, blob);
+      cachePhotoBlob(photoId, blob);
+      owner.photos.push({id: photoId, date: todayISO()});
+    } else {
+      // Rare IndexedDB-unavailable fallback — same embedded-dataURL behaviour
+      // used elsewhere (see handlePhotoSelected) rather than losing the photo.
+      const dataUrl = await blobToDataURL(blob);
+      owner.photos.push({id: photoId, dataUrl, date: todayISO()});
+    }
+    if(await saveData()){
+      toast('Annotated photo saved');
+      annotateEntry = null; annotateImg = null; annotateStrokes = []; annotateDrawing = null;
+      const list = entry.kind === 'customer' ? buildCustomerPhotoList(entry.ownerId) : buildJobPhotoList(entry.ownerId);
+      const idx = list.findIndex(e=>e.photoId===photoId);
+      openPhotoViewerAt(list, idx===-1 ? list.length-1 : idx, photoViewerOnClose);
+    }
+  }, 'image/jpeg', 0.9);
 }
 
 async function sharePhoto(id, photoId){
@@ -6467,7 +6694,7 @@ async function openBackup(){
     <p style="color:var(--ink-muted); font-size:0.8438rem; line-height:1.5; margin:0 2px 4px;">
       Everything is stored only on this phone, in this browser. Nothing is sent anywhere. Export a backup regularly in case the app data is ever cleared.
     </p>
-    <p style="color:${days>=BACKUP_REMINDER_DAYS?'var(--amber)':'var(--ink-muted)'}; font-size:0.7812rem; font-weight:700; margin:0 2px 16px;">${lastText}</p>
+    <p style="color:${backupReminderDue()?'var(--amber)':'var(--ink-muted)'}; font-size:0.7812rem; font-weight:700; margin:0 2px 16px;">${lastText}</p>
     ${storageWarning}
     <button class="backup-btn" onclick="exportData()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
@@ -6521,6 +6748,7 @@ async function exportData(){
 
   const markBackedUp = ()=>{
     localStorage.setItem('roundBookLastBackup', todayISO());
+    clearPendingBackupChange();
     bannerDismissed = false;
     renderBackupBanner();
   };
