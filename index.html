@@ -411,7 +411,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 76;
+const APP_VERSION = 77;
 function formatVersion(v){ return '1.' + v; }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
@@ -420,6 +420,7 @@ function formatVersion(v){ return '1.' + v; }
 // the most recent 10 entries (oldest ones can be left in the array or trimmed,
 // either is fine, since the display always slices to 10).
 const VERSION_HISTORY = [
+  {version: 77, changes: ['Converting a quote to a one-off job now automatically links it to an existing customer if the address matches, so it shows up in that customer\'s history', 'Added property type (detached/semi-detached/terraced/bungalow), add-ons (conservatory, extension, garage door, or other), and a "fronts only" tick box — recorded on customers, quotes and one-off jobs, and carried across automatically when a quote becomes a job or customer']},
   {version: 76, changes: ['Fixed the ✕ button not working after saving changes on a customer\'s edit screen — saving could leave the unsaved-changes prompt stuck showing on the next close attempt', 'Moved the weather info to its own line so it has room to show in full underneath the top buttons, which sit slightly higher now']},
   {version: 75, changes: ['"Suggest a route order" now tries real road-based routing first (via free OSRM/Valhalla services), only falling back to the straight-line estimate if neither is reachable — the suggestion screen says which one was actually used']},
   {version: 74, changes: ['Fixed the ✕ button not working when editing a customer with unsaved changes — the save/discard prompt now uses the app\'s own screen instead of the phone\'s native pop-up, which could fail silently on some devices', 'Added a "✓ Text sent" flag once the windows-cleaned-today text has actually been sent, so it\'s clear at a glance who\'s been told — tap it again any time to resend']},
@@ -1992,6 +1993,82 @@ function closeSheet(){
   }
 }
 
+/* ---------- property details (type / add-ons / fronts only) ----------
+   Shared by the customer, one-off job, and quote forms so a property's
+   details can be recorded wherever it's first captured and carried
+   through when a quote becomes a job or a customer, etc. */
+const PROPERTY_TYPES = ['Detached','Semi-detached','Terraced','Bungalow'];
+function propertyFieldsHtml(obj, prefix){
+  obj = obj || {};
+  return `
+    <label>Property type <span style="text-transform:none; font-weight:500; opacity:0.7;">(optional)</span></label>
+    <select id="${prefix}_propertyType">
+      <option value="">— Not set —</option>
+      ${PROPERTY_TYPES.map(t=>`<option value="${escapeAttr(t)}" ${obj.propertyType===t?'selected':''}>${t}</option>`).join('')}
+    </select>
+    <label style="display:flex; align-items:center; gap:8px; margin-top:10px; text-transform:none; font-weight:600; cursor:pointer;">
+      <input type="checkbox" id="${prefix}_frontsOnly" ${obj.frontsOnly?'checked':''} style="width:18px; height:18px; margin:0;">
+      Fronts only
+    </label>
+    <label style="margin-top:12px;">Add-ons <span style="text-transform:none; font-weight:500; opacity:0.7;">(optional)</span></label>
+    <div style="display:flex; flex-wrap:wrap; gap:8px 16px; margin:2px 2px 8px;">
+      <label style="display:flex; align-items:center; gap:6px; text-transform:none; font-weight:600; margin:0; cursor:pointer;">
+        <input type="checkbox" id="${prefix}_addOnConservatory" ${obj.addOnConservatory?'checked':''} style="width:17px; height:17px; margin:0;"> Conservatory
+      </label>
+      <label style="display:flex; align-items:center; gap:6px; text-transform:none; font-weight:600; margin:0; cursor:pointer;">
+        <input type="checkbox" id="${prefix}_addOnExtension" ${obj.addOnExtension?'checked':''} style="width:17px; height:17px; margin:0;"> Extension
+      </label>
+      <label style="display:flex; align-items:center; gap:6px; text-transform:none; font-weight:600; margin:0; cursor:pointer;">
+        <input type="checkbox" id="${prefix}_addOnGarageDoor" ${obj.addOnGarageDoor?'checked':''} style="width:17px; height:17px; margin:0;"> Garage door
+      </label>
+    </div>
+    <input type="text" id="${prefix}_addOnOther" value="${escapeAttr(obj.addOnOther||'')}" placeholder="Other add-ons, e.g. summer house (optional)">
+  `;
+}
+// Reads the property fields for a given form-field prefix — used both for
+// saving (payload) and for change-detection snapshots (customer form).
+function readPropertyPayload(prefix){
+  const el = (elId) => document.getElementById(prefix+elId);
+  const typeEl = el('_propertyType'), frontsEl = el('_frontsOnly'),
+        consEl = el('_addOnConservatory'), extEl = el('_addOnExtension'),
+        garageEl = el('_addOnGarageDoor'), otherEl = el('_addOnOther');
+  return {
+    propertyType: typeEl ? typeEl.value : '',
+    frontsOnly: frontsEl ? frontsEl.checked : false,
+    addOnConservatory: consEl ? consEl.checked : false,
+    addOnExtension: extEl ? extEl.checked : false,
+    addOnGarageDoor: garageEl ? garageEl.checked : false,
+    addOnOther: otherEl ? otherEl.value.trim() : ''
+  };
+}
+// Short human-readable summary, e.g. "Semi-detached · Conservatory, Garage door · Fronts only"
+function propertySummaryText(obj){
+  if(!obj) return '';
+  const parts = [];
+  if(obj.propertyType) parts.push(obj.propertyType);
+  const addOns = [];
+  if(obj.addOnConservatory) addOns.push('Conservatory');
+  if(obj.addOnExtension) addOns.push('Extension');
+  if(obj.addOnGarageDoor) addOns.push('Garage door');
+  if(obj.addOnOther) addOns.push(obj.addOnOther);
+  if(addOns.length) parts.push(addOns.join(', '));
+  if(obj.frontsOnly) parts.push('Fronts only');
+  return parts.join(' · ');
+}
+// Picks out just the property-detail keys from a source object — used to carry
+// these details across when a quote becomes a job or a customer, etc.
+function propertyDetailsOf(obj){
+  if(!obj) return {};
+  return {
+    propertyType: obj.propertyType||'',
+    frontsOnly: !!obj.frontsOnly,
+    addOnConservatory: !!obj.addOnConservatory,
+    addOnExtension: !!obj.addOnExtension,
+    addOnGarageDoor: !!obj.addOnGarageDoor,
+    addOnOther: obj.addOnOther||''
+  };
+}
+
 function openCustomerForm(existing){
   const c = existing || {};
   const rounds = [...new Set(data.customers.map(x=>x.round).filter(Boolean))];
@@ -2032,6 +2109,7 @@ function openCustomerForm(existing){
     </div>
     <label>Notes</label>
     <textarea id="f_notes" rows="2" placeholder="Gate code, dog, access notes...">${escapeHtml(c.notes||'')}</textarea>
+    ${propertyFieldsHtml(c, 'f')}
     <label>Referred by <span style="text-transform:none; font-weight:500; opacity:0.7;">(optional)</span></label>
     <input type="text" id="f_referredBy" value="${escapeAttr(c.referredBy||'')}" placeholder="e.g. Mrs Patterson, 12 Elm Grove">
     <label>Account number <span style="text-transform:none; font-weight:500; opacity:0.7;">(shown on invoices/receipts)</span></label>
@@ -2069,7 +2147,8 @@ function readCustomerFormFields(){
     referredBy: document.getElementById('f_referredBy').value.trim(),
     textBeforeVisit: document.getElementById('f_textBefore').checked,
     marketingOptOut: document.getElementById('f_marketingOptOut').checked,
-    accountNumber: document.getElementById('f_accountNumber').value.trim()
+    accountNumber: document.getElementById('f_accountNumber').value.trim(),
+    property: readPropertyPayload('f')
   };
 }
 let customerFormSnapshot = null;
@@ -2157,7 +2236,8 @@ function saveCustomerForm(id){
     notes: document.getElementById('f_notes').value.trim(),
     referredBy: document.getElementById('f_referredBy').value.trim(),
     textBeforeVisit: document.getElementById('f_textBefore').checked,
-    marketingOptOut: document.getElementById('f_marketingOptOut').checked
+    marketingOptOut: document.getElementById('f_marketingOptOut').checked,
+    ...readPropertyPayload('f')
   };
   const accountNumberEntered = document.getElementById('f_accountNumber').value.trim();
   const dupeAccount = accountNumberEntered && data.customers.find(x=>x.id!==id && x.accountNumber===accountNumberEntered);
@@ -2238,6 +2318,7 @@ function openCustomerDetail(id){
     ${c.textBeforeVisit ? `<div style="color:var(--blue-deep); font-size:0.75rem; font-weight:700; margin:-6px 2px 10px;">📱 Text before you arrive</div>` : ''}
     ${c.referredBy ? `<div style="color:var(--ink-muted); font-size:0.75rem; font-weight:700; margin:-6px 2px 10px;">🤝 Referred by ${escapeHtml(c.referredBy)}</div>` : ''}
     ${c.marketingOptOut ? `<div style="color:var(--red); font-size:0.75rem; font-weight:700; margin:-6px 2px 10px;">🚫 Opted out of marketing texts</div>` : ''}
+    ${propertySummaryText(c) ? `<div style="color:var(--ink-muted); font-size:0.75rem; font-weight:700; margin:-6px 2px 10px;">🏠 ${escapeHtml(propertySummaryText(c))}</div>` : ''}
     ${c.notes?`<div style="background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:10px 12px; font-size:0.8438rem; margin-bottom:14px;">${escapeHtml(c.notes)}</div>`:''}
     ${(c.phone||c.email)?`<div style="display:flex; gap:8px; margin-bottom:14px;">
       ${c.phone?`<a href="tel:${escapeAttr(c.phone.replace(/\\s+/g,''))}" style="flex:1; text-decoration:none; background:var(--blue-dim); color:var(--blue-deep); border-radius:10px; padding:9px; font-size:0.8125rem; font-weight:700; text-align:center;">📞 ${escapeHtml(c.phone)}</a>`:''}
@@ -3813,13 +3894,13 @@ function toggleJobPaid(id){
 function scheduleJobForCustomer(id){
   const c = data.customers.find(x=>x.id===id);
   if(!c) return;
-  openJobForm(null, { address: c.address||'', name: c.name||'', phone: c.phone||'', price: c.price||0, customerId: c.id }, () => openCustomerDetail(id));
+  openJobForm(null, Object.assign({ address: c.address||'', name: c.name||'', phone: c.phone||'', price: c.price||0, customerId: c.id }, propertyDetailsOf(c)), () => openCustomerDetail(id));
 }
 
 function quoteForCustomer(id, returnTo){
   const c = data.customers.find(x=>x.id===id);
   if(!c) return;
-  openQuoteForm(null, { address: c.address||'', name: c.name||'', phone: c.phone||'', email: c.email||'', marketingCustomerId: c.id }, returnTo || (() => openCustomerDetail(id)));
+  openQuoteForm(null, Object.assign({ address: c.address||'', name: c.name||'', phone: c.phone||'', email: c.email||'', marketingCustomerId: c.id }, propertyDetailsOf(c)), returnTo || (() => openCustomerDetail(id)));
 }
 
 function fillJobFromCustomer(id){
@@ -3836,7 +3917,22 @@ function fillJobFromCustomer(id){
   document.getElementById('j_name').value = c.name||'';
   document.getElementById('j_phone').value = c.phone||'';
   if(c.price!=null) document.getElementById('j_price').value = c.price;
+  fillPropertyFields('j', c);
   if(linkNote) linkNote.textContent = `🔗 Linked to ${c.address||c.name||'this customer'} — will show in their history`;
+}
+// Fills a form's property-detail fields (see propertyFieldsHtml) from a source
+// object with the same keys — used when picking an existing customer, or when
+// a quote's details carry across into a new job/customer.
+function fillPropertyFields(prefix, src){
+  if(!src) return;
+  const set = (elId, val) => { const el = document.getElementById(prefix+elId); if(el) el.value = val; };
+  const check = (elId, val) => { const el = document.getElementById(prefix+elId); if(el) el.checked = !!val; };
+  set('_propertyType', src.propertyType||'');
+  check('_frontsOnly', src.frontsOnly);
+  check('_addOnConservatory', src.addOnConservatory);
+  check('_addOnExtension', src.addOnExtension);
+  check('_addOnGarageDoor', src.addOnGarageDoor);
+  set('_addOnOther', src.addOnOther||'');
 }
 
 function openJobForm(existing, prefill, returnTo){
@@ -3884,6 +3980,7 @@ function openJobForm(existing, prefill, returnTo){
     <input type="number" id="j_price" value="${j.price!=null?j.price:''}" placeholder="£" min="0" step="0.5">
     <label>Notes</label>
     <textarea id="j_notes" rows="2" placeholder="What's the job...">${escapeHtml(j.notes||'')}</textarea>
+    ${propertyFieldsHtml(j, 'j')}
     ${(existing && !existing.paid && existing.paymentReminderSent) ? `<div style="font-size:0.75rem; font-weight:700; margin:10px 2px 0; color:var(--amber);">🔔 Payment reminder sent ${fmtDate(existing.paymentReminderSentDate)}</div>` : ''}
     ${existing?`<div class="row2" style="margin-top:14px;">
       <button class="btn" style="background:var(--blue-dim); color:var(--blue-deep);" onclick="printJobInvoice('${existing.id}')">🧾 Print invoice</button>
@@ -4006,7 +4103,8 @@ function saveJobForm(id){
     notes: document.getElementById('j_notes').value.trim(),
     remind24h: document.getElementById('j_remind').checked,
     anniversaryReminder: document.getElementById('j_anniversary').checked,
-    customerId: (customerIdField && customerIdField.value) ? customerIdField.value : null
+    customerId: (customerIdField && customerIdField.value) ? customerIdField.value : null,
+    ...readPropertyPayload('j')
   };
   if(id){
     const j = data.oneOffJobs.find(x=>x.id===id);
@@ -4149,6 +4247,7 @@ function openQuoteForm(existing, prefill, returnTo){
     <input type="number" id="q_followup" value="${q.followUpDays!=null?q.followUpDays:7}" min="0" step="1">
     <label>Notes</label>
     <textarea id="q_notes" rows="2" placeholder="Access notes, size of job...">${escapeHtml(q.notes||'')}</textarea>
+    ${propertyFieldsHtml(q, 'q')}
     <label style="margin-top:0;">Status</label>
     <div class="seg-row">
       <button class="seg-btn ${(!q.status||q.status==='pending')?'active':''}" onclick="setQuoteStatusField('pending', this)">Pending</button>
@@ -4192,7 +4291,8 @@ function saveQuoteForm(id){
     price: parseFloat(document.getElementById('q_price').value) || 0,
     followUpDays: (()=>{ const v = parseInt(document.getElementById('q_followup').value,10); return Number.isFinite(v) && v>=0 ? v : 7; })(),
     notes: document.getElementById('q_notes').value.trim(),
-    status: document.getElementById('q_status').value || 'pending'
+    status: document.getElementById('q_status').value || 'pending',
+    ...readPropertyPayload('q')
   };
   if(id){
     const q = data.quotes.find(x=>x.id===id);
@@ -4234,13 +4334,22 @@ function deleteQuote(id){
 function convertQuoteToJob(quoteId){
   const q = data.quotes.find(x=>x.id===quoteId);
   if(!q) return;
-  openJobForm(null, { address:q.address||'', name:q.name||'', phone:q.phone||'', price:q.price||0, fromQuoteId:q.id });
+  // If the quote's address matches an existing customer, link the new job to
+  // them automatically so it shows up in that customer's history — same
+  // matching (trimmed, case-insensitive) as the duplicate-address check when
+  // adding a customer.
+  const normalized = (q.address||'').trim().toLowerCase();
+  const matchedCustomer = normalized ? data.customers.find(x => (x.address||'').trim().toLowerCase() === normalized) : null;
+  openJobForm(null, Object.assign({
+    address:q.address||'', name:q.name||'', phone:q.phone||'', price:q.price||0, fromQuoteId:q.id,
+    customerId: matchedCustomer ? matchedCustomer.id : null
+  }, propertyDetailsOf(q)));
 }
 
 function convertJobToQuote(jobId){
   const j = data.oneOffJobs.find(x=>x.id===jobId);
   if(!j) return;
-  openQuoteForm(null, { address:j.address||'', name:j.name||'', phone:j.phone||'', price:j.price||0, notes:j.notes||'', fromJobId:j.id });
+  openQuoteForm(null, Object.assign({ address:j.address||'', name:j.name||'', phone:j.phone||'', price:j.price||0, notes:j.notes||'', fromJobId:j.id }, propertyDetailsOf(j)));
 }
 
 function openConvertQuoteToCustomer(quoteId){
@@ -4287,7 +4396,8 @@ function confirmConvertQuoteToCustomer(quoteId){
     cleanHistory: [], paymentHistory: [],
     priceHistory: [{date: todayISO(), price}],
     order: maxOrder + 1,
-    photos: [], paused: false, pauseReason: '', pauseDate: '', textBeforeVisit: false
+    photos: [], paused: false, pauseReason: '', pauseDate: '', textBeforeVisit: false,
+    ...propertyDetailsOf(q)
   };
   data.customers.push(newCustomer);
   q.status = 'converted';
@@ -5581,6 +5691,7 @@ function printCustomerRecord(id){
     ['Price', `${money(c.price)} · every ${c.frequencyWeeks||4} week${(c.frequencyWeeks||4)===1?'':'s'}`],
     c.phone ? ['Phone', escapeHtml(c.phone)] : null,
     c.email ? ['Email', escapeHtml(c.email)] : null,
+    propertySummaryText(c) ? ['Property', escapeHtml(propertySummaryText(c))] : null,
     ['Status', c.paused ? `Paused${c.pauseReason?' — '+escapeHtml(c.pauseReason):''}${c.pauseDate?' since '+fmtDate(c.pauseDate):''}` : 'Active']
   ].filter(Boolean).map(([label,val])=>`<tr><td style="font-weight:700; width:110px;">${label}</td><td>${val}</td></tr>`).join('');
 
@@ -5700,6 +5811,7 @@ function printJobRecord(id){
     j.phone ? ['Phone', escapeHtml(j.phone)] : null,
     linkedCustomer && linkedCustomer.accountNumber ? ['Account no.', escapeHtml(linkedCustomer.accountNumber)] : null,
     ['Price', money(j.price)],
+    propertySummaryText(j) ? ['Property', escapeHtml(propertySummaryText(j))] : null,
     ['Done', j.done ? 'Yes' : 'No'],
     ['Paid', j.paid ? 'Yes' : 'No']
   ].filter(Boolean).map(([label,val])=>`<tr><td style="font-weight:700; width:110px;">${label}</td><td>${val}</td></tr>`).join('');
