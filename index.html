@@ -203,6 +203,14 @@
   }
   .fab svg{width:24px;height:24px;}
   .fab:active{background:#2585c2;}
+  .fab-today{
+    bottom:calc(env(safe-area-inset-bottom) + 84px);
+    width:48px; height:48px;
+    background:var(--navy);
+    box-shadow:0 6px 18px rgba(11,36,56,0.4);
+  }
+  .fab-today svg{width:21px;height:21px;}
+  .fab-today:active{background:#0a2c45;}
 
   /* Overlay / sheet */
   .overlay{
@@ -395,6 +403,9 @@
 <div id="importReviewBanner"></div>
 <main id="main"></main>
 
+<button class="fab fab-today" onclick="openTodayScreen()" aria-label="Today">
+  <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M8 14h2M8 17h2M14 14h2M14 17h2"/></svg>
+</button>
 <button class="fab" onclick="handleFabClick()" aria-label="Add">
   <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
 </button>
@@ -411,7 +422,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 80;
+const APP_VERSION = 81;
 function formatVersion(v){ return '1.' + v; }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
@@ -420,6 +431,7 @@ function formatVersion(v){ return '1.' + v; }
 // the most recent 10 entries (oldest ones can be left in the array or trimmed,
 // either is fine, since the display always slices to 10).
 const VERSION_HISTORY = [
+  {version: 81, changes: ['Property type summary is now square boxes matching the round summary stats above it, with short labels (Det, Semi, Terr, Bung, Flat, NA)', 'Weather now refreshes itself every 30 minutes while the app stays open, instead of only on load', 'Added a Today button (next to Add) — a one-screen briefing of who is due for a clean, who needs a text before you arrive, one-off jobs dated today, quotes overdue for a follow-up, and marketing follow-ups that have come due']},
   {version: 80, changes: ['Added a "Flat" property type', 'Rounds overview and each round\'s own summary now show average price by property type underneath the Customers / Round value / Avg per customer figures', 'Weather now starts with the time it was last updated (HH:MM)']},
   {version: 79, changes: ['Backup reminder now triggers 48 hours after any un-backed-up change, instead of a fixed 7-day gap regardless of whether anything actually changed', 'Photos can now be annotated — circle, arrow, and freehand draw tools, in a choice of colours — saved as a new photo alongside the original from the "Annotate" button in the photo viewer']},
   {version: 78, changes: ['Fixed the ✕ button still not working in one specific case — saving from the "unsaved changes" prompt when closing a customer\'s edit screen could leave the next screen\'s ✕ silently broken', 'Added a "Property types" report — houses and average price by property type, with a total and a breakdown for each round']},
@@ -1144,6 +1156,89 @@ function renderBackupBanner(){
   </div>`;
 }
 
+/* ---------- Today briefing ----------
+   One screen pulling together everything worth checking first thing: who's
+   due for a clean (same definition as the Rounds > Due list), which of those
+   need a text before you arrive, any one-off jobs actually dated today, quotes
+   overdue for a follow-up, and marketing follow-ups that have come due. */
+function openTodayScreen(){
+  const today = todayISO();
+  const rounds = groupByRound(data.customers);
+  const roundNames = Object.keys(rounds).sort((a,b)=>a.localeCompare(b));
+
+  const dueByRound = {};
+  let dueCustomers = [];
+  roundNames.forEach(rn=>{
+    const dueCusts = rounds[rn].filter(c=>{
+      const s = custStatus(c);
+      return !c.paused && s.cleanBadge && s.cleanBadge.type==='due';
+    }).sort((a,b)=>{
+      const daysDueOf = x => { const lc = lastDateOf(x.cleanHistory); return lc ? daysBetween(lc, today) : 0; };
+      return daysDueOf(b) - daysDueOf(a);
+    });
+    if(dueCusts.length){ dueByRound[rn] = dueCusts; dueCustomers = dueCustomers.concat(dueCusts); }
+  });
+  const dueValue = dueCustomers.reduce((s,c)=>s+Number(c.price||0),0);
+  const textFirstNeeded = dueCustomers.filter(c=>c.textBeforeVisit);
+
+  const todaysJobs = (data.oneOffJobs||[]).filter(j=>!j.done && j.date===today);
+  const jobsValue = todaysJobs.reduce((s,j)=>s+Number(j.price||0),0);
+
+  const followUpQuotes = quotesNeedingFollowUp();
+  const marketingDue = marketingFollowUpsDue();
+
+  const nothingToday = !dueCustomers.length && !todaysJobs.length && !followUpQuotes.length && !marketingDue.length;
+
+  let body = `<div class="sheet-head">
+    <h2>Today</h2>
+    <button class="sheet-close" onclick="closeSheet()">✕</button>
+  </div>
+  <p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 14px;">${fmtDate(today)}</p>`;
+
+  if(nothingToday){
+    body += `<div class="empty">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#66798A" stroke-width="1.6"><path d="M20 6L9 17l-5-5"/></svg>
+      <b>All clear</b>
+      <p>Nothing due for a clean, no jobs scheduled today, and no follow-ups waiting.</p>
+    </div>`;
+    openSheet(body);
+    return;
+  }
+
+  if(dueCustomers.length){
+    body += `<div class="section-label" style="margin-top:0;">🧹 Due for a clean <span style="font-weight:600; color:var(--ink-muted); text-transform:none; letter-spacing:0;">— ${dueCustomers.length} · ${money(dueValue)}</span></div>`;
+    Object.keys(dueByRound).forEach(rn=>{
+      body += `<div class="section-label" style="margin:14px 2px 8px; font-size:0.6875rem;">${escapeHtml(rn)} <span style="font-weight:600; color:var(--ink-muted); text-transform:none; letter-spacing:0;">(${dueByRound[rn].length})</span></div>`;
+      body += dueByRound[rn].map(custCardHtml).join('');
+    });
+  }
+
+  if(textFirstNeeded.length){
+    body += `<div class="section-label" style="margin-top:18px;">📱 Text before you arrive <span style="font-weight:600; color:var(--ink-muted); text-transform:none; letter-spacing:0;">— ${textFirstNeeded.length}</span></div>`;
+    body += textFirstNeeded.map(custCardHtml).join('');
+  }
+
+  if(todaysJobs.length){
+    body += `<div class="section-label" style="margin-top:18px;">🧰 One-off jobs today <span style="font-weight:600; color:var(--ink-muted); text-transform:none; letter-spacing:0;">— ${todaysJobs.length} · ${money(jobsValue)}</span></div>`;
+    body += todaysJobs.map(j=>jobCardHtml(j, today)).join('');
+  }
+
+  if(followUpQuotes.length){
+    body += `<div class="section-label" style="margin-top:18px;">🕐 Quotes to follow up <span style="font-weight:600; color:var(--ink-muted); text-transform:none; letter-spacing:0;">— ${followUpQuotes.length}</span></div>`;
+    body += followUpQuotes.map(quoteCardHtml).join('');
+  }
+
+  if(marketingDue.length){
+    body += `<div class="section-label" style="margin-top:18px;">📣 Marketing follow-ups <span style="font-weight:600; color:var(--ink-muted); text-transform:none; letter-spacing:0;">— ${marketingDue.length}</span></div>`;
+    body += marketingDue.map(c=>`<div class="cust-card" onclick="openCustomerDetail('${c.id}')">
+      <div class="cust-addr" style="font-size:0.9375rem; font-weight:800;">${escapeHtml(c.address||c.name||'Customer')}</div>
+      <div class="cust-name" style="font-size:0.8125rem; color:var(--ink-muted); margin-top:2px;">${escapeHtml(MARKETING_ACTION_OPTIONS[c.marketingNextAction] || 'Follow up')}</div>
+    </div>`).join('');
+  }
+
+  openSheet(body);
+}
+
 function upcomingJobReminders(){
   const today = todayISO();
   const tomorrow = (()=>{ const d=new Date(); d.setDate(d.getDate()+1); return d.toISOString().slice(0,10); })();
@@ -1584,7 +1679,9 @@ function render(){
 // Compact "avg price by property type" row, shown under the Customers/Round
 // value/Avg-per-customer stats — both for the all-rounds overview and for a
 // single round's own summary (the caller passes in whichever customer list
-// applies, already filtered to active/non-paused customers).
+// applies, already filtered to active/non-paused customers). Square boxes to
+// match the stats row above them; short labels so several fit without wrapping.
+const PROPERTY_TYPE_ABBR = {'Detached':'Det', 'Semi-detached':'Semi', 'Terraced':'Terr', 'Bungalow':'Bung', 'Flat':'Flat', 'Not recorded':'NA'};
 function propertyTypeAvgSummaryHtml(list){
   if(!list || !list.length) return '';
   const categories = [...PROPERTY_TYPES, 'Not recorded'];
@@ -1595,8 +1692,8 @@ function propertyTypeAvgSummaryHtml(list){
     return {cat, count:inCat.length, avg};
   }).filter(Boolean);
   if(!rows.length) return '';
-  return `<div style="display:flex; gap:6px; flex-wrap:wrap; margin:-4px 2px 12px;">
-    ${rows.map(r=>`<div style="background:var(--surface); border:1px solid var(--box-border); border-radius:9px; padding:5px 9px; font-size:0.6875rem; font-weight:700; color:var(--ink-muted); white-space:nowrap;">${escapeHtml(r.cat)} <span style="color:var(--ink);">${money(r.avg)}</span> <span style="opacity:0.6;">(${r.count})</span></div>`).join('')}
+  return `<div class="summary-overall" style="flex-wrap:wrap;">
+    ${rows.map(r=>`<div class="stat" style="flex:1 1 72px; min-width:72px;"><div class="num">${money(r.avg)}</div><div class="lbl">${escapeHtml(PROPERTY_TYPE_ABBR[r.cat]||r.cat)} (${r.count})</div></div>`).join('')}
   </div>`;
 }
 
@@ -7214,6 +7311,10 @@ function loadWeather(){
   }, ()=>{ /* permission denied — fail silently, no clutter */ }, { enableHighAccuracy:false, timeout:10000, maximumAge:600000 });
 }
 loadWeather();
+// loadWeather() itself only actually re-fetches once its cache is 30+ minutes
+// old, so calling it on a 30-minute timer (rather than only once on load) is
+// what makes it keep itself current through a long open session.
+setInterval(loadWeather, 30*60*1000);
 
 /* seed a couple of example customers on very first run so the app isn't blank —
    handled inside initStorage() below, once data has actually finished loading */
