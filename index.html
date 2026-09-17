@@ -204,12 +204,11 @@
   .fab svg{width:24px;height:24px;}
   .fab:active{background:#2585c2;}
   .fab-today{
-    bottom:calc(env(safe-area-inset-bottom) + 84px);
-    width:48px; height:48px;
+    right:88px;
     background:var(--navy);
     box-shadow:0 6px 18px rgba(11,36,56,0.4);
   }
-  .fab-today svg{width:21px;height:21px;}
+  .fab-today svg{width:24px;height:24px;}
   .fab-today:active{background:#0a2c45;}
 
   /* Overlay / sheet */
@@ -422,7 +421,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 81;
+const APP_VERSION = 82;
 function formatVersion(v){ return '1.' + v; }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
@@ -431,6 +430,7 @@ function formatVersion(v){ return '1.' + v; }
 // the most recent 10 entries (oldest ones can be left in the array or trimmed,
 // either is fine, since the display always slices to 10).
 const VERSION_HISTORY = [
+  {version: 82, changes: ['Today button is now the same size as the Add button and lines up next to it', 'The "Due for a clean" list on the Today screen now shows one card per round instead of every customer — tap a round to jump straight to it']},
   {version: 81, changes: ['Property type summary is now square boxes matching the round summary stats above it, with short labels (Det, Semi, Terr, Bung, Flat, NA)', 'Weather now refreshes itself every 30 minutes while the app stays open, instead of only on load', 'Added a Today button (next to Add) — a one-screen briefing of who is due for a clean, who needs a text before you arrive, one-off jobs dated today, quotes overdue for a follow-up, and marketing follow-ups that have come due']},
   {version: 80, changes: ['Added a "Flat" property type', 'Rounds overview and each round\'s own summary now show average price by property type underneath the Customers / Round value / Avg per customer figures', 'Weather now starts with the time it was last updated (HH:MM)']},
   {version: 79, changes: ['Backup reminder now triggers 48 hours after any un-backed-up change, instead of a fixed 7-day gap regardless of whether anything actually changed', 'Photos can now be annotated — circle, arrow, and freehand draw tools, in a choice of colours — saved as a new photo alongside the original from the "Annotate" button in the photo viewer']},
@@ -1208,8 +1208,18 @@ function openTodayScreen(){
   if(dueCustomers.length){
     body += `<div class="section-label" style="margin-top:0;">🧹 Due for a clean <span style="font-weight:600; color:var(--ink-muted); text-transform:none; letter-spacing:0;">— ${dueCustomers.length} · ${money(dueValue)}</span></div>`;
     Object.keys(dueByRound).forEach(rn=>{
-      body += `<div class="section-label" style="margin:14px 2px 8px; font-size:0.6875rem;">${escapeHtml(rn)} <span style="font-weight:600; color:var(--ink-muted); text-transform:none; letter-spacing:0;">(${dueByRound[rn].length})</span></div>`;
-      body += dueByRound[rn].map(custCardHtml).join('');
+      const list = dueByRound[rn];
+      const value = list.reduce((s,c)=>s+Number(c.price||0),0);
+      body += `<div class="round-card" onclick="goToRoundFromToday('${escapeAttr(rn)}')">
+        <div>
+          <div class="rname">${escapeHtml(rn)}</div>
+          <div class="rcount">${list.length} due · ${money(value)}</div>
+        </div>
+        <div class="badges">
+          <span class="badge due">${list.length} due</span>
+          <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 6l6 6-6 6"/></svg>
+        </div>
+      </div>`;
     });
   }
 
@@ -1237,6 +1247,12 @@ function openTodayScreen(){
   }
 
   openSheet(body);
+}
+// Closes the Today sheet (rather than leaving it stacked on top) and opens
+// the tapped round, for the round-summary cards in the "Due for a clean" list.
+function goToRoundFromToday(rn){
+  closeSheet();
+  openRound(rn);
 }
 
 function upcomingJobReminders(){
