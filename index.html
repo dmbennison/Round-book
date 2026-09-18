@@ -203,13 +203,29 @@
   }
   .fab svg{width:24px;height:24px;}
   .fab:active{background:#2585c2;}
-  .fab-today{
-    right:88px;
-    background:var(--navy);
-    box-shadow:0 6px 18px rgba(11,36,56,0.4);
+
+  /* Today home tab */
+  .today-hero{
+    background:var(--navy); color:#fff; border-radius:16px; padding:18px 18px 16px;
+    margin-bottom:12px; cursor:pointer;
   }
-  .fab-today svg{width:24px;height:24px;}
-  .fab-today:active{background:#0a2c45;}
+  .today-hero:active{background:#0a2c45;}
+  .today-hero .num{font-size:2.25rem; font-weight:800; line-height:1;}
+  .today-hero .lbl{font-size:0.8125rem; font-weight:700; color:#B9D2E2; margin-top:4px;}
+  .today-hero .value{font-size:0.9375rem; font-weight:700; margin-top:10px; color:#fff;}
+  .today-weather-card{
+    background:var(--surface); border:1px solid var(--box-border); border-radius:14px;
+    padding:13px 16px; margin-bottom:12px; font-size:0.9375rem; font-weight:700; color:var(--ink);
+    display:flex; align-items:center; gap:10px;
+  }
+  .today-grid{display:grid; grid-template-columns:repeat(2, 1fr); gap:10px; margin-bottom:8px;}
+  .today-tile{
+    background:var(--surface); border:1px solid var(--box-border); border-radius:14px;
+    padding:14px; text-align:left; cursor:pointer; display:block;
+  }
+  .today-tile:active{background:var(--line);}
+  .today-tile .num{font-size:1.625rem; font-weight:800; color:var(--ink); line-height:1;}
+  .today-tile .lbl{font-size:0.75rem; font-weight:700; color:var(--ink-muted); margin-top:5px;}
 
   /* Overlay / sheet */
   .overlay{
@@ -386,7 +402,8 @@
   </div>
   <div class="sub" id="weatherPill" style="padding-left:46px;"></div>
   <div class="tabs">
-    <button class="tab active" data-tab="rounds" onclick="setTab('rounds')">Rounds</button>
+    <button class="tab active" data-tab="today" onclick="setTab('today')">Today</button>
+    <button class="tab" data-tab="rounds" onclick="setTab('rounds')">Rounds</button>
     <button class="tab" data-tab="jobs" onclick="setTab('jobs')">One-off jobs</button>
     <button class="tab" data-tab="quotes" onclick="setTab('quotes')">Quotes</button>
     <button class="tab" data-tab="marketing" onclick="setTab('marketing')">Marketing</button>
@@ -402,9 +419,6 @@
 <div id="importReviewBanner"></div>
 <main id="main"></main>
 
-<button class="fab fab-today" onclick="openTodayScreen()" aria-label="Today">
-  <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M8 14h2M8 17h2M14 14h2M14 17h2"/></svg>
-</button>
 <button class="fab" onclick="handleFabClick()" aria-label="Add">
   <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
 </button>
@@ -421,7 +435,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 83;
+const APP_VERSION = 84;
 function formatVersion(v){ return '1.' + v; }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
@@ -430,6 +444,7 @@ function formatVersion(v){ return '1.' + v; }
 // the most recent 10 entries (oldest ones can be left in the array or trimmed,
 // either is fine, since the display always slices to 10).
 const VERSION_HISTORY = [
+  {version: 84, changes: ['Today is now the home tab you land on, showing just the headline numbers (due today, value today, text before visit, jobs today, payment reminders, quotes needing follow-up, marketing actions, and the weather) — tap any of them to go straight to the full screen for it', 'Added a "Text first" view under Rounds, grouped by round with a Text all button, replacing the old Today popup version of the same list', 'Removed the separate Today button now that it is the home tab']},
   {version: 83, changes: ['Fronts-only properties now count as half a house in average-price-by-property-type figures (summary boxes and the Property Types report), so a handful of cheaper fronts-only jobs no longer drags the average down as if they were full cleans', 'The Today screen now groups "Text before you arrive" by round, with a "Text all" button that opens a tap-to-send queue for everyone in it', 'Property type (and fronts-only) now shows on the customer card']},
   {version: 82, changes: ['Today button is now the same size as the Add button and lines up next to it', 'The "Due for a clean" list on the Today screen now shows one card per round instead of every customer — tap a round to jump straight to it']},
   {version: 81, changes: ['Property type summary is now square boxes matching the round summary stats above it, with short labels (Det, Semi, Terr, Bung, Flat, NA)', 'Weather now refreshes itself every 30 minutes while the app stays open, instead of only on load', 'Added a Today button (next to Add) — a one-screen briefing of who is due for a clean, who needs a text before you arrive, one-off jobs dated today, quotes overdue for a follow-up, and marketing follow-ups that have come due']},
@@ -1058,7 +1073,7 @@ function roundValueOwedHtml(value, owed){
 }
 
 /* ---------- state ---------- */
-let currentTab = 'rounds';
+let currentTab = 'today';
 let currentRound = null;
 
 let roundsViewMode = 'overview';
@@ -1186,104 +1201,65 @@ function textBeforeDueList(){
   return {byRound, all};
 }
 
-function openTodayScreen(){
+/* ---------- Today home tab ----------
+   The app's landing screen: headline numbers only, each one tap away from the
+   existing full screen that actually deals with it (Rounds > Due, Rounds >
+   Text first, Rounds > Owed, Jobs, Quotes, Marketing) — kept as a dashboard
+   rather than a repeat of those screens' own customer-by-customer lists. */
+function renderTodayHome(main){
   const today = todayISO();
   const rounds = groupByRound(data.customers);
   const roundNames = Object.keys(rounds).sort((a,b)=>a.localeCompare(b));
 
-  const dueByRound = {};
   let dueCustomers = [];
   roundNames.forEach(rn=>{
     const dueCusts = rounds[rn].filter(c=>{
       const s = custStatus(c);
       return !c.paused && s.cleanBadge && s.cleanBadge.type==='due';
-    }).sort((a,b)=>{
-      const daysDueOf = x => { const lc = lastDateOf(x.cleanHistory); return lc ? daysBetween(lc, today) : 0; };
-      return daysDueOf(b) - daysDueOf(a);
     });
-    if(dueCusts.length){ dueByRound[rn] = dueCusts; dueCustomers = dueCustomers.concat(dueCusts); }
+    dueCustomers = dueCustomers.concat(dueCusts);
   });
   const dueValue = dueCustomers.reduce((s,c)=>s+Number(c.price||0),0);
+
   const textBefore = textBeforeDueList();
-
   const todaysJobs = (data.oneOffJobs||[]).filter(j=>!j.done && j.date===today);
-  const jobsValue = todaysJobs.reduce((s,j)=>s+Number(j.price||0),0);
-
+  const owedCustomers = data.customers.filter(c=>custStatus(c).owed);
   const followUpQuotes = quotesNeedingFollowUp();
   const marketingDue = marketingFollowUpsDue();
 
-  const nothingToday = !dueCustomers.length && !todaysJobs.length && !followUpQuotes.length && !marketingDue.length;
+  const cache = (()=>{ try{ return JSON.parse(localStorage.getItem('roundBookWeatherCache')||'null'); }catch(e){ return null; } })();
 
-  let body = `<div class="sheet-head">
-    <h2>Today</h2>
-    <button class="sheet-close" onclick="closeSheet()">✕</button>
-  </div>
-  <p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 14px;">${fmtDate(today)}</p>`;
-
-  if(nothingToday){
-    body += `<div class="empty">
-      <svg viewBox="0 0 24 24" fill="none" stroke="#66798A" stroke-width="1.6"><path d="M20 6L9 17l-5-5"/></svg>
-      <b>All clear</b>
-      <p>Nothing due for a clean, no jobs scheduled today, and no follow-ups waiting.</p>
-    </div>`;
-    openSheet(body);
-    return;
-  }
-
-  if(dueCustomers.length){
-    body += `<div class="section-label" style="margin-top:0;">🧹 Due for a clean <span style="font-weight:600; color:var(--ink-muted); text-transform:none; letter-spacing:0;">— ${dueCustomers.length} · ${money(dueValue)}</span></div>`;
-    Object.keys(dueByRound).forEach(rn=>{
-      const list = dueByRound[rn];
-      const value = list.reduce((s,c)=>s+Number(c.price||0),0);
-      body += `<div class="round-card" onclick="goToRoundFromToday('${escapeAttr(rn)}')">
-        <div>
-          <div class="rname">${escapeHtml(rn)}</div>
-          <div class="rcount">${list.length} due · ${money(value)}</div>
-        </div>
-        <div class="badges">
-          <span class="badge due">${list.length} due</span>
-          <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 6l6 6-6 6"/></svg>
-        </div>
-      </div>`;
-    });
-  }
-
-  if(textBefore.all.length){
-    body += `<div class="section-label" style="margin-top:18px; display:flex; align-items:center; justify-content:space-between; gap:8px;">
-      <span>📱 Text before you arrive <span style="font-weight:600; color:var(--ink-muted); text-transform:none; letter-spacing:0;">— ${textBefore.all.length}</span></span>
-      <button onclick="openBulkTextBeforeVisit()" style="background:var(--blue-deep); color:#fff; border:none; border-radius:8px; padding:6px 12px; font-weight:800; font-size:0.75rem; text-transform:none; letter-spacing:0; flex-shrink:0;">Text all</button>
-    </div>`;
-    Object.keys(textBefore.byRound).forEach(rn=>{
-      body += `<div class="section-label" style="margin:10px 2px 6px; font-size:0.6875rem;">${escapeHtml(rn)}</div>`;
-      body += textBefore.byRound[rn].map(custCardHtml).join('');
-    });
-  }
-
-  if(todaysJobs.length){
-    body += `<div class="section-label" style="margin-top:18px;">🧰 One-off jobs today <span style="font-weight:600; color:var(--ink-muted); text-transform:none; letter-spacing:0;">— ${todaysJobs.length} · ${money(jobsValue)}</span></div>`;
-    body += todaysJobs.map(j=>jobCardHtml(j, today)).join('');
-  }
-
-  if(followUpQuotes.length){
-    body += `<div class="section-label" style="margin-top:18px;">🕐 Quotes to follow up <span style="font-weight:600; color:var(--ink-muted); text-transform:none; letter-spacing:0;">— ${followUpQuotes.length}</span></div>`;
-    body += followUpQuotes.map(quoteCardHtml).join('');
-  }
-
-  if(marketingDue.length){
-    body += `<div class="section-label" style="margin-top:18px;">📣 Marketing follow-ups <span style="font-weight:600; color:var(--ink-muted); text-transform:none; letter-spacing:0;">— ${marketingDue.length}</span></div>`;
-    body += marketingDue.map(c=>`<div class="cust-card" onclick="openCustomerDetail('${c.id}')">
-      <div class="cust-addr" style="font-size:0.9375rem; font-weight:800;">${escapeHtml(c.address||c.name||'Customer')}</div>
-      <div class="cust-name" style="font-size:0.8125rem; color:var(--ink-muted); margin-top:2px;">${escapeHtml(MARKETING_ACTION_OPTIONS[c.marketingNextAction] || 'Follow up')}</div>
-    </div>`).join('');
-  }
-
-  openSheet(body);
-}
-// Closes the Today sheet (rather than leaving it stacked on top) and opens
-// the tapped round, for the round-summary cards in the "Due for a clean" list.
-function goToRoundFromToday(rn){
-  closeSheet();
-  openRound(rn);
+  main.innerHTML = `
+    <div class="section-label" style="margin-top:0;">${fmtDate(today)}</div>
+    ${cache && cache.text ? `<div class="today-weather-card">🌤️ ${escapeHtml(cache.text)}</div>` : ''}
+    <div class="today-hero" onclick="setTab('rounds'); setRoundsView('due');">
+      <div class="num">${dueCustomers.length}</div>
+      <div class="lbl">Due today</div>
+      <div class="value">${money(dueValue)} value today</div>
+    </div>
+    <div class="today-grid">
+      <div class="today-tile" onclick="setTab('rounds'); setRoundsView('text');">
+        <div class="num">${textBefore.all.length}</div>
+        <div class="lbl">Text before visit</div>
+      </div>
+      <div class="today-tile" onclick="setTab('jobs');">
+        <div class="num">${todaysJobs.length}</div>
+        <div class="lbl">Jobs today</div>
+      </div>
+      <div class="today-tile" onclick="setTab('rounds'); setRoundsView('owed');">
+        <div class="num">${owedCustomers.length}</div>
+        <div class="lbl">Payment reminders</div>
+      </div>
+      <div class="today-tile" onclick="setTab('quotes');">
+        <div class="num">${followUpQuotes.length}</div>
+        <div class="lbl">Quotes needing follow-up</div>
+      </div>
+      <div class="today-tile" style="grid-column:span 2;" onclick="setTab('marketing');">
+        <div class="num">${marketingDue.length}</div>
+        <div class="lbl">Marketing actions</div>
+      </div>
+    </div>
+  `;
 }
 
 function upcomingJobReminders(){
@@ -1710,7 +1686,9 @@ function render(){
   const main = document.getElementById('main');
   main.innerHTML = '';
 
-  if(currentTab === 'rounds' && !currentRound){
+  if(currentTab === 'today'){
+    renderTodayHome(main);
+  } else if(currentTab === 'rounds' && !currentRound){
     renderRoundsList(main);
   } else if(currentTab === 'rounds' && currentRound){
     renderRoundDetail(main, currentRound);
@@ -1785,6 +1763,7 @@ function renderRoundsList(main){
   html += `<div class="seg-row">
     <button class="seg-btn ${roundsViewMode==='overview'?'active':''}" onclick="setRoundsView('overview')">Rounds</button>
     <button class="seg-btn ${roundsViewMode==='due'?'active':''}" onclick="setRoundsView('due')">Due</button>
+    <button class="seg-btn ${roundsViewMode==='text'?'active':''}" onclick="setRoundsView('text')">Text first</button>
     <button class="seg-btn ${roundsViewMode==='owed'?'active':''}" onclick="setRoundsView('owed')">Owed</button>
   </div>`;
 
@@ -1857,6 +1836,24 @@ function renderRoundsList(main){
       </div>`;
     } else {
       html += listTotalHtml(`${dueGrandCount} due · ${money(dueGrandValue)}`);
+    }
+  } else if(roundsViewMode === 'text'){
+    const { byRound, all } = textBeforeDueList();
+    if(!all.length){
+      html += `<div class="empty">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#66798A" stroke-width="1.6"><path d="M20 6L9 17l-5-5"/></svg>
+        <b>Nobody to text</b>
+        <p>No one due for a clean today needs a text before you arrive.</p>
+      </div>`;
+    } else {
+      html += `<div style="display:flex; justify-content:flex-end; margin:0 2px 10px;">
+        <button onclick="openBulkTextBeforeVisit()" style="background:var(--blue-deep); color:#fff; border:none; border-radius:8px; padding:8px 16px; font-weight:800; font-size:0.8125rem;">Text all</button>
+      </div>`;
+      Object.keys(byRound).forEach(rn=>{
+        html += `<div class="section-label" style="margin:14px 2px 8px;">${escapeHtml(rn)} <span style="font-weight:600; color:var(--ink-muted); text-transform:none; letter-spacing:0;">(${byRound[rn].length})</span></div>`;
+        html += byRound[rn].map(custCardHtml).join('');
+      });
+      html += listTotalHtml(`${all.length} to text`);
     }
   } else if(roundsViewMode === 'owed'){
     let anyOwed = false;
