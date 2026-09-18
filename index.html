@@ -421,7 +421,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 82;
+const APP_VERSION = 83;
 function formatVersion(v){ return '1.' + v; }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
@@ -430,6 +430,7 @@ function formatVersion(v){ return '1.' + v; }
 // the most recent 10 entries (oldest ones can be left in the array or trimmed,
 // either is fine, since the display always slices to 10).
 const VERSION_HISTORY = [
+  {version: 83, changes: ['Fronts-only properties now count as half a house in average-price-by-property-type figures (summary boxes and the Property Types report), so a handful of cheaper fronts-only jobs no longer drags the average down as if they were full cleans', 'The Today screen now groups "Text before you arrive" by round, with a "Text all" button that opens a tap-to-send queue for everyone in it', 'Property type (and fronts-only) now shows on the customer card']},
   {version: 82, changes: ['Today button is now the same size as the Add button and lines up next to it', 'The "Due for a clean" list on the Today screen now shows one card per round instead of every customer — tap a round to jump straight to it']},
   {version: 81, changes: ['Property type summary is now square boxes matching the round summary stats above it, with short labels (Det, Semi, Terr, Bung, Flat, NA)', 'Weather now refreshes itself every 30 minutes while the app stays open, instead of only on load', 'Added a Today button (next to Add) — a one-screen briefing of who is due for a clean, who needs a text before you arrive, one-off jobs dated today, quotes overdue for a follow-up, and marketing follow-ups that have come due']},
   {version: 80, changes: ['Added a "Flat" property type', 'Rounds overview and each round\'s own summary now show average price by property type underneath the Customers / Round value / Avg per customer figures', 'Weather now starts with the time it was last updated (HH:MM)']},
@@ -1161,6 +1162,30 @@ function renderBackupBanner(){
    due for a clean (same definition as the Rounds > Due list), which of those
    need a text before you arrive, any one-off jobs actually dated today, quotes
    overdue for a follow-up, and marketing follow-ups that have come due. */
+// Everyone marked "text before you arrive" who's also due for a clean today,
+// grouped by round (round names sorted, customers within a round sorted by
+// how overdue they are) — used by both the Today screen and the "Text all"
+// bulk-send screen so the two stay in sync.
+function textBeforeDueList(){
+  const today = todayISO();
+  const rounds = groupByRound(data.customers);
+  const roundNames = Object.keys(rounds).sort((a,b)=>a.localeCompare(b));
+  const byRound = {};
+  let all = [];
+  roundNames.forEach(rn=>{
+    const list = rounds[rn].filter(c=>{
+      if(c.paused || !c.textBeforeVisit) return false;
+      const s = custStatus(c);
+      return s.cleanBadge && s.cleanBadge.type==='due';
+    }).sort((a,b)=>{
+      const daysDueOf = x => { const lc = lastDateOf(x.cleanHistory); return lc ? daysBetween(lc, today) : 0; };
+      return daysDueOf(b) - daysDueOf(a);
+    });
+    if(list.length){ byRound[rn] = list; all = all.concat(list); }
+  });
+  return {byRound, all};
+}
+
 function openTodayScreen(){
   const today = todayISO();
   const rounds = groupByRound(data.customers);
@@ -1179,7 +1204,7 @@ function openTodayScreen(){
     if(dueCusts.length){ dueByRound[rn] = dueCusts; dueCustomers = dueCustomers.concat(dueCusts); }
   });
   const dueValue = dueCustomers.reduce((s,c)=>s+Number(c.price||0),0);
-  const textFirstNeeded = dueCustomers.filter(c=>c.textBeforeVisit);
+  const textBefore = textBeforeDueList();
 
   const todaysJobs = (data.oneOffJobs||[]).filter(j=>!j.done && j.date===today);
   const jobsValue = todaysJobs.reduce((s,j)=>s+Number(j.price||0),0);
@@ -1223,9 +1248,15 @@ function openTodayScreen(){
     });
   }
 
-  if(textFirstNeeded.length){
-    body += `<div class="section-label" style="margin-top:18px;">📱 Text before you arrive <span style="font-weight:600; color:var(--ink-muted); text-transform:none; letter-spacing:0;">— ${textFirstNeeded.length}</span></div>`;
-    body += textFirstNeeded.map(custCardHtml).join('');
+  if(textBefore.all.length){
+    body += `<div class="section-label" style="margin-top:18px; display:flex; align-items:center; justify-content:space-between; gap:8px;">
+      <span>📱 Text before you arrive <span style="font-weight:600; color:var(--ink-muted); text-transform:none; letter-spacing:0;">— ${textBefore.all.length}</span></span>
+      <button onclick="openBulkTextBeforeVisit()" style="background:var(--blue-deep); color:#fff; border:none; border-radius:8px; padding:6px 12px; font-weight:800; font-size:0.75rem; text-transform:none; letter-spacing:0; flex-shrink:0;">Text all</button>
+    </div>`;
+    Object.keys(textBefore.byRound).forEach(rn=>{
+      body += `<div class="section-label" style="margin:10px 2px 6px; font-size:0.6875rem;">${escapeHtml(rn)}</div>`;
+      body += textBefore.byRound[rn].map(custCardHtml).join('');
+    });
   }
 
   if(todaysJobs.length){
@@ -1698,18 +1729,26 @@ function render(){
 // applies, already filtered to active/non-paused customers). Square boxes to
 // match the stats row above them; short labels so several fit without wrapping.
 const PROPERTY_TYPE_ABBR = {'Detached':'Det', 'Semi-detached':'Semi', 'Terraced':'Terr', 'Bungalow':'Bung', 'Flat':'Flat', 'Not recorded':'NA'};
+// A fronts-only clean is a fraction of a full house clean, so it only counts
+// as half a house when working out average prices by property type —
+// otherwise a handful of cheap fronts-only jobs would drag the average down
+// as if they were full cleans.
+function houseWeight(c){ return c.frontsOnly ? 0.5 : 1; }
+function formatHouseCount(w){ return Number.isInteger(w) ? String(w) : w.toFixed(1); }
 function propertyTypeAvgSummaryHtml(list){
   if(!list || !list.length) return '';
   const categories = [...PROPERTY_TYPES, 'Not recorded'];
   const rows = categories.map(cat=>{
     const inCat = list.filter(c => (c.propertyType || 'Not recorded') === cat);
     if(!inCat.length) return null;
-    const avg = inCat.reduce((s,c)=>s+Number(c.price||0),0) / inCat.length;
-    return {cat, count:inCat.length, avg};
+    const weight = inCat.reduce((s,c)=>s+houseWeight(c), 0);
+    const total = inCat.reduce((s,c)=>s+Number(c.price||0),0);
+    const avg = weight ? total/weight : 0;
+    return {cat, weight, avg};
   }).filter(Boolean);
   if(!rows.length) return '';
   return `<div class="summary-overall" style="flex-wrap:wrap;">
-    ${rows.map(r=>`<div class="stat" style="flex:1 1 72px; min-width:72px;"><div class="num">${money(r.avg)}</div><div class="lbl">${escapeHtml(PROPERTY_TYPE_ABBR[r.cat]||r.cat)} (${r.count})</div></div>`).join('')}
+    ${rows.map(r=>`<div class="stat" style="flex:1 1 72px; min-width:72px;"><div class="num">${money(r.avg)}</div><div class="lbl">${escapeHtml(PROPERTY_TYPE_ABBR[r.cat]||r.cat)} (${formatHouseCount(r.weight)})</div></div>`).join('')}
   </div>`;
 }
 
@@ -2058,6 +2097,7 @@ function custCardHtml(c){
         ${(s.owed && c.paymentReminderSent) ? `<span class="badge paused">🔔 ${fmtDate(c.paymentReminderSentDate).split(' ').slice(0,2).join(' ')}</span>` : ''}
         ${(c.photos && c.photos.length) ? `<span class="badge paused">📷 ${c.photos.length}</span>` : ''}
         ${needsPriceReview(c) ? `<span class="badge due" title="12+ months since last price increase">📈 Review</span>` : ''}
+        ${c.propertyType ? `<span class="badge paused" title="${escapeAttr(propertySummaryText(c))}">🏠 ${escapeHtml(PROPERTY_TYPE_ABBR[c.propertyType]||c.propertyType)}${c.frontsOnly?' · Fronts':''}</span>` : (c.frontsOnly ? `<span class="badge paused">Fronts only</span>` : '')}
         ${c.textBeforeVisit ? `<span class="badge anniversary" title="Text before you arrive">📱 Text first</span>` : ''}
         ${showDayBadge ? `<span class="badge anniversary">Day ${c.visitDay||1}</span>` : ''}
         ${(isMobileNumber(c.phone) && s.lastClean===todayISO()) ? (
@@ -3809,7 +3849,7 @@ function openBulkReminders(kind, roundName){
   if(!list.length){ toast('No one with a mobile number to remind'); return; }
 
   const tplField = document.getElementById('bulk_msg');
-  const tpl = tplField ? tplField.value : (kind==='due' ? data.settings.cleanTemplate : data.settings.payTemplate);
+  const tpl = tplField ? tplField.value : (kind==='owed' ? data.settings.payTemplate : data.settings.cleanTemplate);
 
   openSheet(`
     <div class="sheet-head">
@@ -3835,11 +3875,46 @@ function openBulkReminders(kind, roundName){
   `);
 }
 
+// Same tap-to-send-each queue as openBulkReminders, but for everyone due
+// today who's marked "text before you arrive" — spans every round rather
+// than being scoped to one, so it's grouped with round sub-headers instead.
+function openBulkTextBeforeVisit(){
+  const { byRound, all } = textBeforeDueList();
+  const sendable = all.filter(c=>isMobileNumber(c.phone));
+  if(!sendable.length){ toast('No one with a mobile number to text'); return; }
+
+  const tplField = document.getElementById('bulk_msg');
+  const tpl = tplField ? tplField.value : data.settings.cleanTemplate;
+
+  openSheet(`
+    <div class="sheet-head">
+      <h2 style="flex:1; min-width:0;">Text all — before you arrive</h2>
+      <button class="sheet-close" onclick="closeSheet()">✕</button>
+    </div>
+    <label style="margin-top:0;">Message <span style="text-transform:none; font-weight:500; opacity:0.7;">({name}, {company}, {yourname})</span></label>
+    <textarea id="bulk_msg" rows="4">${escapeHtml(tpl)}</textarea>
+    <p style="color:var(--ink-muted); font-size:0.7812rem; margin:10px 2px 14px; line-height:1.5;">
+      Tap Send for each customer — it opens ${data.settings.messagingApp==='whatsapp'?'WhatsApp':'Messages'} pre-filled and ready to go. Come back here for the next one.
+    </p>
+    ${Object.keys(byRound).map(rn=>{
+      const list = byRound[rn].filter(c=>isMobileNumber(c.phone));
+      if(!list.length) return '';
+      return `<div class="section-label" style="margin:10px 2px 6px; font-size:0.6875rem;">${escapeHtml(rn)}</div>` +
+        list.map(c=>`<div class="cust-card" id="bulkrow-${c.id}" style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+          <div style="min-width:0;">
+            <div class="cust-addr" style="font-weight:800; font-size:0.9062rem;">${escapeHtml(c.address||c.name||'Customer')}</div>
+            <div style="font-size:0.75rem; color:var(--ink-muted); margin-top:2px;">${escapeHtml(c.phone)}</div>
+          </div>
+          <button class="btn btn-clean" style="flex:0 0 auto; padding:9px 16px;" onclick="sendBulkReminder('${c.id}','textBefore')">Send</button>
+        </div>`).join('');
+    }).join('')}
+  `);
+}
 function sendBulkReminder(id, kind){
   const c = data.customers.find(x=>x.id===id);
   if(!c || !isMobileNumber(c.phone)) return;
   const msgField = document.getElementById('bulk_msg');
-  const tpl = msgField ? msgField.value : (kind==='due' ? data.settings.cleanTemplate : data.settings.payTemplate);
+  const tpl = msgField ? msgField.value : (kind==='owed' ? data.settings.payTemplate : data.settings.cleanTemplate);
   const firstName = c.name ? c.name.trim().split(' ')[0] : '';
   const company = data.settings.companyName || '';
   const yourname = data.settings.yourName || '';
@@ -6321,18 +6396,19 @@ function printPropertyTypesReport(){
   function breakdown(list){
     return categories.map(cat=>{
       const inCat = list.filter(c => (c.propertyType || 'Not recorded') === cat);
+      const weight = inCat.reduce((sum,c)=>sum+houseWeight(c), 0);
       const total = inCat.reduce((sum,c)=>sum+Number(c.price||0),0);
-      return { cat, count: inCat.length, avg: inCat.length ? total/inCat.length : 0 };
-    }).filter(row => row.count > 0);
+      return { cat, weight, avg: weight ? total/weight : 0 };
+    }).filter(row => row.weight > 0);
   }
   function tableHtml(list){
     const rows = breakdown(list);
-    const totalCount = list.length;
+    const totalWeight = list.reduce((sum,c)=>sum+houseWeight(c), 0);
     const totalValue = list.reduce((sum,c)=>sum+Number(c.price||0),0);
-    const totalAvg = totalCount ? totalValue/totalCount : 0;
-    const bodyRows = rows.map(r=>`<tr><td>${escapeHtml(r.cat)}</td><td style="text-align:right;">${r.count}</td><td style="text-align:right;">${money(r.avg)}</td></tr>`).join('');
+    const totalAvg = totalWeight ? totalValue/totalWeight : 0;
+    const bodyRows = rows.map(r=>`<tr><td>${escapeHtml(r.cat)}</td><td style="text-align:right;">${formatHouseCount(r.weight)}</td><td style="text-align:right;">${money(r.avg)}</td></tr>`).join('');
     return `<table class="rpt-table"><thead><tr><th>Property type</th><th style="text-align:right;">Houses</th><th style="text-align:right;">Average price</th></tr></thead><tbody>${bodyRows}
-      <tr style="font-weight:800;"><td>All</td><td style="text-align:right;">${totalCount}</td><td style="text-align:right;">${money(totalAvg)}</td></tr>
+      <tr style="font-weight:800;"><td>All</td><td style="text-align:right;">${formatHouseCount(totalWeight)}</td><td style="text-align:right;">${money(totalAvg)}</td></tr>
     </tbody></table>`;
   }
 
@@ -6346,7 +6422,7 @@ function printPropertyTypesReport(){
     <div class="rpt-round-title" style="margin-top:0;">All rounds — total</div>
     ${tableHtml(active)}
     ${roundSections}
-    <p style="font-size:11px; color:#66798A; margin-top:12px;">Paused customers are not included. "Not recorded" covers customers with no property type set yet.</p>
+    <p style="font-size:11px; color:#66798A; margin-top:12px;">Paused customers are not included. "Not recorded" covers customers with no property type set yet. Fronts-only properties count as 0.5 of a house.</p>
   `;
   runPrint('Property Types Report', body, false, false, () => openReports());
 }
