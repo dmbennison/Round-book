@@ -429,7 +429,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 86;
+const APP_VERSION = 87;
 function formatVersion(v){ return '1.' + v; }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
@@ -438,6 +438,7 @@ function formatVersion(v){ return '1.' + v; }
 // the most recent 10 entries (oldest ones can be left in the array or trimmed,
 // either is fine, since the display always slices to 10).
 const VERSION_HISTORY = [
+  {version: 87, changes: ['Payment reminders tile on Today now shows the total amount owed', 'Show map and Suggest a route order now re-check every address location each time, instead of trusting a previously cached one', 'Moved Suggest a route order from the round menu into the Reorder screen', 'Address lookup now checks the postcode first via a dedicated UK postcode service, which should fix pins landing hundreds of miles from the right place']},
   {version: 86, changes: ['Removed the weather card from Today, plus the separate quote follow-up and one-off jobs reminder banners, since Today already covers both', 'Rounds and One-off jobs are now under a single new Work tab, opening to two square buttons with the overall customer/value figures moved underneath them', 'Marketing is now a list of campaigns — tap one to see its editable text, its sent texts, and a Send group text button, or add a new campaign at the bottom', 'Rewrote the user guide to be shorter and to match the current app']},
   {version: 85, changes: ['Added a "Show map" button at the top of each round — numbered pins for every stop in your current visiting order, with a route line between them (a real road route where available, straight lines as a fallback)']},
   {version: 84, changes: ['Today is now the home tab you land on, showing just the headline numbers (due today, value today, text before visit, jobs today, payment reminders, quotes needing follow-up, marketing actions, and the weather) — tap any of them to go straight to the full screen for it', 'Added a "Text first" view under Rounds, grouped by round with a Text all button, replacing the old Today popup version of the same list', 'Removed the separate Today button now that it is the home tab']},
@@ -1218,6 +1219,7 @@ function renderTodayHome(main){
   const textBefore = textBeforeDueList();
   const todaysJobs = (data.oneOffJobs||[]).filter(j=>!j.done && j.date===today);
   const owedCustomers = data.customers.filter(c=>custStatus(c).owed);
+  const owedTotal = owedCustomers.reduce((s,c)=>s+custStatus(c).balance,0);
   const followUpQuotes = quotesNeedingFollowUp();
   const marketingDue = marketingFollowUpsDue();
 
@@ -1239,7 +1241,7 @@ function renderTodayHome(main){
       </div>
       <div class="today-tile" onclick="setTab('rounds'); setRoundsView('owed');">
         <div class="num">${owedCustomers.length}</div>
-        <div class="lbl">Payment reminders</div>
+        <div class="lbl">Payment reminders${owedCustomers.length ? ` · ${money(owedTotal)}` : ''}</div>
       </div>
       <div class="today-tile" onclick="setTab('quotes');">
         <div class="num">${followUpQuotes.length}</div>
@@ -1402,7 +1404,31 @@ function haversineKm(lat1, lng1, lat2, lng2){
 // the UK-specific assumptions already made elsewhere in the app (phone number
 // handling, currency). Callers must space consecutive calls out themselves (see
 // suggestRouteOrder) — Nominatim's fair-use policy caps free use at 1 request/sec.
+// Matches a UK postcode anywhere in a free-text address string.
+const UK_POSTCODE_REGEX = /\b([Gg][Ii][Rr] ?0[Aa]{2}|[A-Za-z][0-9]{1,2} ?[0-9][A-Za-z]{2}|[A-Za-z][A-Za-z][0-9]{1,2} ?[0-9][A-Za-z]{2}|[A-Za-z][0-9][A-Za-z] ?[0-9][A-Za-z]{2}|[A-Za-z][A-Za-z][0-9][A-Za-z] ?[0-9][A-Za-z]{2})\b/;
+// api.postcodes.io is a free, unauthenticated UK postcode lookup backed by
+// Ordnance Survey/ONS data — it pinpoints a postcode's own precise location,
+// rather than matching free text against a place-name index the way Nominatim
+// does. That free-text matching is what caused the very wrong (sometimes
+// hundreds-of-miles-off) pins: a postcode is unambiguous, so preferring this
+// whenever an address contains one fixes almost all of that.
+async function geocodePostcode(postcode){
+  try{
+    const res = await fetch(`https://api.postcodes.io/postcodes/${encodeURIComponent(postcode.replace(/\s+/g,''))}`);
+    if(!res.ok) return null;
+    const json = await res.json();
+    if(json.status !== 200 || !json.result) return null;
+    return { lat: json.result.latitude, lng: json.result.longitude };
+  }catch(e){ return null; }
+}
 async function geocodeAddress(address){
+  const postcodeMatch = (address||'').match(UK_POSTCODE_REGEX);
+  if(postcodeMatch){
+    const viaPostcode = await geocodePostcode(postcodeMatch[0]);
+    if(viaPostcode) return viaPostcode;
+    // Postcode present but not recognised (typo, or too new for the postcode
+    // database) — fall through to the free-text search below instead.
+  }
   try{
     const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=gb&q=${encodeURIComponent(address)}`;
     const res = await fetch(url);
@@ -1531,7 +1557,10 @@ async function suggestRouteOrder(rn){
   if(withAddress.length < 2){ toast('Need at least 2 addresses to suggest an order'); return; }
   closeSheet();
 
-  const toGeocode = withAddress.filter(c=>c.lat==null || c.lng==null);
+  // Re-fetches every address rather than trusting a previously cached
+  // location — a bad geocode (wrong postcode match, ambiguous place name)
+  // would otherwise stay wrong forever once cached.
+  const toGeocode = withAddress;
   for(let i=0;i<toGeocode.length;i++){
     toast(`Locating addresses… ${i+1} of ${toGeocode.length}`);
     const coords = await geocodeAddress(toGeocode[i].address);
@@ -1640,7 +1669,10 @@ async function showRoundMap(rn){
   const withAddress = custs.filter(c=>c.address);
   if(!withAddress.length){ toast('No addresses on this round to map'); return; }
 
-  const toGeocode = withAddress.filter(c=>c.lat==null || c.lng==null);
+  // Re-fetches every address rather than trusting a previously cached
+  // location — a bad geocode (wrong postcode match, ambiguous place name)
+  // would otherwise stay wrong forever once cached.
+  const toGeocode = withAddress;
   for(let i=0;i<toGeocode.length;i++){
     toast(`Locating addresses… ${i+1} of ${toGeocode.length}`);
     const coords = await geocodeAddress(toGeocode[i].address);
@@ -1987,10 +2019,6 @@ function openRoundActionsMenu(rn){
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
       <div><div class="t1">Show map</div><div class="t2">See every stop and the route between them</div></div>
     </button>
-    <button class="backup-btn" onclick="suggestRouteOrder('${escapeAttr(rn)}')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h8a4 4 0 0 0 4-4V7a4 4 0 0 0-4-4H8"/></svg>
-      <div><div class="t1">Suggest a route order</div><div class="t2">Works out a shorter visiting order — review before it changes anything</div></div>
-    </button>
     <button class="backup-btn" onclick="printSingleRound('${escapeAttr(rn)}')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
       <div><div class="t1">Print this round</div><div class="t2">Customer list with contact details and prices</div></div>
@@ -2033,6 +2061,10 @@ function renderRoundDetail(main, rn){
   if(reorderMode){
     shellHtml += `<p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 6px;">Use the arrows to set the order you actually visit these customers in.</p>`;
     shellHtml += `<p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 14px;">If this round takes more than one day, tap the day badge to say which day each customer is visited on (up to 5).</p>`;
+    shellHtml += `<button class="btn-open" style="width:100%; margin-bottom:14px; font-weight:800; display:flex; align-items:center; justify-content:center; gap:7px;" onclick="suggestRouteOrder('${escapeAttr(rn)}')">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h8a4 4 0 0 0 4-4V7a4 4 0 0 0-4-4H8"/></svg>
+      Suggest a route order
+    </button>`;
     if(!allInRound.length){ main.innerHTML = shellHtml + emptyState('customers'); return; }
     shellHtml += allInRound.map((c,i)=>`
       <div class="cust-card" style="display:flex; align-items:center; gap:10px;">
@@ -6793,8 +6825,8 @@ const FOCUSED_HELP = {
     body: () => [
       helpP('Open Rounds from the Work tab. Use the Rounds / Due / Text first / Owed switch at the top, or open a single round to see its customers. Swipe a card right to mark cleaned, left to mark paid. Use Reorder to set your walking order.'),
       helpP('A round card shows its customer count and value as price/owed, with paused customers left out of both.'),
-      helpP('A round\'s ⋯ menu has: Show map (numbered stops with a route line), Start round (directions for every stop), Suggest a route order, Print, and Defer the whole round 4 weeks.'),
-      helpP('Suggest a route order works out a shorter visiting order using real road distances where possible, and shows it to you before changing anything — nothing\'s applied unless you tap "Use this order".'),
+      helpP('A round\'s ⋯ menu has: Show map (numbered stops with a route line), Start round (directions for every stop), Print, and Defer the whole round 4 weeks.'),
+      helpP('Suggest a route order is inside Reorder — it works out a shorter visiting order using real road distances where possible, and shows it to you before changing anything (nothing\'s applied unless you tap "Use this order"). Both this and Show map re-check every address\'s location each time, so a correction sticks.'),
       helpP('The magnifying glass searches every customer; the photo icon opens the photo gallery. Both are on the main Rounds screen.'),
       helpP('The small green phone button calls a customer; the small blue compass button opens directions to their address. A red "⚠ Chase" badge appears after 2+ unpaid payment reminders.')
     ]
