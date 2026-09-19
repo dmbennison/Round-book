@@ -9,10 +9,12 @@
 <meta name="theme-color" content="#10344C">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/docx@8.2.4/build/index.umd.js" defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js" defer></script>
 <title>Round Book</title>
 <style>
   :root{
@@ -435,7 +437,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 84;
+const APP_VERSION = 85;
 function formatVersion(v){ return '1.' + v; }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
@@ -444,6 +446,7 @@ function formatVersion(v){ return '1.' + v; }
 // the most recent 10 entries (oldest ones can be left in the array or trimmed,
 // either is fine, since the display always slices to 10).
 const VERSION_HISTORY = [
+  {version: 85, changes: ['Added a "Show map" button at the top of each round — numbered pins for every stop in your current visiting order, with a route line between them (a real road route where available, straight lines as a fallback)']},
   {version: 84, changes: ['Today is now the home tab you land on, showing just the headline numbers (due today, value today, text before visit, jobs today, payment reminders, quotes needing follow-up, marketing actions, and the weather) — tap any of them to go straight to the full screen for it', 'Added a "Text first" view under Rounds, grouped by round with a Text all button, replacing the old Today popup version of the same list', 'Removed the separate Today button now that it is the home tab']},
   {version: 83, changes: ['Fronts-only properties now count as half a house in average-price-by-property-type figures (summary boxes and the Property Types report), so a handful of cheaper fronts-only jobs no longer drags the average down as if they were full cleans', 'The Today screen now groups "Text before you arrive" by round, with a "Text all" button that opens a tap-to-send queue for everyone in it', 'Property type (and fronts-only) now shows on the customer card']},
   {version: 82, changes: ['Today button is now the same size as the Add button and lines up next to it', 'The "Due for a clean" list on the Today screen now shows one card per round instead of every customer — tap a round to jump straight to it']},
@@ -1674,6 +1677,113 @@ function applySuggestedRouteOrder(){
   toast('New route order applied');
 }
 
+/* ---------- round map ----------
+   Shows every customer on a round as a numbered pin (in the round's current
+   visiting order, not a re-optimised one) with a route line connecting them.
+   Reuses the same geocoding as "Suggest a route order" above. */
+let roundMapLeafletInstance = null;
+async function showRoundMap(rn){
+  let custs = sortByRoute(data.customers.filter(c=>(c.round||'Unassigned')===rn && !c.paused));
+  const days = roundDaysUsed(custs);
+  if(days.length > 1){
+    if(roundDayFilter === 'all'){
+      toast('This round spans multiple days — pick a day above first');
+      return;
+    }
+    custs = custs.filter(c=>(c.visitDay||1) === roundDayFilter);
+  }
+  const withAddress = custs.filter(c=>c.address);
+  if(!withAddress.length){ toast('No addresses on this round to map'); return; }
+
+  const toGeocode = withAddress.filter(c=>c.lat==null || c.lng==null);
+  for(let i=0;i<toGeocode.length;i++){
+    toast(`Locating addresses… ${i+1} of ${toGeocode.length}`);
+    const coords = await geocodeAddress(toGeocode[i].address);
+    if(coords){ toGeocode[i].lat = coords.lat; toGeocode[i].lng = coords.lng; }
+    if(i < toGeocode.length-1) await new Promise(r=>setTimeout(r, 1100));
+  }
+  if(toGeocode.length) saveData(); // cache whatever was found either way
+
+  const located = withAddress.filter(c=>c.lat!=null && c.lng!=null);
+  const notLocatedCount = withAddress.length - located.length;
+  if(!located.length){ toast('Could not locate any addresses on this round'); return; }
+
+  renderRoundMapSheet(rn, located, notLocatedCount);
+}
+function destroyRoundMap(){
+  if(roundMapLeafletInstance){ roundMapLeafletInstance.remove(); roundMapLeafletInstance = null; }
+}
+function renderRoundMapSheet(rn, located, notLocatedCount){
+  openSheet(`
+    <div class="sheet-head">
+      <h2 style="flex:1; min-width:0;">${escapeHtml(rn)} — map</h2>
+      <button class="sheet-close" onclick="destroyRoundMap(); closeSheet();">✕</button>
+    </div>
+    ${notLocatedCount ? `<p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 10px; line-height:1.4;">${notLocatedCount} address${notLocatedCount===1?'':'es'} on this round couldn't be placed and ${notLocatedCount===1?"isn't":"aren't"} shown below.</p>` : ''}
+    <div id="roundMapEl" style="height:min(65vh, 520px); border-radius:14px; overflow:hidden; background:var(--surface); border:1px solid var(--box-border); margin-bottom:12px;"></div>
+    <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 14px; line-height:1.4;">Numbered in your current visiting order — tap a pin for the address.</p>
+    <button class="btn btn-primary" style="width:100%;" onclick="startRoundDirections('${escapeAttr(rn)}')">Start round — directions</button>
+  `, destroyRoundMap);
+  // The sheet needs to finish laying out (real, non-zero size) before Leaflet
+  // measures its container, or the map renders as a grey box.
+  setTimeout(()=> initRoundMapLeaflet(located), 50);
+}
+function initRoundMapLeaflet(located){
+  const el = document.getElementById('roundMapEl');
+  if(!el) return; // sheet was closed again before this fired
+  if(typeof L === 'undefined'){
+    el.innerHTML = '<div style="padding:24px; text-align:center; color:var(--ink-muted); font-size:0.8125rem;">Map could not load — check your connection and try again.</div>';
+    return;
+  }
+  destroyRoundMap();
+  const map = L.map(el, { zoomControl:true });
+  roundMapLeafletInstance = map;
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(map);
+
+  located.forEach((c,i)=>{
+    const icon = L.divIcon({
+      className: 'round-map-pin',
+      html: `<div style="background:#10344C; color:#fff; width:26px; height:26px; border-radius:50% 50% 50% 0; transform:rotate(-45deg); display:flex; align-items:center; justify-content:center; box-shadow:0 2px 6px rgba(0,0,0,0.35); border:2px solid #fff;"><span style="transform:rotate(45deg); font-weight:800; font-size:0.75rem;">${i+1}</span></div>`,
+      iconSize: [26,26], iconAnchor: [13,26]
+    });
+    L.marker([c.lat, c.lng], {icon}).addTo(map).bindPopup(`<b>${i+1}. ${escapeHtml(c.address||c.name||'Customer')}</b>`);
+  });
+
+  const latlngs = located.map(c=>[c.lat, c.lng]);
+  if(latlngs.length > 1){
+    map.fitBounds(L.latLngBounds(latlngs), {padding:[30,30]});
+    // Draw a straight-line route immediately (always available), then try to
+    // upgrade it to a real road-following line in the background — same
+    // road-routing-with-a-fallback approach as "Suggest a route order".
+    const straightLine = L.polyline(latlngs, {color:'#2F9BDE', weight:4, opacity:0.7, dashArray:'6 8'}).addTo(map);
+    getOsrmRouteGeometry(located.map(c=>({lat:c.lat, lng:c.lng}))).then(roadGeometry=>{
+      if(roadGeometry && roundMapLeafletInstance === map){
+        straightLine.remove();
+        L.polyline(roadGeometry, {color:'#2F9BDE', weight:4, opacity:0.85}).addTo(map);
+      }
+    });
+  } else {
+    map.setView(latlngs[0], 15);
+  }
+}
+// Traces an actual road route through the given points, in the order given
+// (unlike getOsrmTripOrder above, which is allowed to reorder them) — used to
+// draw the route line on the map. Returns null on any failure so the caller
+// can fall back to the straight-line version already on screen.
+async function getOsrmRouteGeometry(points){
+  try{
+    const coordStr = points.map(p=>`${p.lng},${p.lat}`).join(';');
+    const res = await fetch(`https://router.project-osrm.org/route/v1/driving/${coordStr}?overview=full&geometries=geojson`);
+    if(!res.ok) return null;
+    const json = await res.json();
+    if(json.code !== 'Ok' || !json.routes || !json.routes[0]) return null;
+    return json.routes[0].geometry.coordinates.map(([lng,lat])=>[lat,lng]);
+  }catch(e){ return null; }
+}
+
 /* ---------- rendering ---------- */
 function render(){
   renderBackupBanner();
@@ -1902,6 +2012,10 @@ function openRoundActionsMenu(rn){
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
       <div><div class="t1">Start round — directions</div><div class="t2">Opens Google Maps with every stop queued up, in your current order</div></div>
     </button>
+    <button class="backup-btn" onclick="closeSheet(); showRoundMap('${escapeAttr(rn)}')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+      <div><div class="t1">Show map</div><div class="t2">See every stop and the route between them</div></div>
+    </button>
     <button class="backup-btn" onclick="suggestRouteOrder('${escapeAttr(rn)}')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h8a4 4 0 0 0 4-4V7a4 4 0 0 0-4-4H8"/></svg>
       <div><div class="t1">Suggest a route order</div><div class="t2">Works out a shorter visiting order — review before it changes anything</div></div>
@@ -1939,6 +2053,10 @@ function renderRoundDetail(main, rn){
         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
       </button>
     </div>
+    <button class="btn-open" style="width:100%; margin-bottom:12px; font-weight:800; display:flex; align-items:center; justify-content:center; gap:7px;" onclick="showRoundMap('${escapeAttr(rn)}')">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+      Show map
+    </button>
   `;
 
   if(reorderMode){
