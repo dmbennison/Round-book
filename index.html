@@ -429,7 +429,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 87;
+const APP_VERSION = 88;
 function formatVersion(v){ return '1.' + v; }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
@@ -438,6 +438,7 @@ function formatVersion(v){ return '1.' + v; }
 // the most recent 10 entries (oldest ones can be left in the array or trimmed,
 // either is fine, since the display always slices to 10).
 const VERSION_HISTORY = [
+  {version: 88, changes: ['Work tab now remembers which round and view you were in when you step away to another tab (e.g. to quote someone) and resumes there instead of going back to the hub every time — tap Work again once you are back in it to return to the hub on purpose']},
   {version: 87, changes: ['Payment reminders tile on Today now shows the total amount owed', 'Show map and Suggest a route order now re-check every address location each time, instead of trusting a previously cached one', 'Moved Suggest a route order from the round menu into the Reorder screen', 'Address lookup now checks the postcode first via a dedicated UK postcode service, which should fix pins landing hundreds of miles from the right place']},
   {version: 86, changes: ['Removed the weather card from Today, plus the separate quote follow-up and one-off jobs reminder banners, since Today already covers both', 'Rounds and One-off jobs are now under a single new Work tab, opening to two square buttons with the overall customer/value figures moved underneath them', 'Marketing is now a list of campaigns — tap one to see its editable text, its sent texts, and a Send group text button, or add a new campaign at the bottom', 'Rewrote the user guide to be shorter and to match the current app']},
   {version: 85, changes: ['Added a "Show map" button at the top of each round — numbered pins for every stop in your current visiting order, with a route line between them (a real road route where available, straight lines as a fallback)']},
@@ -1361,9 +1362,34 @@ function cycleVisitDay(id){
 }
 function setRoundDayFilter(day){ roundDayFilter = day; render(); }
 
+// Remembers where you were inside Work (which round, which Due/Text/Owed
+// view, which day) whenever you step away to another tab — e.g. to quote a
+// walk-up customer — so tapping back into Work resumes there instead of
+// dumping you back on the hub every time.
+let lastWorkView = null;
 function setTab(tab){
-  currentTab = tab; currentRound = null; reorderMode = false; roundFilterMode = 'all'; roundDayFilter = 'all';
-  const activeTabKey = (tab === 'rounds' || tab === 'jobs') ? 'work' : tab;
+  if(tab === 'work'){
+    if(currentTab === 'rounds' || currentTab === 'jobs'){
+      // Already inside Work — tapping Work again means "take me to the hub",
+      // the same way tapping an already-active tab elsewhere goes to its root.
+      lastWorkView = null;
+      currentTab = 'work'; currentRound = null; reorderMode = false; roundFilterMode = 'all'; roundDayFilter = 'all';
+    } else if(lastWorkView){
+      currentTab = lastWorkView.screen;
+      currentRound = lastWorkView.round;
+      roundsViewMode = lastWorkView.roundsViewMode;
+      roundDayFilter = lastWorkView.roundDayFilter;
+      reorderMode = false; roundFilterMode = 'all';
+    } else {
+      currentTab = 'work'; currentRound = null; reorderMode = false; roundFilterMode = 'all'; roundDayFilter = 'all';
+    }
+  } else {
+    if(currentTab === 'rounds' || currentTab === 'jobs'){
+      lastWorkView = { screen: currentTab, round: currentRound, roundsViewMode, roundDayFilter };
+    }
+    currentTab = tab; currentRound = null; reorderMode = false; roundFilterMode = 'all'; roundDayFilter = 'all';
+  }
+  const activeTabKey = (currentTab === 'rounds' || currentTab === 'jobs') ? 'work' : currentTab;
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===activeTabKey));
   render();
   window.scrollTo(0, 0);
