@@ -429,7 +429,7 @@
 <script>
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 88;
+const APP_VERSION = 89;
 function formatVersion(v){ return '1.' + v; }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
@@ -438,6 +438,7 @@ function formatVersion(v){ return '1.' + v; }
 // the most recent 10 entries (oldest ones can be left in the array or trimmed,
 // either is fine, since the display always slices to 10).
 const VERSION_HISTORY = [
+  {version: 89, changes: ['Today large Due button now shows the running value of work actually completed today, on the right', 'Round names on Rounds > Due now tap straight through to that round, pre-filtered to Due']},
   {version: 88, changes: ['Work tab now remembers which round and view you were in when you step away to another tab (e.g. to quote someone) and resumes there instead of going back to the hub every time — tap Work again once you are back in it to return to the hub on purpose']},
   {version: 87, changes: ['Payment reminders tile on Today now shows the total amount owed', 'Show map and Suggest a route order now re-check every address location each time, instead of trusting a previously cached one', 'Moved Suggest a route order from the round menu into the Reorder screen', 'Address lookup now checks the postcode first via a dedicated UK postcode service, which should fix pins landing hundreds of miles from the right place']},
   {version: 86, changes: ['Removed the weather card from Today, plus the separate quote follow-up and one-off jobs reminder banners, since Today already covers both', 'Rounds and One-off jobs are now under a single new Work tab, opening to two square buttons with the overall customer/value figures moved underneath them', 'Marketing is now a list of campaigns — tap one to see its editable text, its sent texts, and a Send group text button, or add a new campaign at the bottom', 'Rewrote the user guide to be shorter and to match the current app']},
@@ -1202,6 +1203,19 @@ function textBeforeDueList(){
    existing full screen that actually deals with it (Rounds > Due, Rounds >
    Text first, Rounds > Owed, Jobs, Quotes, Marketing) — kept as a dashboard
    rather than a repeat of those screens' own customer-by-customer lists. */
+// Value of cleans and one-off jobs actually completed today — same figures
+// as the Daily work done report, just for today specifically.
+function valueOfWorkDoneToday(){
+  const today = todayISO();
+  let total = 0;
+  data.customers.forEach(c=>{
+    (c.cleanHistory||[]).forEach(e=>{ if(e.date === today) total += Number(e.amount||0); });
+  });
+  (data.oneOffJobs||[]).forEach(j=>{
+    if(j.done && j.date === today) total += Number(j.price||0);
+  });
+  return total;
+}
 function renderTodayHome(main){
   const today = todayISO();
   const rounds = groupByRound(data.customers);
@@ -1216,6 +1230,7 @@ function renderTodayHome(main){
     dueCustomers = dueCustomers.concat(dueCusts);
   });
   const dueValue = dueCustomers.reduce((s,c)=>s+Number(c.price||0),0);
+  const doneToday = valueOfWorkDoneToday();
 
   const textBefore = textBeforeDueList();
   const todaysJobs = (data.oneOffJobs||[]).filter(j=>!j.done && j.date===today);
@@ -1226,10 +1241,16 @@ function renderTodayHome(main){
 
   main.innerHTML = `
     <div class="section-label" style="margin-top:0;">${fmtDate(today)}</div>
-    <div class="today-hero" onclick="setTab('rounds'); setRoundsView('due');">
-      <div class="num">${dueCustomers.length}</div>
-      <div class="lbl">Due today</div>
-      <div class="value">${money(dueValue)} value today</div>
+    <div class="today-hero" onclick="setTab('rounds'); setRoundsView('due');" style="display:flex; align-items:flex-start; justify-content:space-between; gap:14px;">
+      <div>
+        <div class="num">${dueCustomers.length}</div>
+        <div class="lbl">Due today</div>
+        <div class="value">${money(dueValue)} value today</div>
+      </div>
+      <div style="text-align:right; flex-shrink:0;">
+        <div class="num" style="font-size:1.5rem;">${money(doneToday)}</div>
+        <div class="lbl">Done today</div>
+      </div>
     </div>
     <div class="today-grid">
       <div class="today-tile" onclick="setTab('rounds'); setRoundsView('text');">
@@ -1379,13 +1400,13 @@ function setTab(tab){
       currentRound = lastWorkView.round;
       roundsViewMode = lastWorkView.roundsViewMode;
       roundDayFilter = lastWorkView.roundDayFilter;
-      reorderMode = false; roundFilterMode = 'all';
+      reorderMode = false; roundFilterMode = lastWorkView.roundFilterMode || 'all';
     } else {
       currentTab = 'work'; currentRound = null; reorderMode = false; roundFilterMode = 'all'; roundDayFilter = 'all';
     }
   } else {
     if(currentTab === 'rounds' || currentTab === 'jobs'){
-      lastWorkView = { screen: currentTab, round: currentRound, roundsViewMode, roundDayFilter };
+      lastWorkView = { screen: currentTab, round: currentRound, roundsViewMode, roundDayFilter, roundFilterMode };
     }
     currentTab = tab; currentRound = null; reorderMode = false; roundFilterMode = 'all'; roundDayFilter = 'all';
   }
@@ -1962,7 +1983,7 @@ function renderRoundsList(main){
       dueGrandValue += dueCusts.reduce((s,c)=>s+Number(c.price||0),0);
       const anyPhone = dueCusts.some(c=>isMobileNumber(c.phone));
       html += `<div class="round-group-header" style="display:flex; align-items:center; justify-content:space-between; margin:18px 2px 8px;">
-        <div class="section-label" style="margin:0;">${escapeHtml(rn)} <span style="font-weight:600; color:var(--ink-muted); text-transform:none; letter-spacing:0;">(${dueCusts.length})</span></div>
+        <div class="section-label" style="margin:0; cursor:pointer;" onclick="goToRoundDue('${escapeAttr(rn)}')">${escapeHtml(rn)} <span style="font-weight:600; color:var(--ink-muted); text-transform:none; letter-spacing:0;">(${dueCusts.length})</span></div>
         ${anyPhone ? `<button onclick="openBulkReminders('due','${escapeAttr(rn)}')" style="background:none; border:none; color:var(--blue); font-size:0.75rem; font-weight:800;">✉️ Remind all</button>` : ''}
       </div>`;
       html += dueCusts.map(custCardHtml).join('');
@@ -2028,6 +2049,9 @@ function renderRoundsList(main){
 }
 
 function openRound(rn){ currentRound = rn; reorderMode = false; roundFilterMode = 'all'; roundDayFilter = 'all'; render(); window.scrollTo(0, 0); }
+// Same as openRound, but opens straight into that round's Due filter — used
+// by the round-name headers on the Rounds > Due overview list.
+function goToRoundDue(rn){ currentRound = rn; reorderMode = false; roundFilterMode = 'due'; roundDayFilter = 'all'; render(); window.scrollTo(0, 0); }
 function backToRounds(){ currentRound = null; reorderMode = false; roundFilterMode = 'all'; roundDayFilter = 'all'; render(); window.scrollTo(0, 0); }
 function setRoundFilterMode(v){ roundFilterMode = v; render(); }
 
