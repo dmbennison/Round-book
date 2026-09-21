@@ -1,10 +1,19 @@
-const CACHE_NAME = 'round-book-v89';
+const CACHE_NAME = 'round-book-v90';
 const ASSETS = [
   './',
   './manifest.json',
   './icon-192.png',
   './icon-512.png',
   './apple-touch-icon.png',
+  './js/01-data.js',
+  './js/02-today-rounds.js',
+  './js/03-customers.js',
+  './js/04-photos-messaging.js',
+  './js/05-jobs-quotes.js',
+  './js/06-settings-reports-a.js',
+  './js/07-reports-b.js',
+  './js/08-backup-import.js',
+  './js/09-boot.js',
   'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',
   'https://cdn.jsdelivr.net/npm/docx@8.2.4/build/index.umd.js',
   'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',
