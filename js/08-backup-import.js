@@ -113,7 +113,8 @@ const FOCUSED_HELP = {
   today: {
     title: 'Today',
     body: () => [
-      helpP('Today is the home screen. It shows due today, today\'s value, text-before-visit, jobs today, payment reminders, quotes needing follow-up, and marketing actions due. Tap any of them to go straight to the full screen for it.')
+      helpP('Today is the home screen. It shows due today, today\'s value, text-before-visit, jobs today, payment reminders, quotes needing follow-up, and marketing actions due. Tap any of them to go straight to the full screen for it.'),
+      helpP('The mileage tile logs a start-of-day reading on first tap, an end-of-day reading on the next tap, then shows the day\'s total — tap again to view, edit, or clear it. See it broken down by day/week/month/tax-year-to-date in Reports.')
     ]
   },
   work: {
@@ -178,6 +179,7 @@ const FOCUSED_HELP = {
       helpRow('Monthly schedule', 'Calendar of rounds and jobs due'),
       helpRow('One-off jobs', 'Every job, status and value'),
       helpRow('Property types', 'Houses and average price by type'),
+      helpRow('Mileage', 'Daily, weekly, monthly, tax-year-to-date'),
       helpRow('Price review due', '12+ months since last increase')
     ]
   },

@@ -70,6 +70,10 @@ function renderTodayHome(main){
   const owedTotal = owedCustomers.reduce((s,c)=>s+custStatus(c).balance,0);
   const followUpQuotes = quotesNeedingFollowUp();
   const marketingDue = marketingFollowUpsDue();
+  const mEntry = todayMileageEntry();
+  const mState = mileageTileState(mEntry);
+  const mNum = mState==='start' ? '🚗' : (mState==='end' ? mEntry.start : (mEntry.end - mEntry.start).toFixed(1));
+  const mLbl = mState==='start' ? 'Start day mileage' : (mState==='end' ? 'End day mileage (tap to log)' : 'Miles today ✓');
 
   main.innerHTML = `
     <div class="section-label" style="margin-top:0;">${fmtDate(today)}</div>
@@ -101,12 +105,104 @@ function renderTodayHome(main){
         <div class="num">${followUpQuotes.length}</div>
         <div class="lbl">Quotes needing follow-up</div>
       </div>
-      <div class="today-tile" style="grid-column:span 2;" onclick="setTab('marketing');">
+      <div class="today-tile" onclick="setTab('marketing');">
         <div class="num">${marketingDue.length}</div>
         <div class="lbl">Marketing actions</div>
       </div>
+      <div class="today-tile" onclick="openMileageEntry();">
+        <div class="num">${mNum}</div>
+        <div class="lbl">${mLbl}</div>
+      </div>
     </div>
   `;
+}
+
+/* ---------- mileage tracking ----------
+   data.mileageLog: [{date, start, end}] — one entry per day. Tapping the
+   Today tile the first time each day asks for the start reading, tapping it
+   again asks for the end reading, and tapping it a third time (once both are
+   in) opens a small summary with edit/clear options. */
+function todayMileageEntry(){
+  data.mileageLog = data.mileageLog || [];
+  return data.mileageLog.find(e=>e.date===todayISO());
+}
+function mileageTileState(entry){
+  entry = entry !== undefined ? entry : todayMileageEntry();
+  if(!entry || entry.start==null) return 'start';
+  if(entry.end==null) return 'end';
+  return 'done';
+}
+function openMileageEntry(forceMode){
+  const entry = todayMileageEntry();
+  const state = mileageTileState(entry);
+  if(!forceMode && state === 'done'){ openMileageSummary(); return; }
+  const mode = forceMode || state;
+  if(mode === 'end' && (!entry || entry.start==null)){ toast('Log a start reading first'); return; }
+  // Suggests picking up where the last logged day left off, so most days it's
+  // just confirming a number rather than typing the full odometer reading.
+  const priorEntries = (data.mileageLog||[]).filter(e=>e.end!=null && e.date !== todayISO()).sort((a,b)=>b.date.localeCompare(a.date));
+  const suggestedStart = mode==='start' && priorEntries.length ? priorEntries[0].end : '';
+  openSheet(`
+    <div class="sheet-head">
+      <h2 style="flex:1; min-width:0;">${mode==='start' ? 'Start of day mileage' : 'End of day mileage'}</h2>
+      <button class="sheet-close" onclick="closeSheet()">✕</button>
+    </div>
+    <label style="margin-top:0;">Odometer reading now</label>
+    <input type="number" id="mileage_input" inputmode="decimal" step="0.1" min="0" value="${mode==='start' ? suggestedStart : (entry && entry.end!=null ? entry.end : '')}" placeholder="e.g. 45210">
+    ${mode==='end' ? `<p style="color:var(--ink-muted); font-size:0.75rem; margin:6px 2px 0; line-height:1.5;">Started today at ${entry.start}.</p>` : ''}
+    <div class="form-actions">
+      <button class="btn-primary" onclick="saveMileageEntry('${mode}')">Save</button>
+    </div>
+  `, () => setTab('today'));
+}
+function saveMileageEntry(mode){
+  const raw = document.getElementById('mileage_input').value;
+  const val = parseFloat(raw);
+  if(raw === '' || isNaN(val) || val < 0){ toast('Enter a valid mileage reading'); return; }
+  data.mileageLog = data.mileageLog || [];
+  const today = todayISO();
+  let entry = data.mileageLog.find(e=>e.date===today);
+  if(!entry){ entry = {date:today, start:null, end:null}; data.mileageLog.push(entry); }
+  if(mode === 'start'){
+    entry.start = val;
+    saveData();
+    toast('Start mileage logged');
+  } else {
+    if(val < entry.start){ toast('End mileage should be more than the start reading'); return; }
+    entry.end = val;
+    saveData();
+    toast(`${(val - entry.start).toFixed(1)} miles logged for today`);
+  }
+  closeSheet();
+  render();
+}
+function openMileageSummary(){
+  const entry = todayMileageEntry();
+  if(!entry || entry.start==null || entry.end==null) return;
+  const miles = entry.end - entry.start;
+  openSheet(`
+    <div class="sheet-head">
+      <h2 style="flex:1; min-width:0;">Today's mileage</h2>
+      <button class="sheet-close" onclick="closeSheet()">✕</button>
+    </div>
+    <div class="summary-overall" style="margin-bottom:16px;">
+      <div class="stat"><div class="num">${entry.start}</div><div class="lbl">Start</div></div>
+      <div class="stat"><div class="num">${entry.end}</div><div class="lbl">End</div></div>
+      <div class="stat"><div class="num">${miles.toFixed(1)}</div><div class="lbl">Miles</div></div>
+    </div>
+    <button class="btn-open" style="width:100%; margin-bottom:10px;" onclick="openMileageEntry('start')">Edit start reading</button>
+    <button class="btn-open" style="width:100%; margin-bottom:14px;" onclick="openMileageEntry('end')">Edit end reading</button>
+    <button class="btn-danger-text" onclick="clearTodayMileage()">Clear today's mileage</button>
+  `, () => setTab('today'));
+}
+function clearTodayMileage(){
+  if(!confirm("Clear today's mileage entry?")) return;
+  const today = todayISO();
+  data.mileageLog = (data.mileageLog||[]).filter(e=>e.date!==today);
+  saveData();
+  toast('Cleared');
+  closeSheet();
+  render();
 }
 
 function quoteNeedsFollowUp(q, today){

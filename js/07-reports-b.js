@@ -502,6 +502,68 @@ function printPropertyTypesReport(){
   runPrint('Property Types Report', body, false, false, () => openReports());
 }
 
+// UK tax year runs 6 April to 5 April the following year — returns the ISO
+// date (YYYY-MM-DD) the current tax year started, given any date within it.
+function taxYearStart(dateStr){
+  const d = new Date(dateStr+'T00:00:00');
+  const y = d.getFullYear();
+  const aprSixThisYear = `${y}-04-06`;
+  return dateStr >= aprSixThisYear ? aprSixThisYear : `${y-1}-04-06`;
+}
+// Monday of the week containing this date, as an ISO date — used to group
+// mileage into Monday–Sunday weeks.
+function mondayOfWeek(dateStr){
+  const d = new Date(dateStr+'T00:00:00');
+  const dayIdx = (d.getDay()+6)%7; // 0 = Monday
+  d.setDate(d.getDate()-dayIdx);
+  return d.toISOString().slice(0,10);
+}
+function printMileageReport(){
+  const entries = (data.mileageLog||[])
+    .filter(e=>e.start!=null && e.end!=null && e.end>=e.start)
+    .map(e=>({date:e.date, miles: e.end-e.start}))
+    .sort((a,b)=>a.date.localeCompare(b.date));
+  if(!entries.length){
+    runPrint('Mileage Report', '<div class="rpt-empty-note">No mileage logged yet — use the mileage tile on the Today tab to start.</div>', false, false, () => openReports());
+    return;
+  }
+  const today = todayISO();
+  const tyStart = taxYearStart(today);
+  const tyEnd = (()=>{ const d = new Date(tyStart+'T00:00:00'); d.setFullYear(d.getFullYear()+1); d.setDate(d.getDate()-1); return d.toISOString().slice(0,10); })();
+  const tyMiles = entries.filter(e=>e.date >= tyStart).reduce((s,e)=>s+e.miles,0);
+
+  const monthTotals = {};
+  entries.forEach(e=>{ const mk = e.date.slice(0,7); monthTotals[mk] = (monthTotals[mk]||0) + e.miles; });
+  const monthRows = Object.keys(monthTotals).sort((a,b)=>b.localeCompare(a)).map(mk=>{
+    const label = new Date(mk+'-01T00:00:00').toLocaleDateString('en-GB', {month:'long', year:'numeric'});
+    return `<tr><td>${label}</td><td style="text-align:right;">${monthTotals[mk].toFixed(1)}</td></tr>`;
+  }).join('');
+
+  const weekTotals = {};
+  entries.forEach(e=>{ const wk = mondayOfWeek(e.date); weekTotals[wk] = (weekTotals[wk]||0) + e.miles; });
+  const weekRows = Object.keys(weekTotals).sort((a,b)=>b.localeCompare(a)).map(wk=>{
+    const end = new Date(wk+'T00:00:00'); end.setDate(end.getDate()+6);
+    return `<tr><td>${fmtDate(wk)} – ${fmtDate(end.toISOString().slice(0,10))}</td><td style="text-align:right;">${weekTotals[wk].toFixed(1)}</td></tr>`;
+  }).join('');
+
+  const dailyRows = entries.slice().reverse().map(e=>`<tr><td>${fmtDate(e.date)}</td><td style="text-align:right;">${e.miles.toFixed(1)}</td></tr>`).join('');
+
+  const body = `
+    <div class="rpt-round-title" style="margin-top:0;">Tax year to date (6 Apr ${tyStart.slice(0,4)} – ${fmtDate(tyEnd)})</div>
+    <table class="rpt-table"><tbody><tr style="font-weight:800;"><td>Total miles</td><td style="text-align:right;">${tyMiles.toFixed(1)}</td></tr></tbody></table>
+
+    <div class="rpt-round-title">Monthly totals</div>
+    <table class="rpt-table"><thead><tr><th>Month</th><th style="text-align:right;">Miles</th></tr></thead><tbody>${monthRows}</tbody></table>
+
+    <div class="rpt-round-title">Weekly totals</div>
+    <table class="rpt-table"><thead><tr><th>Week (Mon–Sun)</th><th style="text-align:right;">Miles</th></tr></thead><tbody>${weekRows}</tbody></table>
+
+    <div class="rpt-round-title">Daily mileage</div>
+    <table class="rpt-table"><thead><tr><th>Date</th><th style="text-align:right;">Miles</th></tr></thead><tbody>${dailyRows}</tbody></table>
+  `;
+  runPrint('Mileage Report', body, false, false, () => openReports());
+}
+
 function printEarnings(){
   const payments = [];
   data.customers.forEach(c=>{

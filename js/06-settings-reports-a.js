@@ -699,6 +699,10 @@ function openReports(){
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9.5"/></svg>
       <div><div class="t1">Property types</div><div class="t2">Houses and average price by property type, total and by round</div></div>
     </button>
+    <button class="backup-btn" onclick="printMileageReport()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/><path d="M5 17H3v-6l2-5h9l4 5h1a2 2 0 0 1 2 2v4h-2M9 17h6M5 12h13"/></svg>
+      <div><div class="t1">Mileage</div><div class="t2">Daily, weekly, monthly and tax-year-to-date totals</div></div>
+    </button>
   `);
 }
 
