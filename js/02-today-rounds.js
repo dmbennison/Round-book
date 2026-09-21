@@ -534,8 +534,10 @@ async function suggestRouteOrder(rn){
 
   // Re-fetches every address rather than trusting a previously cached
   // location — a bad geocode (wrong postcode match, ambiguous place name)
-  // would otherwise stay wrong forever once cached.
-  const toGeocode = withAddress;
+  // would otherwise stay wrong forever once cached. Skips anyone whose pin
+  // has already been dragged and locked on the map, since re-fetching would
+  // just overwrite a correction the user already made.
+  const toGeocode = withAddress.filter(c=>!c.latLocked);
   for(let i=0;i<toGeocode.length;i++){
     toast(`Locating addresses… ${i+1} of ${toGeocode.length}`);
     const coords = await geocodeAddress(toGeocode[i].address);
@@ -629,8 +631,12 @@ function applySuggestedRouteOrder(){
 /* ---------- round map ----------
    Shows every customer on a round as a numbered pin (in the round's current
    visiting order, not a re-optimised one) with a route line connecting them.
-   Reuses the same geocoding as "Suggest a route order" above. */
+   Every address gets a pin, even one that fails to geocode — it's placed as
+   a best-guess cluster near the round's other pins, clearly marked, so it's
+   still visible and can be dragged to the right spot. Dragging any pin locks
+   that customer's location so future map/route requests leave it alone. */
 let roundMapLeafletInstance = null;
+let roundMapRouteLine = null;
 async function showRoundMap(rn){
   let custs = sortByRoute(data.customers.filter(c=>(c.round||'Unassigned')===rn && !c.paused));
   const days = roundDaysUsed(custs);
@@ -644,43 +650,65 @@ async function showRoundMap(rn){
   const withAddress = custs.filter(c=>c.address);
   if(!withAddress.length){ toast('No addresses on this round to map'); return; }
 
-  // Re-fetches every address rather than trusting a previously cached
-  // location — a bad geocode (wrong postcode match, ambiguous place name)
-  // would otherwise stay wrong forever once cached.
-  const toGeocode = withAddress;
+  // Skips anyone whose pin has already been dragged and locked — re-fetching
+  // would just overwrite a correction the user already made.
+  const toGeocode = withAddress.filter(c=>!c.latLocked);
   for(let i=0;i<toGeocode.length;i++){
     toast(`Locating addresses… ${i+1} of ${toGeocode.length}`);
     const coords = await geocodeAddress(toGeocode[i].address);
     if(coords){ toGeocode[i].lat = coords.lat; toGeocode[i].lng = coords.lng; }
     if(i < toGeocode.length-1) await new Promise(r=>setTimeout(r, 1100));
   }
-  if(toGeocode.length) saveData(); // cache whatever was found either way
+  if(toGeocode.length) saveData();
 
   const located = withAddress.filter(c=>c.lat!=null && c.lng!=null);
-  const notLocatedCount = withAddress.length - located.length;
+  const failed = withAddress.filter(c=>c.lat==null || c.lng==null);
   if(!located.length){ toast('Could not locate any addresses on this round'); return; }
 
-  renderRoundMapSheet(rn, located, notLocatedCount);
+  // Everyone still gets a pin — anyone who failed to geocode is placed in a
+  // small ring around the round's other pins (never saved as a real location)
+  // rather than left off the map, and marked as approximate so it's obvious
+  // it needs dragging into place.
+  const fallbackCoords = new Map();
+  if(failed.length){
+    const centerLat = located.reduce((s,c)=>s+c.lat,0)/located.length;
+    const centerLng = located.reduce((s,c)=>s+c.lng,0)/located.length;
+    failed.forEach((c,i)=>{
+      const angle = (i / failed.length) * Math.PI * 2;
+      fallbackCoords.set(c.id, { lat: centerLat + Math.cos(angle)*0.003, lng: centerLng + Math.sin(angle)*0.003 });
+    });
+  }
+
+  renderRoundMapSheet(rn, withAddress, fallbackCoords);
 }
 function destroyRoundMap(){
   if(roundMapLeafletInstance){ roundMapLeafletInstance.remove(); roundMapLeafletInstance = null; }
+  roundMapRouteLine = null;
 }
-function renderRoundMapSheet(rn, located, notLocatedCount){
+function renderRoundMapSheet(rn, customers, fallbackCoords){
+  const approxCount = fallbackCoords.size;
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">${escapeHtml(rn)} — map</h2>
       <button class="sheet-close" onclick="destroyRoundMap(); closeSheet();">✕</button>
     </div>
-    ${notLocatedCount ? `<p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 10px; line-height:1.4;">${notLocatedCount} address${notLocatedCount===1?'':'es'} on this round couldn't be placed and ${notLocatedCount===1?"isn't":"aren't"} shown below.</p>` : ''}
+    ${approxCount ? `<p style="color:var(--amber); font-size:0.75rem; margin:0 2px 10px; line-height:1.4; font-weight:700;">📍 ${approxCount} address${approxCount===1?'':'es'} couldn't be found automatically — shown as a grey dashed pin near the others. Drag ${approxCount===1?'it':'them'} to the right spot to fix.</p>` : ''}
     <div id="roundMapEl" style="height:min(65vh, 520px); border-radius:14px; overflow:hidden; background:var(--surface); border:1px solid var(--box-border); margin-bottom:12px;"></div>
-    <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 14px; line-height:1.4;">Numbered in your current visiting order — tap a pin for the address.</p>
+    <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 14px; line-height:1.4;">Numbered in your current visiting order. Tap a pin for the address, or drag any pin to correct its spot — dragging locks it there so it won't move again.</p>
     <button class="btn btn-primary" style="width:100%;" onclick="startRoundDirections('${escapeAttr(rn)}')">Start round — directions</button>
   `, destroyRoundMap);
   // The sheet needs to finish laying out (real, non-zero size) before Leaflet
   // measures its container, or the map renders as a grey box.
-  setTimeout(()=> initRoundMapLeaflet(located), 50);
+  setTimeout(()=> initRoundMapLeaflet(customers, fallbackCoords), 50);
 }
-function initRoundMapLeaflet(located){
+function roundMapPinIcon(num, isApprox){
+  return L.divIcon({
+    className: 'round-map-pin',
+    html: `<div style="background:${isApprox ? '#8A97A3' : '#10344C'}; color:#fff; width:26px; height:26px; border-radius:50% 50% 50% 0; transform:rotate(-45deg); display:flex; align-items:center; justify-content:center; box-shadow:0 2px 6px rgba(0,0,0,0.35); border:2px solid #fff; ${isApprox ? 'border-style:dashed;' : ''}"><span style="transform:rotate(45deg); font-weight:800; font-size:0.75rem;">${num}</span></div>`,
+    iconSize: [26,26], iconAnchor: [13,26]
+  });
+}
+function initRoundMapLeaflet(customers, fallbackCoords){
   const el = document.getElementById('roundMapEl');
   if(!el) return; // sheet was closed again before this fired
   if(typeof L === 'undefined'){
@@ -695,31 +723,46 @@ function initRoundMapLeaflet(located){
     attribution: '&copy; OpenStreetMap contributors'
   }).addTo(map);
 
-  located.forEach((c,i)=>{
-    const icon = L.divIcon({
-      className: 'round-map-pin',
-      html: `<div style="background:#10344C; color:#fff; width:26px; height:26px; border-radius:50% 50% 50% 0; transform:rotate(-45deg); display:flex; align-items:center; justify-content:center; box-shadow:0 2px 6px rgba(0,0,0,0.35); border:2px solid #fff;"><span style="transform:rotate(45deg); font-weight:800; font-size:0.75rem;">${i+1}</span></div>`,
-      iconSize: [26,26], iconAnchor: [13,26]
+  const pointOf = c => fallbackCoords.has(c.id) ? fallbackCoords.get(c.id) : {lat:c.lat, lng:c.lng};
+
+  customers.forEach((c,i)=>{
+    const isApprox = fallbackCoords.has(c.id);
+    const pos = pointOf(c);
+    const marker = L.marker([pos.lat, pos.lng], {icon: roundMapPinIcon(i+1, isApprox), draggable:true}).addTo(map)
+      .bindPopup(`<b>${i+1}. ${escapeHtml(c.address||c.name||'Customer')}</b>${isApprox ? '<br><span style="color:#8A97A3;">Approximate — drag to the right spot</span>' : ''}`);
+    marker.on('dragend', (e)=>{
+      const p = e.target.getLatLng();
+      c.lat = p.lat; c.lng = p.lng; c.latLocked = true;
+      fallbackCoords.delete(c.id);
+      saveData();
+      marker.setIcon(roundMapPinIcon(i+1, false));
+      marker.setPopupContent(`<b>${i+1}. ${escapeHtml(c.address||c.name||'Customer')}</b>`);
+      toast('Location saved — locked so it stays put next time');
+      redrawRoundMapRoute(customers, fallbackCoords, map);
     });
-    L.marker([c.lat, c.lng], {icon}).addTo(map).bindPopup(`<b>${i+1}. ${escapeHtml(c.address||c.name||'Customer')}</b>`);
   });
 
-  const latlngs = located.map(c=>[c.lat, c.lng]);
-  if(latlngs.length > 1){
-    map.fitBounds(L.latLngBounds(latlngs), {padding:[30,30]});
-    // Draw a straight-line route immediately (always available), then try to
-    // upgrade it to a real road-following line in the background — same
-    // road-routing-with-a-fallback approach as "Suggest a route order".
-    const straightLine = L.polyline(latlngs, {color:'#2F9BDE', weight:4, opacity:0.7, dashArray:'6 8'}).addTo(map);
-    getOsrmRouteGeometry(located.map(c=>({lat:c.lat, lng:c.lng}))).then(roadGeometry=>{
-      if(roadGeometry && roundMapLeafletInstance === map){
-        straightLine.remove();
-        L.polyline(roadGeometry, {color:'#2F9BDE', weight:4, opacity:0.85}).addTo(map);
-      }
-    });
-  } else {
-    map.setView(latlngs[0], 15);
-  }
+  redrawRoundMapRoute(customers, fallbackCoords, map);
+  const latlngs = customers.map(c=>{ const p = pointOf(c); return [p.lat, p.lng]; });
+  if(latlngs.length > 1) map.fitBounds(L.latLngBounds(latlngs), {padding:[30,30]});
+  else map.setView(latlngs[0], 15);
+}
+function redrawRoundMapRoute(customers, fallbackCoords, map){
+  if(roundMapRouteLine){ roundMapRouteLine.remove(); roundMapRouteLine = null; }
+  if(customers.length < 2) return;
+  const pointOf = c => fallbackCoords.has(c.id) ? fallbackCoords.get(c.id) : {lat:c.lat, lng:c.lng};
+  const latlngs = customers.map(c=>{ const p = pointOf(c); return [p.lat, p.lng]; });
+  // Draw a straight-line route immediately (always available), then try to
+  // upgrade it to a real road-following line in the background — same
+  // road-routing-with-a-fallback approach as "Suggest a route order".
+  roundMapRouteLine = L.polyline(latlngs, {color:'#2F9BDE', weight:4, opacity:0.7, dashArray:'6 8'}).addTo(map);
+  const thisLine = roundMapRouteLine;
+  getOsrmRouteGeometry(customers.map(c=>pointOf(c))).then(roadGeometry=>{
+    if(roadGeometry && roundMapLeafletInstance === map && roundMapRouteLine === thisLine){
+      thisLine.remove();
+      roundMapRouteLine = L.polyline(roadGeometry, {color:'#2F9BDE', weight:4, opacity:0.85}).addTo(map);
+    }
+  });
 }
 // Traces an actual road route through the given points, in the order given
 // (unlike getOsrmTripOrder above, which is allowed to reorder them) — used to

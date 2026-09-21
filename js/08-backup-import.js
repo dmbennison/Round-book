@@ -129,7 +129,8 @@ const FOCUSED_HELP = {
       helpP('Open Rounds from the Work tab. Use the Rounds / Due / Text first / Owed switch at the top, or open a single round to see its customers. Swipe a card right to mark cleaned, left to mark paid. Use Reorder to set your walking order.'),
       helpP('A round card shows its customer count and value as price/owed, with paused customers left out of both.'),
       helpP('A round\'s ⋯ menu has: Show map (numbered stops with a route line), Start round (directions for every stop), Print, and Defer the whole round 4 weeks.'),
-      helpP('Suggest a route order is inside Reorder — it works out a shorter visiting order using real road distances where possible, and shows it to you before changing anything (nothing\'s applied unless you tap "Use this order"). Both this and Show map re-check every address\'s location each time, so a correction sticks.'),
+      helpP('Suggest a route order is inside Reorder — it works out a shorter visiting order using real road distances where possible, and shows it to you before changing anything (nothing\'s applied unless you tap "Use this order"). Both this and Show map re-check every address\'s location each time, unless it\'s been manually corrected (see below).'),
+      helpP('On the map, every address gets a pin — one that couldn\'t be found automatically shows as a grey dashed pin near the others. Drag any pin to fix its spot; dragging locks it there, so it\'s never fetched again and won\'t be moved by a later map or route request.'),
       helpP('The magnifying glass searches every customer; the photo icon opens the photo gallery. Both are on the main Rounds screen.'),
       helpP('The small green phone button calls a customer; the small blue compass button opens directions to their address. A red "⚠ Chase" badge appears after 2+ unpaid payment reminders.')
     ]

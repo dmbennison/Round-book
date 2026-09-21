@@ -3,7 +3,7 @@
 
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 91;
+const APP_VERSION = 92;
 function formatVersion(v){ return '1.' + v; }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
@@ -12,6 +12,7 @@ function formatVersion(v){ return '1.' + v; }
 // the most recent 10 entries (oldest ones can be left in the array or trimmed,
 // either is fine, since the display always slices to 10).
 const VERSION_HISTORY = [
+  {version: 92, changes: ['Show map now gives every address a pin, even one that fails to find automatically (shown as an approximate grey pin near the others)', 'Pins on the map can now be dragged to correct their position — dragging locks that location so it is never re-fetched by a later map or route request, only by dragging it again']},
   {version: 91, changes: ['Added a mileage tracker to the Today tab -- tap to log a start-of-day reading, tap again at the end of the day for an end reading, tap once more to see/edit/clear the total', 'Added a Mileage report -- daily, weekly, monthly and UK tax-year-to-date (6 Apr) totals']},
   {version: 90, changes: ['No user-visible changes -- the app itself has just been split from one very large JavaScript file into 9 smaller ones by feature area, to make it easier to find and edit code going forward']},
   {version: 89, changes: ['Today large Due button now shows the running value of work actually completed today, on the right', 'Round names on Rounds > Due now tap straight through to that round, pre-filtered to Due']},
