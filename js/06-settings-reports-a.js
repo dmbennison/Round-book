@@ -518,16 +518,16 @@ function toggleMarketingActionDone(id){
   render();
 }
 
-function openCustomerSearch(){
+function openUniversalSearch(){
   openSheet(`
     <div class="sheet-head">
-      <h2 style="flex:1; min-width:0;">Search customers</h2>
+      <h2 style="flex:1; min-width:0;">Search</h2>
       <button class="sheet-close" onclick="closeSheet()">✕</button>
     </div>
-    <input type="text" id="search_input" placeholder="Name, address, phone, round, account no..." oninput="renderCustomerSearchResults()" style="margin-top:0; margin-bottom:14px;">
+    <input type="text" id="search_input" placeholder="Customers, jobs, quotes, rounds..." oninput="renderUniversalSearchResults()" style="margin-top:0; margin-bottom:14px;">
     <div id="search_results"></div>
-  `, () => setTab('rounds'));
-  renderCustomerSearchResults();
+  `, () => render());
+  renderUniversalSearchResults();
   setTimeout(() => { const el = document.getElementById('search_input'); if(el) el.focus(); }, 60);
 }
 // Wraps the first matching occurrence of the search term in a highlight span —
@@ -546,38 +546,107 @@ function highlightMatch(text, rawQuery){
     + '</mark>'
     + escaped.slice(idx+escapedQuery.length);
 }
-function renderCustomerSearchResults(){
+function universalSearchSectionLabel(text, first){
+  return `<div class="section-label" style="margin-top:${first?'0':'16px'};">${text}</div>`;
+}
+function renderUniversalSearchResults(){
   const inputEl = document.getElementById('search_input');
   const resultsEl = document.getElementById('search_results');
   if(!inputEl || !resultsEl) return;
   const raw = inputEl.value.trim();
   const q = raw.toLowerCase();
   if(!q){
-    resultsEl.innerHTML = '<p style="color:var(--ink-muted); font-size:0.8438rem; text-align:center; margin-top:24px;">Start typing to search your customers.</p>';
+    resultsEl.innerHTML = '<p style="color:var(--ink-muted); font-size:0.8438rem; text-align:center; margin-top:24px;">Start typing to search customers, jobs, quotes, and rounds.</p>';
     return;
   }
-  const matches = data.customers.filter(c=>{
+
+  const roundNames = [...new Set(data.customers.map(c=>c.round||'Unassigned'))].sort((a,b)=>a.localeCompare(b));
+  const roundMatches = roundNames.filter(rn=>rn.toLowerCase().includes(q));
+
+  const custMatches = data.customers.filter(c=>{
     const haystack = [c.name, c.address, c.phone, c.email, c.notes, c.round, c.accountNumber].filter(Boolean).join(' ').toLowerCase();
     return haystack.includes(q);
   }).sort((a,b)=>(a.address||'').localeCompare(b.address||''));
-  if(!matches.length){
-    resultsEl.innerHTML = `<p style="color:var(--ink-muted); font-size:0.8438rem; text-align:center; margin-top:24px;">No customers match "${escapeHtml(raw)}".</p>`;
+
+  const jobMatches = (data.oneOffJobs||[]).filter(j=>{
+    const haystack = [j.name, j.address, j.phone, j.notes].filter(Boolean).join(' ').toLowerCase();
+    return haystack.includes(q);
+  }).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+
+  const quoteMatches = (data.quotes||[]).filter(qt=>{
+    const haystack = [qt.name, qt.address, qt.phone, qt.notes].filter(Boolean).join(' ').toLowerCase();
+    return haystack.includes(q);
+  }).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+
+  if(!roundMatches.length && !custMatches.length && !jobMatches.length && !quoteMatches.length){
+    resultsEl.innerHTML = `<p style="color:var(--ink-muted); font-size:0.8438rem; text-align:center; margin-top:24px;">Nothing matches "${escapeHtml(raw)}".</p>`;
     return;
   }
-  resultsEl.innerHTML = matches.map(c=>{
-    const subtitle = [c.name, c.round||'Unassigned', c.accountNumber?`Acct #${c.accountNumber}`:''].filter(Boolean).join(' · ');
-    return `<button class="backup-btn" onclick="searchResultTap('${c.id}')" style="margin-bottom:8px;">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+
+  let html = '';
+  let firstSection = true;
+  if(roundMatches.length){
+    html += universalSearchSectionLabel('Rounds', firstSection); firstSection = false;
+    html += roundMatches.map(rn=>`<button class="backup-btn" onclick="openRoundFromSearch('${escapeAttr(rn)}')" style="margin-bottom:8px;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+      <div style="flex:1; min-width:0;"><div class="t1">${highlightMatch(rn, raw)}</div></div>
+    </button>`).join('');
+  }
+  if(custMatches.length){
+    html += universalSearchSectionLabel('Customers', firstSection); firstSection = false;
+    html += custMatches.map(c=>{
+      const subtitle = [c.name, c.round||'Unassigned', c.accountNumber?`Acct #${c.accountNumber}`:''].filter(Boolean).join(' · ');
+      return `<button class="backup-btn" onclick="searchResultTap('${c.id}')" style="margin-bottom:8px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <div style="flex:1; min-width:0;">
+          <div class="t1">${highlightMatch(c.address||c.name||'Customer', raw)}</div>
+          <div class="t2">${highlightMatch(subtitle, raw)}</div>
+        </div>
+      </button>`;
+    }).join('');
+  }
+  if(jobMatches.length){
+    html += universalSearchSectionLabel('One-off jobs', firstSection); firstSection = false;
+    html += jobMatches.map(j=>`<button class="backup-btn" onclick="openJobFromSearch('${j.id}')" style="margin-bottom:8px;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
       <div style="flex:1; min-width:0;">
-        <div class="t1">${highlightMatch(c.address||'No address', raw)}</div>
-        <div class="t2">${highlightMatch(subtitle, raw)}</div>
+        <div class="t1">${highlightMatch(j.address||j.name||'Job', raw)}</div>
+        <div class="t2">${fmtDate(j.date)} · ${money(j.price)}</div>
       </div>
-    </button>`;
-  }).join('');
+    </button>`).join('');
+  }
+  if(quoteMatches.length){
+    html += universalSearchSectionLabel('Quotes', firstSection); firstSection = false;
+    html += quoteMatches.map(qt=>`<button class="backup-btn" onclick="openQuoteFromSearch('${qt.id}')" style="margin-bottom:8px;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+      <div style="flex:1; min-width:0;">
+        <div class="t1">${highlightMatch(qt.address||qt.name||'Quote', raw)}</div>
+        <div class="t2">${money(qt.price)} · ${qt.status||'pending'}</div>
+      </div>
+    </button>`).join('');
+  }
+  resultsEl.innerHTML = html;
 }
 function searchResultTap(id){
   closeSheet();
   openCustomerDetail(id);
+}
+function openJobFromSearch(id){
+  closeSheet();
+  setTab('jobs');
+  const j = (data.oneOffJobs||[]).find(x=>x.id===id);
+  if(j) openJobForm(j);
+}
+function openQuoteFromSearch(id){
+  closeSheet();
+  setTab('quotes');
+  const qt = (data.quotes||[]).find(x=>x.id===id);
+  if(qt) openQuoteForm(qt);
+}
+function openRoundFromSearch(rn){
+  closeSheet();
+  setTab('rounds');
+  openRound(rn);
 }
 
 // Photo gallery — every customer with at least one photo (their own, or from a

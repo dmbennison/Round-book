@@ -126,12 +126,12 @@ const FOCUSED_HELP = {
   rounds: {
     title: 'Rounds',
     body: () => [
-      helpP('Open Rounds from the Work tab. Use the Rounds / Due / Text first / Owed switch at the top, or open a single round to see its customers. Swipe a card right to mark cleaned, left to mark paid. Use Reorder to set your walking order.'),
+      helpP('Open Rounds from the Work tab. Use the Rounds / Due / Text first / Owed switch at the top, or open a single round to see its customers. Swipe a card halfway right to mark cleaned, all the way right to mark cleaned AND paid in one go, or left to mark paid alone. Use Reorder to set your walking order.'),
       helpP('A round card shows its customer count and value as price/owed, with paused customers left out of both.'),
       helpP('A round\'s ⋯ menu has: Show map (numbered stops with a route line), Start round (directions for every stop), Print, and Defer the whole round 4 weeks.'),
       helpP('Suggest a route order is inside Reorder — it works out a shorter visiting order using real road distances where possible, and shows it to you before changing anything (nothing\'s applied unless you tap "Use this order"). Both this and Show map re-check every address\'s location each time, unless it\'s been manually corrected (see below).'),
       helpP('On the map, every address gets a pin — one that couldn\'t be found automatically shows as a grey dashed pin near the others. Drag any pin to fix its spot; dragging locks it there, so it\'s never fetched again and won\'t be moved by a later map or route request.'),
-      helpP('The magnifying glass searches every customer; the photo icon opens the photo gallery. Both are on the main Rounds screen.'),
+      helpP('The photo icon on the Rounds screen opens the photo gallery.'),
       helpP('The small green phone button calls a customer; the small blue compass button opens directions to their address. A red "⚠ Chase" badge appears after 2+ unpaid payment reminders.')
     ]
   },
@@ -165,6 +165,7 @@ const FOCUSED_HELP = {
     title: 'Marketing',
     body: () => [
       helpP('Marketing is a list of campaigns. Tap one to open its page: an editable name and message, a Send group text button, and the list of texts sent for that campaign. Tap "+ Add a campaign" to create another.'),
+      helpP('Send group text can also be narrowed by property type, add-ons (conservatory/extension/garage door), and fronts-only — useful for a campaign aimed at, say, conservatory cleaning specifically.'),
       helpP('Send group text: tick which rounds (or paused/lapsed customers) to include, optionally skip anyone already Interested/Booked or texted recently, then tap Send for each customer in turn — it opens Messages/WhatsApp pre-filled, one at a time.'),
       helpP('Round Book can\'t see replies — check your own Messages/WhatsApp, then record what happened: a response and a next action, each with an optional follow-up date.'),
       helpP('Anyone opted out of marketing (set on their own customer screen) is always excluded, on every campaign.')
@@ -234,7 +235,7 @@ function openHelp(returnTo){
     ${helpP('Round Book is a simple, offline window cleaning round tracker. It keeps track of customers, rounds, cleaning and payment dates, one-off jobs, and quotes — all stored privately on your own phone.')}
 
     ${helpH('Getting around')}
-    ${helpP('Four tabs: <b>Today</b> (your home screen), <b>Work</b> (Rounds and One-off jobs), <b>Quotes</b>, and <b>Marketing</b>. The blue + button adds something appropriate to whichever screen you\'re on. Header icons: <b>About</b>, <b>Reports</b>, <b>Backup</b>, <b>Settings</b>. Look for a <b>?</b> next to a screen\'s print icon for help on just that screen.')}
+    ${helpP('Four tabs: <b>Today</b> (your home screen), <b>Work</b> (Rounds and One-off jobs), <b>Quotes</b>, and <b>Marketing</b>. The blue + button adds something appropriate to whichever screen you\'re on. Header icons: <b>Search</b> (customers, jobs, quotes, and rounds, all in one place), <b>About</b>, <b>Reports</b>, <b>Backup</b>, <b>Settings</b>. Look for a <b>?</b> next to a screen\'s print icon for help on just that screen.')}
 
     ${FOCUSED_HELP_ORDER.map(key=>{
       const h = FOCUSED_HELP[key];

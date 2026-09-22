@@ -880,9 +880,6 @@ function renderRoundsList(main){
     </button>
     <div style="display:flex; align-items:center; gap:8px;">
       ${mainScreenHelpBtn('rounds', "()=>setTab('rounds')")}
-      <button class="btn-open" style="width:38px; height:38px; padding:0;" onclick="openCustomerSearch()" aria-label="Search customers">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-      </button>
       <button class="btn-open" style="width:38px; height:38px; padding:0;" onclick="openPhotoGallery()" aria-label="Photo gallery">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></svg>
       </button>
@@ -1264,6 +1261,19 @@ function quickPaid(id){
   c.paymentReminderSentDate = null;
   c.paymentReminderCount = 0;
   saveData(); render(); toast(`Marked ${c.name||c.address||'customer'} as paid`);
+}
+function quickCleanAndPaid(id){
+  const c = data.customers.find(x=>x.id===id);
+  const today = todayISO();
+  c.cleanHistory = c.cleanHistory || [];
+  c.cleanHistory.push({date: today, amount: c.price||0});
+  c.deferUntil = null;
+  c.paymentHistory = c.paymentHistory || [];
+  c.paymentHistory.push({date: today, amount: c.price||0});
+  c.paymentReminderSent = false;
+  c.paymentReminderSentDate = null;
+  c.paymentReminderCount = 0;
+  saveData(); render(); toast(`Marked ${c.name||c.address||'customer'} as cleaned and paid today`);
 }
 
 function useCurrentLocation(){

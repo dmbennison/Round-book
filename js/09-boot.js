@@ -42,26 +42,47 @@ function onSwipeMove(e){
   }
   if(!swipeState) return;
   e.preventDefault();
-  const maxDrag = 96;
-  const clamped = Math.max(-maxDrag, Math.min(maxDrag, dx));
+  // Customer cards get extra room on the right: halfway = clean, all the way
+  // across = clean AND paid in one gesture. Job/quote cards keep the plain
+  // single-action swipe either way.
+  const isCustomer = swipeState.card.dataset.kind === 'customer';
+  const maxDragRight = isCustomer ? SWIPE_FULL_X : 96;
+  const clamped = Math.max(-96, Math.min(maxDragRight, dx));
   swipeState.currentX = clamped;
   swipeState.card.style.transition = 'none';
   swipeState.card.style.transform = `translateX(${clamped}px)`;
+
+  // Live-updates the revealed left label as a customer card crosses into "all
+  // the way" territory, so it's clear before releasing which action will fire.
+  if(isCustomer && clamped > 0){
+    const bgLeft = swipeState.card.parentElement && swipeState.card.parentElement.querySelector('.swipe-bg-left');
+    if(bgLeft){
+      const full = clamped >= SWIPE_FULL_THRESHOLD;
+      bgLeft.textContent = full ? '✓ Cleaned + 💷 Paid' : '✓ Cleaned';
+      bgLeft.style.background = full ? 'var(--navy)' : '';
+    }
+  }
 }
+const SWIPE_HALF_THRESHOLD = 64; // customer card: clean
+const SWIPE_FULL_X = 150; // customer card: max right-drag distance
+const SWIPE_FULL_THRESHOLD = 125; // customer card: clean + paid
 function onSwipeEnd(){
   if(!swipeState) return;
   const { card, currentX, decided, horizontal } = swipeState;
   card.style.transition = 'transform 0.2s ease';
   card.style.transform = 'translateX(0)';
-  const threshold = 64;
-  if(decided && horizontal && Math.abs(currentX) >= threshold){
+  const bgLeft = card.parentElement && card.parentElement.querySelector('.swipe-bg-left');
+  if(bgLeft){ bgLeft.textContent = '✓ Cleaned'; bgLeft.style.background = ''; }
+
+  if(decided && horizontal){
     const id = card.dataset.id;
     const kind = card.dataset.kind || 'customer';
-    if(currentX > 0){
+    if(currentX >= SWIPE_HALF_THRESHOLD){
       if(kind === 'job') toggleJobDone(id);
       else if(kind === 'quote') markQuoteAccepted(id);
+      else if(kind === 'customer' && currentX >= SWIPE_FULL_THRESHOLD) quickCleanAndPaid(id);
       else quickClean(id);
-    } else {
+    } else if(currentX <= -64){
       if(kind === 'job') toggleJobPaid(id);
       else if(kind === 'quote') markQuoteDeclined(id);
       else quickPaid(id);

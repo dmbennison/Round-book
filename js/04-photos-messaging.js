@@ -973,6 +973,9 @@ let marketingSelectedRounds = new Set();
 let marketingSelectedCampaignId = null; // remembers the last campaign picked, for this session
 let marketingSkipResponded = true; // skip anyone already marked Interested/Booked in
 let marketingSkipRecentDays = 14; // skip anyone texted (any campaign) within this many days; 0 = off
+let marketingPropertyTypeFilter = new Set(); // empty = no restriction; values from PROPERTY_TYPES, or 'Not recorded'
+let marketingAddOnFilter = new Set(); // empty = no restriction; matches ANY ticked add-on
+let marketingFrontsOnlyFilter = false; // true = only fronts-only customers
 function toggleMarketingRound(rn, checked){
   if(checked) marketingSelectedRounds.add(rn); else marketingSelectedRounds.delete(rn);
   openGroupMarketingText();
@@ -990,6 +993,18 @@ function setMarketingSkipRecentDaysValue(val){
   // Deliberately not re-rendering the whole screen on every keystroke here (unlike
   // the other filters) — that would steal focus from the number input mid-type.
   // The candidate list below just reflects the latest value next time it renders.
+}
+function toggleMarketingPropertyType(type, checked){
+  if(checked) marketingPropertyTypeFilter.add(type); else marketingPropertyTypeFilter.delete(type);
+  openGroupMarketingText();
+}
+function toggleMarketingAddOn(key, checked){
+  if(checked) marketingAddOnFilter.add(key); else marketingAddOnFilter.delete(key);
+  openGroupMarketingText();
+}
+function setMarketingFrontsOnlyFilter(checked){
+  marketingFrontsOnlyFilter = checked;
+  openGroupMarketingText();
 }
 function selectMarketingCampaign(id){
   marketingSelectedCampaignId = id;
@@ -1016,6 +1031,21 @@ function marketingCandidateList(){
       const lastSent = (c.messageLog||[]).filter(m=>m.kind==='marketing').sort((a,b)=>b.time-a.time)[0];
       return !lastSent || daysBetween(lastSent.date, today) >= marketingSkipRecentDays;
     });
+  }
+  // Property filters — optional extra narrowing on top of the round/group
+  // selection above; an empty filter set means "no restriction".
+  if(marketingPropertyTypeFilter.size){
+    list = list.filter(c => marketingPropertyTypeFilter.has(c.propertyType || 'Not recorded'));
+  }
+  if(marketingAddOnFilter.size){
+    list = list.filter(c =>
+      (marketingAddOnFilter.has('conservatory') && c.addOnConservatory) ||
+      (marketingAddOnFilter.has('extension') && c.addOnExtension) ||
+      (marketingAddOnFilter.has('garageDoor') && c.addOnGarageDoor)
+    );
+  }
+  if(marketingFrontsOnlyFilter){
+    list = list.filter(c => c.frontsOnly);
   }
   return list;
 }
@@ -1082,7 +1112,30 @@ function openGroupMarketingText(){
       <input type="number" min="1" value="${marketingSkipRecentDays||14}" ${marketingSkipRecentDays>0?'':'disabled'} oninput="setMarketingSkipRecentDaysValue(this.value)" style="width:56px; margin:0; padding:6px 8px; text-align:center;">
       <span>days</span>
     </label>
-    <label style="margin-top:16px;">Message <span style="text-transform:none; font-weight:500; opacity:0.7;">({name}, {company}, {yourname})</span></label>
+    <label style="margin-top:16px;">Property type <span style="text-transform:none; font-weight:500; opacity:0.7;">(optional — leave all unticked to include every type)</span></label>
+    <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px;">
+      ${PROPERTY_TYPES.concat(['Not recorded']).map(t=>`<label style="display:flex; align-items:center; gap:6px; background:var(--surface); border:1px solid var(--box-border); border-radius:20px; padding:6px 12px; font-size:0.75rem; font-weight:700; text-transform:none; margin:0;">
+        <input type="checkbox" ${marketingPropertyTypeFilter.has(t)?'checked':''} onchange="toggleMarketingPropertyType('${escapeAttr(t)}', this.checked)" style="width:15px; height:15px; margin:0;">
+        ${escapeHtml(PROPERTY_TYPE_ABBR[t]||t)}
+      </label>`).join('')}
+    </div>
+    <label>Add-ons <span style="text-transform:none; font-weight:500; opacity:0.7;">(optional — matches anyone with any ticked)</span></label>
+    <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:6px;">
+      <label style="display:flex; align-items:center; gap:6px; background:var(--surface); border:1px solid var(--box-border); border-radius:20px; padding:6px 12px; font-size:0.75rem; font-weight:700; text-transform:none; margin:0;">
+        <input type="checkbox" ${marketingAddOnFilter.has('conservatory')?'checked':''} onchange="toggleMarketingAddOn('conservatory', this.checked)" style="width:15px; height:15px; margin:0;"> Conservatory
+      </label>
+      <label style="display:flex; align-items:center; gap:6px; background:var(--surface); border:1px solid var(--box-border); border-radius:20px; padding:6px 12px; font-size:0.75rem; font-weight:700; text-transform:none; margin:0;">
+        <input type="checkbox" ${marketingAddOnFilter.has('extension')?'checked':''} onchange="toggleMarketingAddOn('extension', this.checked)" style="width:15px; height:15px; margin:0;"> Extension
+      </label>
+      <label style="display:flex; align-items:center; gap:6px; background:var(--surface); border:1px solid var(--box-border); border-radius:20px; padding:6px 12px; font-size:0.75rem; font-weight:700; text-transform:none; margin:0;">
+        <input type="checkbox" ${marketingAddOnFilter.has('garageDoor')?'checked':''} onchange="toggleMarketingAddOn('garageDoor', this.checked)" style="width:15px; height:15px; margin:0;"> Garage door
+      </label>
+    </div>
+    <label style="display:flex; align-items:center; gap:8px; margin-top:8px; margin-bottom:16px; text-transform:none; font-weight:600;">
+      <input type="checkbox" ${marketingFrontsOnlyFilter?'checked':''} onchange="setMarketingFrontsOnlyFilter(this.checked)" style="width:18px; height:18px; margin:0; flex-shrink:0;">
+      Fronts-only customers only
+    </label>
+    <label style="margin-top:0;">Message <span style="text-transform:none; font-weight:500; opacity:0.7;">({name}, {company}, {yourname})</span></label>
     <textarea id="mkt_msg" rows="4">${escapeHtml(tpl)}</textarea>
     <p style="color:var(--ink-muted); font-size:0.7812rem; margin:10px 2px 14px; line-height:1.5;">
       Tap Send for each customer — it opens ${data.settings.messagingApp==='whatsapp'?'WhatsApp':'Messages'} pre-filled and ready to go. Come back here for the next one.
