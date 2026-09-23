@@ -24,7 +24,19 @@ function onSwipeStart(e){
   const card = e.target.closest('.cust-card[data-id]');
   if(!card) return;
   const touch = e.touches[0];
-  swipeState = { card, startX: touch.clientX, startY: touch.clientY, currentX: 0, decided:false, horizontal:false };
+  const wrap = card.parentElement;
+  const bgLeft = wrap && wrap.querySelector('.swipe-bg-left');
+  const bgRight = wrap && wrap.querySelector('.swipe-bg-right');
+  swipeState = {
+    card, startX: touch.clientX, startY: touch.clientY, currentX: 0, decided:false, horizontal:false,
+    bgLeft, bgRight,
+    // Remembered so onSwipeEnd/onSwipeCancel can restore the label exactly as it
+    // was — job ("✓ Done") and quote ("✓ Accept") cards must never get stuck
+    // showing the customer card's "✓ Cleaned" wording after a swipe.
+    bgLeftDefaultText: bgLeft ? bgLeft.textContent : ''
+  };
+  if(bgLeft) bgLeft.style.opacity = '0';
+  if(bgRight) bgRight.style.opacity = '0';
 }
 function onSwipeMove(e){
   if(!swipeState) return;
@@ -52,10 +64,24 @@ function onSwipeMove(e){
   swipeState.card.style.transition = 'none';
   swipeState.card.style.transform = `translateX(${clamped}px)`;
 
+  // Only one background should ever be visible at a time — otherwise whichever
+  // one comes later in the markup (swipe-bg-right, "💷 Paid") paints over the
+  // other and dragging right never actually shows the "Cleaned" indication.
+  const { bgLeft, bgRight } = swipeState;
+  if(clamped > 0){
+    if(bgLeft) bgLeft.style.opacity = '1';
+    if(bgRight) bgRight.style.opacity = '0';
+  } else if(clamped < 0){
+    if(bgLeft) bgLeft.style.opacity = '0';
+    if(bgRight) bgRight.style.opacity = '1';
+  } else {
+    if(bgLeft) bgLeft.style.opacity = '0';
+    if(bgRight) bgRight.style.opacity = '0';
+  }
+
   // Live-updates the revealed left label as a customer card crosses into "all
   // the way" territory, so it's clear before releasing which action will fire.
   if(isCustomer && clamped > 0){
-    const bgLeft = swipeState.card.parentElement && swipeState.card.parentElement.querySelector('.swipe-bg-left');
     if(bgLeft){
       const full = clamped >= SWIPE_FULL_THRESHOLD;
       bgLeft.textContent = full ? '✓ Cleaned + 💷 Paid' : '✓ Cleaned';
@@ -68,11 +94,11 @@ const SWIPE_FULL_X = 150; // customer card: max right-drag distance
 const SWIPE_FULL_THRESHOLD = 125; // customer card: clean + paid
 function onSwipeEnd(){
   if(!swipeState) return;
-  const { card, currentX, decided, horizontal } = swipeState;
+  const { card, currentX, decided, horizontal, bgLeft, bgRight, bgLeftDefaultText } = swipeState;
   card.style.transition = 'transform 0.2s ease';
   card.style.transform = 'translateX(0)';
-  const bgLeft = card.parentElement && card.parentElement.querySelector('.swipe-bg-left');
-  if(bgLeft){ bgLeft.textContent = '✓ Cleaned'; bgLeft.style.background = ''; }
+  if(bgLeft){ bgLeft.textContent = bgLeftDefaultText; bgLeft.style.background = ''; bgLeft.style.opacity = '0'; }
+  if(bgRight){ bgRight.style.opacity = '0'; }
 
   if(decided && horizontal){
     const id = card.dataset.id;
@@ -92,8 +118,11 @@ function onSwipeEnd(){
 }
 function onSwipeCancel(){
   if(!swipeState) return;
+  const { bgLeft, bgRight, bgLeftDefaultText } = swipeState;
   swipeState.card.style.transition = 'transform 0.2s ease';
   swipeState.card.style.transform = 'translateX(0)';
+  if(bgLeft){ bgLeft.textContent = bgLeftDefaultText; bgLeft.style.background = ''; bgLeft.style.opacity = '0'; }
+  if(bgRight){ bgRight.style.opacity = '0'; }
   swipeState = null;
 }
 

@@ -285,6 +285,8 @@ function printJobInvoice(id){
   ].filter(Boolean).map(l=>`<div>${l}</div>`).join('');
 
   const description = j.notes ? escapeHtml(j.notes) : 'Window cleaning — one-off job';
+  const discountPct = Math.max(0, Math.min(100, Number(j.discountPercent||0)));
+  const total = jobDiscountedTotal(j);
 
   // Logo (its own top-level block, so the docx exporter's image branch picks it up cleanly)
   // and the company name / address / phone (separate top-level blocks, left-aligned, so they
@@ -320,9 +322,12 @@ function printJobInvoice(id){
     <div class="rpt-round-title">Details</div>
     <table class="rpt-table" style="margin-bottom:4px;">
       <thead><tr><th>Description</th><th style="text-align:right;">Amount</th></tr></thead>
-      <tbody><tr><td>${description}</td><td style="text-align:right;">${money(j.price)}</td></tr></tbody>
+      <tbody>
+        <tr><td>${description}</td><td style="text-align:right;">${money(j.price)}</td></tr>
+        ${discountPct ? `<tr><td>Discount (${discountPct}%)</td><td style="text-align:right;">-${money(j.price - total)}</td></tr>` : ''}
+      </tbody>
     </table>
-    <div class="rpt-total inv-total-box"><span>Total</span><span class="inv-total-amount">${money(j.price)}</span></div>
+    <div class="rpt-total inv-total-box"><span>Total</span><span class="inv-total-amount">${money(total)}</span></div>
     <div style="margin-top:14px;"><span class="inv-stamp ${j.paid?'paid':'due'}">${j.paid?'✓ Paid':'Payment due'}</span></div>
 
     <div class="rpt-footer" style="text-align:left; border-top:none; margin-top:28px; padding-top:0;">

@@ -578,6 +578,15 @@ function daysBetween(a,b){
 function lastOf(arr){ if(!arr||!arr.length) return null; return [...arr].sort().slice(-1)[0]; }
 function lastDateOf(arr){ if(!arr||!arr.length) return null; return [...arr.map(e=>e.date)].sort().slice(-1)[0]; }
 function money(n){ const v=Number(n||0); return '£'+v.toFixed(v%1?2:0); }
+// One-off jobs can carry a discount percentage (next to price on the job form,
+// default 0) which is applied when the job's total is shown on invoices and
+// receipts — the job's own `price` stays the full undiscounted rate everywhere
+// else (job lists, totals, etc).
+function jobDiscountedTotal(j){
+  const price = Number((j&&j.price)||0);
+  const pct = Math.max(0, Math.min(100, Number((j&&j.discountPercent)||0)));
+  return Math.round((price * (1 - pct/100)) * 100) / 100;
+}
 let pendingToastAction = null;
 function toast(msg, actionLabel, actionFn){
   const t=document.getElementById('toast');
@@ -693,7 +702,11 @@ function backupReminderDue(){
   if(!pending) return false;
   return (Date.now() - Number(pending)) >= BACKUP_REMINDER_HOURS * 3600000;
 }
-function dismissBackupBanner(){ bannerDismissed = true; renderBackupBanner(); }
+function dismissBackupBanner(){ bannerDismissed = true; removeBackupPopup(); }
+function removeBackupPopup(){
+  const el = document.getElementById('backupPopup');
+  if(el) el.remove();
+}
 // Tracks the single most recent delete (customer, job, or quote) so it can be
 // undone from a persistent banner, not just a toast that's easy to miss while busy
 // out on a round. Overwritten by whatever's deleted next, and cleared once
@@ -732,18 +745,71 @@ function renderLastActionBanner(){
     </span>
   </div>`;
 }
+// Backup reminder — a real popup (like the unsaved-changes prompt below), not just
+// a dismissible strip: it's easy to swipe past a thin banner without registering it,
+// and un-backed-up data is exactly the kind of thing worth interrupting for. "Not
+// now" only dismisses it for this session (bannerDismissed is a plain in-memory
+// flag, never persisted), so it reliably comes back the next time the app is opened
+// as long as the underlying 48-hour condition still holds.
 function renderBackupBanner(){
-  const el = document.getElementById('backupBanner');
-  if(!el) return;
-  if(bannerDismissed || !data.customers.length){ el.innerHTML = ''; return; }
-  if(!backupReminderDue()){ el.innerHTML = ''; return; }
-  const lastText = "You've made changes that haven't been backed up in over 48 hours";
-  el.innerHTML = `<div style="background:var(--amber-dim); color:var(--amber); border-radius:12px; padding:11px 14px; margin:0 14px 14px; display:flex; align-items:center; justify-content:space-between; gap:10px; font-size:0.8125rem; font-weight:700;">
-    <span>📦 ${lastText}</span>
-    <span style="display:flex; gap:8px; flex-shrink:0; align-items:center;">
-      <button onclick="exportData()" style="background:var(--amber); color:#fff; border:none; border-radius:8px; padding:6px 10px; font-weight:800; font-size:0.7812rem;">Back up</button>
-      <button onclick="dismissBackupBanner()" style="background:none; border:none; color:var(--amber); font-weight:800; font-size:1rem; line-height:1; padding:0 2px;">✕</button>
-    </span>
-  </div>`;
+  const legacy = document.getElementById('backupBanner');
+  if(legacy) legacy.innerHTML = ''; // no longer used as a banner; kept in the DOM harmlessly
+  if(bannerDismissed || !data.customers.length || !backupReminderDue()){ removeBackupPopup(); return; }
+  if(document.getElementById('backupPopup')) return; // already showing — don't recreate on every render()
+  const el = document.createElement('div');
+  el.id = 'backupPopup';
+  el.style.cssText = 'position:fixed; inset:0; z-index:9998; display:flex; align-items:flex-end; justify-content:center;';
+  el.innerHTML = `
+    <div style="position:absolute; inset:0; background:rgba(0,0,0,0.4);" onclick="dismissBackupBanner()"></div>
+    <div style="position:relative; background:var(--bg); width:100%; max-width:480px; border-radius:16px 16px 0 0; padding:20px; padding-bottom:calc(20px + env(safe-area-inset-bottom)); box-shadow:0 -4px 24px rgba(0,0,0,0.25);">
+      <h3 style="margin:0 0 8px; font-size:1.0625rem; font-weight:800; color:var(--ink);">📦 Back up your data</h3>
+      <p style="color:var(--ink-muted); font-size:0.875rem; margin:0 0 18px; line-height:1.5;">You've made changes that haven't been backed up in over 48 hours. If something happens to this phone before then, that work is gone for good.</p>
+      <button class="btn btn-primary" style="width:100%; margin-bottom:10px;" onclick="exportData(); dismissBackupBanner();">Back up now</button>
+      <button class="btn btn-clean" style="width:100%; border:none;" onclick="dismissBackupBanner()">Not now</button>
+    </div>
+  `;
+  document.body.appendChild(el);
+}
+
+/* ---------- app-styled confirm dialog ----------
+   Replaces window.confirm() everywhere in the app. Native confirm() is unreliable
+   inside an iOS home-screen PWA (there's no Safari chrome for it to anchor to, so
+   it can fail to appear at all) — this is the same bottom-sheet prompt originally
+   built for the customer-edit "Unsaved changes" warning, generalised so every
+   confirmation in the app looks and behaves the same way. Async by nature: pass
+   what should happen next as onConfirm/onCancel rather than reading a return value. */
+let appConfirmState = null;
+function appConfirm(message, opts){
+  opts = opts || {};
+  removeAppConfirm();
+  const el = document.createElement('div');
+  el.id = 'appConfirmPrompt';
+  el.style.cssText = 'position:fixed; inset:0; z-index:9999; display:flex; align-items:flex-end; justify-content:center;';
+  const danger = opts.danger !== false;
+  el.innerHTML = `
+    <div style="position:absolute; inset:0; background:rgba(0,0,0,0.4);" onclick="appConfirmCancel()"></div>
+    <div style="position:relative; background:var(--bg); width:100%; max-width:480px; border-radius:16px 16px 0 0; padding:20px; padding-bottom:calc(20px + env(safe-area-inset-bottom)); box-shadow:0 -4px 24px rgba(0,0,0,0.25);">
+      <h3 style="margin:0 0 8px; font-size:1.0625rem; font-weight:800; color:var(--ink);">${escapeHtml(opts.title || 'Are you sure?')}</h3>
+      <p style="color:var(--ink-muted); font-size:0.875rem; margin:0 0 18px; line-height:1.5;">${escapeHtml(message)}</p>
+      <button class="btn" style="width:100%; margin-bottom:10px; border:none; ${danger ? 'background:var(--red-dim); color:var(--red);' : 'background:var(--blue); color:#fff;'}" onclick="appConfirmYes()">${escapeHtml(opts.confirmLabel || 'Confirm')}</button>
+      <button class="btn btn-clean" style="width:100%; border:none;" onclick="appConfirmCancel()">${escapeHtml(opts.cancelLabel || 'Cancel')}</button>
+    </div>
+  `;
+  document.body.appendChild(el);
+  appConfirmState = {onConfirm: opts.onConfirm || null, onCancel: opts.onCancel || null};
+}
+function removeAppConfirm(){
+  const el = document.getElementById('appConfirmPrompt');
+  if(el) el.remove();
+}
+function appConfirmYes(){
+  const st = appConfirmState; appConfirmState = null;
+  removeAppConfirm();
+  if(st && st.onConfirm) st.onConfirm();
+}
+function appConfirmCancel(){
+  const st = appConfirmState; appConfirmState = null;
+  removeAppConfirm();
+  if(st && st.onCancel) st.onCancel();
 }
 

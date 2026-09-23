@@ -198,19 +198,21 @@ function saveEditedTemplate(key){
 function resetOneTemplate(key){
   const def = TEMPLATE_DEFS.find(d=>d.key===key);
   if(!def) return;
-  if(!confirm(`Reset "${def.label}" wording to default?`)) return;
-  data.settings[key] = def.default;
-  saveData();
-  toast('Reset to default wording');
-  openMessageTemplates();
+  appConfirm(`Reset "${def.label}" wording to default?`, {title:'Reset wording', confirmLabel:'Reset', onConfirm: () => {
+    data.settings[key] = def.default;
+    saveData();
+    toast('Reset to default wording');
+    openMessageTemplates();
+  }});
 }
 
 function resetAllTemplates(){
-  if(!confirm('Reset all message wording to default? This replaces any custom wording you\'ve set for every message.')) return;
-  TEMPLATE_DEFS.forEach(def=>{ data.settings[def.key] = def.default; });
-  saveData();
-  openMessageTemplates();
-  toast('Reset to default wording');
+  appConfirm("Reset all message wording to default? This replaces any custom wording you've set for every message.", {title:'Reset all wording', confirmLabel:'Reset all', onConfirm: () => {
+    TEMPLATE_DEFS.forEach(def=>{ data.settings[def.key] = def.default; });
+    saveData();
+    openMessageTemplates();
+    toast('Reset to default wording');
+  }});
 }
 
 function openBusinessDetails(){

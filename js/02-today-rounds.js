@@ -196,13 +196,14 @@ function openMileageSummary(){
   `, () => setTab('today'));
 }
 function clearTodayMileage(){
-  if(!confirm("Clear today's mileage entry?")) return;
-  const today = todayISO();
-  data.mileageLog = (data.mileageLog||[]).filter(e=>e.date!==today);
-  saveData();
-  toast('Cleared');
-  closeSheet();
-  render();
+  appConfirm("Clear today's mileage entry?", {confirmLabel:'Clear', onConfirm: () => {
+    const today = todayISO();
+    data.mileageLog = (data.mileageLog||[]).filter(e=>e.date!==today);
+    saveData();
+    toast('Cleared');
+    closeSheet();
+    render();
+  }});
 }
 
 function quoteNeedsFollowUp(q, today){
@@ -1248,23 +1249,36 @@ function custCardHtml(c){
 
 function quickClean(id){
   const c = data.customers.find(x=>x.id===id);
+  const prevDeferUntil = c.deferUntil;
   c.cleanHistory = c.cleanHistory || [];
   c.cleanHistory.push({date: todayISO(), amount: c.price||0});
   c.deferUntil = null;
-  saveData(); render(); toast(`Marked ${c.name||c.address||'customer'} as cleaned today`);
+  saveData(); render();
+  toast(`Marked ${c.name||c.address||'customer'} as cleaned today`, 'Undo', () => {
+    c.cleanHistory.pop();
+    c.deferUntil = prevDeferUntil;
+    saveData(); render();
+  });
 }
 function quickPaid(id){
   const c = data.customers.find(x=>x.id===id);
+  const prev = { paymentReminderSent: c.paymentReminderSent, paymentReminderSentDate: c.paymentReminderSentDate, paymentReminderCount: c.paymentReminderCount };
   c.paymentHistory = c.paymentHistory || [];
   c.paymentHistory.push({date: todayISO(), amount: c.price||0});
   c.paymentReminderSent = false;
   c.paymentReminderSentDate = null;
   c.paymentReminderCount = 0;
-  saveData(); render(); toast(`Marked ${c.name||c.address||'customer'} as paid`);
+  saveData(); render();
+  toast(`Marked ${c.name||c.address||'customer'} as paid`, 'Undo', () => {
+    c.paymentHistory.pop();
+    Object.assign(c, prev);
+    saveData(); render();
+  });
 }
 function quickCleanAndPaid(id){
   const c = data.customers.find(x=>x.id===id);
   const today = todayISO();
+  const prev = { deferUntil: c.deferUntil, paymentReminderSent: c.paymentReminderSent, paymentReminderSentDate: c.paymentReminderSentDate, paymentReminderCount: c.paymentReminderCount };
   c.cleanHistory = c.cleanHistory || [];
   c.cleanHistory.push({date: today, amount: c.price||0});
   c.deferUntil = null;
@@ -1273,7 +1287,13 @@ function quickCleanAndPaid(id){
   c.paymentReminderSent = false;
   c.paymentReminderSentDate = null;
   c.paymentReminderCount = 0;
-  saveData(); render(); toast(`Marked ${c.name||c.address||'customer'} as cleaned and paid today`);
+  saveData(); render();
+  toast(`Marked ${c.name||c.address||'customer'} as cleaned and paid today`, 'Undo', () => {
+    c.cleanHistory.pop();
+    c.paymentHistory.pop();
+    Object.assign(c, prev);
+    saveData(); render();
+  });
 }
 
 function useCurrentLocation(){

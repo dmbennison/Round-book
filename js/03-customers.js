@@ -246,44 +246,56 @@ function unsavedChangesPromptKeepEditing(id){
 }
 function unsavedChangesPromptSave(id){
   removeUnsavedChangesPrompt();
-  const saved = saveCustomerForm(id); // reads straight from the still-open form's own fields
-  if(!saved){
-    // saveCustomerForm didn't end up saving (e.g. validation failed, or a
-    // duplicate-address warning was declined) — restore the guard so unsaved
-    // changes are still protected on the next attempt too.
-    sheetCloseGuard = () => confirmCustomerFormClose(id);
-  }
-  // If it did save, saveCustomerForm has already closed this form (and cleared
-  // the guard) — whatever sheet is open now, if any, is unrelated and must be
-  // left alone. Checking the overlay's visibility here would be wrong: a
-  // successful save can itself reopen another sheet (e.g. back to the
-  // customer's detail screen), which leaves the overlay showing too and would
-  // look identical to a failed save that never closed.
+  // reads straight from the still-open form's own fields
+  saveCustomerForm(id, (saved) => {
+    if(!saved){
+      // saveCustomerForm didn't end up saving (e.g. validation failed, or a
+      // duplicate-address warning was declined) — restore the guard so unsaved
+      // changes are still protected on the next attempt too.
+      sheetCloseGuard = () => confirmCustomerFormClose(id);
+    }
+    // If it did save, saveCustomerForm has already closed this form (and cleared
+    // the guard) — whatever sheet is open now, if any, is unrelated and must be
+    // left alone. Checking the overlay's visibility here would be wrong: a
+    // successful save can itself reopen another sheet (e.g. back to the
+    // customer's detail screen), which leaves the overlay showing too and would
+    // look identical to a failed save that never closed.
+  });
 }
 function unsavedChangesPromptDiscard(){
   removeUnsavedChangesPrompt();
   closeSheet();
 }
 
-// Returns true if the customer was actually saved (and the form closed), or
-// false if it stopped short of saving (missing name/address, or a declined
-// duplicate-address warning) — see unsavedChangesPromptSave, the one caller
-// that needs to tell the difference.
-function saveCustomerForm(id){
+// Calls afterAttempt(true) if the customer was actually saved (and the form
+// closed), or afterAttempt(false) if it stopped short of saving (missing
+// name/address, or a declined duplicate-address warning) — see
+// unsavedChangesPromptSave, the one caller that needs to tell the difference.
+// Async because the duplicate-address warning now goes through the app's own
+// confirm dialog rather than a synchronous native confirm().
+function saveCustomerForm(id, afterAttempt){
   const name = document.getElementById('f_name').value.trim();
   const address = document.getElementById('f_address').value.trim();
-  if(!name && !address){ toast('Please enter at least a name or an address'); return false; }
+  if(!name && !address){ toast('Please enter at least a name or an address'); if(afterAttempt) afterAttempt(false); return; }
+  const proceedSave = () => finishSavingCustomerForm(id, afterAttempt);
   if(address){
     const normalized = address.toLowerCase();
     const dupe = data.customers.find(x=> x.id!==id && (x.address||'').trim().toLowerCase()===normalized);
     if(dupe){
-      const proceed = confirm(`This address is already saved for ${dupe.name || 'another customer'} (${dupe.round||'Unassigned'} round). Add it again anyway?`);
-      if(!proceed) return false;
+      appConfirm(`This address is already saved for ${dupe.name || 'another customer'} (${dupe.round||'Unassigned'} round). Add it again anyway?`, {
+        title: 'Duplicate address', confirmLabel: 'Add anyway', danger: false,
+        onConfirm: proceedSave,
+        onCancel: () => { if(afterAttempt) afterAttempt(false); }
+      });
+      return;
     }
   }
+  proceedSave();
+}
+function finishSavingCustomerForm(id, afterAttempt){
   const payload = {
-    name,
-    address,
+    name: document.getElementById('f_name').value.trim(),
+    address: document.getElementById('f_address').value.trim(),
     phone: document.getElementById('f_phone').value.trim(),
     email: document.getElementById('f_email').value.trim(),
     round: document.getElementById('f_round').value.trim() || 'Unassigned',
@@ -340,18 +352,19 @@ function saveCustomerForm(id){
     setTimeout(() => toast(`Note: account number ${accountNumberEntered} is already used by ${dupeAccount.name||dupeAccount.address||'another customer'}`), 1800);
   }
   saveData(); sheetCloseGuard = null; closeSheet(); render();
-  return true;
+  if(afterAttempt) afterAttempt(true);
 }
 
 function deleteCustomer(id){
   const idx = data.customers.findIndex(x=>x.id===id);
   if(idx===-1) return;
   const removed = data.customers[idx];
-  if(!confirm(`Delete ${removed.address||removed.name||'this customer'}? This removes all their history too.`)) return;
-  data.customers.splice(idx,1);
-  saveData(); closeSheet(); render();
-  recordLastAction('customer', removed, idx, removed.address||removed.name||'customer');
-  toast(`Deleted ${removed.address||removed.name||'customer'}`);
+  appConfirm(`Delete ${removed.address||removed.name||'this customer'}? This removes all their history too.`, {title:'Delete customer', confirmLabel:'Delete', onConfirm: () => {
+    data.customers.splice(idx,1);
+    saveData(); closeSheet(); render();
+    recordLastAction('customer', removed, idx, removed.address||removed.name||'customer');
+    toast(`Deleted ${removed.address||removed.name||'customer'}`);
+  }});
 }
 
 function openCustomerDetail(id){
@@ -634,11 +647,12 @@ async function handleLogoSelected(inputEl){
   inputEl.value = '';
 }
 function removeLogo(){
-  if(!confirm('Remove your logo?')) return;
-  data.settings.logo = '';
-  saveData();
-  openBusinessDetails();
-  toast('Logo removed');
+  appConfirm('Remove your logo?', {title:'Remove logo', confirmLabel:'Remove', onConfirm: () => {
+    data.settings.logo = '';
+    saveData();
+    openBusinessDetails();
+    toast('Logo removed');
+  }});
 }
 
 async function handlePhotoSelected(id, inputEl){
@@ -791,26 +805,27 @@ function sharePhotoViewerEntry(){
 function deletePhotoViewerEntry(){
   const entry = photoViewerList[photoViewerIndex];
   if(!entry) return;
-  if(!confirm('Delete this photo?')) return;
-  if(entry.kind === 'customer'){
-    const c = data.customers.find(x=>x.id===entry.ownerId);
-    if(c) c.photos = (c.photos||[]).filter(p=>p.id!==entry.photoId);
-  } else {
-    const j = data.oneOffJobs.find(x=>x.id===entry.ownerId);
-    if(j) j.photos = (j.photos||[]).filter(p=>p.id!==entry.photoId);
-  }
-  saveData();
-  if(photoStorageAvailable){
-    idbDeletePhoto(entry.photoId).then(()=>{}).catch(()=>{});
-    uncachePhoto(entry.photoId);
-  }
-  photoViewerList.splice(photoViewerIndex, 1);
-  if(photoViewerIndex >= photoViewerList.length) photoViewerIndex = photoViewerList.length - 1;
-  if(photoViewerList.length){
-    renderPhotoViewer();
-  } else {
-    closeSheet();
-  }
+  appConfirm('Delete this photo?', {title:'Delete photo', confirmLabel:'Delete', onConfirm: () => {
+    if(entry.kind === 'customer'){
+      const c = data.customers.find(x=>x.id===entry.ownerId);
+      if(c) c.photos = (c.photos||[]).filter(p=>p.id!==entry.photoId);
+    } else {
+      const j = data.oneOffJobs.find(x=>x.id===entry.ownerId);
+      if(j) j.photos = (j.photos||[]).filter(p=>p.id!==entry.photoId);
+    }
+    saveData();
+    if(photoStorageAvailable){
+      idbDeletePhoto(entry.photoId).then(()=>{}).catch(()=>{});
+      uncachePhoto(entry.photoId);
+    }
+    photoViewerList.splice(photoViewerIndex, 1);
+    if(photoViewerIndex >= photoViewerList.length) photoViewerIndex = photoViewerList.length - 1;
+    if(photoViewerList.length){
+      renderPhotoViewer();
+    } else {
+      closeSheet();
+    }
+  }});
 }
 
 function viewPhoto(id, photoId){

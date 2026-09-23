@@ -90,15 +90,24 @@ function toggleJobDone(id){
   const j = data.oneOffJobs.find(x=>x.id===id);
   j.done = !j.done;
   saveData(); render();
+  toast(j.done ? `Marked ${j.address||j.name||'job'} as done` : `Marked ${j.address||j.name||'job'} as not done`, 'Undo', () => {
+    j.done = !j.done;
+    saveData(); render();
+  });
 }
 function toggleJobPaid(id){
   const j = data.oneOffJobs.find(x=>x.id===id);
+  const prev = { paid: j.paid, paidDate: j.paidDate, paymentReminderSent: j.paymentReminderSent, paymentReminderSentDate: j.paymentReminderSentDate, paymentReminderCount: j.paymentReminderCount };
   j.paid = !j.paid;
   if(j.paid) j.paidDate = todayISO();
   j.paymentReminderSent = false;
   j.paymentReminderSentDate = null;
   j.paymentReminderCount = 0;
   saveData(); render();
+  toast(j.paid ? `Marked ${j.address||j.name||'job'} as paid` : `Marked ${j.address||j.name||'job'} as unpaid`, 'Undo', () => {
+    Object.assign(j, prev);
+    saveData(); render();
+  });
 }
 
 function scheduleJobForCustomer(id){
@@ -186,17 +195,25 @@ function openJobForm(existing, prefill, returnTo){
         <input type="time" id="j_time" value="${j.time||''}">
       </div>
     </div>
-    <label>Price</label>
-    <input type="number" id="j_price" value="${j.price!=null?j.price:''}" placeholder="£" min="0" step="0.5">
+    <div class="row2">
+      <div>
+        <label style="margin-top:0">Price</label>
+        <input type="number" id="j_price" value="${j.price!=null?j.price:''}" placeholder="£" min="0" step="0.5">
+      </div>
+      <div>
+        <label style="margin-top:0">Discount %</label>
+        <input type="number" id="j_discount" value="${j.discountPercent!=null?j.discountPercent:0}" placeholder="0" min="0" max="100" step="1">
+      </div>
+    </div>
     <label>Notes</label>
     <textarea id="j_notes" rows="2" placeholder="What's the job...">${escapeHtml(j.notes||'')}</textarea>
     ${propertyFieldsHtml(j, 'j')}
-    ${(existing && !existing.paid && existing.paymentReminderSent) ? `<div style="font-size:0.75rem; font-weight:700; margin:10px 2px 0; color:var(--amber);">🔔 Payment reminder sent ${fmtDate(existing.paymentReminderSentDate)}</div>` : ''}
+    ${(existing && existing.done && !existing.paid && existing.paymentReminderSent) ? `<div style="font-size:0.75rem; font-weight:700; margin:10px 2px 0; color:var(--amber);">🔔 Payment reminder sent ${fmtDate(existing.paymentReminderSentDate)}</div>` : ''}
     ${existing?`<div class="row2" style="margin-top:14px;">
       <button class="btn" style="background:var(--blue-dim); color:var(--blue-deep);" onclick="printJobInvoice('${existing.id}')">🧾 Print invoice</button>
       ${isMobileNumber(existing.phone) ? `<button class="btn" style="background:var(--amber-dim); color:var(--amber);" onclick="sendJobReceipt('${existing.id}')">🧾 Send receipt</button>` : ''}
     </div>`:''}
-    ${(existing && !existing.paid && isMobileNumber(existing.phone)) ? `<button class="btn" style="background:var(--amber-dim); color:var(--amber); width:100%; margin-top:10px;" onclick="sendJobPaymentReminder('${existing.id}')">💬 Payment reminder</button>` : ''}
+    ${(existing && existing.done && !existing.paid && isMobileNumber(existing.phone)) ? `<button class="btn" style="background:var(--amber-dim); color:var(--amber); width:100%; margin-top:10px;" onclick="sendJobPaymentReminder('${existing.id}')">💬 Payment reminder</button>` : ''}
     ${(existing && existing.messageLog && existing.messageLog.length) ? `<button class="backup-btn" style="margin-top:10px;" onclick="openMessageLog('job','${existing.id}')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
       <div style="flex:1; min-width:0;"><div class="t1">Messages</div><div class="t2">${existing.messageLog.length} sent</div></div>
@@ -310,6 +327,7 @@ function saveJobForm(id){
     date: document.getElementById('j_date').value || todayISO(),
     time: document.getElementById('j_time').value || '',
     price: parseFloat(document.getElementById('j_price').value) || 0,
+    discountPercent: Math.max(0, Math.min(100, parseFloat(document.getElementById('j_discount').value) || 0)),
     notes: document.getElementById('j_notes').value.trim(),
     remind24h: document.getElementById('j_remind').checked,
     anniversaryReminder: document.getElementById('j_anniversary').checked,
@@ -336,11 +354,12 @@ function deleteJob(id){
   const idx = data.oneOffJobs.findIndex(x=>x.id===id);
   if(idx===-1) return;
   const removed = data.oneOffJobs[idx];
-  if(!confirm(`Delete the job at ${removed.address||removed.name||'this address'}?`)) return;
-  data.oneOffJobs.splice(idx,1);
-  saveData(); closeSheet(); render();
-  recordLastAction('job', removed, idx, `job at ${removed.address||removed.name||'this address'}`);
-  toast(`Deleted job at ${removed.address||removed.name||'job'}`);
+  appConfirm(`Delete the job at ${removed.address||removed.name||'this address'}?`, {title:'Delete job', confirmLabel:'Delete', onConfirm: () => {
+    data.oneOffJobs.splice(idx,1);
+    saveData(); closeSheet(); render();
+    recordLastAction('job', removed, idx, `job at ${removed.address||removed.name||'this address'}`);
+    toast(`Deleted job at ${removed.address||removed.name||'job'}`);
+  }});
 }
 
 /* ---------- quotes ---------- */
@@ -412,16 +431,24 @@ function quoteCardHtml(q){
 function markQuoteAccepted(id){
   const q = data.quotes.find(x=>x.id===id);
   if(!q) return;
+  const prevStatus = q.status;
   q.status = 'accepted';
   saveData(); render();
-  toast('Quote marked accepted');
+  toast('Quote marked accepted', 'Undo', () => {
+    q.status = prevStatus;
+    saveData(); render();
+  });
 }
 function markQuoteDeclined(id){
   const q = data.quotes.find(x=>x.id===id);
   if(!q) return;
+  const prevStatus = q.status;
   q.status = 'declined';
   saveData(); render();
-  toast('Quote marked declined');
+  toast('Quote marked declined', 'Undo', () => {
+    q.status = prevStatus;
+    saveData(); render();
+  });
 }
 
 function openQuoteForm(existing, prefill, returnTo){
@@ -534,11 +561,12 @@ function deleteQuote(id){
   const idx = data.quotes.findIndex(x=>x.id===id);
   if(idx===-1) return;
   const removed = data.quotes[idx];
-  if(!confirm(`Delete the quote for ${removed.address||removed.name||'this customer'}?`)) return;
-  data.quotes.splice(idx,1);
-  saveData(); closeSheet(); render();
-  recordLastAction('quote', removed, idx, `quote for ${removed.address||removed.name||'this customer'}`);
-  toast(`Deleted quote for ${removed.address||removed.name||'quote'}`);
+  appConfirm(`Delete the quote for ${removed.address||removed.name||'this customer'}?`, {title:'Delete quote', confirmLabel:'Delete', onConfirm: () => {
+    data.quotes.splice(idx,1);
+    saveData(); closeSheet(); render();
+    recordLastAction('quote', removed, idx, `quote for ${removed.address||removed.name||'this customer'}`);
+    toast(`Deleted quote for ${removed.address||removed.name||'quote'}`);
+  }});
 }
 
 function convertQuoteToJob(quoteId){

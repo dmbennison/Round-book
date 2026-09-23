@@ -70,9 +70,10 @@ function undoAnnotationStroke(){
 }
 function clearAnnotationStrokes(){
   if(!annotateStrokes.length) return;
-  if(!confirm('Clear all annotations on this photo?')) return;
-  annotateStrokes = [];
-  redrawAnnotateCanvas();
+  appConfirm('Clear all annotations on this photo?', {title:'Clear annotations', confirmLabel:'Clear', onConfirm: () => {
+    annotateStrokes = [];
+    redrawAnnotateCanvas();
+  }});
 }
 function initAnnotateCanvas(){
   const canvas = document.getElementById('annotateCanvas');
@@ -280,9 +281,10 @@ function removePriceHistoryEntry(id, dateKey){
   const c = data.customers.find(x=>x.id===id);
   const idx = (c.priceHistory||[]).findIndex(p=>p.date===dateKey);
   if(idx===-1) return;
-  if(!confirm('Remove this price entry?')) return;
-  c.priceHistory.splice(idx,1);
-  saveData(); openCustomerHistoryList(id, 'price'); render();
+  appConfirm('Remove this price entry?', {title:'Remove price entry', confirmLabel:'Remove', onConfirm: () => {
+    c.priceHistory.splice(idx,1);
+    saveData(); openCustomerHistoryList(id, 'price'); render();
+  }});
 }
 
 function emailCustomer(id){
@@ -414,12 +416,13 @@ function saveDeferDate(id){
 function nudgeRoundDue(rn){
   const custs = data.customers.filter(c => c.round === rn && !c.paused);
   if(!custs.length){ toast('No active customers in this round'); return; }
-  if(!confirm(`Defer the due date by 4 weeks for all ${custs.length} active customer${custs.length===1?'':'s'} in "${rn}"?`)) return;
-  custs.forEach(c => { c.deferUntil = deferredDateFor(c); });
-  saveData();
-  closeSheet();
-  render();
-  toast(`Deferred ${custs.length} customer${custs.length===1?'':'s'} in "${rn}" by 4 weeks`);
+  appConfirm(`Defer the due date by 4 weeks for all ${custs.length} active customer${custs.length===1?'':'s'} in "${rn}"?`, {title:'Defer whole round', confirmLabel:'Defer', danger:false, onConfirm: () => {
+    custs.forEach(c => { c.deferUntil = deferredDateFor(c); });
+    saveData();
+    closeSheet();
+    render();
+    toast(`Deferred ${custs.length} customer${custs.length===1?'':'s'} in "${rn}" by 4 weeks`);
+  }});
 }
 
 // Builds the "pay by bank transfer" block used by the {bankdetails} token — empty
@@ -773,7 +776,7 @@ function sendJobReceipt(id){
   const company = data.settings.companyName || '';
   const yourname = data.settings.yourName || '';
   const msg = applyTemplate(data.settings.receiptTemplate, {
-    name: firstName, amount: Number(j.price||0), company, date: fmtDate(j.date), yourname
+    name: firstName, amount: jobDiscountedTotal(j), company, date: fmtDate(j.date), yourname
   });
   openMessagePreview('Send receipt', j.phone, msg, null, () => openJobForm(data.oneOffJobs.find(x=>x.id===id)), {item: j, kind: 'receipt'});
 }
@@ -781,12 +784,13 @@ function sendJobReceipt(id){
 function sendJobPaymentReminder(id){
   const j = data.oneOffJobs.find(x=>x.id===id);
   if(!j) return;
+  if(!j.done){ toast('Mark the job done before sending a payment reminder'); return; }
   if(!isMobileNumber(j.phone)){ toast('No mobile number saved for this job'); return; }
   const firstName = j.name ? j.name.trim().split(' ')[0] : '';
   const company = data.settings.companyName || '';
   const yourname = data.settings.yourName || '';
   const msg = applyTemplate(data.settings.payTemplate, {
-    name: firstName, amount: Number(j.price||0), company, yourname, address: j.address
+    name: firstName, amount: jobDiscountedTotal(j), company, yourname, address: j.address
   });
   const afterSend = () => {
     j.paymentReminderSent = true;
@@ -1176,12 +1180,13 @@ function deleteMarketingCampaign(id){
   if(list.length <= 1){ toast('Keep at least one campaign'); return; }
   const camp = list.find(c=>c.id===id);
   if(!camp) return;
-  if(!confirm(`Delete "${camp.name}"? This can't be undone.`)) return;
-  data.settings.marketingCampaigns = list.filter(c=>c.id!==id);
-  saveData();
-  toast('Campaign deleted');
-  marketingDetailCampaignId = null;
-  setTab('marketing');
+  appConfirm(`Delete "${camp.name}"? This can't be undone.`, {title:'Delete campaign', confirmLabel:'Delete', onConfirm: () => {
+    data.settings.marketingCampaigns = list.filter(c=>c.id!==id);
+    saveData();
+    toast('Campaign deleted');
+    marketingDetailCampaignId = null;
+    setTab('marketing');
+  }});
 }
 
 function sendMarketingText(id){
@@ -1271,15 +1276,16 @@ function addHistDate(id, kind){
 }
 function removeHist(id, kind, dateVal){
   const c = data.customers.find(x=>x.id===id);
-  if(!confirm(`Remove this ${kind==='clean'?'clean':'payment'}?`)) return;
-  if(kind==='clean'){
-    const idx = c.cleanHistory.findIndex(e=>e.date===dateVal);
-    if(idx>-1) c.cleanHistory.splice(idx,1);
-  } else {
-    const idx = c.paymentHistory.findIndex(p=>p.date===dateVal);
-    if(idx>-1) c.paymentHistory.splice(idx,1);
-  }
-  saveData(); openCustomerHistoryList(id, kind); render();
+  appConfirm(`Remove this ${kind==='clean'?'clean':'payment'}?`, {title:'Remove entry', confirmLabel:'Remove', onConfirm: () => {
+    if(kind==='clean'){
+      const idx = c.cleanHistory.findIndex(e=>e.date===dateVal);
+      if(idx>-1) c.cleanHistory.splice(idx,1);
+    } else {
+      const idx = c.paymentHistory.findIndex(p=>p.date===dateVal);
+      if(idx>-1) c.paymentHistory.splice(idx,1);
+    }
+    saveData(); openCustomerHistoryList(id, kind); render();
+  }});
 }
 
 function handleFabClick(){

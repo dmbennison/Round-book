@@ -394,10 +394,16 @@ document.getElementById('importFile').addEventListener('change', function(e){
   if(!file) return;
   const reader = new FileReader();
   reader.onload = async function(evt){
+    let parsed;
     try{
-      const parsed = JSON.parse(evt.target.result);
+      parsed = JSON.parse(evt.target.result);
       if(!parsed.customers || !Array.isArray(parsed.customers)) throw new Error('bad format');
-      if(confirm(`Import ${parsed.customers.length} customers? This will replace all data currently on this phone.`)){
+    }catch(err){
+      alert('That file could not be read as a Round Book backup.');
+      return;
+    }
+    appConfirm(`Import ${parsed.customers.length} customers? This will replace all data currently on this phone.`, {title:'Import backup', confirmLabel:'Import', onConfirm: async () => {
+      try{
         toast('Restoring backup…');
         const migrated = migrateData(parsed);
         // Handles both a backup from this version (photos bundled under
@@ -421,10 +427,10 @@ document.getElementById('importFile').addEventListener('change', function(e){
         toast(failedPhotos
           ? `Backup restored, but ${failedPhotos} photo${failedPhotos===1?'':'s'} couldn't be recovered`
           : 'Backup restored');
+      }catch(err){
+        alert('That file could not be read as a Round Book backup.');
       }
-    }catch(err){
-      alert('That file could not be read as a Round Book backup.');
-    }
+    }});
   };
   reader.readAsText(file);
   e.target.value = '';
