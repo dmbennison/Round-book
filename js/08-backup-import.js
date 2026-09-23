@@ -113,7 +113,8 @@ const FOCUSED_HELP = {
   today: {
     title: 'Today',
     body: () => [
-      helpP('Today is the home screen. It shows due today, today\'s value, text-before-visit, jobs today, payment reminders, quotes needing follow-up, and marketing actions due. Tap any of them to go straight to the full screen for it.'),
+      helpP('Today is the home screen. Due today and today\'s value sit at the top, then five tiles: text before visit, mileage, jobs today, payment reminders, and quotes needing follow-up — in that order, mileage early since it\'s usually the first thing you\'d log. Tap any of them to go straight to the full screen for it.'),
+      helpP('Text before visit and quotes needing follow-up show a small "X overdue" / "X well overdue" note underneath the count when there is one, so you can see at a glance if any are genuinely overdue rather than just due today or freshly past their follow-up window.'),
       helpP('The mileage tile logs a start-of-day reading on first tap, an end-of-day reading on the next tap, then shows the day\'s total — tap again to view, edit, or clear it. See it broken down by day/week/month/tax-year-to-date in Reports.')
     ]
   },
@@ -126,7 +127,7 @@ const FOCUSED_HELP = {
   rounds: {
     title: 'Rounds',
     body: () => [
-      helpP('Open Rounds from the Work tab. Use the Rounds / Due / Text first / Owed switch at the top, or open a single round to see its customers. Swipe a card halfway right to mark cleaned, all the way right to mark cleaned AND paid in one go, or left to mark paid alone. Use Reorder to set your walking order.'),
+      helpP('Open Rounds from the Work tab. Use the Rounds / Due / Text first / Owed switch at the top, or open a single round to see its customers. Swipe a card halfway right to mark cleaned, all the way right to mark cleaned AND paid in one go, or left to mark paid alone — the background colour shows which action you\'re about to trigger as you drag. Every swipe action can be undone for a few seconds afterwards via the Undo button on the confirmation. Use Reorder to set your walking order.'),
       helpP('A round card shows its customer count and value as price/owed, with paused customers left out of both.'),
       helpP('A round\'s ⋯ menu has: Show map (numbered stops with a route line), Start round (directions for every stop), Print, and Defer the whole round 4 weeks.'),
       helpP('Suggest a route order is inside Reorder — it works out a shorter visiting order using real road distances where possible, and shows it to you before changing anything (nothing\'s applied unless you tap "Use this order"). Both this and Show map re-check every address\'s location each time, unless it\'s been manually corrected (see below).'),
@@ -138,7 +139,8 @@ const FOCUSED_HELP = {
   jobs: {
     title: 'One-off jobs',
     body: () => [
-      helpP('For anything outside your regular rounds. Swipe right for done, left for paid. A completed job can be turned into a quote, invoiced, or sent as a PDF.'),
+      helpP('For anything outside your regular rounds. Swipe right for done (undo appears for a few seconds after), left for paid. A completed job can be turned into a quote, invoiced, or sent as a PDF.'),
+      helpP('Add a discount percentage right next to the price (0 by default) — it\'s applied automatically to that job\'s invoice total and receipt message, while the price itself stays the full rate everywhere else. A payment reminder can only be sent once a job is marked done.'),
       helpP('If a job\'s address matches an existing customer, it links to them automatically and shows in their history.'),
       helpP('The small green phone button calls; the small blue compass button opens directions. The printer icon prints every job with status and value.')
     ]
@@ -189,7 +191,7 @@ const FOCUSED_HELP = {
     title: 'Backup and restore',
     body: () => [
       helpP('Everything lives only on this phone. Back up regularly from the Backup icon — export a full backup, export to Excel, export everyone as a contacts file, restore from a backup file, or import customers from a spreadsheet.'),
-      helpP('A reminder appears if a change hasn\'t been backed up for 48 hours.')
+      helpP('A pop-up appears if a change hasn\'t been backed up for 48 hours. "Not now" only puts it off for this visit to the app — it reappears next time you open Round Book until you actually back up.')
     ]
   },
   settings: {
@@ -201,7 +203,7 @@ const FOCUSED_HELP = {
   reminders: {
     title: 'Reminders and banners',
     body: () => [
-      helpP('Backups, job anniversaries, marketing follow-ups due, and imported customers awaiting review appear as a dismissible banner across the top of the app. Jobs due today and quotes needing follow-up are covered by the Today tab instead.')
+      helpP('Job anniversaries, marketing follow-ups due, and imported customers awaiting review appear as a dismissible banner across the top of the app. The backup reminder is a pop-up instead (see Backup and restore). Jobs due today and quotes needing follow-up are covered by the Today tab instead.')
     ]
   }
 };

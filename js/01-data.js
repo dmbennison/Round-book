@@ -3,7 +3,7 @@
 
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 93;
+const APP_VERSION = 94;
 function formatVersion(v){ return '1.' + v; }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
@@ -12,6 +12,7 @@ function formatVersion(v){ return '1.' + v; }
 // the most recent 10 entries (oldest ones can be left in the array or trimmed,
 // either is fine, since the display always slices to 10).
 const VERSION_HISTORY = [
+  {version: 94, changes: ['Fixed the card background shown while swiping — dragging right now actually shows the green "cleaned" colour instead of always showing blue "paid"', 'Swipe actions (cleaned, paid, job done, quote accepted, etc.) can now be undone for a few seconds via an Undo button', 'Payment reminders on one-off jobs can no longer be sent until the job is marked done', 'Added a discount percentage field next to price on one-off jobs, applied automatically to that job\'s invoice and receipt', 'The backup reminder is now a pop-up instead of a dismissible banner, and reliably reappears next time the app is opened if you dismiss it without backing up', 'All confirmation pop-ups in the app (delete, reset, import, etc.) now use the same on-screen style, for consistency and reliability on iPhone', 'Today tab: reordered tiles so text before visit and mileage come first, removed the separate Marketing tile (marketing follow-ups still surface as a banner when due), and added an overdue count under the Text before visit and Quotes tiles']},
   {version: 93, changes: ['Swiping a customer card right now has two stops: halfway marks cleaned, all the way across marks cleaned AND paid in one go', 'Added a universal search to the header, available on every tab -- searches customers, one-off jobs, quotes, and rounds together, replacing the old Rounds-only search', 'Send group text in Marketing can now also be narrowed by property type, add-ons (conservatory/extension/garage door), and fronts-only']},
   {version: 92, changes: ['Show map now gives every address a pin, even one that fails to find automatically (shown as an approximate grey pin near the others)', 'Pins on the map can now be dragged to correct their position — dragging locks that location so it is never re-fetched by a later map or route request, only by dragging it again']},
   {version: 91, changes: ['Added a mileage tracker to the Today tab -- tap to log a start-of-day reading, tap again at the end of the day for an end reading, tap once more to see/edit/clear the total', 'Added a Mileage report -- daily, weekly, monthly and UK tax-year-to-date (6 Apr) totals']},

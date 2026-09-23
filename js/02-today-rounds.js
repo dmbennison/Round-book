@@ -29,6 +29,16 @@ function textBeforeDueList(){
   });
   return {byRound, all};
 }
+// How many of the "text before visit" list are actually overdue rather than
+// just due today. cleanBadge.type is 'due' for both cases (there's no separate
+// 'overdue' badge type in the data model — see custStatus) — the distinction
+// lives in the badge text ("Due today" vs "Due +N" / "Never cleaned").
+function textBeforeOverdueCount(){
+  return textBeforeDueList().all.filter(c=>{
+    const s = custStatus(c);
+    return s.cleanBadge && s.cleanBadge.type==='due' && s.cleanBadge.text !== 'Due today';
+  }).length;
+}
 
 /* ---------- Today home tab ----------
    The app's landing screen: headline numbers only, each one tap away from the
@@ -65,11 +75,12 @@ function renderTodayHome(main){
   const doneToday = valueOfWorkDoneToday();
 
   const textBefore = textBeforeDueList();
+  const textBeforeOverdue = textBeforeOverdueCount();
   const todaysJobs = (data.oneOffJobs||[]).filter(j=>!j.done && j.date===today);
   const owedCustomers = data.customers.filter(c=>custStatus(c).owed);
   const owedTotal = owedCustomers.reduce((s,c)=>s+custStatus(c).balance,0);
   const followUpQuotes = quotesNeedingFollowUp();
-  const marketingDue = marketingFollowUpsDue();
+  const quotesWellOverdue = quotesWellOverdueCount();
   const mEntry = todayMileageEntry();
   const mState = mileageTileState(mEntry);
   const mNum = mState==='start' ? '🚗' : (mState==='end' ? mEntry.start : (mEntry.end - mEntry.start).toFixed(1));
@@ -91,7 +102,11 @@ function renderTodayHome(main){
     <div class="today-grid">
       <div class="today-tile" onclick="setTab('rounds'); setRoundsView('text');">
         <div class="num">${textBefore.all.length}</div>
-        <div class="lbl">Text before visit</div>
+        <div class="lbl">Text before visit${textBeforeOverdue ? ` · ${textBeforeOverdue} overdue` : ''}</div>
+      </div>
+      <div class="today-tile" onclick="openMileageEntry();">
+        <div class="num">${mNum}</div>
+        <div class="lbl">${mLbl}</div>
       </div>
       <div class="today-tile" onclick="setTab('jobs');">
         <div class="num">${todaysJobs.length}</div>
@@ -103,15 +118,7 @@ function renderTodayHome(main){
       </div>
       <div class="today-tile" onclick="setTab('quotes');">
         <div class="num">${followUpQuotes.length}</div>
-        <div class="lbl">Quotes needing follow-up</div>
-      </div>
-      <div class="today-tile" onclick="setTab('marketing');">
-        <div class="num">${marketingDue.length}</div>
-        <div class="lbl">Marketing actions</div>
-      </div>
-      <div class="today-tile" onclick="openMileageEntry();">
-        <div class="num">${mNum}</div>
-        <div class="lbl">${mLbl}</div>
+        <div class="lbl">Quotes needing follow-up${quotesWellOverdue ? ` · ${quotesWellOverdue} well overdue` : ''}</div>
       </div>
     </div>
   `;
@@ -215,6 +222,15 @@ function quoteNeedsFollowUp(q, today){
 function quotesNeedingFollowUp(){
   const today = todayISO();
   return (data.quotes||[]).filter(q => quoteNeedsFollowUp(q, today));
+}
+// Among quotes already needing a follow-up, how many are well overdue — more
+// than double their own follow-up window — worth calling out on the Today tile.
+function quotesWellOverdueCount(){
+  const today = todayISO();
+  return quotesNeedingFollowUp().filter(q=>{
+    const followUpDays = q.followUpDays != null ? q.followUpDays : 7;
+    return daysBetween(q.date, today) >= followUpDays * 2;
+  }).length;
 }
 
 // A pending marketing action (a call to make, a text to send again) is only
