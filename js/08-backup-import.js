@@ -133,6 +133,7 @@ const FOCUSED_HELP = {
       helpP('Suggest a route order is inside Reorder — it works out a shorter visiting order using real road distances where possible, and shows it to you before changing anything (nothing\'s applied unless you tap "Use this order"). Both this and Show map re-check every address\'s location each time, unless it\'s been manually corrected (see below).'),
       helpP('On the map, every address gets a pin — one that couldn\'t be found automatically shows as a grey dashed pin near the others. Drag any pin to fix its spot; dragging locks it there, so it\'s never fetched again and won\'t be moved by a later map or route request.'),
       helpP('The photo icon on the Rounds screen opens the photo gallery.'),
+      helpP('The Owed view (and "Remind all") sorts by how long a balance has actually been outstanding, not just its size, so the most overdue customer comes first. The payment reminder wording automatically gets firmer from the second reminder onward — edit both versions under Settings > Message templates.'),
       helpP('The small green phone button calls a customer; the small blue compass button opens directions to their address. A red "⚠ Chase" badge appears after 2+ unpaid payment reminders.')
     ]
   },
@@ -140,7 +141,7 @@ const FOCUSED_HELP = {
     title: 'One-off jobs',
     body: () => [
       helpP('For anything outside your regular rounds. Swipe right for done (undo appears for a few seconds after), left for paid. A completed job can be turned into a quote, invoiced, or sent as a PDF.'),
-      helpP('Add a discount percentage right next to the price (0 by default) — it\'s applied automatically to that job\'s invoice total and receipt message, while the price itself stays the full rate everywhere else. A payment reminder can only be sent once a job is marked done.'),
+      helpP('Add a discount percentage right next to the price (0 by default) — it\'s applied automatically to that job\'s invoice total and receipt message, while the price itself stays the full rate everywhere else. A payment reminder can only be sent once a job is marked done, and a red "⚠ Chase" badge appears after 2+ unpaid reminders, same as on customers.'),
       helpP('If a job\'s address matches an existing customer, it links to them automatically and shows in their history.'),
       helpP('The small green phone button calls; the small blue compass button opens directions. The printer icon prints every job with status and value.')
     ]

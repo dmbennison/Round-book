@@ -478,6 +478,14 @@ function logMessage(item, kind, extra){
   item.messageLog.unshift(Object.assign({kind, date: todayISO(), time: Date.now()}, extra||{}));
   if(item.messageLog.length > 30) item.messageLog.length = 30;
 }
+// The 1st payment reminder uses the normal wording; the 2nd and every one after
+// switches to the firmer follow-up template, based on the count already tracked
+// per customer/job — so the tone escalates automatically without extra taps.
+function payTemplateFor(reminderCount){
+  return (reminderCount||0) >= 1
+    ? (data.settings.payFollowUpTemplate || DEFAULT_PAY_FOLLOWUP_TEMPLATE)
+    : (data.settings.payTemplate || DEFAULT_PAY_TEMPLATE);
+}
 function applyTemplate(tpl, tokens){
   return (tpl||'')
     .replace(/\{name\}/g, tokens.name || 'there')
@@ -486,6 +494,7 @@ function applyTemplate(tpl, tokens){
     .replace(/\{date\}/g, tokens.date || '')
     .replace(/\{yourname\}/g, tokens.yourname || '')
     .replace(/\{work\}/g, tokens.work || 'your window cleaning')
+    .replace(/\{daysoverdue\}/g, tokens.daysoverdue != null ? String(tokens.daysoverdue) : '')
     .replace(/\{bankdetails\}/g, bankDetailsBlock(tokens.address));
 }
 
@@ -789,9 +798,9 @@ function sendJobPaymentReminder(id){
   const firstName = j.name ? j.name.trim().split(' ')[0] : '';
   const company = data.settings.companyName || '';
   const yourname = data.settings.yourName || '';
-  const msg = applyTemplate(data.settings.payTemplate, {
-    name: firstName, amount: jobDiscountedTotal(j), company, yourname, address: j.address
-  });
+  const tpl = payTemplateFor(j.paymentReminderCount);
+  const daysOverdue = j.date ? Math.max(0, daysBetween(j.date, todayISO())) : 0;
+  const msg = applyTemplate(tpl, {name: firstName, amount: jobDiscountedTotal(j), company, yourname, address: j.address, daysoverdue: daysOverdue});
   const afterSend = () => {
     j.paymentReminderSent = true;
     j.paymentReminderSentDate = todayISO();
@@ -846,7 +855,8 @@ function sendTemplate(id, kind, returnTo){
   } else {
     const s = custStatus(c);
     const amt = s.owed ? s.balance : c.price;
-    msg = applyTemplate(data.settings.payTemplate, {name: firstName, amount: amt, company, yourname, address: c.address});
+    const tpl = payTemplateFor(c.paymentReminderCount);
+    msg = applyTemplate(tpl, {name: firstName, amount: amt, company, yourname, address: c.address, daysoverdue: daysSinceLastPayment(c)});
     title = 'Payment reminder';
     afterSend = () => {
       c.paymentReminderSent = true;
@@ -869,7 +879,8 @@ function openBulkReminders(kind, roundName){
       return !c.paused && s.cleanBadge && s.cleanBadge.type==='due' && isMobileNumber(c.phone);
     });
   } else {
-    list = roundCusts.filter(c=> custStatus(c).owed && isMobileNumber(c.phone));
+    list = roundCusts.filter(c=> custStatus(c).owed && isMobileNumber(c.phone))
+      .sort((a,b)=> (daysSinceLastPayment(b)-daysSinceLastPayment(a)) || (custStatus(b).balance-custStatus(a).balance));
   }
   if(!list.length){ toast('No one with a mobile number to remind'); return; }
 
@@ -889,10 +900,11 @@ function openBulkReminders(kind, roundName){
     ${list.map(c=>{
       const s = custStatus(c);
       const alreadySent = kind === 'owed' && c.paymentReminderSent;
+      const daysOverdue = kind === 'owed' ? daysSinceLastPayment(c) : 0;
       return `<div class="cust-card" id="bulkrow-${c.id}" style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
         <div style="min-width:0;">
           <div class="cust-addr" style="font-weight:800; font-size:0.9062rem;">${escapeHtml(c.address||c.name||'Customer')}</div>
-          <div style="font-size:0.75rem; color:var(--ink-muted); margin-top:2px;">${escapeHtml(c.phone)}${kind==='owed'?` · Owes ${money(s.balance)}`:''}${alreadySent?` · 🔔 Reminded ${fmtDate(c.paymentReminderSentDate).split(' ').slice(0,2).join(' ')}`:''}</div>
+          <div style="font-size:0.75rem; color:var(--ink-muted); margin-top:2px;">${escapeHtml(c.phone)}${kind==='owed'?` · Owes ${money(s.balance)}${daysOverdue?` · ${daysOverdue}d`:''}`:''}${alreadySent?` · 🔔 Reminded ${fmtDate(c.paymentReminderSentDate).split(' ').slice(0,2).join(' ')}`:''}</div>
         </div>
         <button class="btn btn-clean" style="flex:0 0 auto; padding:9px 16px;" onclick="sendBulkReminder('${c.id}','${kind}')">${alreadySent?'Send again':'Send'}</button>
       </div>`;
@@ -948,7 +960,7 @@ function sendBulkReminder(id, kind){
     const s = custStatus(c);
     amt = s.owed ? s.balance : c.price;
   }
-  const msg = applyTemplate(tpl, {name: firstName, amount: amt, company, yourname, address: c.address});
+  const msg = applyTemplate(tpl, {name: firstName, amount: amt, company, yourname, address: c.address, daysoverdue: kind==='owed' ? daysSinceLastPayment(c) : undefined});
   sendPhoneMessage(c.phone, msg);
   logMessage(c, kind === 'owed' ? 'pay' : 'clean');
   if(kind === 'owed'){

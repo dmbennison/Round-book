@@ -142,6 +142,7 @@ function openSettings(){
 const TEMPLATE_DEFS = [
   { key: 'cleanTemplate', label: 'Cleaning reminder', default: DEFAULT_CLEAN_TEMPLATE },
   { key: 'payTemplate', label: 'Payment reminder', default: DEFAULT_PAY_TEMPLATE },
+  { key: 'payFollowUpTemplate', label: 'Payment reminder (2nd+ chase)', default: DEFAULT_PAY_FOLLOWUP_TEMPLATE },
   { key: 'cleanedTodayTemplate', label: 'Windows cleaned today', default: DEFAULT_CLEANED_TODAY_TEMPLATE },
   { key: 'receiptTemplate', label: 'Receipt', default: DEFAULT_RECEIPT_TEMPLATE },
   { key: 'quoteTemplate', label: 'Quote (new enquiry)', default: DEFAULT_QUOTE_TEMPLATE },
@@ -154,7 +155,7 @@ function openMessageTemplates(){
       <h2 style="flex:1; min-width:0;">Message templates</h2>
       <button class="sheet-close" onclick="closeSheet()">✕</button>
     </div>
-    <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 12px; line-height:1.5;">Tap a message to edit its wording. Use <b>{name}</b>, <b>{amount}</b>, <b>{date}</b> (receipts), <b>{work}</b> (quotes), <b>{company}</b>, <b>{yourname}</b>, and <b>{bankdetails}</b> (only appears if you've added bank details under Business details).</p>
+    <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 12px; line-height:1.5;">Tap a message to edit its wording. Use <b>{name}</b>, <b>{amount}</b>, <b>{date}</b> (receipts), <b>{work}</b> (quotes), <b>{daysoverdue}</b> (payment reminders), <b>{company}</b>, <b>{yourname}</b>, and <b>{bankdetails}</b> (only appears if you've added bank details under Business details). The payment reminder automatically switches to the "2nd+ chase" wording from the second reminder onwards for that customer or job.</p>
     ${TEMPLATE_DEFS.map(def=>{
       const val = (data.settings[def.key] || def.default).replace(/\s+/g,' ').trim();
       return `<button class="backup-btn" onclick="openEditTemplate('${def.key}')">

@@ -3,7 +3,7 @@
 
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 94;
+const APP_VERSION = 95;
 function formatVersion(v){ return '1.' + v; }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
@@ -12,6 +12,7 @@ function formatVersion(v){ return '1.' + v; }
 // the most recent 10 entries (oldest ones can be left in the array or trimmed,
 // either is fine, since the display always slices to 10).
 const VERSION_HISTORY = [
+  {version: 95, changes: ['Owed list and "Remind all" now sort by how long a balance has been outstanding, not just its size, so the most overdue customer comes first', 'Payment reminders now automatically switch to a firmer follow-up wording from the second reminder onwards — edit both under Settings > Message templates', 'Added a {daysoverdue} option for the payment reminder wording', 'One-off jobs now get the same red "⚠ Chase" badge as customers once 2+ payment reminders have gone unpaid']},
   {version: 94, changes: ['Fixed the card background shown while swiping — dragging right now actually shows the green "cleaned" colour instead of always showing blue "paid"', 'Swipe actions (cleaned, paid, job done, quote accepted, etc.) can now be undone for a few seconds via an Undo button', 'Payment reminders on one-off jobs can no longer be sent until the job is marked done', 'Added a discount percentage field next to price on one-off jobs, applied automatically to that job\'s invoice and receipt', 'The backup reminder is now a pop-up instead of a dismissible banner, and reliably reappears next time the app is opened if you dismiss it without backing up', 'All confirmation pop-ups in the app (delete, reset, import, etc.) now use the same on-screen style, for consistency and reliability on iPhone', 'Today tab: reordered tiles so text before visit and mileage come first, removed the separate Marketing tile (marketing follow-ups still surface as a banner when due), and added an overdue count under the Text before visit and Quotes tiles']},
   {version: 93, changes: ['Swiping a customer card right now has two stops: halfway marks cleaned, all the way across marks cleaned AND paid in one go', 'Added a universal search to the header, available on every tab -- searches customers, one-off jobs, quotes, and rounds together, replacing the old Rounds-only search', 'Send group text in Marketing can now also be narrowed by property type, add-ons (conservatory/extension/garage door), and fronts-only']},
   {version: 92, changes: ['Show map now gives every address a pin, even one that fails to find automatically (shown as an approximate grey pin near the others)', 'Pins on the map can now be dragged to correct their position — dragging locks that location so it is never re-fetched by a later map or route request, only by dragging it again']},
@@ -146,6 +147,7 @@ async function exportContacts(){
 }
 const DEFAULT_CLEAN_TEMPLATE = "Hi {name}, just a reminder I'll be round to clean your windows soon. Let me know if that's not convenient.\n\nThanks,\n{yourname}\n{company}";
 const DEFAULT_PAY_TEMPLATE = "Hi {name}, a friendly reminder that your window cleaning payment of {amount} is outstanding.\n\n{bankdetails}Thanks,\n{yourname}\n{company}";
+const DEFAULT_PAY_FOLLOWUP_TEMPLATE = "Hi {name}, following up again — your window cleaning payment of {amount} is now {daysoverdue} days overdue. Could you sort this when you get a chance?\n\n{bankdetails}Thanks,\n{yourname}\n{company}";
 const DEFAULT_RECEIPT_TEMPLATE = "Hi {name}, thank you for your payment of {amount} received {date}.\n\nThanks,\n{yourname}\n{company}";
 const DEFAULT_QUOTE_TEMPLATE = "Hi {name}, thanks for your enquiry. I'd quote {amount} for the following work: {work}\nLet me know if you'd like to go ahead.\nThanks,\n{yourname}\n{company}";
 const DEFAULT_REPEAT_QUOTE_TEMPLATE = "Hi {name}, hope you're well! I cleaned your windows for you before and wondered if you'd like the same job done again? I'd quote {amount} for the following work: {work}\n\nJust let me know and I'll get you booked back in.\n\nThanks,\n{yourname}\n{company}";
@@ -208,6 +210,7 @@ function migrateData(parsed){
   const OLD_CLEANED_TODAY_TEMPLATES = ["Hi {name}, your windows have been cleaned today!\n\n{bankdetails}Thanks,\n{yourname}\n{company}"];
   if(!parsed.settings.cleanTemplate || OLD_CLEAN_TEMPLATES.includes(parsed.settings.cleanTemplate)) parsed.settings.cleanTemplate = DEFAULT_CLEAN_TEMPLATE;
   if(!parsed.settings.payTemplate || OLD_PAY_TEMPLATES.includes(parsed.settings.payTemplate)) parsed.settings.payTemplate = DEFAULT_PAY_TEMPLATE;
+  if(!parsed.settings.payFollowUpTemplate) parsed.settings.payFollowUpTemplate = DEFAULT_PAY_FOLLOWUP_TEMPLATE;
   if(!parsed.settings.receiptTemplate || OLD_RECEIPT_TEMPLATES.includes(parsed.settings.receiptTemplate)) parsed.settings.receiptTemplate = DEFAULT_RECEIPT_TEMPLATE;
   if(!parsed.settings.quoteTemplate || OLD_QUOTE_TEMPLATES.includes(parsed.settings.quoteTemplate)) parsed.settings.quoteTemplate = DEFAULT_QUOTE_TEMPLATE;
   if(!parsed.settings.repeatQuoteTemplate || OLD_REPEAT_QUOTE_TEMPLATES.includes(parsed.settings.repeatQuoteTemplate)) parsed.settings.repeatQuoteTemplate = DEFAULT_REPEAT_QUOTE_TEMPLATE;
@@ -648,6 +651,18 @@ function custStatus(c){
   const owed = balance > 0.005;
   const credit = balance < -0.005;
   return {cleanBadge, owed, credit, balance, lastClean, lastPaid};
+}
+// How many days since this customer's account last saw any payment — or, if
+// they've never paid anything at all, since their first clean — used to sort
+// and chase the Owed list by how long a balance has actually been outstanding,
+// not just by its size. There's no per-invoice tracking (balance is just a
+// running total), so "days since last payment" is the closest simple proxy.
+function daysSinceLastPayment(c){
+  if(!custStatus(c).owed) return 0;
+  const cleanDates = (c.cleanHistory||[]).map(e=>e.date);
+  const firstClean = cleanDates.length ? [...cleanDates].sort()[0] : null;
+  const anchor = lastOf((c.paymentHistory||[]).map(p=>p.date)) || firstClean;
+  return anchor ? daysBetween(anchor, todayISO()) : 0;
 }
 // "£value/£owed" — the format used everywhere a round's worth is shown: the
 // plain price total for its active (non-paused) customers, followed by however

@@ -69,6 +69,8 @@ function jobCardHtml(j, today){
       <div class="cust-meta">
         ${statusBadge}
         <span class="badge ${j.paid?'ok':'owed'}">${j.paid?'Paid':'Unpaid'}</span>
+        ${(j.done && !j.paid && (j.paymentReminderCount||0) >= 2) ? `<span class="badge escalate" title="${j.paymentReminderCount} payment reminders sent, still unpaid">⚠ Chase</span>` : ''}
+        ${(j.done && !j.paid && j.paymentReminderSent) ? `<span class="badge paused">🔔 ${fmtDate(j.paymentReminderSentDate).split(' ').slice(0,2).join(' ')}</span>` : ''}
         ${(j.photos && j.photos.length) ? `<span class="badge paused">📷 ${j.photos.length}</span>` : ''}
         ${anniv ? `<span class="badge anniversary">🎉 ${anniv}-year anniversary</span>` : ''}
       </div>

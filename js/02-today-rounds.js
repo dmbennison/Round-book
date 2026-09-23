@@ -1006,7 +1006,7 @@ function renderRoundsList(main){
     let owedGrandCount = 0;
     roundNames.forEach(rn=>{
       const owedCusts = rounds[rn].filter(c=>custStatus(c).owed)
-        .sort((a,b)=>custStatus(b).balance-custStatus(a).balance);
+        .sort((a,b)=> (daysSinceLastPayment(b)-daysSinceLastPayment(a)) || (custStatus(b).balance-custStatus(a).balance));
       if(!owedCusts.length) return;
       anyOwed = true;
       owedGrandCount += owedCusts.length;
@@ -1160,7 +1160,8 @@ function renderRoundDetail(main, rn){
       return !c.paused && (dueNow || cleanedToday);
     });
   } else if(roundFilterMode === 'owed'){
-    baseList = baseList.filter(c=>custStatus(c).owed);
+    baseList = baseList.filter(c=>custStatus(c).owed)
+      .sort((a,b)=> (daysSinceLastPayment(b)-daysSinceLastPayment(a)) || (custStatus(b).balance-custStatus(a).balance));
   }
   const custs = baseList;
   if(!custs.length){
