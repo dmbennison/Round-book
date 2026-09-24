@@ -194,6 +194,12 @@
   .btn-paid{background:var(--green-dim); color:var(--green);}
   .btn-paid:active{background:#cdefdc;}
   .btn-open{background:var(--bg); color:var(--ink); flex:0 0 auto; width:42px;}
+  /* Utility icons (Show map, Reorder, the round-actions kebab, every menu-row
+     icon in Settings/Reports/Backup) inherit currentColor from --ink, which in
+     dark mode is a near-white text colour — fine for text, but as a thin SVG
+     stroke it reads as a harsh white outline. Softening just the icon (not the
+     button's own text) to --ink-muted keeps it recognisable without the glare. */
+  .btn-open svg, .backup-btn svg{color:var(--ink-muted);}
 
   .empty{
     text-align:center; padding:50px 20px; color:var(--ink-muted);
