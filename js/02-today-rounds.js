@@ -82,9 +82,9 @@ function renderTodayHome(main){
   const followUpQuotes = quotesNeedingFollowUp();
   const quotesWellOverdue = quotesWellOverdueCount();
   const mEntry = todayMileageEntry();
-  const mState = mileageTileState(mEntry);
-  const mNum = mState==='start' ? '🚗' : (mState==='end' ? mEntry.start : (mEntry.end - mEntry.start).toFixed(1));
-  const mLbl = mState==='start' ? 'Start day mileage' : (mState==='end' ? 'End day mileage (tap to log)' : 'Miles today ✓');
+  const mStartText = (mEntry && mEntry.start!=null) ? mEntry.start : 'Tap to log';
+  const mFinishText = (mEntry && mEntry.start!=null) ? ((mEntry.end!=null) ? mEntry.end : 'Tap to log') : '—';
+  const mTotalText = (mEntry && mEntry.start!=null && mEntry.end!=null) ? (mEntry.end - mEntry.start).toFixed(1) : '—';
 
   main.innerHTML = `
     <div class="section-label" style="margin-top:0;">${fmtDate(today)}</div>
@@ -104,9 +104,16 @@ function renderTodayHome(main){
         <div class="num">${textBefore.all.length}</div>
         <div class="lbl">Text before visit${textBeforeOverdue ? ` · ${textBeforeOverdue} overdue` : ''}</div>
       </div>
-      <div class="today-tile" onclick="openMileageEntry();">
-        <div class="num">${mNum}</div>
-        <div class="lbl">${mLbl}</div>
+      <div class="today-tile" onclick="openMileageEntry();" style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+        <div style="min-width:0;">
+          <div style="font-size:0.8125rem; font-weight:800; color:var(--ink);">Today's Mileage</div>
+          <div style="font-size:0.6875rem; font-weight:700; color:var(--ink-muted); margin-top:5px;">Start - ${mStartText}</div>
+          <div style="font-size:0.6875rem; font-weight:700; color:var(--ink-muted); margin-top:2px;">Finish - ${mFinishText}</div>
+        </div>
+        <div style="text-align:right; flex-shrink:0;">
+          <div class="num" style="font-size:1.5rem;">${mTotalText}</div>
+          <div class="lbl" style="margin-top:2px;">miles</div>
+        </div>
       </div>
       <div class="today-tile" onclick="setTab('jobs');">
         <div class="num">${todaysJobs.length}</div>

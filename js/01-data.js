@@ -3,7 +3,7 @@
 
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 98;
+const APP_VERSION = 99;
 function formatVersion(v){ return '1.' + v; }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
@@ -12,6 +12,7 @@ function formatVersion(v){ return '1.' + v; }
 // the most recent 10 entries (oldest ones can be left in the array or trimmed,
 // either is fine, since the display always slices to 10).
 const VERSION_HISTORY = [
+  {version: 99, changes: ['Softened the outline icons on buttons like Show map and Reorder — no longer stark white in dark mode', 'Redesigned the Today\'s Mileage tile to always show the title with small Start/Finish readings underneath and the day\'s total on the right, instead of switching between a car icon and a number']},
   {version: 98, changes: ['Customer cards now flag a "💷 Low" badge if their price is 15%+ below their round\'s average (rounds need 4+ active customers before this shows), and the Price review report has a second table listing everyone below their round\'s average, biggest gap first', 'Quote follow-up texts now get progressively softer wording each time (checking in, then no pressure) and automatically become due again sooner after each chase, rather than staying on a fixed weekly reminder forever', 'Added an Upsell opportunities report — fronts-only customers who could add backs, conservatories with no roof clean, detached/semi-detached houses with no garage door clean, and long-standing customers with no add-ons at all']},
   {version: 97, changes: ['Added an Auto option alongside Light and Dark under Settings > Appearance, which follows your phone\'s system setting automatically', 'Removed the black/white outline from buttons, Today tiles, stat boxes, and the round-view switcher — they now use a themed background instead, so they stay visible (especially in dark mode) without a hard border, and follow your chosen colour scheme']},
   {version: 96, changes: ['Cards (customers, rounds, backup screen) now use a softer themed border and shadow instead of the black/white outline, and follow your colour scheme in dark mode instead of all looking the same dark grey']},
