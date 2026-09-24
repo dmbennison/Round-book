@@ -36,6 +36,9 @@
     --radius:14px;
     --emphasis:var(--navy);
     --card-tint:#EEF6FB;
+    --card-surface:#FFFFFF;
+    --card-border:#DCF0F8;
+    --card-shadow:0 1px 3px rgba(0,0,0,0.06);
     --box-border:#000;
     /* Fixed colours for the directions/call buttons — deliberately NOT theme
        variables, so they stay the same blue/green whichever colour scheme is
@@ -57,6 +60,9 @@
     --red-dim:#3A1616;
     --emphasis:#EAF1F6;
     --card-tint:#182530;
+    --card-surface:#1C3444;
+    --card-border:transparent;
+    --card-shadow:inset 0 1px 0 rgba(255,255,255,0.06), 0 2px 8px rgba(9,28,36,0.45), 0 1px 2px rgba(9,28,36,0.35);
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color: transparent;}
   html,body{height:100%;}
@@ -123,9 +129,9 @@
   .day-divider:first-child{margin-top:0;}
 
   .round-card{
-    background:linear-gradient(to bottom, var(--surface), var(--card-tint));
+    background:linear-gradient(to bottom, var(--card-surface), var(--card-tint));
     border-radius:var(--radius); padding:14px 16px; margin-bottom:10px;
-    border:1px solid var(--box-border); display:flex; align-items:center; justify-content:space-between; gap:10px;
+    border:1px solid var(--card-border); box-shadow:var(--card-shadow); display:flex; align-items:center; justify-content:space-between; gap:10px;
     position:relative; overflow:hidden;
   }
   .round-card::before{
@@ -156,9 +162,9 @@
   .swipe-bg-left{background:var(--green); justify-content:flex-start;}
   .swipe-bg-right{background:var(--blue); justify-content:flex-end;}
   .cust-card{
-    background:linear-gradient(to bottom, var(--surface), var(--card-tint));
+    background:linear-gradient(to bottom, var(--card-surface), var(--card-tint));
     border-radius:var(--radius); padding:14px 16px;
-    border:1px solid var(--box-border); position:relative; z-index:1; touch-action:pan-y; overflow:hidden;
+    border:1px solid var(--card-border); box-shadow:var(--card-shadow); position:relative; z-index:1; touch-action:pan-y; overflow:hidden;
   }
   .cust-card::before{
     content:""; position:absolute; left:0; top:0; bottom:0; width:5px; background:var(--blue);
@@ -271,14 +277,14 @@
   .stat .lbl{font-size:0.6562rem; color:var(--ink-muted); font-weight:700; text-transform:uppercase; letter-spacing:.03em; margin-top:2px;}
 
   .backup-btn{
-    display:flex; align-items:center; gap:12px; background:var(--surface); border:1px solid var(--box-border);
+    display:flex; align-items:center; gap:12px; background:var(--card-surface); border:1px solid var(--card-border); box-shadow:var(--card-shadow);
     border-radius:12px; padding:14px; margin-bottom:10px; text-align:left; width:100%;
   }
   .backup-btn svg{width:20px;height:20px; color:var(--blue); flex-shrink:0;}
   .backup-btn .t1{font-size:0.9062rem; font-weight:700;}
   .backup-btn .t2{font-size:0.75rem; color:var(--ink-muted); margin-top:1px;}
 
-  .cust-section{border:1px solid var(--box-border); border-radius:12px; margin-bottom:12px; overflow:hidden; background:var(--surface);}
+  .cust-section{border:1px solid var(--card-border); box-shadow:var(--card-shadow); border-radius:12px; margin-bottom:12px; overflow:hidden; background:var(--card-surface);}
   .cust-section summary{
     list-style:none; cursor:pointer; padding:13px 14px; font-weight:800; font-size:0.875rem; color:var(--ink);
     display:flex; align-items:center; justify-content:space-between; gap:8px;
@@ -356,6 +362,9 @@
       --ink:#1C2B36;
       --ink-muted:#66798A;
       --line:#E3E9EC;
+      --card-surface:#ffffff;
+      --card-border:transparent;
+      --card-shadow:none;
     }
     header, #backupBanner, #lastActionBanner, #marketingFollowUpBanner, #jobAnniversaryBanner, #importReviewBanner, main, .fab, .overlay, #importFile, #importSpreadsheetFile, .toast{
       display:none !important;
