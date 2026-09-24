@@ -39,7 +39,6 @@
     --card-surface:#FFFFFF;
     --card-border:#DCF0F8;
     --card-shadow:0 1px 3px rgba(0,0,0,0.06);
-    --box-border:#000;
     /* Fixed colours for the directions/call buttons — deliberately NOT theme
        variables, so they stay the same blue/green whichever colour scheme is
        chosen, rather than following --blue/--green like most of the app does. */
@@ -48,7 +47,6 @@
     --fixed-green:#2E9E5B;
   }
   body.dark{
-    --box-border:#fff;
     --bg:#0E1620;
     --surface:#16212C;
     --ink:#EAF1F6;
@@ -187,7 +185,7 @@
   .cust-meta{display:flex; gap:6px; flex-wrap:wrap; margin-top:10px;}
   .cust-actions{display:flex; gap:8px; margin-top:12px;}
   .btn{
-    flex:1; padding:10px 8px; border-radius:10px; border:1px solid var(--box-border); font-size:0.8438rem; font-weight:800;
+    flex:1; padding:10px 8px; border-radius:10px; font-size:0.8438rem; font-weight:800;
     display:flex; align-items:center; justify-content:center; gap:6px;
   }
   .btn svg{width:15px;height:15px;}
@@ -223,7 +221,7 @@
   .today-hero .value{font-size:0.9375rem; font-weight:700; margin-top:10px; color:#fff;}
   .today-grid{display:grid; grid-template-columns:repeat(2, 1fr); gap:10px; margin-bottom:8px;}
   .today-tile{
-    background:var(--surface); border:1px solid var(--box-border); border-radius:14px;
+    background:var(--card-surface); border-radius:14px;
     padding:14px; text-align:left; cursor:pointer; display:block;
   }
   .today-tile:active{background:var(--line);}
@@ -260,7 +258,7 @@
   .row2{display:flex; gap:10px;}
   .row2 > div{flex:1;}
   .form-actions{display:flex; gap:10px; margin-top:20px;}
-  .btn-primary{background:var(--blue); color:#fff; padding:13px; border-radius:12px; border:1px solid var(--box-border); font-weight:800; font-size:0.9375rem; flex:1;}
+  .btn-primary{background:var(--blue); color:#fff; padding:13px; border-radius:12px; font-weight:800; font-size:0.9375rem; flex:1;}
   .btn-primary:active{background:#2585c2;}
   .btn-danger-text{background:none; border:none; color:var(--red); font-weight:700; font-size:0.8438rem; padding:14px 2px 2px; width:100%; text-align:center;}
 
@@ -272,7 +270,7 @@
   .hist-list li:last-child{border-bottom:none;}
 
   .stat-row{display:flex; gap:8px; margin-bottom:16px;}
-  .stat{flex:1; background:var(--surface); border:1px solid var(--box-border); border-radius:12px; padding:12px; text-align:center;}
+  .stat{flex:1; background:var(--card-surface); border-radius:12px; padding:12px; text-align:center;}
   .stat .num{font-size:1.1875rem; font-weight:800;}
   .stat .lbl{font-size:0.6562rem; color:var(--ink-muted); font-weight:700; text-transform:uppercase; letter-spacing:.03em; margin-top:2px;}
 
@@ -306,10 +304,10 @@
 
   .seg-row{display:flex; gap:8px; margin-bottom:14px;}
   .seg-btn{
-    flex:1; padding:10px 6px; border-radius:11px; border:1px solid var(--box-border); background:var(--surface);
+    flex:1; padding:10px 6px; border-radius:11px; background:var(--card-surface);
     font-size:0.8438rem; font-weight:800; color:var(--ink-muted); display:flex; align-items:center; justify-content:center; gap:6px;
   }
-  .seg-btn.active{background:var(--navy); border-color:var(--navy); color:#fff;}
+  .seg-btn.active{background:var(--navy); color:#fff;}
   .seg-btn .count{
     font-size:0.6875rem; padding:1px 6px; border-radius:20px; background:rgba(0,0,0,0.06); color:inherit;
   }
