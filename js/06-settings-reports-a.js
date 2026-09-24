@@ -25,6 +25,10 @@ function mixHex(hexA, hexB, weight){
   const mixed = a.map((v,i)=> v + (b[i]-v)*weight);
   return '#' + mixed.map(v=>Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,'0')).join('');
 }
+function hexToRgba(hex, alpha){
+  const [r,g,b] = hexToRgb(hex);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
 
 function applyDarkMode(){
   document.body.classList.toggle('dark', darkMode);
@@ -70,13 +74,22 @@ function applyTheme(){
   // scheme gets its own badge colour instead of everything defaulting to ocean-blue.
   root.setProperty('--blue-dim', darkMode ? mixHex(t.blue, '#0E1620', 0.82) : mixHex(t.blue, '#FFFFFF', 0.86));
   // A much paler tint than --blue-dim, used only for the subtle gradient fill on
-  // cards (round-card, cust-card) — kept pale so the black outline (below) reads
-  // as the card's main definition rather than the fill colour.
+  // cards (round-card, cust-card) — kept pale so the card's own border/shadow
+  // still reads as its main definition rather than the fill colour.
   root.setProperty('--card-tint', darkMode ? mixHex(t.blue, '#16212C', 0.92) : mixHex(t.blue, '#FFFFFF', 0.94));
   // A soft tint of the main screen background, so the page itself carries a hint of the
   // chosen scheme rather than staying neutral grey — card surfaces (--surface) stay
   // untinted so content still stands out clearly on top.
   root.setProperty('--bg', darkMode ? mixHex(t.blue, '#0E1620', 0.90) : mixHex(t.blue, '#F5F7F8', 0.92));
+  // Card surfaces (cust-card, round-card, backup-btn, cust-section) derive from
+  // the theme too, mixed toward the card's own dark-mode base rather than the
+  // plain --surface colour, so schemes stay visibly distinct from each other in
+  // dark mode instead of converging on the same neutral dark card.
+  root.setProperty('--card-surface', darkMode ? mixHex(t.blue, '#16212C', 0.86) : '#FFFFFF');
+  root.setProperty('--card-border', darkMode ? 'transparent' : mixHex(t.blue, '#FFFFFF', 0.82));
+  root.setProperty('--card-shadow', darkMode
+    ? `inset 0 1px 0 rgba(255,255,255,0.06), 0 2px 8px ${hexToRgba(mixHex(t.navy, '#000000', 0.6), 0.45)}, 0 1px 2px ${hexToRgba(mixHex(t.navy, '#000000', 0.6), 0.35)}`
+    : '0 1px 3px rgba(0,0,0,0.06)');
   const meta = document.querySelector('meta[name="theme-color"]');
   if(meta) meta.setAttribute('content', t.navy);
 }
