@@ -3,7 +3,7 @@
 
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 96;
+const APP_VERSION = 97;
 function formatVersion(v){ return '1.' + v; }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
@@ -12,6 +12,7 @@ function formatVersion(v){ return '1.' + v; }
 // the most recent 10 entries (oldest ones can be left in the array or trimmed,
 // either is fine, since the display always slices to 10).
 const VERSION_HISTORY = [
+  {version: 97, changes: ['Added an Auto option alongside Light and Dark under Settings > Appearance, which follows your phone\'s system setting automatically', 'Removed the black/white outline from buttons, Today tiles, stat boxes, and the round-view switcher — they now use a themed background instead, so they stay visible (especially in dark mode) without a hard border, and follow your chosen colour scheme']},
   {version: 96, changes: ['Cards (customers, rounds, backup screen) now use a softer themed border and shadow instead of the black/white outline, and follow your colour scheme in dark mode instead of all looking the same dark grey']},
   {version: 95, changes: ['Owed list and "Remind all" now sort by how long a balance has been outstanding, not just its size, so the most overdue customer comes first', 'Payment reminders now automatically switch to a firmer follow-up wording from the second reminder onwards — edit both under Settings > Message templates', 'Added a {daysoverdue} option for the payment reminder wording', 'One-off jobs now get the same red "⚠ Chase" badge as customers once 2+ payment reminders have gone unpaid']},
   {version: 94, changes: ['Fixed the card background shown while swiping — dragging right now actually shows the green "cleaned" colour instead of always showing blue "paid"', 'Swipe actions (cleaned, paid, job done, quote accepted, etc.) can now be undone for a few seconds via an Undo button', 'Payment reminders on one-off jobs can no longer be sent until the job is marked done', 'Added a discount percentage field next to price on one-off jobs, applied automatically to that job\'s invoice and receipt', 'The backup reminder is now a pop-up instead of a dismissible banner, and reliably reappears next time the app is opened if you dismiss it without backing up', 'All confirmation pop-ups in the app (delete, reset, import, etc.) now use the same on-screen style, for consistency and reliability on iPhone', 'Today tab: reordered tiles so text before visit and mileage come first, removed the separate Marketing tile (marketing follow-ups still surface as a banner when due), and added an overdue count under the Text before visit and Quotes tiles']},
@@ -683,7 +684,15 @@ let roundsViewMode = 'overview';
 let reorderMode = false;
 let roundFilterMode = 'all';
 let roundDayFilter = 'all';
-let darkMode = localStorage.getItem('roundBookDark') === '1';
+// Theme mode is 'light', 'dark', or 'auto' (follows the device's system setting).
+// darkMode below is always the resolved boolean the rest of the app reads —
+// migrated from the old boolean-only roundBookDark key so an existing install
+// keeps whatever was explicitly chosen rather than jumping to auto.
+let themeMode = localStorage.getItem('roundBookThemeMode') ||
+  (localStorage.getItem('roundBookDark') !== null ? (localStorage.getItem('roundBookDark') === '1' ? 'dark' : 'light') : 'auto');
+let darkMode = themeMode === 'auto'
+  ? !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)
+  : themeMode === 'dark';
 let textSize = (()=>{ const v = parseInt(localStorage.getItem('roundBookTextSize'),10); return (Number.isFinite(v) && v>=15 && v<=24) ? v : 18; })();
 let bannerDismissed = false;
 let marketingFollowUpDismissed = false;

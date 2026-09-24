@@ -31,12 +31,15 @@ function hexToRgba(hex, alpha){
 }
 
 function applyDarkMode(){
+  darkMode = themeMode === 'auto'
+    ? !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)
+    : themeMode === 'dark';
   document.body.classList.toggle('dark', darkMode);
   applyTheme();
 }
-function setDarkMode(v){
-  darkMode = v;
-  localStorage.setItem('roundBookDark', v?'1':'0');
+function setThemeMode(mode){
+  themeMode = mode;
+  localStorage.setItem('roundBookThemeMode', mode);
   applyDarkMode();
   openSettings();
 }
@@ -109,8 +112,9 @@ function openSettings(){
     </div>
     <div class="section-label" style="margin-top:0;">Appearance</div>
     <div class="seg-row">
-      <button class="seg-btn ${!darkMode?'active':''}" onclick="setDarkMode(false)">☀️ Light</button>
-      <button class="seg-btn ${darkMode?'active':''}" onclick="setDarkMode(true)">🌙 Dark</button>
+      <button class="seg-btn ${themeMode==='light'?'active':''}" onclick="setThemeMode('light')">☀️ Light</button>
+      <button class="seg-btn ${themeMode==='dark'?'active':''}" onclick="setThemeMode('dark')">🌙 Dark</button>
+      <button class="seg-btn ${themeMode==='auto'?'active':''}" onclick="setThemeMode('auto')">🌓 Auto</button>
     </div>
     <div class="section-label">Text size</div>
     <div style="display:flex; align-items:center; gap:10px; margin:4px 2px 16px;">

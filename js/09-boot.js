@@ -11,6 +11,13 @@ function escapeAttr(str){ return escapeHtml(str); }
 applyDarkMode();
 applyTheme();
 applyTextSize();
+// While in auto mode, follow the device's system setting live rather than only
+// picking it up next time the app is opened.
+if(window.matchMedia){
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    if(themeMode === 'auto') applyDarkMode();
+  });
+}
 /* ---------- swipe actions ---------- */
 let swipeState = null;
 function initSwipeHandlers(){

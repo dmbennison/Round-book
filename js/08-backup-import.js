@@ -198,7 +198,7 @@ const FOCUSED_HELP = {
   settings: {
     title: 'Settings',
     body: () => [
-      helpP('Appearance, text size, colour scheme, and messaging app (text or WhatsApp) live on the main Settings screen. Business details and message templates each have their own screen, opened from a button here.')
+      helpP('Appearance, text size, colour scheme, and messaging app (text or WhatsApp) live on the main Settings screen. Light/Dark/Auto picks whether the app follows your phone\'s system setting or a fixed choice. Business details and message templates each have their own screen, opened from a button here.')
     ]
   },
   reminders: {
