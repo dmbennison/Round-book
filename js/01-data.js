@@ -3,7 +3,7 @@
 
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 97;
+const APP_VERSION = 98;
 function formatVersion(v){ return '1.' + v; }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
@@ -12,6 +12,7 @@ function formatVersion(v){ return '1.' + v; }
 // the most recent 10 entries (oldest ones can be left in the array or trimmed,
 // either is fine, since the display always slices to 10).
 const VERSION_HISTORY = [
+  {version: 98, changes: ['Customer cards now flag a "💷 Low" badge if their price is 15%+ below their round\'s average (rounds need 4+ active customers before this shows), and the Price review report has a second table listing everyone below their round\'s average, biggest gap first', 'Quote follow-up texts now get progressively softer wording each time (checking in, then no pressure) and automatically become due again sooner after each chase, rather than staying on a fixed weekly reminder forever', 'Added an Upsell opportunities report — fronts-only customers who could add backs, conservatories with no roof clean, detached/semi-detached houses with no garage door clean, and long-standing customers with no add-ons at all']},
   {version: 97, changes: ['Added an Auto option alongside Light and Dark under Settings > Appearance, which follows your phone\'s system setting automatically', 'Removed the black/white outline from buttons, Today tiles, stat boxes, and the round-view switcher — they now use a themed background instead, so they stay visible (especially in dark mode) without a hard border, and follow your chosen colour scheme']},
   {version: 96, changes: ['Cards (customers, rounds, backup screen) now use a softer themed border and shadow instead of the black/white outline, and follow your colour scheme in dark mode instead of all looking the same dark grey']},
   {version: 95, changes: ['Owed list and "Remind all" now sort by how long a balance has been outstanding, not just its size, so the most overdue customer comes first', 'Payment reminders now automatically switch to a firmer follow-up wording from the second reminder onwards — edit both under Settings > Message templates', 'Added a {daysoverdue} option for the payment reminder wording', 'One-off jobs now get the same red "⚠ Chase" badge as customers once 2+ payment reminders have gone unpaid']},
@@ -153,6 +154,8 @@ const DEFAULT_PAY_FOLLOWUP_TEMPLATE = "Hi {name}, following up again — your wi
 const DEFAULT_RECEIPT_TEMPLATE = "Hi {name}, thank you for your payment of {amount} received {date}.\n\nThanks,\n{yourname}\n{company}";
 const DEFAULT_QUOTE_TEMPLATE = "Hi {name}, thanks for your enquiry. I'd quote {amount} for the following work: {work}\nLet me know if you'd like to go ahead.\nThanks,\n{yourname}\n{company}";
 const DEFAULT_REPEAT_QUOTE_TEMPLATE = "Hi {name}, hope you're well! I cleaned your windows for you before and wondered if you'd like the same job done again? I'd quote {amount} for the following work: {work}\n\nJust let me know and I'll get you booked back in.\n\nThanks,\n{yourname}\n{company}";
+const DEFAULT_QUOTE_FOLLOWUP_TEMPLATE = "Hi {name}, just checking you saw my last message — I quoted {amount} for {work}. Let me know if you'd like to go ahead.\n\nThanks,\n{yourname}\n{company}";
+const DEFAULT_QUOTE_FOLLOWUP2_TEMPLATE = "Hi {name}, no worries if the timing's not right at the moment — just wanted to leave the door open. My quote of {amount} for {work} still stands whenever suits.\n\nThanks,\n{yourname}\n{company}";
 const DEFAULT_MARKETING_TEMPLATE = "Hi {name}, just letting you know we also offer gutter clearing and fascia cleaning alongside your window clean — let me know if you'd like a quote.\n\nThanks,\n{yourname}\n{company}";
 const DEFAULT_REFERRAL_TEMPLATE = "Hi {name}, hope you're happy with your window cleaning! If you know anyone nearby who'd like a regular clean too, we'd really appreciate a mention — just get them to say your name when they get in touch.\n\nThanks,\n{yourname}\n{company}";
 const DEFAULT_WINBACK_TEMPLATE = "Hi {name}, it's been a while since we last cleaned your windows — just checking in to see if you'd like to start up again. Let me know and I'll get you back on the round.\n\nThanks,\n{yourname}\n{company}";
@@ -188,6 +191,7 @@ function migrateData(parsed){
     if(!q.status) q.status = 'pending';
     if(q.date === undefined) q.date = todayISO();
     if(q.followUpDays == null) q.followUpDays = 7;
+    if(q.quoteFollowUpCount == null) q.quoteFollowUpCount = 0;
   });
   parsed.settings = parsed.settings || {};
   // Auto-upgrade template wording that still matches an earlier built-in default (i.e. the user
@@ -216,6 +220,8 @@ function migrateData(parsed){
   if(!parsed.settings.receiptTemplate || OLD_RECEIPT_TEMPLATES.includes(parsed.settings.receiptTemplate)) parsed.settings.receiptTemplate = DEFAULT_RECEIPT_TEMPLATE;
   if(!parsed.settings.quoteTemplate || OLD_QUOTE_TEMPLATES.includes(parsed.settings.quoteTemplate)) parsed.settings.quoteTemplate = DEFAULT_QUOTE_TEMPLATE;
   if(!parsed.settings.repeatQuoteTemplate || OLD_REPEAT_QUOTE_TEMPLATES.includes(parsed.settings.repeatQuoteTemplate)) parsed.settings.repeatQuoteTemplate = DEFAULT_REPEAT_QUOTE_TEMPLATE;
+  if(!parsed.settings.quoteFollowUpTemplate) parsed.settings.quoteFollowUpTemplate = DEFAULT_QUOTE_FOLLOWUP_TEMPLATE;
+  if(!parsed.settings.quoteFollowUp2Template) parsed.settings.quoteFollowUp2Template = DEFAULT_QUOTE_FOLLOWUP2_TEMPLATE;
   if(!parsed.settings.marketingTemplate) parsed.settings.marketingTemplate = DEFAULT_MARKETING_TEMPLATE;
   if(!Array.isArray(parsed.settings.marketingCampaigns) || !parsed.settings.marketingCampaigns.length){
     // First time running this version: seed the campaign list, carrying over

@@ -134,7 +134,7 @@ const FOCUSED_HELP = {
       helpP('On the map, every address gets a pin — one that couldn\'t be found automatically shows as a grey dashed pin near the others. Drag any pin to fix its spot; dragging locks it there, so it\'s never fetched again and won\'t be moved by a later map or route request.'),
       helpP('The photo icon on the Rounds screen opens the photo gallery.'),
       helpP('The Owed view (and "Remind all") sorts by how long a balance has actually been outstanding, not just its size, so the most overdue customer comes first. The payment reminder wording automatically gets firmer from the second reminder onward — edit both versions under Settings > Message templates.'),
-      helpP('The small green phone button calls a customer; the small blue compass button opens directions to their address. A red "⚠ Chase" badge appears after 2+ unpaid payment reminders.')
+      helpP('The small green phone button calls a customer; the small blue compass button opens directions to their address. A red "⚠ Chase" badge appears after 2+ unpaid payment reminders. A "💷 Low" badge appears if a customer\'s price is 15%+ below their round\'s average (only once a round has 4+ active customers, so a small round doesn\'t get flagged on too little data).')
     ]
   },
   jobs: {
@@ -160,7 +160,7 @@ const FOCUSED_HELP = {
   quotes: {
     title: 'Quotes',
     body: () => [
-      helpP('Swipe right to accept, left to decline. Accepted quotes convert into a job or customer — if the address matches an existing customer, it links automatically. Quotes left Pending past their follow-up window (7 days by default) are flagged on the Today tab.'),
+      helpP('Swipe right to accept, left to decline. Accepted quotes convert into a job or customer — if the address matches an existing customer, it links automatically. Quotes left Pending past their follow-up window (7 days by default) are flagged on the Today tab. Each follow-up text sent gets a little softer in wording, and automatically pushes the next one further out, so an unanswered quote doesn\'t nag forever on a fixed weekly cycle.'),
       helpP('Start a quote from an existing customer\'s screen with "Get a quote for this customer" to pre-fill their details.')
     ]
   },
@@ -185,7 +185,8 @@ const FOCUSED_HELP = {
       helpRow('One-off jobs', 'Every job, status and value'),
       helpRow('Property types', 'Houses and average price by type'),
       helpRow('Mileage', 'Daily, weekly, monthly, tax-year-to-date'),
-      helpRow('Price review due', '12+ months since last increase')
+      helpRow('Price review due', '12+ months since last increase; plus anyone priced below their round\'s average'),
+      helpRow('Upsell opportunities', 'Fronts-only, conservatory, garage door and gutter add-ons worth offering')
     ]
   },
   backup: {

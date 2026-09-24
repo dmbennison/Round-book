@@ -163,7 +163,9 @@ const TEMPLATE_DEFS = [
   { key: 'cleanedTodayTemplate', label: 'Windows cleaned today', default: DEFAULT_CLEANED_TODAY_TEMPLATE },
   { key: 'receiptTemplate', label: 'Receipt', default: DEFAULT_RECEIPT_TEMPLATE },
   { key: 'quoteTemplate', label: 'Quote (new enquiry)', default: DEFAULT_QUOTE_TEMPLATE },
-  { key: 'repeatQuoteTemplate', label: 'Quote (repeat work)', default: DEFAULT_REPEAT_QUOTE_TEMPLATE }
+  { key: 'repeatQuoteTemplate', label: 'Quote (repeat work)', default: DEFAULT_REPEAT_QUOTE_TEMPLATE },
+  { key: 'quoteFollowUpTemplate', label: 'Quote follow-up (2nd)', default: DEFAULT_QUOTE_FOLLOWUP_TEMPLATE },
+  { key: 'quoteFollowUp2Template', label: 'Quote follow-up (3rd+)', default: DEFAULT_QUOTE_FOLLOWUP2_TEMPLATE }
 ];
 
 function openMessageTemplates(){
@@ -172,7 +174,7 @@ function openMessageTemplates(){
       <h2 style="flex:1; min-width:0;">Message templates</h2>
       <button class="sheet-close" onclick="closeSheet()">✕</button>
     </div>
-    <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 12px; line-height:1.5;">Tap a message to edit its wording. Use <b>{name}</b>, <b>{amount}</b>, <b>{date}</b> (receipts), <b>{work}</b> (quotes), <b>{daysoverdue}</b> (payment reminders), <b>{company}</b>, <b>{yourname}</b>, and <b>{bankdetails}</b> (only appears if you've added bank details under Business details). The payment reminder automatically switches to the "2nd+ chase" wording from the second reminder onwards for that customer or job.</p>
+    <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 12px; line-height:1.5;">Tap a message to edit its wording. Use <b>{name}</b>, <b>{amount}</b>, <b>{date}</b> (receipts), <b>{work}</b> (quotes), <b>{daysoverdue}</b> (payment reminders), <b>{company}</b>, <b>{yourname}</b>, and <b>{bankdetails}</b> (only appears if you've added bank details under Business details). The payment reminder automatically switches to the "2nd+ chase" wording from the second reminder onwards for that customer or job, and quote follow-ups get progressively softer the same way.</p>
     ${TEMPLATE_DEFS.map(def=>{
       const val = (data.settings[def.key] || def.default).replace(/\s+/g,' ').trim();
       return `<button class="backup-btn" onclick="openEditTemplate('${def.key}')">
@@ -782,7 +784,11 @@ function openReports(){
     </button>
     <button class="backup-btn" onclick="printPriceReview()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-      <div><div class="t1">Price review due</div><div class="t2">12+ months since last price increase, by next clean</div></div>
+      <div><div class="t1">Price review due</div><div class="t2">12+ months since last price increase, by next clean; plus anyone priced below their round's average</div></div>
+    </button>
+    <button class="backup-btn" onclick="printUpsellOpportunities()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M17 7h4v4"/></svg>
+      <div><div class="t1">Upsell opportunities</div><div class="t2">Fronts-only, conservatory, garage door and gutter add-ons worth offering</div></div>
     </button>
     <button class="backup-btn" onclick="printPropertyTypesReport()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9.5"/></svg>

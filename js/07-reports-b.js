@@ -428,6 +428,13 @@ function getLastPriceIncreaseDate(c){
   }
   return lastIncrease;
 }
+// Earliest recorded clean — the closest thing this app has to "customer
+// since" (there's no separate signup date field), used by the upsell report
+// below to judge how long someone's actually been on the books.
+function earliestCleanDate(c){
+  const dates = (c.cleanHistory||[]).map(e=>e.date);
+  return dates.length ? [...dates].sort()[0] : null;
+}
 
 function printPriceReview(){
   const flagged = [];
@@ -442,7 +449,26 @@ function printPriceReview(){
   });
   flagged.sort((a,b)=> b.days - a.days);
 
-  if(!flagged.length){
+  // Second table: anyone priced notably below their round's median £-per-house
+  // — same >15% threshold and 4+ active-customer minimum as the "💷 Low" badge
+  // on the customer card (see roundMedianPricePerHouse), so the report and the
+  // badge always agree with each other.
+  const belowMedian = [];
+  data.customers.forEach(c=>{
+    if(c.paused) return;
+    const roundName = c.round || 'Unassigned';
+    const activeInRound = data.customers.filter(x=>!x.paused && (x.round||'Unassigned')===roundName).length;
+    if(activeInRound < 4) return;
+    const median = roundMedianPricePerHouse(roundName);
+    if(median == null || median <= 0) return;
+    const ownPerHouse = Number(c.price||0) / houseWeight(c);
+    if(ownPerHouse >= median * 0.85) return;
+    const gap = (median - ownPerHouse) * houseWeight(c);
+    belowMedian.push({ c, roundName, median, gap });
+  });
+  belowMedian.sort((a,b)=> b.gap - a.gap);
+
+  if(!flagged.length && !belowMedian.length){
     runPrint('Price Review Due', '<div class="rpt-empty-note">Nobody is due a price review right now.</div>', false, false, () => openReports());
     return;
   }
@@ -454,11 +480,85 @@ function printPriceReview(){
     <td>${fmtDate(lastIncrease)}</td>
     <td>${fmtDate(target)}</td>
   </tr>`).join('');
-  const body = `
+  const firstTable = flagged.length ? `
     <table class="rpt-table"><thead><tr><th>Customer</th><th>Round</th><th style="text-align:right;">Current price</th><th>Last increase</th><th>Next clean</th></tr></thead><tbody>${rows}</tbody></table>
     <p style="font-size:11px; color:#66798A; margin-top:12px;">Shows customers where it will have been 12 months or more since their last price increase by their next scheduled clean. Customers with no price history are not included.</p>
-  `;
+  ` : '<div class="rpt-empty-note">Nobody is due a price review right now.</div>';
+
+  const belowMedianRows = belowMedian.map(({c, roundName, median, gap})=>`<tr>
+    <td>${escapeHtml(c.address||'')}${c.name?`<br><span style="color:#66798A">${escapeHtml(c.name)}</span>`:''}${c.accountNumber?`<br><span style="color:#66798A">Acct #${escapeHtml(c.accountNumber)}</span>`:''}</td>
+    <td>${escapeHtml(roundName)}</td>
+    <td style="text-align:right;">${money(c.price)}</td>
+    <td style="text-align:right;">${money(median)}</td>
+    <td style="text-align:right;">${money(gap)}</td>
+  </tr>`).join('');
+  const secondTable = belowMedian.length ? `
+    <div class="rpt-round-title" style="margin-top:22px;">Priced below round average</div>
+    <table class="rpt-table"><thead><tr><th>Customer</th><th>Round</th><th style="text-align:right;">Current price</th><th style="text-align:right;">Round median (per house)</th><th style="text-align:right;">Gap</th></tr></thead><tbody>${belowMedianRows}</tbody></table>
+    <p style="font-size:11px; color:#66798A; margin-top:12px;">Customers priced 15%+ below their round's median price per house. Rounds with fewer than 4 active customers aren't included, since a small round's median isn't meaningful. Gap is house-weighted (see fronts-only pricing) and sorted biggest first.</p>
+  ` : '';
+
+  const body = firstTable + secondTable;
   runPrint('Price Review Due', body, false, false, () => openReports());
+}
+
+function printUpsellOpportunities(){
+  // Flat, easy-to-tweak uplift figures per reason. frontsToBacks is a fraction
+  // of the customer's current price (a full clean scales with house size, so a
+  // flat figure wouldn't make sense there); the rest are one-off flat prices
+  // for a specific add-on job.
+  const UPLIFT = {
+    frontsToBacks: 0.5,
+    conservatoryRoof: 20,
+    garageDoor: 10,
+    gutters: 60
+  };
+  const today = todayISO();
+  // Paused customers are left out — no point suggesting an upsell to someone
+  // who's stopped the service, matching how other reports (e.g. property
+  // types) already treat paused customers as inactive.
+  const opportunities = [];
+  data.customers.forEach(c=>{
+    if(c.paused) return;
+    const firstClean = earliestCleanDate(c);
+    let reason = null, uplift = 0;
+    // Checked in this order, first match wins — each customer gets one
+    // suggestion, not a stack of every add-on they happen to be missing.
+    if(c.frontsOnly && firstClean && daysBetween(firstClean, today) >= 90){
+      reason = 'Fronts-only — backs could add ~50% of price';
+      uplift = Number(c.price||0) * UPLIFT.frontsToBacks;
+    } else if(c.addOnConservatory && !/roof/i.test(c.addOnOther||'')){
+      reason = 'Conservatory roof clean';
+      uplift = UPLIFT.conservatoryRoof;
+    } else if((c.propertyType === 'Detached' || c.propertyType === 'Semi-detached') && !c.addOnGarageDoor){
+      reason = 'Garage door clean';
+      uplift = UPLIFT.garageDoor;
+    } else if(!c.addOnConservatory && !c.addOnExtension && !c.addOnGarageDoor && !c.addOnOther && firstClean && daysBetween(firstClean, today) >= 182){
+      reason = 'Gutter/fascia upsell';
+      uplift = UPLIFT.gutters;
+    }
+    if(reason) opportunities.push({ c, reason, uplift });
+  });
+  opportunities.sort((a,b)=> b.uplift - a.uplift);
+
+  if(!opportunities.length){
+    runPrint('Upsell Opportunities', '<div class="rpt-empty-note">No upsell opportunities spotted right now.</div>', false, false, () => openReports());
+    return;
+  }
+
+  const rows = opportunities.map(({c, reason, uplift})=>`<tr>
+    <td>${escapeHtml(c.address||'')}${c.name?`<br><span style="color:#66798A">${escapeHtml(c.name)}</span>`:''}${c.accountNumber?`<br><span style="color:#66798A">Acct #${escapeHtml(c.accountNumber)}</span>`:''}</td>
+    <td>${escapeHtml(c.round||'Unassigned')}</td>
+    <td>${escapeHtml(reason)}</td>
+    <td style="text-align:right;">${money(uplift)}</td>
+  </tr>`).join('');
+  const totalUplift = opportunities.reduce((sum,o)=>sum+o.uplift, 0);
+  const body = `
+    <table class="rpt-table"><thead><tr><th>Customer</th><th>Round</th><th>Reason</th><th style="text-align:right;">Suggested uplift</th></tr></thead><tbody>${rows}</tbody></table>
+    <div class="rpt-total" style="border-top:2px solid #10344C; padding-top:10px; margin-top:12px; font-size:16px;">Total potential uplift: ${money(totalUplift)}</div>
+    <p style="font-size:11px; color:#66798A; margin-top:12px;">Each customer shows one suggestion only — the first that applies, checked in order: fronts-only long enough that backs are worth offering, a conservatory with no roof clean mentioned, a detached/semi-detached house with no garage door clean, then anyone with no add-ons at all who's been a customer 6+ months. Uplift figures are flat estimates, not quotes — adjust to the job.</p>
+  `;
+  runPrint('Upsell Opportunities', body, false, false, () => openReports());
 }
 
 function printPropertyTypesReport(){

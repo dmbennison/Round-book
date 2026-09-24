@@ -217,7 +217,11 @@ function quoteNeedsFollowUp(q, today){
   today = today || todayISO();
   if(!q || q.status !== 'pending' || !q.date) return false;
   const followUpDays = q.followUpDays != null ? q.followUpDays : 7;
-  return daysBetween(q.date, today) >= followUpDays;
+  // Each chase already sent (quoteFollowUpCount, bumped by sendQuoteText) widens
+  // the window before the next one's due — so a quote just followed up on
+  // doesn't immediately show as needing another one the very next day.
+  const dueAfter = followUpDays * (1 + (q.quoteFollowUpCount||0));
+  return daysBetween(q.date, today) >= dueAfter;
 }
 function quotesNeedingFollowUp(){
   const today = todayISO();
@@ -834,6 +838,19 @@ const PROPERTY_TYPE_ABBR = {'Detached':'Det', 'Semi-detached':'Semi', 'Terraced'
 // otherwise a handful of cheap fronts-only jobs would drag the average down
 // as if they were full cleans.
 function houseWeight(c){ return c.frontsOnly ? 0.5 : 1; }
+// Median £-per-house across a round's active (non-paused) customers — a
+// house-weighted figure (via houseWeight) so fronts-only customers don't skew
+// it the way a flat per-customer average would. Used to flag anyone priced
+// well below what the rest of the round is actually getting.
+function roundMedianPricePerHouse(roundName){
+  const values = data.customers
+    .filter(c=>!c.paused && (c.round||'Unassigned')===roundName)
+    .map(c=> Number(c.price||0) / houseWeight(c))
+    .sort((a,b)=>a-b);
+  if(!values.length) return null;
+  const mid = Math.floor(values.length/2);
+  return values.length % 2 ? values[mid] : (values[mid-1]+values[mid])/2;
+}
 function formatHouseCount(w){ return Number.isInteger(w) ? String(w) : w.toFixed(1); }
 function propertyTypeAvgSummaryHtml(list){
   if(!list || !list.length) return '';
@@ -1227,6 +1244,13 @@ function custCardHtml(c){
   const s = custStatus(c);
   const roundCustomers = data.customers.filter(x=>(x.round||'Unassigned')===(c.round||'Unassigned'));
   const showDayBadge = roundDaysUsed(roundCustomers).length > 1;
+  // Only flag once a round has enough customers (4+) for "the round's median"
+  // to actually mean something — on a tiny round, one or two prices decide the
+  // whole median and the badge would just be noise.
+  const activeInRound = roundCustomers.filter(x=>!x.paused).length;
+  const roundMedian = activeInRound >= 4 ? roundMedianPricePerHouse(c.round||'Unassigned') : null;
+  const ownPerHouse = Number(c.price||0) / houseWeight(c);
+  const belowRoundMedian = roundMedian != null && roundMedian > 0 && ownPerHouse < roundMedian * 0.85;
   return `<div class="swipe-wrap">
     <div class="swipe-bg swipe-bg-left">✓ Cleaned</div>
     <div class="swipe-bg swipe-bg-right">💷 Paid</div>
@@ -1251,6 +1275,7 @@ function custCardHtml(c){
         ${(s.owed && c.paymentReminderSent) ? `<span class="badge paused">🔔 ${fmtDate(c.paymentReminderSentDate).split(' ').slice(0,2).join(' ')}</span>` : ''}
         ${(c.photos && c.photos.length) ? `<span class="badge paused">📷 ${c.photos.length}</span>` : ''}
         ${needsPriceReview(c) ? `<span class="badge due" title="12+ months since last price increase">📈 Review</span>` : ''}
+        ${belowRoundMedian ? `<span class="badge due" title="Below this round's average">💷 Low</span>` : ''}
         ${c.propertyType ? `<span class="badge paused" title="${escapeAttr(propertySummaryText(c))}">🏠 ${escapeHtml(PROPERTY_TYPE_ABBR[c.propertyType]||c.propertyType)}${c.frontsOnly?' · Fronts':''}</span>` : (c.frontsOnly ? `<span class="badge paused">Fronts only</span>` : '')}
         ${c.textBeforeVisit ? `<span class="badge anniversary" title="Text before you arrive">📱 Text first</span>` : ''}
         ${showDayBadge ? `<span class="badge anniversary">Day ${c.visitDay||1}</span>` : ''}

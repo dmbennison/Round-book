@@ -486,6 +486,16 @@ function payTemplateFor(reminderCount){
     ? (data.settings.payFollowUpTemplate || DEFAULT_PAY_FOLLOWUP_TEMPLATE)
     : (data.settings.payTemplate || DEFAULT_PAY_TEMPLATE);
 }
+// Quote follow-ups get softer each time rather than pushier: the 1st send uses
+// the normal quote wording, the 2nd switches to a light "just checking you saw
+// it" nudge, and the 3rd+ backs off further to a no-pressure closing message —
+// same escalating-by-count pattern as payTemplateFor above, just the reverse
+// tone (chasing an unpaid bill vs. chasing a sale calls for different energy).
+function quoteTemplateFor(count){
+  if((count||0) >= 2) return data.settings.quoteFollowUp2Template || DEFAULT_QUOTE_FOLLOWUP2_TEMPLATE;
+  if((count||0) >= 1) return data.settings.quoteFollowUpTemplate || DEFAULT_QUOTE_FOLLOWUP_TEMPLATE;
+  return null; // caller falls back to the base quote/repeat-quote template
+}
 function applyTemplate(tpl, tokens){
   return (tpl||'')
     .replace(/\{name\}/g, tokens.name || 'there')
@@ -820,12 +830,20 @@ function sendQuoteText(id){
   const firstName = q.name ? q.name.trim().split(' ')[0] : '';
   const company = data.settings.companyName || '';
   const yourname = data.settings.yourName || '';
-  const tpl = q.fromJobId ? data.settings.repeatQuoteTemplate : data.settings.quoteTemplate;
+  const tpl = quoteTemplateFor(q.quoteFollowUpCount) || (q.fromJobId ? data.settings.repeatQuoteTemplate : data.settings.quoteTemplate);
   const msg = applyTemplate(tpl, {
     name: firstName, amount: Number(q.price||0), company, date: fmtDate(q.date), yourname, work: q.notes||''
   });
   if(mobile){
-    openMessagePreview('Send quote', q.phone, msg, null, () => openQuoteForm(data.quotes.find(x=>x.id===id)), {item: q, kind: q.fromJobId ? 'repeatQuote' : 'quote'});
+    const afterSend = () => {
+      // Mirrors payTemplateFor/paymentReminderCount: each send escalates the
+      // wording next time, and (via quoteNeedsFollowUp) widens the due window
+      // so a quote just chased doesn't immediately look overdue again tomorrow.
+      q.quoteFollowUpCount = (q.quoteFollowUpCount||0) + 1;
+      saveData();
+      render();
+    };
+    openMessagePreview('Send quote', q.phone, msg, afterSend, () => openQuoteForm(data.quotes.find(x=>x.id===id)), {item: q, kind: q.fromJobId ? 'repeatQuote' : 'quote'});
   } else {
     window.location.href = `mailto:${q.email}?subject=${encodeURIComponent('Your window cleaning quote')}&body=${encodeURIComponent(msg)}`;
   }
