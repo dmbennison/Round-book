@@ -76,6 +76,12 @@
   }
   input, textarea{-webkit-user-select:text; user-select:text;}
   h1,h2,h3{margin:0; font-family:-apple-system, BlinkMacSystemFont, sans-serif; letter-spacing:-0.01em;}
+  /* Every button in this app supplies its own border/background via its class
+     (.btn, .btn-open, .seg-btn, .backup-btn, etc), so the native button chrome
+     iOS/Android draw by default — including a border — needs switching off
+     once here, globally, rather than fighting it class by class. Individual
+     classes below can still opt back into a border if they ever need one. */
+  button{border:none; background:none; font:inherit; color:inherit; -webkit-appearance:none; appearance:none;}
 
   header{
     background:var(--navy);
