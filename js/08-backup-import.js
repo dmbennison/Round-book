@@ -115,7 +115,7 @@ const FOCUSED_HELP = {
     body: () => [
       helpP('Today is the home screen. The top hero card shows what\'s due today, its value, today\'s clean total and paid total, and — if more than one round has anyone due — a row of round chips underneath. Tap a chip to jump straight to that round\'s Due list; the hero then stays scoped to that round (its own due count, and a live "cleaned" count next to it as you work through it) until you pick a different round or a new day starts. Below the hero, five tiles: text before visit, mileage, jobs today, payment reminders, and quotes needing follow-up — in that order, mileage early since it\'s usually the first thing you\'d log. Tap any of them to go straight to the full screen for it.'),
       helpP('Text before visit and quotes needing follow-up show a small "X overdue" / "X well overdue" note underneath the count when there is one, so you can see at a glance if any are genuinely overdue rather than just due today or freshly past their follow-up window.'),
-      helpP('The Today\'s Mileage tile logs a start-of-day reading on first tap and an end-of-day reading on the next tap — both readings and the day\'s total stay visible on the tile once logged. Tap again to view, edit, or clear it. See it broken down by day/week/month/tax-year-to-date in Reports.')
+      helpP('The Mileage tile logs a start-of-day reading on first tap and an end-of-day reading on the next tap — both readings stay visible on the tile once logged, and the day\'s total appears once both are in. Tap again to view, edit, or clear it. See it broken down by day/week/month/tax-year-to-date in Reports.')
     ]
   },
   work: {
@@ -129,12 +129,12 @@ const FOCUSED_HELP = {
     body: () => [
       helpP('Open Rounds from the Work tab. Use the Rounds / Due / Text first / Owed switch at the top, or open a single round to see its customers. Swipe a card halfway right to mark cleaned, all the way right to mark cleaned AND paid in one go, or left to mark paid alone — the background colour shows which action you\'re about to trigger as you drag. Every swipe action can be undone for a few seconds afterwards via the Undo button on the confirmation. Use Reorder to set your walking order.'),
       helpP('A round card shows its customer count and value as price/owed, with paused customers left out of both.'),
-      helpP('A round\'s ⋯ menu has: Show map (numbered stops with a route line), Start round (directions for every stop), Print, and Defer the whole round 4 weeks.'),
+      helpP('A round\'s ⋯ menu has: Show map (numbered stops with a route line), Start round (directions for every stop), Print, Defer the whole round 4 weeks, Set whole round due date (pick an exact date for everyone at once), and Apply price uplift (a % or flat £ increase for every active customer in the round).'),
       helpP('Suggest a route order is inside Reorder — it works out a shorter visiting order using real road distances where possible, and shows it to you before changing anything (nothing\'s applied unless you tap "Use this order"). Both this and Show map re-check every address\'s location each time, unless it\'s been manually corrected (see below).'),
       helpP('On the map, every address gets a pin — one that couldn\'t be found automatically shows as a grey dashed pin near the others. Drag any pin to fix its spot; dragging locks it there, so it\'s never fetched again and won\'t be moved by a later map or route request.'),
       helpP('The photo icon on the Rounds screen opens the photo gallery.'),
       helpP('The Owed view (and "Remind all") sorts by how long a balance has actually been outstanding, not just its size, so the most overdue customer comes first. The payment reminder wording automatically gets firmer from the second reminder onward — edit both versions under Settings > Message templates.'),
-      helpP('The small green phone button calls a customer; the small blue compass button opens directions to their address. A red "⚠ Chase" badge appears after 2+ unpaid payment reminders. A "💷 Low" badge appears if a customer\'s price is 15%+ below their round\'s average (only once a round has 4+ active customers, so a small round doesn\'t get flagged on too little data).')
+      helpP('The small green phone button calls a customer; the small blue compass button opens directions to their address. A red "⚠ Chase" badge appears after 2+ unpaid payment reminders. A "💷 Low" badge appears if a customer\'s price is 15%+ below the average for their property type — their own round\'s average for that type once there are 4+ of them, otherwise the overall average for that type across every round.')
     ]
   },
   jobs: {
@@ -154,7 +154,8 @@ const FOCUSED_HELP = {
       helpP('"Add a clean" and "Add a payment" open a quick pop-up for the date and amount. Tapping a history entry opens Edit, Remove, and (for payments) Send receipt.'),
       helpP('Every text (reminders, receipts, quotes) opens a preview you can edit first, and only offers to send to a mobile number. "Messages" under History lists everything actually sent.'),
       helpP('Tick "Text before I arrive" to flag a customer who needs a heads-up text. Tick "Don\'t send marketing texts" to opt them out of every campaign — this doesn\'t affect calls, quotes, or normal reminders.'),
-      helpP('Property type, add-ons, and "fronts only" can be recorded here too — fronts-only counts as half a house in average-price figures.')
+      helpP('Property type, add-ons, and "fronts only" can be recorded here too — fronts-only counts as half a house in average-price figures.'),
+      helpP('An active customer\'s due date can be pushed +4 weeks or set to an exact date, any time — not just once already deferred. "Apply price uplift" increases their price by a % or a flat £ amount in one step, recorded in their price history.')
     ]
   },
   quotes: {
@@ -185,8 +186,8 @@ const FOCUSED_HELP = {
       helpRow('One-off jobs', 'Every job, status and value'),
       helpRow('Property types', 'Houses and average price by type'),
       helpRow('Mileage', 'Daily, weekly, monthly, tax-year-to-date'),
-      helpRow('Price review due', '12+ months since last increase; plus anyone priced below their round\'s average'),
-      helpRow('Upsell opportunities', 'Fronts-only, conservatory, garage door and gutter add-ons worth offering')
+      helpRow('Price review due', '12+ months since last increase; plus anyone priced below their property type\'s average'),
+      helpRow('Upsell opportunities', 'Fronts-only, conservatory, garage door and gutter add-ons worth offering — print it, or use "Text upsell opportunities" above it to pick a marketing campaign and send straight to that list')
     ]
   },
   backup: {

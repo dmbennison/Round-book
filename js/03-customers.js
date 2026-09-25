@@ -425,14 +425,18 @@ function openCustomerDetail(id){
           (s.cleanBadge && s.cleanBadge.type === 'deferred') ? `
         <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin:0 2px 6px;">
           <span style="font-size:0.75rem; color:var(--ink-muted);">⏭ Deferred to ${fmtDate(c.deferUntil)}</span>
-          <button onclick="editDeferDate('${id}')" style="font-size:0.75rem; font-weight:700; color:var(--blue); background:none; border:none; padding:0;">Edit date</button>
+          <button onclick="cancelDefer('${id}')" style="font-size:0.75rem; font-weight:700; color:var(--ink-muted); background:none; border:none; padding:0;">Cancel defer</button>
         </div>
         <div class="row2" style="margin-bottom:10px;">
           <button class="btn" style="background:var(--blue-dim); color:var(--blue-deep);" onclick="deferCustomerDue('${id}')">+4 more weeks</button>
-          <button class="btn" style="background:var(--line); color:var(--ink-muted);" onclick="cancelDefer('${id}')">Cancel defer</button>
+          <button class="btn" style="background:var(--blue-dim); color:var(--blue-deep);" onclick="editDeferDate('${id}')">📅 Set date</button>
         </div>` : `
-        <button class="btn" style="width:100%; background:var(--blue-dim); color:var(--blue-deep); margin-bottom:10px;" onclick="deferCustomerDue('${id}')">⏭ Defer due date 4 weeks</button>`
+        <div class="row2" style="margin-bottom:10px;">
+          <button class="btn" style="background:var(--blue-dim); color:var(--blue-deep);" onclick="deferCustomerDue('${id}')">⏭ +4 weeks</button>
+          <button class="btn" style="background:var(--blue-dim); color:var(--blue-deep);" onclick="editDeferDate('${id}')">📅 Set due date</button>
+        </div>`
         ) : ''}
+        <button class="btn" style="width:100%; background:var(--green-dim); color:var(--green); margin-bottom:10px;" onclick="openCustomerUpliftSheet('${id}')">📈 Apply price uplift</button>
         <button class="btn" style="width:100%; background:${c.paused?'var(--green-dim)':'var(--line)'}; color:${c.paused?'var(--green)':'var(--ink-muted)'}; margin-bottom:10px;" onclick="${c.paused?`resumeCustomer('${id}')`:`openPauseReasonSheet('${id}')`}">
           ${c.paused ? '▶ Resume this customer' : '⏸ Pause'}
         </button>

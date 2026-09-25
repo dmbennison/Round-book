@@ -784,11 +784,15 @@ function openReports(){
     </button>
     <button class="backup-btn" onclick="printPriceReview()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-      <div><div class="t1">Price review due</div><div class="t2">12+ months since last price increase, by next clean; plus anyone priced below their round's average</div></div>
+      <div><div class="t1">Price review due</div><div class="t2">12+ months since last price increase, by next clean; plus anyone priced below their property type's average</div></div>
     </button>
     <button class="backup-btn" onclick="printUpsellOpportunities()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M17 7h4v4"/></svg>
       <div><div class="t1">Upsell opportunities</div><div class="t2">Fronts-only, conservatory, garage door and gutter add-ons worth offering</div></div>
+    </button>
+    <button class="backup-btn" onclick="closeSheet(); openUpsellCampaignSend()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      <div><div class="t1">Text upsell opportunities</div><div class="t2">Pick a campaign and send it straight to everyone on that list</div></div>
     </button>
     <button class="backup-btn" onclick="printPropertyTypesReport()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9.5"/></svg>

@@ -384,14 +384,15 @@ function cancelDefer(id){
   saveData(); openCustomerDetail(id); render();
   toast('Defer cancelled');
 }
-// Lets the deferred date be fine-tuned to an exact date rather than only ever
-// jumping in fixed 4-week steps.
+// Lets a customer's due date be set to an exact date rather than only ever
+// jumping in fixed 4-week steps — available whether or not they're currently
+// deferred (defaults to their existing deferred date, or the +4-weeks date).
 function editDeferDate(id){
   const c = data.customers.find(x=>x.id===id);
   if(!c) return;
   openSheet(`
     <div class="sheet-head">
-      <h2 style="flex:1; min-width:0;">Edit deferred date</h2>
+      <h2 style="flex:1; min-width:0;">Set due date</h2>
       <button class="sheet-close" onclick="closeSheet()">✕</button>
     </div>
     <label style="margin-top:0;">Due again from</label>
@@ -422,6 +423,125 @@ function nudgeRoundDue(rn){
     closeSheet();
     render();
     toast(`Deferred ${custs.length} customer${custs.length===1?'':'s'} in "${rn}" by 4 weeks`);
+  }});
+}
+// Lets a whole round's due date be set to one exact date in one step, as an
+// alternative to nudging everyone forward a fixed 4 weeks (see nudgeRoundDue).
+function openSetRoundDueDate(rn){
+  const custs = data.customers.filter(c => c.round === rn && !c.paused);
+  if(!custs.length){ toast('No active customers in this round'); return; }
+  openSheet(`
+    <div class="sheet-head">
+      <h2 style="flex:1; min-width:0;">Set due date</h2>
+      <button class="sheet-close" onclick="closeSheet()">✕</button>
+    </div>
+    <label style="margin-top:0;">Due again from</label>
+    <input type="date" id="round_due_date_input" value="${deferredDateFor(custs[0])}">
+    <p style="color:var(--ink-muted); font-size:0.75rem; margin:6px 2px 16px; line-height:1.5;">Applies to all ${custs.length} active customer${custs.length===1?'':'s'} in "${escapeHtml(rn)}".</p>
+    <div class="form-actions">
+      <button class="btn-primary" onclick="saveRoundDueDate('${escapeAttr(rn)}')">Save</button>
+    </div>
+  `, () => openRoundActionsMenu(rn));
+}
+function saveRoundDueDate(rn){
+  const v = document.getElementById('round_due_date_input').value;
+  if(!v){ toast('Pick a date'); return; }
+  const custs = data.customers.filter(c => c.round === rn && !c.paused);
+  custs.forEach(c => { c.deferUntil = v; });
+  saveData();
+  closeSheet();
+  render();
+  toast(`Due date set to ${fmtDate(v)} for ${custs.length} customer${custs.length===1?'':'s'} in "${rn}"`);
+}
+
+/* ---------- Price uplift ----------
+   Applies a price increase — a percentage or a flat £ amount — to one
+   customer or a whole round in one go, recorded through the normal
+   priceHistory mechanism so it shows in price history and clears the
+   "📈 Review" flag, same as editing a price by hand would. */
+function roundToNearestHalf(n){ return Math.round(n*2)/2; }
+function upliftedPrice(price, type, raw){
+  return roundToNearestHalf(type==='percent' ? Number(price||0) * (1 + raw/100) : Number(price||0) + raw);
+}
+function openCustomerUpliftSheet(id){
+  const c = data.customers.find(x=>x.id===id);
+  if(!c) return;
+  openSheet(`
+    <div class="sheet-head">
+      <h2 style="flex:1; min-width:0;">Price uplift</h2>
+      <button class="sheet-close" onclick="closeSheet()">✕</button>
+    </div>
+    <p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 14px;">Current price: ${money(c.price)}</p>
+    <label style="margin-top:0;">Uplift type</label>
+    <select id="uplift_type">
+      <option value="percent">Percentage increase</option>
+      <option value="amount">Flat £ amount increase</option>
+    </select>
+    <label>Value</label>
+    <input type="number" id="uplift_value" inputmode="decimal" step="0.5" min="0" placeholder="e.g. 5">
+    <p style="color:var(--ink-muted); font-size:0.75rem; margin:6px 2px 0; line-height:1.5;">Rounded to the nearest 50p, recorded in this customer's price history.</p>
+    <div class="form-actions">
+      <button class="btn-primary" onclick="applyCustomerUplift('${id}')">Apply uplift</button>
+    </div>
+  `, () => openCustomerDetail(id));
+}
+function applyCustomerUplift(id){
+  const c = data.customers.find(x=>x.id===id);
+  if(!c) return;
+  const type = document.getElementById('uplift_type').value;
+  const raw = parseFloat(document.getElementById('uplift_value').value);
+  if(!raw || raw <= 0){ toast('Enter a value above 0'); return; }
+  const newPrice = upliftedPrice(c.price, type, raw);
+  if(newPrice !== c.price){
+    c.price = newPrice;
+    c.priceHistory = c.priceHistory || [];
+    c.priceHistory.push({date: todayISO(), price: newPrice});
+    saveData();
+  }
+  closeSheet();
+  openCustomerDetail(id);
+  render();
+  toast(`Price updated to ${money(newPrice)}`);
+}
+function openRoundUpliftSheet(rn){
+  const custs = data.customers.filter(c => c.round === rn && !c.paused);
+  if(!custs.length){ toast('No active customers in this round'); return; }
+  openSheet(`
+    <div class="sheet-head">
+      <h2 style="flex:1; min-width:0;">Price uplift</h2>
+      <button class="sheet-close" onclick="closeSheet()">✕</button>
+    </div>
+    <label style="margin-top:0;">Uplift type</label>
+    <select id="uplift_type">
+      <option value="percent">Percentage increase</option>
+      <option value="amount">Flat £ amount increase</option>
+    </select>
+    <label>Value</label>
+    <input type="number" id="uplift_value" inputmode="decimal" step="0.5" min="0" placeholder="e.g. 5">
+    <p style="color:var(--ink-muted); font-size:0.75rem; margin:6px 2px 0; line-height:1.5;">Applies to all ${custs.length} active customer${custs.length===1?'':'s'} in "${escapeHtml(rn)}", rounded to the nearest 50p and recorded in each customer's own price history.</p>
+    <div class="form-actions">
+      <button class="btn-primary" onclick="applyRoundUplift('${escapeAttr(rn)}')">Apply uplift</button>
+    </div>
+  `, () => openRoundActionsMenu(rn));
+}
+function applyRoundUplift(rn){
+  const type = document.getElementById('uplift_type').value;
+  const raw = parseFloat(document.getElementById('uplift_value').value);
+  if(!raw || raw <= 0){ toast('Enter a value above 0'); return; }
+  const custs = data.customers.filter(c => c.round === rn && !c.paused);
+  appConfirm(`Apply a ${type==='percent'?raw+'% increase':'£'+raw.toFixed(2)+' increase'} to all ${custs.length} active customer${custs.length===1?'':'s'} in "${rn}"?`, {title:'Apply price uplift', confirmLabel:'Apply', danger:false, onConfirm: () => {
+    custs.forEach(c=>{
+      const newPrice = upliftedPrice(c.price, type, raw);
+      if(newPrice !== c.price){
+        c.price = newPrice;
+        c.priceHistory = c.priceHistory || [];
+        c.priceHistory.push({date: todayISO(), price: newPrice});
+      }
+    });
+    saveData();
+    closeSheet();
+    render();
+    toast(`Price uplift applied to ${custs.length} customer${custs.length===1?'':'s'} in "${rn}"`);
   }});
 }
 
@@ -1241,6 +1361,71 @@ function sendMarketingText(id){
   c.marketingFollowUpDate = '';
   c.marketingCampaign = activeCampaign ? activeCampaign.id : '';
   saveData();
+}
+
+/* ---------- Text upsell opportunities ----------
+   Lets a marketing campaign be picked and sent straight to everyone the
+   Upsell opportunities report (see upsellOpportunitiesList) has flagged —
+   same one-tap-per-customer send flow as Send group text, but scoped to
+   that specific list instead of a round/property-type filter. */
+let upsellSelectedCampaignId = null;
+function openUpsellCampaignSend(){
+  const campaigns = (data.settings.marketingCampaigns && data.settings.marketingCampaigns.length) ? data.settings.marketingCampaigns : DEFAULT_MARKETING_CAMPAIGNS;
+  if(!upsellSelectedCampaignId || !campaigns.some(c=>c.id===upsellSelectedCampaignId)){
+    upsellSelectedCampaignId = campaigns[0].id;
+  }
+  const activeCampaign = campaigns.find(c=>c.id===upsellSelectedCampaignId);
+  const opportunities = upsellOpportunitiesList().filter(o=>isMobileNumber(o.c.phone) && !o.c.marketingOptOut);
+  const tpl = document.getElementById('upsell_msg') ? document.getElementById('upsell_msg').value : (activeCampaign ? activeCampaign.body : DEFAULT_MARKETING_TEMPLATE);
+
+  openSheet(`
+    <div class="sheet-head">
+      <h2 style="flex:1; min-width:0;">Text upsell opportunities</h2>
+      <button class="sheet-close" onclick="closeSheet()">✕</button>
+    </div>
+    <label style="margin-top:0;">Campaign</label>
+    <select id="upsell_campaign_id" onchange="selectUpsellCampaign(this.value)" style="margin-bottom:16px;">
+      ${campaigns.map(c=>`<option value="${c.id}" ${c.id===upsellSelectedCampaignId?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}
+    </select>
+    <label style="margin-top:0;">Message <span style="text-transform:none; font-weight:500; opacity:0.7;">({name}, {company}, {yourname})</span></label>
+    <textarea id="upsell_msg" rows="4">${escapeHtml(tpl)}</textarea>
+    <p style="color:var(--ink-muted); font-size:0.7812rem; margin:10px 2px 14px; line-height:1.5;">
+      Tap Send for each customer — it opens ${data.settings.messagingApp==='whatsapp'?'WhatsApp':'Messages'} pre-filled and ready to go. Come back here for the next one.
+    </p>
+    <div style="color:var(--ink-muted); font-size:0.75rem; font-weight:700; margin:0 2px 8px;">${opportunities.length} customer${opportunities.length===1?'':'s'} with an upsell opportunity and a mobile number</div>
+    ${opportunities.length ? opportunities.map(({c, reason, uplift})=>`
+      <div class="cust-card" id="bulkrow-${c.id}" style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+        <div style="min-width:0;">
+          <div class="cust-addr" style="font-weight:800; font-size:0.9062rem;">${escapeHtml(c.address||c.name||'Customer')}</div>
+          <div style="font-size:0.75rem; color:var(--ink-muted); margin-top:2px;">${escapeHtml(reason)} · ${money(uplift)}</div>
+        </div>
+        <button class="btn btn-clean" style="flex:0 0 auto; padding:9px 16px;" onclick="sendUpsellCampaignText('${c.id}')">Send</button>
+      </div>`).join('') : `<p style="color:var(--ink-muted); font-size:0.8438rem; margin:0 2px;">Nobody with an upsell opportunity has a usable mobile number right now.</p>`}
+  `, () => openReports());
+}
+function selectUpsellCampaign(id){ upsellSelectedCampaignId = id; openUpsellCampaignSend(); }
+function sendUpsellCampaignText(id){
+  const c = data.customers.find(x=>x.id===id);
+  if(!c || !isMobileNumber(c.phone)){ toast('No mobile number saved for this customer'); return; }
+  if(c.marketingOptOut){ toast("This customer has opted out of marketing texts"); return; }
+  const campaigns = (data.settings.marketingCampaigns && data.settings.marketingCampaigns.length) ? data.settings.marketingCampaigns : DEFAULT_MARKETING_CAMPAIGNS;
+  const activeCampaign = campaigns.find(c=>c.id===upsellSelectedCampaignId) || campaigns[0];
+  const msgField = document.getElementById('upsell_msg');
+  const tpl = msgField ? msgField.value : (activeCampaign ? activeCampaign.body : DEFAULT_MARKETING_TEMPLATE);
+  const firstName = c.name ? c.name.trim().split(' ')[0] : '';
+  const company = data.settings.companyName || '';
+  const yourname = data.settings.yourName || '';
+  const msg = applyTemplate(tpl, {name: firstName, company, yourname});
+  sendPhoneMessage(c.phone, msg);
+  logMessage(c, 'marketing', activeCampaign ? {campaign: activeCampaign.id} : null);
+  c.marketingStatus = 'awaiting';
+  c.marketingNextAction = 'none';
+  c.marketingActionDone = false;
+  c.marketingFollowUpDate = '';
+  c.marketingCampaign = activeCampaign ? activeCampaign.id : '';
+  saveData();
+  toast(`Sent to ${c.name || c.address || 'customer'}`);
+  openUpsellCampaignSend();
 }
 
 function openAddCleanForm(id){

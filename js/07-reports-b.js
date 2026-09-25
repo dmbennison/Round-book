@@ -449,26 +449,22 @@ function printPriceReview(){
   });
   flagged.sort((a,b)=> b.days - a.days);
 
-  // Second table: anyone priced notably below their round's median £-per-house
-  // — same >15% threshold and 4+ active-customer minimum as the "💷 Low" badge
-  // on the customer card (see roundMedianPricePerHouse), so the report and the
-  // badge always agree with each other.
-  const belowMedian = [];
+  // Second table: anyone priced notably below the average for their own
+  // property type — same >15% threshold as the "💷 Low" badge on the customer
+  // card (see priceReviewBenchmark), so the report and the badge always agree.
+  const belowAvg = [];
   data.customers.forEach(c=>{
     if(c.paused) return;
-    const roundName = c.round || 'Unassigned';
-    const activeInRound = data.customers.filter(x=>!x.paused && (x.round||'Unassigned')===roundName).length;
-    if(activeInRound < 4) return;
-    const median = roundMedianPricePerHouse(roundName);
-    if(median == null || median <= 0) return;
+    const benchmark = priceReviewBenchmark(c);
+    if(benchmark == null || benchmark <= 0) return;
     const ownPerHouse = Number(c.price||0) / houseWeight(c);
-    if(ownPerHouse >= median * 0.85) return;
-    const gap = (median - ownPerHouse) * houseWeight(c);
-    belowMedian.push({ c, roundName, median, gap });
+    if(ownPerHouse >= benchmark * 0.85) return;
+    const gap = (benchmark - ownPerHouse) * houseWeight(c);
+    belowAvg.push({ c, roundName: c.round || 'Unassigned', cat: c.propertyType || 'Not recorded', benchmark, gap });
   });
-  belowMedian.sort((a,b)=> b.gap - a.gap);
+  belowAvg.sort((a,b)=> b.gap - a.gap);
 
-  if(!flagged.length && !belowMedian.length){
+  if(!flagged.length && !belowAvg.length){
     runPrint('Price Review Due', '<div class="rpt-empty-note">Nobody is due a price review right now.</div>', false, false, () => openReports());
     return;
   }
@@ -485,38 +481,41 @@ function printPriceReview(){
     <p style="font-size:11px; color:#66798A; margin-top:12px;">Shows customers where it will have been 12 months or more since their last price increase by their next scheduled clean. Customers with no price history are not included.</p>
   ` : '<div class="rpt-empty-note">Nobody is due a price review right now.</div>';
 
-  const belowMedianRows = belowMedian.map(({c, roundName, median, gap})=>`<tr>
+  const belowAvgRows = belowAvg.map(({c, roundName, cat, benchmark, gap})=>`<tr>
     <td>${escapeHtml(c.address||'')}${c.name?`<br><span style="color:#66798A">${escapeHtml(c.name)}</span>`:''}${c.accountNumber?`<br><span style="color:#66798A">Acct #${escapeHtml(c.accountNumber)}</span>`:''}</td>
     <td>${escapeHtml(roundName)}</td>
+    <td>${escapeHtml(cat)}</td>
     <td style="text-align:right;">${money(c.price)}</td>
-    <td style="text-align:right;">${money(median)}</td>
+    <td style="text-align:right;">${money(benchmark)}</td>
     <td style="text-align:right;">${money(gap)}</td>
   </tr>`).join('');
-  const secondTable = belowMedian.length ? `
-    <div class="rpt-round-title" style="margin-top:22px;">Priced below round average</div>
-    <table class="rpt-table"><thead><tr><th>Customer</th><th>Round</th><th style="text-align:right;">Current price</th><th style="text-align:right;">Round median (per house)</th><th style="text-align:right;">Gap</th></tr></thead><tbody>${belowMedianRows}</tbody></table>
-    <p style="font-size:11px; color:#66798A; margin-top:12px;">Customers priced 15%+ below their round's median price per house. Rounds with fewer than 4 active customers aren't included, since a small round's median isn't meaningful. Gap is house-weighted (see fronts-only pricing) and sorted biggest first.</p>
+  const secondTable = belowAvg.length ? `
+    <div class="rpt-round-title" style="margin-top:22px;">Priced below property type average</div>
+    <table class="rpt-table"><thead><tr><th>Customer</th><th>Round</th><th>Property type</th><th style="text-align:right;">Current price</th><th style="text-align:right;">Type average (per house)</th><th style="text-align:right;">Gap</th></tr></thead><tbody>${belowAvgRows}</tbody></table>
+    <p style="font-size:11px; color:#66798A; margin-top:12px;">Customers priced 15%+ below the average price per house for their own property type — their own round's average for that type where there are 4+ of them, otherwise the overall average for that type. Gap is house-weighted (see fronts-only pricing) and sorted biggest first.</p>
   ` : '';
 
   const body = firstTable + secondTable;
   runPrint('Price Review Due', body, false, false, () => openReports());
 }
 
-function printUpsellOpportunities(){
-  // Flat, easy-to-tweak uplift figures per reason. frontsToBacks is a fraction
-  // of the customer's current price (a full clean scales with house size, so a
-  // flat figure wouldn't make sense there); the rest are one-off flat prices
-  // for a specific add-on job.
-  const UPLIFT = {
-    frontsToBacks: 0.5,
-    conservatoryRoof: 20,
-    garageDoor: 10,
-    gutters: 60
-  };
+// Flat, easy-to-tweak uplift figures per reason. frontsToBacks is a fraction
+// of the customer's current price (a full clean scales with house size, so a
+// flat figure wouldn't make sense there); the rest are one-off flat prices
+// for a specific add-on job.
+const UPSELL_UPLIFT = {
+  frontsToBacks: 0.5,
+  conservatoryRoof: 20,
+  garageDoor: 10,
+  gutters: 60
+};
+// Shared upsell-opportunity detection, used by both the printed report and
+// the "Text upsell opportunities" campaign send screen, so the two always
+// agree on exactly who qualifies and why. Paused customers are left out —
+// no point suggesting an upsell to someone who's stopped the service,
+// matching how other reports (e.g. property types) treat them as inactive.
+function upsellOpportunitiesList(){
   const today = todayISO();
-  // Paused customers are left out — no point suggesting an upsell to someone
-  // who's stopped the service, matching how other reports (e.g. property
-  // types) already treat paused customers as inactive.
   const opportunities = [];
   data.customers.forEach(c=>{
     if(c.paused) return;
@@ -526,20 +525,24 @@ function printUpsellOpportunities(){
     // suggestion, not a stack of every add-on they happen to be missing.
     if(c.frontsOnly && firstClean && daysBetween(firstClean, today) >= 90){
       reason = 'Fronts-only — backs could add ~50% of price';
-      uplift = Number(c.price||0) * UPLIFT.frontsToBacks;
+      uplift = Number(c.price||0) * UPSELL_UPLIFT.frontsToBacks;
     } else if(c.addOnConservatory && !/roof/i.test(c.addOnOther||'')){
       reason = 'Conservatory roof clean';
-      uplift = UPLIFT.conservatoryRoof;
+      uplift = UPSELL_UPLIFT.conservatoryRoof;
     } else if((c.propertyType === 'Detached' || c.propertyType === 'Semi-detached') && !c.addOnGarageDoor){
       reason = 'Garage door clean';
-      uplift = UPLIFT.garageDoor;
+      uplift = UPSELL_UPLIFT.garageDoor;
     } else if(!c.addOnConservatory && !c.addOnExtension && !c.addOnGarageDoor && !c.addOnOther && firstClean && daysBetween(firstClean, today) >= 182){
       reason = 'Gutter/fascia upsell';
-      uplift = UPLIFT.gutters;
+      uplift = UPSELL_UPLIFT.gutters;
     }
     if(reason) opportunities.push({ c, reason, uplift });
   });
   opportunities.sort((a,b)=> b.uplift - a.uplift);
+  return opportunities;
+}
+function printUpsellOpportunities(){
+  const opportunities = upsellOpportunitiesList();
 
   if(!opportunities.length){
     runPrint('Upsell Opportunities', '<div class="rpt-empty-note">No upsell opportunities spotted right now.</div>', false, false, () => openReports());
