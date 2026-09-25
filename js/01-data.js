@@ -3,7 +3,7 @@
 
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-const APP_VERSION = 99;
+const APP_VERSION = 100;
 function formatVersion(v){ return '1.' + v; }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
@@ -12,6 +12,7 @@ function formatVersion(v){ return '1.' + v; }
 // the most recent 10 entries (oldest ones can be left in the array or trimmed,
 // either is fine, since the display always slices to 10).
 const VERSION_HISTORY = [
+  {version: 100, changes: ['Fixed buttons like Show map, Reorder, and the ⋮ menu showing a stray box/border around them (a side effect of last update\'s border cleanup)', 'The Today hero now lists which rounds have anyone due — tap one to jump straight to that round\'s Due list, and the hero stays focused on that round (its own due count, plus a live cleaned-today count) until you pick another round or a new day starts', 'Added a Paid total under the Clean total on the Today hero', 'Today\'s Mileage tile: Start and Finish now sit side by side, and the total is aligned higher on the tile']},
   {version: 99, changes: ['Softened the outline icons on buttons like Show map and Reorder — no longer stark white in dark mode', 'Redesigned the Today\'s Mileage tile to always show the title with small Start/Finish readings underneath and the day\'s total on the right, instead of switching between a car icon and a number']},
   {version: 98, changes: ['Customer cards now flag a "💷 Low" badge if their price is 15%+ below their round\'s average (rounds need 4+ active customers before this shows), and the Price review report has a second table listing everyone below their round\'s average, biggest gap first', 'Quote follow-up texts now get progressively softer wording each time (checking in, then no pressure) and automatically become due again sooner after each chase, rather than staying on a fixed weekly reminder forever', 'Added an Upsell opportunities report — fronts-only customers who could add backs, conservatories with no roof clean, detached/semi-detached houses with no garage door clean, and long-standing customers with no add-ons at all']},
   {version: 97, changes: ['Added an Auto option alongside Light and Dark under Settings > Appearance, which follows your phone\'s system setting automatically', 'Removed the black/white outline from buttons, Today tiles, stat boxes, and the round-view switcher — they now use a themed background instead, so they stay visible (especially in dark mode) without a hard border, and follow your chosen colour scheme']},
@@ -686,6 +687,13 @@ function roundValueOwedHtml(value, owed){
 /* ---------- state ---------- */
 let currentTab = 'today';
 let currentRound = null;
+// Which round the Today tab is currently tracking, chosen by tapping one of
+// the "due today" round chips on the hero — stays put across re-renders (even
+// after the round's own due count drops to 0 as it gets worked) until either
+// a different round is tapped or the date rolls over, at which point
+// renderTodayHome() clears it back to the all-rounds view for the new day.
+let todaySelectedRound = null;
+let todaySelectedRoundDate = null;
 
 let roundsViewMode = 'overview';
 let reorderMode = false;

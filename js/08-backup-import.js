@@ -113,7 +113,7 @@ const FOCUSED_HELP = {
   today: {
     title: 'Today',
     body: () => [
-      helpP('Today is the home screen. Due today and today\'s value sit at the top, then five tiles: text before visit, mileage, jobs today, payment reminders, and quotes needing follow-up — in that order, mileage early since it\'s usually the first thing you\'d log. Tap any of them to go straight to the full screen for it.'),
+      helpP('Today is the home screen. The top hero card shows what\'s due today, its value, today\'s clean total and paid total, and — if more than one round has anyone due — a row of round chips underneath. Tap a chip to jump straight to that round\'s Due list; the hero then stays scoped to that round (its own due count, and a live "cleaned" count next to it as you work through it) until you pick a different round or a new day starts. Below the hero, five tiles: text before visit, mileage, jobs today, payment reminders, and quotes needing follow-up — in that order, mileage early since it\'s usually the first thing you\'d log. Tap any of them to go straight to the full screen for it.'),
       helpP('Text before visit and quotes needing follow-up show a small "X overdue" / "X well overdue" note underneath the count when there is one, so you can see at a glance if any are genuinely overdue rather than just due today or freshly past their follow-up window.'),
       helpP('The Today\'s Mileage tile logs a start-of-day reading on first tap and an end-of-day reading on the next tap — both readings and the day\'s total stay visible on the tile once logged. Tap again to view, edit, or clear it. See it broken down by day/week/month/tax-year-to-date in Reports.')
     ]

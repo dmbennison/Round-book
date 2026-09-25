@@ -58,21 +58,59 @@ function valueOfWorkDoneToday(){
   });
   return total;
 }
+// Total actually paid in today, across customer payments and paid one-off
+// jobs — job amounts go through jobDiscountedTotal so a discounted job's
+// payment matches what its receipt/invoice actually said, not the full price.
+function valueOfPaymentsReceivedToday(){
+  const today = todayISO();
+  let total = 0;
+  data.customers.forEach(c=>{
+    (c.paymentHistory||[]).forEach(p=>{ if(p.date === today) total += Number(p.amount||0); });
+  });
+  (data.oneOffJobs||[]).forEach(j=>{
+    if(j.paid && j.paidDate === today) total += jobDiscountedTotal(j);
+  });
+  return total;
+}
+// How many of a single round's customers have been cleaned today — the
+// progress figure shown next to the due count once that round is selected on
+// the Today tab.
+function cleanedTodayCountForRound(rn){
+  const today = todayISO();
+  return data.customers.filter(c=>(c.round||'Unassigned')===rn && (c.cleanHistory||[]).some(e=>e.date===today)).length;
+}
 function renderTodayHome(main){
   const today = todayISO();
   const rounds = groupByRound(data.customers);
   const roundNames = Object.keys(rounds).sort((a,b)=>a.localeCompare(b));
 
+  // Reset the round the Today tab is tracking at the start of each new day —
+  // the same in-memory state persists across re-renders within a day, but a
+  // choice made yesterday shouldn't still be scoping today's numbers.
+  if(todaySelectedRoundDate !== today){ todaySelectedRound = null; todaySelectedRoundDate = today; }
+
   let dueCustomers = [];
+  const dueByRound = {};
   roundNames.forEach(rn=>{
     const dueCusts = rounds[rn].filter(c=>{
       const s = custStatus(c);
       return !c.paused && s.cleanBadge && s.cleanBadge.type==='due';
     });
+    if(dueCusts.length) dueByRound[rn] = dueCusts;
     dueCustomers = dueCustomers.concat(dueCusts);
   });
-  const dueValue = dueCustomers.reduce((s,c)=>s+Number(c.price||0),0);
+  // Rounds with anyone due today, busiest first — the list on the hero you
+  // pick a round to work from.
+  const roundsWithDue = Object.keys(dueByRound).sort((a,b)=> dueByRound[b].length - dueByRound[a].length);
+
+  // A selected round keeps showing (at 0 due) once fully cleaned rather than
+  // disappearing from view — dueByRound only lists rounds with 1+ due, so a
+  // fully-worked round just falls back to an empty array here, not a reset.
+  const heroDueCusts = todaySelectedRound ? (dueByRound[todaySelectedRound]||[]) : dueCustomers;
+  const heroDueValue = heroDueCusts.reduce((s,c)=>s+Number(c.price||0),0);
+  const heroCleanedToday = todaySelectedRound ? cleanedTodayCountForRound(todaySelectedRound) : null;
   const doneToday = valueOfWorkDoneToday();
+  const paidToday = valueOfPaymentsReceivedToday();
 
   const textBefore = textBeforeDueList();
   const textBeforeOverdue = textBeforeOverdueCount();
@@ -88,27 +126,41 @@ function renderTodayHome(main){
 
   main.innerHTML = `
     <div class="section-label" style="margin-top:0;">${fmtDate(today)}</div>
-    <div class="today-hero" onclick="setTab('rounds'); setRoundsView('due');" style="display:flex; align-items:flex-start; justify-content:space-between; gap:14px;">
-      <div>
-        <div class="num">${dueCustomers.length}</div>
-        <div class="lbl">Due today</div>
-        <div class="value">${money(dueValue)} value today</div>
+    <div class="today-hero">
+      <div onclick="${todaySelectedRound ? `goToRoundDue('${escapeAttr(todaySelectedRound)}')` : `setTab('rounds'); setRoundsView('due');`}" style="cursor:pointer; display:flex; align-items:flex-start; justify-content:space-between; gap:14px;">
+        <div>
+          <div style="display:flex; align-items:baseline; gap:16px;">
+            <div><div class="num">${heroDueCusts.length}</div><div class="lbl" style="margin-top:2px;">Due</div></div>
+            ${heroCleanedToday!=null ? `<div><div class="num" style="font-size:1.75rem;">${heroCleanedToday}</div><div class="lbl" style="margin-top:2px;">Cleaned</div></div>` : ''}
+          </div>
+          <div class="lbl" style="margin-top:8px; ${todaySelectedRound ? 'color:#fff;' : ''}">${todaySelectedRound ? escapeHtml(todaySelectedRound) : 'Due today'}</div>
+          <div class="value">${money(heroDueValue)} value today</div>
+        </div>
+        <div style="text-align:right; flex-shrink:0;">
+          <div class="num" style="font-size:1.5rem;">${money(doneToday)}</div>
+          <div class="lbl">Clean total</div>
+          <div class="num" style="font-size:1.5rem; margin-top:10px;">${money(paidToday)}</div>
+          <div class="lbl">Paid total</div>
+        </div>
       </div>
-      <div style="text-align:right; flex-shrink:0;">
-        <div class="num" style="font-size:1.5rem;">${money(doneToday)}</div>
-        <div class="lbl">Done today</div>
-      </div>
+      ${roundsWithDue.length ? `
+        <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:16px; padding-top:14px; border-top:1px solid rgba(255,255,255,0.15);">
+          ${roundsWithDue.map(rn=>`<span onclick="event.stopPropagation(); selectTodayRound('${escapeAttr(rn)}')" style="cursor:pointer; padding:6px 12px; border-radius:20px; font-size:0.75rem; font-weight:800; white-space:nowrap; ${rn===todaySelectedRound ? 'background:#fff; color:var(--navy);' : 'background:rgba(255,255,255,0.15); color:#fff;'}">${escapeHtml(rn)} · ${dueByRound[rn].length}</span>`).join('')}
+        </div>
+      ` : ''}
     </div>
     <div class="today-grid">
       <div class="today-tile" onclick="setTab('rounds'); setRoundsView('text');">
         <div class="num">${textBefore.all.length}</div>
         <div class="lbl">Text before visit${textBeforeOverdue ? ` · ${textBeforeOverdue} overdue` : ''}</div>
       </div>
-      <div class="today-tile" onclick="openMileageEntry();" style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+      <div class="today-tile" onclick="openMileageEntry();" style="display:flex; align-items:flex-start; justify-content:space-between; gap:10px;">
         <div style="min-width:0;">
           <div style="font-size:0.8125rem; font-weight:800; color:var(--ink);">Today's Mileage</div>
-          <div style="font-size:0.6875rem; font-weight:700; color:var(--ink-muted); margin-top:5px;">Start - ${mStartText}</div>
-          <div style="font-size:0.6875rem; font-weight:700; color:var(--ink-muted); margin-top:2px;">Finish - ${mFinishText}</div>
+          <div style="display:flex; gap:12px; margin-top:5px;">
+            <div style="font-size:0.6875rem; font-weight:700; color:var(--ink-muted);">Start - ${mStartText}</div>
+            <div style="font-size:0.6875rem; font-weight:700; color:var(--ink-muted);">Finish - ${mFinishText}</div>
+          </div>
         </div>
         <div style="text-align:right; flex-shrink:0;">
           <div class="num" style="font-size:1.5rem;">${mTotalText}</div>
@@ -1061,6 +1113,15 @@ function openRound(rn){ currentRound = rn; reorderMode = false; roundFilterMode 
 // Same as openRound, but opens straight into that round's Due filter — used
 // by the round-name headers on the Rounds > Due overview list.
 function goToRoundDue(rn){ currentRound = rn; reorderMode = false; roundFilterMode = 'due'; roundDayFilter = 'all'; render(); window.scrollTo(0, 0); }
+// Tapping a round chip on the Today hero both jumps straight to that round's
+// Due list (goToRoundDue) and remembers the choice so the Today tab itself
+// stays scoped to that round next time you're back on it — see
+// todaySelectedRound above for how/when that resets.
+function selectTodayRound(rn){
+  todaySelectedRound = rn;
+  todaySelectedRoundDate = todayISO();
+  goToRoundDue(rn);
+}
 function backToRounds(){ currentRound = null; reorderMode = false; roundFilterMode = 'all'; roundDayFilter = 'all'; render(); window.scrollTo(0, 0); }
 function setRoundFilterMode(v){ roundFilterMode = v; render(); }
 
