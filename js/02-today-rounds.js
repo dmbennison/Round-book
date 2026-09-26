@@ -1246,7 +1246,20 @@ function renderRoundsList(main){
 function openRound(rn){ currentRound = rn; reorderMode = false; roundFilterMode = 'all'; roundDayFilter = 'all'; render(); window.scrollTo(0, 0); }
 // Same as openRound, but opens straight into that round's Due filter — used
 // by the round-name headers on the Rounds > Due overview list.
-function goToRoundDue(rn){ currentRound = rn; reorderMode = false; roundFilterMode = 'due'; roundDayFilter = 'all'; render(); window.scrollTo(0, 0); }
+// Jumps straight to a round's Due list — called both from inside the Rounds
+// tab itself, and directly from the Today hero once a round's selected
+// there (see selectTodayRound), so this has to switch tabs itself rather
+// than assume it's already on the Rounds tab.
+function goToRoundDue(rn){
+  currentTab = 'rounds';
+  currentRound = rn;
+  reorderMode = false;
+  roundFilterMode = 'due';
+  roundDayFilter = 'all';
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab==='work'));
+  render();
+  window.scrollTo(0, 0);
+}
 // Tapping a round chip on the Today hero both jumps straight to that round's
 // Due list (goToRoundDue) and remembers the choice so the Today tab itself
 // stays scoped to that round next time you're back on it — see

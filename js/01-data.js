@@ -6,7 +6,7 @@ const STORE_KEY = 'roundBookData_v1';
 // APP_VERSION is a plain decimal number (e.g. 1.01, 1.02 ... 1.99, 2.00) —
 // bump by 0.01 for every change. formatVersion always renders it to exactly
 // two decimal places, so it's never shown as "1.1" or "1.100".
-const APP_VERSION = 2.01;
+const APP_VERSION = 2.02;
 function formatVersion(v){ return Number(v).toFixed(2); }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
@@ -15,6 +15,7 @@ function formatVersion(v){ return Number(v).toFixed(2); }
 // the most recent 10 entries (oldest ones can be left in the array or trimmed,
 // either is fine, since the display always slices to 10).
 const VERSION_HISTORY = [
+  {version: 2.02, changes: ['Fixed the owed amounts on the Today tab (and the Owed list\'s sort order, and the {daysoverdue} in payment reminder texts) — they were measured from a customer\'s last payment date rather than from when their current balance actually became outstanding, so a fresh charge could wrongly land in the 30+ days bucket', 'Fixed tapping the Today hero once a round was selected not taking you through to that round\'s Due list']},
   {version: 2.01, changes: ['Added "Business" as a property type', 'The Today tab\'s payment tile no longer says "Payment reminders" — it now leads with how many customers owe money, then breaks the total down into 0–14, 14–30 and 30+ days outstanding. It\'s now full-width and moved to the bottom of the tiles, so those amounts can be shown bigger']},
   {version: 2.00, changes: ['Version numbers now start from 2.xx', 'Fixed the app not updating itself — it now checks for a new version whenever it\'s opened, brought back to the foreground, or every 30 minutes while left open, and shows a small "tap to update" banner instead of needing Safari reloaded and re-added to the Home Screen', 'Reorder screen: customers can now be dragged into order by their ⠿ handle, as well as the existing up/down arrows']},
   {version: 1.02, changes: ['Added first-time setup: a brand new install now asks straight away whether you\'re new here (a short 2-step setup for your business details) or an existing user (taken straight to Backup & restore to bring your data back)', 'Added a dismissible "Getting started" checklist on the Today tab for anything left outstanding — business details, first customer, first backup — re-runnable any time from the "i" menu', 'The "No customers yet" screen and the Work tab\'s empty state now have direct buttons to add a customer or import a spreadsheet, instead of just an instruction to find the + button']},
@@ -669,17 +670,30 @@ function custStatus(c){
   const credit = balance < -0.005;
   return {cleanBadge, owed, credit, balance, lastClean, lastPaid};
 }
-// How many days since this customer's account last saw any payment — or, if
-// they've never paid anything at all, since their first clean — used to sort
-// and chase the Owed list by how long a balance has actually been outstanding,
-// not just by its size. There's no per-invoice tracking (balance is just a
-// running total), so "days since last payment" is the closest simple proxy.
+// How long the customer's *current* balance has actually been outstanding —
+// used to sort/chase the Owed list, the {daysoverdue} message placeholder,
+// and the Today tab's 0–14/14–30/30+ day owed buckets. There's no
+// per-invoice tracking (balance is just a running total), so this works out
+// the anchor date properly instead of just using the last payment date:
+// payments are allocated to the oldest charges first (FIFO, like a normal
+// aged-debt report), and the first charge not fully covered by payments
+// made so far is what the current balance is actually measured from. This
+// matters because a customer who pays off their balance every visit, then
+// gets cleaned again yesterday but hasn't paid for that one yet, should
+// read as "1 day", not as however long ago their last payment happened to
+// land.
 function daysSinceLastPayment(c){
   if(!custStatus(c).owed) return 0;
-  const cleanDates = (c.cleanHistory||[]).map(e=>e.date);
-  const firstClean = cleanDates.length ? [...cleanDates].sort()[0] : null;
-  const anchor = lastOf((c.paymentHistory||[]).map(p=>p.date)) || firstClean;
-  return anchor ? daysBetween(anchor, todayISO()) : 0;
+  const charges = (c.cleanHistory||[]).map(e=>({date: e.date, amount: Number(e.amount||0)})).sort((a,b)=> a.date<b.date?-1 : a.date>b.date?1 : 0);
+  let paymentsLeft = (c.paymentHistory||[]).reduce((s,p)=>s+Number(p.amount||0), 0);
+  for(const charge of charges){
+    if(paymentsLeft >= charge.amount - 0.005){
+      paymentsLeft -= charge.amount;
+    } else {
+      return daysBetween(charge.date, todayISO());
+    }
+  }
+  return 0;
 }
 // "£value/£owed" — the format used everywhere a round's worth is shown: the
 // plain price total for its active (non-paused) customers, followed by however
