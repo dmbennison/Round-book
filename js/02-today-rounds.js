@@ -126,6 +126,7 @@ function renderTodayHome(main){
 
   main.innerHTML = `
     <div class="section-label" style="margin-top:0;">${fmtDate(today)}</div>
+    ${renderGettingStartedCard()}
     <div class="today-hero">
       <div onclick="${todaySelectedRound ? `goToRoundDue('${escapeAttr(todaySelectedRound)}')` : `setTab('rounds'); setRoundsView('due');`}" style="cursor:pointer; display:flex; align-items:flex-start; justify-content:space-between; gap:14px;">
         <div>
@@ -986,6 +987,8 @@ function renderWorkHub(main){
       <div class="stat"><div class="num">${money(overallAvg)}</div><div class="lbl">Avg / customer</div></div>
     </div>
     ${propertyTypeAvgSummaryHtml(activeCustomers)}`;
+  } else {
+    html += emptyState('rounds');
   }
   main.innerHTML = html;
 }
@@ -1326,8 +1329,16 @@ function emptyState(kind){
     return `<div class="empty">
       <svg viewBox="0 0 24 24" fill="none" stroke="#66798A" stroke-width="1.6"><path d="M4 4h16v12H4z"/><path d="M4 10h16M10 4v12"/></svg>
       <b>No customers yet</b>
-      <p>Tap the blue + button to add your first customer and give them a round.</p>
-    </div>`;
+      <p>Add them one at a time, or bring in a whole round from a spreadsheet.</p>
+    </div>
+    <button class="backup-btn" onclick="openCustomerForm();">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="16" y1="11" x2="22" y2="11"/></svg>
+      <div><div class="t1">Add your first customer</div><div class="t2">Address, price, round, and how often they're due</div></div>
+    </button>
+    <button class="backup-btn" onclick="document.getElementById('importSpreadsheetFile').click();">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v16H4z"/><path d="M4 10h16M10 4v16"/></svg>
+      <div><div class="t1">Import from a spreadsheet</div><div class="t2">.csv or .xlsx — bring in a whole round at once</div></div>
+    </button>`;
   }
   return `<div class="empty">
     <svg viewBox="0 0 24 24" fill="none" stroke="#66798A" stroke-width="1.6"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>

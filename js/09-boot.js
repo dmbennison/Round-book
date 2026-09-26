@@ -212,6 +212,7 @@ setInterval(loadWeather, 30*60*1000);
 initStorage().catch(()=>{}).finally(()=>{
   render();
   initSwipeHandlers();
+  maybeShowFirstRun();
 });
 
 if ('serviceWorker' in navigator) {

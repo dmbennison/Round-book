@@ -6,7 +6,7 @@ const STORE_KEY = 'roundBookData_v1';
 // APP_VERSION is a plain decimal number (e.g. 1.01, 1.02 ... 1.99, 2.00) —
 // bump by 0.01 for every change. formatVersion always renders it to exactly
 // two decimal places, so it's never shown as "1.1" or "1.100".
-const APP_VERSION = 1.01;
+const APP_VERSION = 1.02;
 function formatVersion(v){ return Number(v).toFixed(2); }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
@@ -15,6 +15,7 @@ function formatVersion(v){ return Number(v).toFixed(2); }
 // the most recent 10 entries (oldest ones can be left in the array or trimmed,
 // either is fine, since the display always slices to 10).
 const VERSION_HISTORY = [
+  {version: 1.02, changes: ['Added first-time setup: a brand new install now asks straight away whether you\'re new here (a short 2-step setup for your business details) or an existing user (taken straight to Backup & restore to bring your data back)', 'Added a dismissible "Getting started" checklist on the Today tab for anything left outstanding — business details, first customer, first backup — re-runnable any time from the "i" menu', 'The "No customers yet" screen and the Work tab\'s empty state now have direct buttons to add a customer or import a spreadsheet, instead of just an instruction to find the + button']},
   {version: 1.01, changes: ['Today tab no longer labels the hero "Due today" — the tab itself already says that', 'The "💷 Low" price badge and the Price review report now judge a customer against the average for their own property type (their round\'s, or the overall average for that type if the round doesn\'t have enough of that type yet), instead of the round\'s overall average', 'Due dates can now be set to an exact date, for one customer or a whole round, as well as the existing +4 weeks option', 'Added price uplift — apply a percentage or flat £ increase to one customer or a whole round in one go, recorded in price history', 'Added "Text upsell opportunities" — pick a marketing campaign and send it straight to everyone the Upsell opportunities report has flagged', 'The Mileage tile is now just called "Mileage", Start/Finish readings are larger, and the total only shows once both readings are logged']},
   {version: 1.00, changes: ['Fixed buttons like Show map, Reorder, and the ⋮ menu showing a stray box/border around them (a side effect of last update\'s border cleanup)', 'The Today hero now lists which rounds have anyone due — tap one to jump straight to that round\'s Due list, and the hero stays focused on that round (its own due count, plus a live cleaned-today count) until you pick another round or a new day starts', 'Added a Paid total under the Clean total on the Today hero', 'Today\'s Mileage tile: Start and Finish now sit side by side, and the total is aligned higher on the tile']},
   {version: 0.99, changes: ['Softened the outline icons on buttons like Show map and Reorder — no longer stark white in dark mode', 'Redesigned the Today\'s Mileage tile to always show the title with small Start/Finish readings underneath and the day\'s total on the right, instead of switching between a car icon and a number']},

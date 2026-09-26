@@ -1,7 +1,120 @@
 /* 08-backup-import.js -- Backup/restore/export and importing customers from a spreadsheet.
    Part of Round Book's split JS bundle; loaded in numeric order from index.html. */
 
-/* ---------- backup ---------- */
+/* ---------- first-run onboarding ----------
+   Shown once, before anything else, on a genuinely fresh install (no
+   customers yet, and this hasn't been dismissed before). Splits straight
+   away into two paths: an existing user goes straight to Backup & restore
+   to bring their data back; a new user gets a short 2-step setup instead. */
+function maybeShowFirstRun(){
+  if(data.customers.length > 0) return;
+  if(localStorage.getItem('roundBookOnboardingSeen')) return;
+  openWelcomeSheet();
+}
+function markOnboardingSeen(){ localStorage.setItem('roundBookOnboardingSeen', '1'); }
+
+function openWelcomeSheet(){
+  openSheet(`
+    <div style="text-align:center; padding:8px 4px 4px;">
+      <div style="font-size:2.5rem; margin-bottom:10px;">🪟</div>
+      <h2 style="margin:0 0 8px;">Welcome to Round Book</h2>
+      <p style="color:var(--ink-muted); font-size:0.875rem; line-height:1.6; margin:0 6px 22px;">A simple, offline window cleaning round tracker. Let's get you set up — are you new here, or moving over from an existing backup?</p>
+    </div>
+    <button class="btn btn-primary" style="width:100%; margin-bottom:10px;" onclick="chooseNewUser()">✨ I'm new — set up my account</button>
+    <button class="btn" style="width:100%; background:var(--blue-dim); color:var(--blue-deep);" onclick="chooseExistingUser()">📂 I'm an existing user — restore my backup</button>
+  `);
+}
+function chooseExistingUser(){
+  markOnboardingSeen();
+  closeSheet();
+  openBackup();
+}
+function chooseNewUser(){
+  markOnboardingSeen();
+  openOnboardingBusiness();
+}
+function openOnboardingBusiness(){
+  openSheet(`
+    <div class="sheet-head"><h2 style="flex:1; min-width:0;">Set up — your business</h2></div>
+    <p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 16px; line-height:1.5;">This fills in your texts, invoices, and reports automatically. You can change any of it later in Settings.</p>
+    <label style="margin-top:0;">Company name</label>
+    <input type="text" id="ob_company" value="${escapeAttr(data.settings.companyName||'')}" placeholder="e.g. Darren's Window Cleaning">
+    <label>Your name</label>
+    <input type="text" id="ob_yourname" value="${escapeAttr(data.settings.yourName||'')}" placeholder="e.g. Dave">
+    <div class="section-label">How do you text customers?</div>
+    <div class="seg-row">
+      <button type="button" class="seg-btn ${data.settings.messagingApp!=='whatsapp'?'active':''}" onclick="setMessagingApp('sms'); openOnboardingBusiness();">💬 Text message</button>
+      <button type="button" class="seg-btn ${data.settings.messagingApp==='whatsapp'?'active':''}" onclick="setMessagingApp('whatsapp'); openOnboardingBusiness();">🟢 WhatsApp</button>
+    </div>
+    <div class="form-actions" style="margin-top:20px;">
+      <button class="btn-primary" onclick="saveOnboardingBusiness()">Continue</button>
+    </div>
+    <button class="btn-danger-text" onclick="openOnboardingFinish()">Skip this for now</button>
+  `);
+}
+function saveOnboardingBusiness(){
+  data.settings.companyName = document.getElementById('ob_company').value.trim();
+  data.settings.yourName = document.getElementById('ob_yourname').value.trim();
+  saveData();
+  openOnboardingFinish();
+}
+function openOnboardingFinish(){
+  openSheet(`
+    <div style="text-align:center; padding:8px 4px 4px;">
+      <div style="font-size:2.5rem; margin-bottom:10px;">🎉</div>
+      <h2 style="margin:0 0 8px;">You're all set</h2>
+      <p style="color:var(--ink-muted); font-size:0.875rem; line-height:1.6; margin:0 6px 22px;">Add customers one at a time, or bring in a whole round from a spreadsheet.</p>
+    </div>
+    <button class="backup-btn" onclick="closeSheet(); openCustomerForm();">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="16" y1="11" x2="22" y2="11"/></svg>
+      <div><div class="t1">Add your first customer</div><div class="t2">Address, price, round, and how often they're due</div></div>
+    </button>
+    <button class="backup-btn" onclick="closeSheet(); document.getElementById('importSpreadsheetFile').click();">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v16H4z"/><path d="M4 10h16M10 4v16"/></svg>
+      <div><div class="t1">Import from a spreadsheet</div><div class="t2">.csv or .xlsx — bring in a whole round at once</div></div>
+    </button>
+    <p style="color:var(--ink-muted); font-size:0.75rem; margin:16px 2px 0; line-height:1.5;">Tap the <b>?</b> icon on any screen for help with that part of the app, any time.</p>
+    <button class="btn" style="width:100%; background:var(--line); color:var(--ink-muted); margin-top:14px;" onclick="closeSheet()">I'll have a look around first</button>
+  `);
+}
+
+/* ---------- getting-started checklist ----------
+   A small, dismissible nudge on the Today tab for anyone who skipped parts
+   of onboarding — reopens the relevant screen for whatever's still missing,
+   from the same three things the welcome flow offers. Disappears for good
+   once dismissed or once nothing's left outstanding. */
+function checklistItemsRemaining(){
+  const items = [];
+  if(!data.settings.companyName) items.push({label:'Add your business details', action:'openBusinessDetails()'});
+  if(!data.customers.length) items.push({label:'Add your first customer', action:'openCustomerForm()'});
+  if(daysSinceBackup() === Infinity) items.push({label:'Make your first backup', action:'openBackup()'});
+  return items;
+}
+function renderGettingStartedCard(){
+  if(localStorage.getItem('roundBookChecklistDismissed')) return '';
+  const items = checklistItemsRemaining();
+  if(!items.length) return '';
+  return `<div style="background:var(--blue-dim); border-radius:14px; padding:14px 16px; margin-bottom:16px;">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+      <b style="color:var(--blue-deep); font-size:0.875rem;">Getting started</b>
+      <button onclick="dismissGettingStarted()" style="background:none; border:none; color:var(--blue-deep); font-weight:800; font-size:1rem; line-height:1; padding:0 2px;">✕</button>
+    </div>
+    ${items.map(i=>`<button onclick="${i.action}" style="display:flex; align-items:center; gap:8px; width:100%; text-align:left; background:none; border:none; padding:6px 0; color:var(--blue-deep); font-size:0.8125rem; font-weight:700;">
+      <span style="width:16px; height:16px; border:2px solid var(--blue-deep); border-radius:50%; flex-shrink:0;"></span> ${escapeHtml(i.label)}
+    </button>`).join('')}
+  </div>`;
+}
+function dismissGettingStarted(){
+  localStorage.setItem('roundBookChecklistDismissed', '1');
+  render();
+}
+function reopenGettingStarted(){
+  localStorage.removeItem('roundBookChecklistDismissed');
+  localStorage.removeItem('roundBookOnboardingSeen');
+  closeSheet();
+  openWelcomeSheet();
+}
+
 // Shares plain-English install instructions plus the app link, via the native
 // share sheet where available (so it can go straight out over WhatsApp, text,
 // email, etc.), falling back to copying the message to the clipboard.
@@ -36,6 +149,11 @@ function openInfo(){
     <button onclick="openHelp()" style="display:flex; align-items:center; gap:10px; width:100%; text-align:left; background:var(--blue-dim); color:var(--blue-deep); border:1px solid var(--box-border); border-radius:12px; padding:13px 14px; font-weight:800; font-size:0.9375rem; margin-bottom:10px;">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px; height:20px; flex-shrink:0;"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
       <span style="flex:1;">User guide — how everything works</span>
+      <span style="opacity:0.6;">›</span>
+    </button>
+    <button onclick="reopenGettingStarted()" style="display:flex; align-items:center; gap:10px; width:100%; text-align:left; background:var(--blue-dim); color:var(--blue-deep); border:1px solid var(--box-border); border-radius:12px; padding:13px 14px; font-weight:800; font-size:0.9375rem; margin-bottom:10px;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px; height:20px; flex-shrink:0;"><path d="M12 2l2.4 7.2H22l-6 4.4 2.3 7.2-6.3-4.5L5.7 21l2.3-7.2-6-4.4h7.6z"/></svg>
+      <span style="flex:1;">Getting started — run first-time setup again</span>
       <span style="opacity:0.6;">›</span>
     </button>
     <button onclick="shareRoundBook()" style="display:flex; align-items:center; gap:10px; width:100%; text-align:left; background:var(--surface); border:1px solid var(--box-border); color:var(--ink); border-radius:12px; padding:13px 14px; font-weight:800; font-size:0.9375rem; margin-bottom:16px;">
@@ -113,6 +231,7 @@ const FOCUSED_HELP = {
   today: {
     title: 'Today',
     body: () => [
+      helpP('A "Getting started" card sits above the hero for anything left outstanding from first-time setup — business details, first customer, first backup — until everything\'s done or you dismiss it with the ✕. Re-run first-time setup any time from the "i" menu.'),
       helpP('Today is the home screen. The top hero card shows what\'s due today, its value, today\'s clean total and paid total, and — if more than one round has anyone due — a row of round chips underneath. Tap a chip to jump straight to that round\'s Due list; the hero then stays scoped to that round (its own due count, and a live "cleaned" count next to it as you work through it) until you pick a different round or a new day starts. Below the hero, five tiles: text before visit, mileage, jobs today, payment reminders, and quotes needing follow-up — in that order, mileage early since it\'s usually the first thing you\'d log. Tap any of them to go straight to the full screen for it.'),
       helpP('Text before visit and quotes needing follow-up show a small "X overdue" / "X well overdue" note underneath the count when there is one, so you can see at a glance if any are genuinely overdue rather than just due today or freshly past their follow-up window.'),
       helpP('The Mileage tile logs a start-of-day reading on first tap and an end-of-day reading on the next tap — both readings stay visible on the tile once logged, and the day\'s total appears once both are in. Tap again to view, edit, or clear it. See it broken down by day/week/month/tax-year-to-date in Reports.')
