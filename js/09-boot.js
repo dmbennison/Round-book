@@ -217,6 +217,27 @@ initStorage().catch(()=>{}).finally(()=>{
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js').catch(() => {});
+    navigator.serviceWorker.register('./sw.js').then(reg => {
+      // The new service worker activates immediately (see skipWaiting/
+      // clients.claim in sw.js), but the page that's already open keeps
+      // running the OLD html/js in memory regardless — only a reload picks
+      // up the new version. Rather than yanking that reload out from under
+      // someone mid-form, just show a small "tap to update" banner once a
+      // new version has actually taken over.
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        showUpdateBanner();
+      });
+      // Safari can leave a home-screen PWA sitting open for a long time
+      // without ever re-checking sw.js on its own (that normally only
+      // happens on a full page navigation, which opening the app from the
+      // Home Screen doesn't really do) — so ask explicitly every time the
+      // app opens, whenever it's brought back to the foreground, and every
+      // 30 minutes while it stays open.
+      reg.update().catch(()=>{});
+      document.addEventListener('visibilitychange', () => {
+        if(document.visibilityState === 'visible') reg.update().catch(()=>{});
+      });
+      setInterval(() => reg.update().catch(()=>{}), 30*60*1000);
+    }).catch(() => {});
   });
 }

@@ -6,7 +6,7 @@ const STORE_KEY = 'roundBookData_v1';
 // APP_VERSION is a plain decimal number (e.g. 1.01, 1.02 ... 1.99, 2.00) —
 // bump by 0.01 for every change. formatVersion always renders it to exactly
 // two decimal places, so it's never shown as "1.1" or "1.100".
-const APP_VERSION = 1.02;
+const APP_VERSION = 2.00;
 function formatVersion(v){ return Number(v).toFixed(2); }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
@@ -15,6 +15,7 @@ function formatVersion(v){ return Number(v).toFixed(2); }
 // the most recent 10 entries (oldest ones can be left in the array or trimmed,
 // either is fine, since the display always slices to 10).
 const VERSION_HISTORY = [
+  {version: 2.00, changes: ['Version numbers now start from 2.xx', 'Fixed the app not updating itself — it now checks for a new version whenever it\'s opened, brought back to the foreground, or every 30 minutes while left open, and shows a small "tap to update" banner instead of needing Safari reloaded and re-added to the Home Screen', 'Reorder screen: customers can now be dragged into order by their ⠿ handle, as well as the existing up/down arrows']},
   {version: 1.02, changes: ['Added first-time setup: a brand new install now asks straight away whether you\'re new here (a short 2-step setup for your business details) or an existing user (taken straight to Backup & restore to bring your data back)', 'Added a dismissible "Getting started" checklist on the Today tab for anything left outstanding — business details, first customer, first backup — re-runnable any time from the "i" menu', 'The "No customers yet" screen and the Work tab\'s empty state now have direct buttons to add a customer or import a spreadsheet, instead of just an instruction to find the + button']},
   {version: 1.01, changes: ['Today tab no longer labels the hero "Due today" — the tab itself already says that', 'The "💷 Low" price badge and the Price review report now judge a customer against the average for their own property type (their round\'s, or the overall average for that type if the round doesn\'t have enough of that type yet), instead of the round\'s overall average', 'Due dates can now be set to an exact date, for one customer or a whole round, as well as the existing +4 weeks option', 'Added price uplift — apply a percentage or flat £ increase to one customer or a whole round in one go, recorded in price history', 'Added "Text upsell opportunities" — pick a marketing campaign and send it straight to everyone the Upsell opportunities report has flagged', 'The Mileage tile is now just called "Mileage", Start/Finish readings are larger, and the total only shows once both readings are logged']},
   {version: 1.00, changes: ['Fixed buttons like Show map, Reorder, and the ⋮ menu showing a stray box/border around them (a side effect of last update\'s border cleanup)', 'The Today hero now lists which rounds have anyone due — tap one to jump straight to that round\'s Due list, and the hero stays focused on that round (its own due count, plus a live cleaned-today count) until you pick another round or a new day starts', 'Added a Paid total under the Clean total on the Today hero', 'Today\'s Mileage tile: Start and Finish now sit side by side, and the total is aligned higher on the tile']},
@@ -752,6 +753,25 @@ function dismissBackupBanner(){ bannerDismissed = true; removeBackupPopup(); }
 function removeBackupPopup(){
   const el = document.getElementById('backupPopup');
   if(el) el.remove();
+}
+// A new service worker taking over (see the controllerchange listener in
+// 09-boot.js) means an update has already been downloaded and is ready —
+// this just offers a one-tap reload rather than forcing one, so it never
+// interrupts someone filling in a form or mid-sheet.
+let updateBannerShown = false;
+function showUpdateBanner(){
+  if(updateBannerShown || document.getElementById('updatePopup')) return;
+  updateBannerShown = true;
+  const el = document.createElement('div');
+  el.id = 'updatePopup';
+  el.style.cssText = 'position:fixed; left:0; right:0; bottom:0; z-index:9999; display:flex; justify-content:center; padding:0 14px calc(14px + env(safe-area-inset-bottom));';
+  el.innerHTML = `
+    <div style="background:var(--navy); color:#fff; border-radius:14px; padding:12px 14px; display:flex; align-items:center; gap:12px; box-shadow:0 4px 20px rgba(0,0,0,0.3); max-width:480px; width:100%;">
+      <span style="font-size:1.25rem; flex-shrink:0;">🔄</span>
+      <span style="flex:1; font-size:0.8125rem; font-weight:700; line-height:1.4;">A new version of Round Book is ready.</span>
+      <button onclick="window.location.reload()" style="background:#fff; color:var(--navy); border:none; border-radius:8px; padding:8px 12px; font-weight:800; font-size:0.8125rem; flex-shrink:0;">Update</button>
+    </div>`;
+  document.body.appendChild(el);
 }
 // Tracks the single most recent delete (customer, job, or quote) so it can be
 // undone from a persistent banner, not just a toast that's easy to miss while busy

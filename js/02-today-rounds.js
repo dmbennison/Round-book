@@ -438,6 +438,85 @@ function moveInRound(id, direction){
   saveData(); render();
 }
 
+/* ---------- drag-to-reorder (Reorder screen) ----------
+   Native HTML5 drag-and-drop doesn't support touch at all on iOS Safari, so
+   this is done by hand with Pointer Events instead: pressing the ⠿ handle
+   lifts that row out of the flow so it follows the finger/cursor, swapping
+   past whichever row it's currently nearest to; releasing commits the new
+   DOM order back into every customer's `order` field in one go — the same
+   field moveInRound and sortByRoute already use everywhere else. */
+let dragState = null;
+function startDragReorder(e, id){
+  e.preventDefault();
+  const row = document.querySelector(`.reorder-row[data-id="${id}"]`);
+  const list = document.getElementById('reorderList');
+  if(!row || !list) return;
+  const rect = row.getBoundingClientRect();
+  const placeholder = document.createElement('div');
+  placeholder.style.cssText = `height:${rect.height}px; margin-bottom:8px; border:2px dashed var(--blue); border-radius:${getComputedStyle(row).borderRadius}; background:var(--blue-dim); opacity:0.5;`;
+  row.parentNode.insertBefore(placeholder, row.nextSibling);
+  dragState = { id, row, list, placeholder, startY: e.clientY, startTop: rect.top, height: rect.height };
+  row.style.position = 'fixed';
+  row.style.left = rect.left + 'px';
+  row.style.width = rect.width + 'px';
+  row.style.top = rect.top + 'px';
+  row.style.zIndex = '999';
+  row.style.boxShadow = '0 8px 24px rgba(0,0,0,0.25)';
+  row.style.pointerEvents = 'none';
+  document.addEventListener('pointermove', onDragReorderMove);
+  document.addEventListener('pointerup', endDragReorder, {once:true});
+  document.addEventListener('pointercancel', endDragReorder, {once:true});
+}
+function onDragReorderMove(e){
+  if(!dragState) return;
+  const { row, startY, startTop, list, placeholder, height } = dragState;
+  const newTop = startTop + (e.clientY - startY);
+  row.style.top = newTop + 'px';
+
+  // Nudge the page when dragging near the top/bottom of the viewport, so a
+  // long round doesn't strand a row off-screen mid-drag.
+  const margin = 60;
+  if(e.clientY < margin) window.scrollBy(0, -12);
+  else if(e.clientY > window.innerHeight - margin) window.scrollBy(0, 12);
+
+  const rowMidY = newTop + height/2;
+  let closest = placeholder, closestDist = Infinity;
+  list.querySelectorAll('.reorder-row').forEach(sib=>{
+    if(sib === row) return;
+    const r = sib.getBoundingClientRect();
+    const mid = r.top + r.height/2;
+    const dist = Math.abs(mid - rowMidY);
+    if(dist < closestDist){ closestDist = dist; closest = sib; }
+  });
+  if(closest !== placeholder){
+    const r = closest.getBoundingClientRect();
+    list.insertBefore(placeholder, rowMidY < r.top + r.height/2 ? closest : closest.nextSibling);
+  }
+}
+function endDragReorder(){
+  if(!dragState) return;
+  const { row, placeholder, list } = dragState;
+  document.removeEventListener('pointermove', onDragReorderMove);
+  list.insertBefore(row, placeholder);
+  placeholder.remove();
+  row.style.position = '';
+  row.style.left = '';
+  row.style.width = '';
+  row.style.top = '';
+  row.style.zIndex = '';
+  row.style.boxShadow = '';
+  row.style.pointerEvents = '';
+  dragState = null;
+
+  const ids = [...list.querySelectorAll('.reorder-row')].map(el=>el.dataset.id);
+  ids.forEach((id,i)=>{
+    const c = data.customers.find(x=>x.id===id);
+    if(c) c.order = i;
+  });
+  saveData();
+  render();
+}
+
 /* ---------- route order suggestion ----------
    A free, on-device alternative to a paid routing API: geocode each customer's
    address once (cached on the customer forever after — see c.lat/c.lng) via
@@ -1217,26 +1296,29 @@ function renderRoundDetail(main, rn){
   `;
 
   if(reorderMode){
-    shellHtml += `<p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 6px;">Use the arrows to set the order you actually visit these customers in.</p>`;
+    shellHtml += `<p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 6px;">Drag the ⠿ handle to set the order you actually visit these customers in (or use the arrows).</p>`;
     shellHtml += `<p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 14px;">If this round takes more than one day, tap the day badge to say which day each customer is visited on (up to 5).</p>`;
     shellHtml += `<button class="btn-open" style="width:100%; margin-bottom:14px; font-weight:800; display:flex; align-items:center; justify-content:center; gap:7px;" onclick="suggestRouteOrder('${escapeAttr(rn)}')">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h8a4 4 0 0 0 4-4V7a4 4 0 0 0-4-4H8"/></svg>
       Suggest a route order
     </button>`;
     if(!allInRound.length){ main.innerHTML = shellHtml + emptyState('customers'); return; }
-    shellHtml += allInRound.map((c,i)=>`
-      <div class="cust-card" style="display:flex; align-items:center; gap:10px;">
+    shellHtml += `<div id="reorderList">` + allInRound.map((c,i)=>`
+      <div class="cust-card reorder-row" data-id="${c.id}" style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+        <button type="button" onpointerdown="startDragReorder(event,'${c.id}')" style="background:none; border:none; padding:6px; margin:-6px; color:var(--ink-muted); cursor:grab; touch-action:none; flex-shrink:0;" aria-label="Drag to reorder">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>
+        </button>
         <div style="flex:1; min-width:0;">
           <div class="cust-addr" style="font-size:0.9375rem; font-weight:800;">${i+1}. ${escapeHtml(c.address||'No address')}</div>
           ${c.name?`<div class="cust-name" style="font-size:0.8125rem; color:var(--ink-muted); margin-top:2px;">${escapeHtml(c.name)}</div>`:''}
         </div>
         <button class="btn-open" style="width:auto; padding:6px 10px; font-size:0.75rem; font-weight:800; background:var(--blue-dim); color:var(--blue-deep); flex-shrink:0;" onclick="cycleVisitDay('${c.id}')">Day ${c.visitDay||1}</button>
         <div style="display:flex; flex-direction:column; gap:6px;">
-          <button class="btn-open" style="width:38px; height:32px; padding:0; opacity:${i===0?'0.3':'1'};" onclick="moveInRound('${c.id}','up')">▲</button>
-          <button class="btn-open" style="width:38px; height:32px; padding:0; opacity:${i===allInRound.length-1?'0.3':'1'};" onclick="moveInRound('${c.id}','down')">▼</button>
+          <button class="btn-open" style="width:34px; height:28px; padding:0; opacity:${i===0?'0.3':'1'};" onclick="moveInRound('${c.id}','up')">▲</button>
+          <button class="btn-open" style="width:34px; height:28px; padding:0; opacity:${i===allInRound.length-1?'0.3':'1'};" onclick="moveInRound('${c.id}','down')">▼</button>
         </div>
       </div>
-    `).join('');
+    `).join('') + `</div>`;
     main.innerHTML = shellHtml;
     return;
   }
