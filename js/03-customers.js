@@ -37,7 +37,7 @@ function closeSheet(){
    Shared by the customer, one-off job, and quote forms so a property's
    details can be recorded wherever it's first captured and carried
    through when a quote becomes a job or a customer, etc. */
-const PROPERTY_TYPES = ['Detached','Semi-detached','Terraced','Bungalow','Flat'];
+const PROPERTY_TYPES = ['Detached','Semi-detached','Terraced','Bungalow','Flat','Business'];
 function propertyFieldsHtml(obj, prefix){
   obj = obj || {};
   return `

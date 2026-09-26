@@ -6,7 +6,7 @@ const STORE_KEY = 'roundBookData_v1';
 // APP_VERSION is a plain decimal number (e.g. 1.01, 1.02 ... 1.99, 2.00) —
 // bump by 0.01 for every change. formatVersion always renders it to exactly
 // two decimal places, so it's never shown as "1.1" or "1.100".
-const APP_VERSION = 2.00;
+const APP_VERSION = 2.01;
 function formatVersion(v){ return Number(v).toFixed(2); }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
@@ -15,6 +15,7 @@ function formatVersion(v){ return Number(v).toFixed(2); }
 // the most recent 10 entries (oldest ones can be left in the array or trimmed,
 // either is fine, since the display always slices to 10).
 const VERSION_HISTORY = [
+  {version: 2.01, changes: ['Added "Business" as a property type', 'The Today tab\'s payment tile no longer says "Payment reminders" — it now leads with how many customers owe money, then breaks the total down into 0–14, 14–30 and 30+ days outstanding. It\'s now full-width and moved to the bottom of the tiles, so those amounts can be shown bigger']},
   {version: 2.00, changes: ['Version numbers now start from 2.xx', 'Fixed the app not updating itself — it now checks for a new version whenever it\'s opened, brought back to the foreground, or every 30 minutes while left open, and shows a small "tap to update" banner instead of needing Safari reloaded and re-added to the Home Screen', 'Reorder screen: customers can now be dragged into order by their ⠿ handle, as well as the existing up/down arrows']},
   {version: 1.02, changes: ['Added first-time setup: a brand new install now asks straight away whether you\'re new here (a short 2-step setup for your business details) or an existing user (taken straight to Backup & restore to bring your data back)', 'Added a dismissible "Getting started" checklist on the Today tab for anything left outstanding — business details, first customer, first backup — re-runnable any time from the "i" menu', 'The "No customers yet" screen and the Work tab\'s empty state now have direct buttons to add a customer or import a spreadsheet, instead of just an instruction to find the + button']},
   {version: 1.01, changes: ['Today tab no longer labels the hero "Due today" — the tab itself already says that', 'The "💷 Low" price badge and the Price review report now judge a customer against the average for their own property type (their round\'s, or the overall average for that type if the round doesn\'t have enough of that type yet), instead of the round\'s overall average', 'Due dates can now be set to an exact date, for one customer or a whole round, as well as the existing +4 weeks option', 'Added price uplift — apply a percentage or flat £ increase to one customer or a whole round in one go, recorded in price history', 'Added "Text upsell opportunities" — pick a marketing campaign and send it straight to everyone the Upsell opportunities report has flagged', 'The Mileage tile is now just called "Mileage", Start/Finish readings are larger, and the total only shows once both readings are logged']},

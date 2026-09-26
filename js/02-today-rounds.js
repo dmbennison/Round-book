@@ -116,7 +116,17 @@ function renderTodayHome(main){
   const textBeforeOverdue = textBeforeOverdueCount();
   const todaysJobs = (data.oneOffJobs||[]).filter(j=>!j.done && j.date===today);
   const owedCustomers = data.customers.filter(c=>custStatus(c).owed);
-  const owedTotal = owedCustomers.reduce((s,c)=>s+custStatus(c).balance,0);
+  // Bucketed by how long the balance has been outstanding — see
+  // daysSinceLastPayment for what "days" means when there's no per-invoice
+  // tracking, just a running balance.
+  let owed014 = 0, owed1430 = 0, owed30plus = 0;
+  owedCustomers.forEach(c=>{
+    const bal = custStatus(c).balance;
+    const days = daysSinceLastPayment(c);
+    if(days < 14) owed014 += bal;
+    else if(days < 30) owed1430 += bal;
+    else owed30plus += bal;
+  });
   const followUpQuotes = quotesNeedingFollowUp();
   const quotesWellOverdue = quotesWellOverdueCount();
   const mEntry = todayMileageEntry();
@@ -173,13 +183,28 @@ function renderTodayHome(main){
         <div class="num">${todaysJobs.length}</div>
         <div class="lbl">Jobs today</div>
       </div>
-      <div class="today-tile" onclick="setTab('rounds'); setRoundsView('owed');">
-        <div class="num">${owedCustomers.length}</div>
-        <div class="lbl">Payment reminders${owedCustomers.length ? ` · ${money(owedTotal)}` : ''}</div>
-      </div>
       <div class="today-tile" onclick="setTab('quotes');">
         <div class="num">${followUpQuotes.length}</div>
         <div class="lbl">Quotes needing follow-up${quotesWellOverdue ? ` · ${quotesWellOverdue} well overdue` : ''}</div>
+      </div>
+      <div class="today-tile" onclick="setTab('rounds'); setRoundsView('owed');" style="grid-column:1 / -1;">
+        <div class="num">${owedCustomers.length}</div>
+        <div class="lbl">Customer${owedCustomers.length===1?'':'s'} owing</div>
+        ${owedCustomers.length ? `
+        <div style="display:flex; gap:10px; margin-top:16px;">
+          <div style="flex:1; text-align:center;">
+            <div class="lbl" style="font-size:0.6875rem;">0–14 days</div>
+            <div style="font-size:1.5rem; font-weight:800; color:var(--ink); margin-top:4px;">${money(owed014)}</div>
+          </div>
+          <div style="flex:1; text-align:center; border-left:1px solid var(--line); border-right:1px solid var(--line);">
+            <div class="lbl" style="font-size:0.6875rem;">14–30 days</div>
+            <div style="font-size:1.5rem; font-weight:800; color:var(--ink); margin-top:4px;">${money(owed1430)}</div>
+          </div>
+          <div style="flex:1; text-align:center;">
+            <div class="lbl" style="font-size:0.6875rem;">30+ days</div>
+            <div style="font-size:1.5rem; font-weight:800; color:${owed30plus>0.005?'var(--red)':'var(--ink)'}; margin-top:4px;">${money(owed30plus)}</div>
+          </div>
+        </div>` : ''}
       </div>
     </div>
   `;
@@ -972,7 +997,7 @@ function render(){
 // single round's own summary (the caller passes in whichever customer list
 // applies, already filtered to active/non-paused customers). Square boxes to
 // match the stats row above them; short labels so several fit without wrapping.
-const PROPERTY_TYPE_ABBR = {'Detached':'Det', 'Semi-detached':'Semi', 'Terraced':'Terr', 'Bungalow':'Bung', 'Flat':'Flat', 'Not recorded':'NA'};
+const PROPERTY_TYPE_ABBR = {'Detached':'Det', 'Semi-detached':'Semi', 'Terraced':'Terr', 'Bungalow':'Bung', 'Flat':'Flat', 'Business':'Biz', 'Not recorded':'NA'};
 // A fronts-only clean is a fraction of a full house clean, so it only counts
 // as half a house when working out average prices by property type —
 // otherwise a handful of cheap fronts-only jobs would drag the average down
