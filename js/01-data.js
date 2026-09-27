@@ -6,7 +6,7 @@ const STORE_KEY = 'roundBookData_v1';
 // APP_VERSION is a plain decimal number (e.g. 1.01, 1.02 ... 1.99, 2.00) —
 // bump by 0.01 for every change. formatVersion always renders it to exactly
 // two decimal places, so it's never shown as "1.1" or "1.100".
-const APP_VERSION = 2.03;
+const APP_VERSION = 2.04;
 function formatVersion(v){ return Number(v).toFixed(2); }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
@@ -15,6 +15,7 @@ function formatVersion(v){ return Number(v).toFixed(2); }
 // the most recent 10 entries (oldest ones can be left in the array or trimmed,
 // either is fine, since the display always slices to 10).
 const VERSION_HISTORY = [
+  {version: 2.04, changes: ['Round cleaning dates reports (list and calendar) now only count a day if 4+ houses in that round were cleaned on it, oldest first — no more single stragglers or one-off recleans cluttering the list', 'The Owed view — both the Rounds tab\'s and a single round\'s — can now be filtered by age of debt: 0–14, 14–30, or 30+ days', 'Every owed customer\'s card now shows how many days the balance has been outstanding, and a "✉️ Chase" button to send them a reminder straight from the card']},
   {version: 2.03, changes: ['Opening the app now prompts for an end mileage reading if an earlier day was left with a start reading but no end reading', 'Removed "Text upsell opportunities" from Reports', 'Every "defer 4 weeks" option is now just "Defer", offering 1 day / 1 week / 4 weeks / a custom date, for a single customer or a whole round', 'Mileage report now shows the mileage tax allowance (45p/mile for the first 10,000 miles in a tax year, 25p/mile after), both for the current tax year to date and broken down by tax year']},
   {version: 2.02, changes: ['Fixed the owed amounts on the Today tab (and the Owed list\'s sort order, and the {daysoverdue} in payment reminder texts) — they were measured from a customer\'s last payment date rather than from when their current balance actually became outstanding, so a fresh charge could wrongly land in the 30+ days bucket', 'Fixed tapping the Today hero once a round was selected not taking you through to that round\'s Due list']},
   {version: 2.01, changes: ['Added "Business" as a property type', 'The Today tab\'s payment tile no longer says "Payment reminders" — it now leads with how many customers owe money, then breaks the total down into 0–14, 14–30 and 30+ days outstanding. It\'s now full-width and moved to the bottom of the tiles, so those amounts can be shown bigger']},
@@ -721,6 +722,18 @@ let roundsViewMode = 'overview';
 let reorderMode = false;
 let roundFilterMode = 'all';
 let roundDayFilter = 'all';
+// How long a balance has to have been outstanding to show in an Owed list —
+// 'all', '0-14', '14-30', or '30+' (see daysSinceLastPayment for what "days"
+// means without per-invoice tracking).
+let owedAgeFilter = 'all';
+function setOwedAgeFilter(v){ owedAgeFilter = v; render(); }
+function matchesOwedAgeFilter(c){
+  if(owedAgeFilter === 'all') return true;
+  const days = daysSinceLastPayment(c);
+  if(owedAgeFilter === '0-14') return days < 14;
+  if(owedAgeFilter === '14-30') return days >= 14 && days < 30;
+  return days >= 30;
+}
 // Theme mode is 'light', 'dark', or 'auto' (follows the device's system setting).
 // darkMode below is always the resolved boolean the rest of the app reads —
 // migrated from the old boolean-only roundBookDark key so an existing install

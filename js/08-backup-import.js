@@ -253,7 +253,7 @@ const FOCUSED_HELP = {
       helpP('Suggest a route order is inside Reorder — it works out a shorter visiting order using real road distances where possible, and shows it to you before changing anything (nothing\'s applied unless you tap "Use this order"). Both this and Show map re-check every address\'s location each time, unless it\'s been manually corrected (see below).'),
       helpP('On the map, every address gets a pin — one that couldn\'t be found automatically shows as a grey dashed pin near the others. Drag any pin to fix its spot; dragging locks it there, so it\'s never fetched again and won\'t be moved by a later map or route request.'),
       helpP('The photo icon on the Rounds screen opens the photo gallery.'),
-      helpP('The Owed view (and "Remind all") sorts by how long a balance has actually been outstanding, not just its size, so the most overdue customer comes first. The payment reminder wording automatically gets firmer from the second reminder onward — edit both versions under Settings > Message templates.'),
+      helpP('The Owed view (and "Remind all") sorts by how long a balance has actually been outstanding, not just its size, so the most overdue customer comes first — filter it down to 0–14, 14–30, or 30+ days with the switch above the list. Every owed customer\'s card shows how many days it\'s been outstanding, and a "✉️ Chase" button to send them a reminder on the spot. The payment reminder wording automatically gets firmer from the second reminder onward — edit both versions under Settings > Message templates.'),
       helpP('The small green phone button calls a customer; the small blue compass button opens directions to their address. A red "⚠ Chase" badge appears after 2+ unpaid payment reminders. A "💷 Low" badge appears if a customer\'s price is 15%+ below the average for their property type — their own round\'s average for that type once there are 4+ of them, otherwise the overall average for that type across every round.')
     ]
   },
@@ -299,7 +299,7 @@ const FOCUSED_HELP = {
     title: 'Reports',
     body: () => [
       helpP('Tap the printer icon for a list of reports. Choose <b>Print</b> (good for saving as a PDF too) or <b>Save as Word document</b> for an editable .docx. Both work offline.'),
-      helpRow('Round cleaning dates', 'List or calendar, last 5 weeks'),
+      helpRow('Round cleaning dates', 'List or calendar, last 5 weeks — only counts a day if 4+ houses were cleaned then, oldest first'),
       helpRow('Earnings report', 'Totals by week/month/year'),
       helpRow('Daily work done', 'Value completed, day by day'),
       helpRow('Monthly schedule', 'Calendar of rounds and jobs due'),

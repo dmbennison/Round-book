@@ -14,16 +14,19 @@ function printRoundsLastCleaned(){
 
   const rows = roundNames.map(rn=>{
     const custs = rounds[rn];
-    const dateSet = new Set();
+    const dateCounts = {};
     let latestOverall = null;
     custs.forEach(c=>{
       (c.cleanHistory||[]).forEach(e=>{
         if(!e.date) return;
-        if(e.date >= cutoffISO) dateSet.add(e.date);
+        if(e.date >= cutoffISO) dateCounts[e.date] = (dateCounts[e.date]||0) + 1;
         if(!latestOverall || e.date > latestOverall) latestOverall = e.date;
       });
     });
-    const sortedDates = Array.from(dateSet).sort().reverse();
+    // Only counts as a real round day if at least 4 houses were actually
+    // cleaned then — otherwise it's just a one-off reclean or straggler
+    // catch-up, not a day the round as a whole was done. Oldest first.
+    const sortedDates = Object.keys(dateCounts).filter(d=>dateCounts[d] >= 4).sort();
     const datesCell = sortedDates.length
       ? sortedDates.map(d=>fmtDate(d)).join(', ')
       : `<span style="color:#66798A;">None in the last 5 weeks${latestOverall ? ' · last cleaned ' + fmtDate(latestOverall) : ' · never cleaned'}</span>`;
@@ -32,7 +35,8 @@ function printRoundsLastCleaned(){
       <td>${datesCell}</td>
     </tr>`;
   }).join('');
-  const body = `<table class="rpt-table rpt-table-as-tabs"><thead><tr><th>Round</th><th>Dates cleaned (last 5 weeks)</th></tr></thead><tbody>${rows}</tbody></table>`;
+  const body = `<table class="rpt-table rpt-table-as-tabs"><thead><tr><th>Round</th><th>Dates cleaned (last 5 weeks)</th></tr></thead><tbody>${rows}</tbody></table>
+  <p style="font-size:11px; color:#66798A; margin-top:12px;">Only shows a date if 4 or more houses in that round were cleaned on it, oldest first — single stragglers or one-off recleans aren't listed.</p>`;
   runPrint('Round Cleaning Dates', body, false, false, () => openReports());
 }
 
@@ -51,12 +55,13 @@ function printRoundsLastCleanedCalendar(){
   const gridStart = new Date(rangeStart);
   gridStart.setDate(gridStart.getDate() - rsDiffToMonday);
 
-  const cleanedByDate = {};
+  const countsByDate = {}; // date -> {round: count of customers cleaned}
   data.customers.forEach(c=>{
     (c.cleanHistory||[]).forEach(e=>{
       if(!e.date) return;
-      if(!cleanedByDate[e.date]) cleanedByDate[e.date] = new Set();
-      cleanedByDate[e.date].add(c.round || 'Unassigned');
+      const rn = c.round || 'Unassigned';
+      if(!countsByDate[e.date]) countsByDate[e.date] = {};
+      countsByDate[e.date][rn] = (countsByDate[e.date][rn]||0) + 1;
     });
   });
 
@@ -69,7 +74,9 @@ function printRoundsLastCleanedCalendar(){
       cellDate.setDate(cellDate.getDate() + w*7 + d);
       const iso = cellDate.toISOString().slice(0,10);
       const outside = cellDate < rangeStart || cellDate > today;
-      const roundsCleaned = cleanedByDate[iso] ? Array.from(cleanedByDate[iso]).sort((a,b)=>a.localeCompare(b)) : [];
+      const roundsCleaned = countsByDate[iso]
+        ? Object.keys(countsByDate[iso]).filter(rn=>countsByDate[iso][rn] >= 4).sort((a,b)=>a.localeCompare(b))
+        : [];
       const dayNum = cellDate.getDate();
       const monthLabel = (dayNum === 1) ? cellDate.toLocaleDateString('en-GB',{month:'short'}) + ' ' : '';
       bodyRows += `<td class="${outside?'outside':''}">
@@ -85,7 +92,7 @@ function printRoundsLastCleanedCalendar(){
       <thead><tr><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th></tr></thead>
       <tbody>${bodyRows}</tbody>
     </table>
-    <p style="font-size:11px; color:#66798A; margin-top:12px;">Shows any round with a customer cleaned on that day. Greyed-out days fall outside the last 5 weeks.</p>
+    <p style="font-size:11px; color:#66798A; margin-top:12px;">Shows a round on a day only if 4 or more of its houses were cleaned then — single stragglers or one-off recleans aren't shown. Greyed-out days fall outside the last 5 weeks.</p>
   `;
   runPrint('Round Cleaning Dates — Calendar', body, false, false, () => openReports());
 }

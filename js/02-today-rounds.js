@@ -1251,11 +1251,17 @@ function renderRoundsList(main){
       html += listTotalHtml(`${all.length} to text`);
     }
   } else if(roundsViewMode === 'owed'){
+    html += `<div class="seg-row">
+      <button class="seg-btn seg-btn-sm ${owedAgeFilter==='all'?'active':''}" onclick="setOwedAgeFilter('all')">All</button>
+      <button class="seg-btn seg-btn-sm ${owedAgeFilter==='0-14'?'active':''}" onclick="setOwedAgeFilter('0-14')">0–14 days</button>
+      <button class="seg-btn seg-btn-sm ${owedAgeFilter==='14-30'?'active':''}" onclick="setOwedAgeFilter('14-30')">14–30 days</button>
+      <button class="seg-btn seg-btn-sm ${owedAgeFilter==='30+'?'active':''}" onclick="setOwedAgeFilter('30+')">30+ days</button>
+    </div>`;
     let anyOwed = false;
     let grandTotal = 0;
     let owedGrandCount = 0;
     roundNames.forEach(rn=>{
-      const owedCusts = rounds[rn].filter(c=>custStatus(c).owed)
+      const owedCusts = rounds[rn].filter(c=>custStatus(c).owed && matchesOwedAgeFilter(c))
         .sort((a,b)=> (daysSinceLastPayment(b)-daysSinceLastPayment(a)) || (custStatus(b).balance-custStatus(a).balance));
       if(!owedCusts.length) return;
       anyOwed = true;
@@ -1272,8 +1278,8 @@ function renderRoundsList(main){
     if(!anyOwed){
       html += `<div class="empty">
         <svg viewBox="0 0 24 24" fill="none" stroke="#66798A" stroke-width="1.6"><path d="M20 6L9 17l-5-5"/></svg>
-        <b>Nobody owes anything</b>
-        <p>Everyone's paid up.</p>
+        <b>${owedAgeFilter==='all' ? 'Nobody owes anything' : 'No matches'}</b>
+        <p>${owedAgeFilter==='all' ? "Everyone's paid up." : 'Nobody owing falls in that age range.'}</p>
       </div>`;
     } else {
       html += listTotalHtml(`${owedGrandCount} owing · Total owed: ${money(grandTotal)}`);
@@ -1422,6 +1428,14 @@ function renderRoundDetail(main, rn){
     <button class="seg-btn seg-btn-sm ${roundFilterMode==='due'?'active':''}" onclick="setRoundFilterMode('due')">Due</button>
     <button class="seg-btn seg-btn-sm ${roundFilterMode==='owed'?'active':''}" onclick="setRoundFilterMode('owed')">Owed</button>
   </div>`;
+  if(roundFilterMode === 'owed'){
+    shellHtml += `<div class="seg-row">
+      <button class="seg-btn seg-btn-sm ${owedAgeFilter==='all'?'active':''}" onclick="setOwedAgeFilter('all')">All</button>
+      <button class="seg-btn seg-btn-sm ${owedAgeFilter==='0-14'?'active':''}" onclick="setOwedAgeFilter('0-14')">0–14 days</button>
+      <button class="seg-btn seg-btn-sm ${owedAgeFilter==='14-30'?'active':''}" onclick="setOwedAgeFilter('14-30')">14–30 days</button>
+      <button class="seg-btn seg-btn-sm ${owedAgeFilter==='30+'?'active':''}" onclick="setOwedAgeFilter('30+')">30+ days</button>
+    </div>`;
+  }
 
   let baseList = allInRound;
   if(spansMultipleDays && roundDayFilter !== 'all'){
@@ -1439,7 +1453,7 @@ function renderRoundDetail(main, rn){
       return !c.paused && (dueNow || cleanedToday);
     });
   } else if(roundFilterMode === 'owed'){
-    baseList = baseList.filter(c=>custStatus(c).owed)
+    baseList = baseList.filter(c=>custStatus(c).owed && matchesOwedAgeFilter(c))
       .sort((a,b)=> (daysSinceLastPayment(b)-daysSinceLastPayment(a)) || (custStatus(b).balance-custStatus(a).balance));
   }
   const custs = baseList;
@@ -1538,7 +1552,7 @@ function custCardHtml(c){
       </div>
       <div class="cust-meta">
         ${s.cleanBadge ? `<span class="badge ${s.cleanBadge.type}"${c.paused&&c.pauseDate?` title="Paused since ${fmtDate(c.pauseDate)}"`:''}>${s.cleanBadge.text}</span>` : `<span class="badge ok">Cleaned ${fmtDate(s.lastClean)}</span>`}
-        ${s.owed ? `<span class="badge owed">Owes ${money(s.balance)}</span>` : s.credit ? `<span class="badge ok">Credit ${money(Math.abs(s.balance))}</span>` : `<span class="badge ok">Paid up</span>`}
+        ${s.owed ? `<span class="badge owed">Owes ${money(s.balance)}${daysSinceLastPayment(c) ? ` · ${daysSinceLastPayment(c)}d` : ''}</span>` : s.credit ? `<span class="badge ok">Credit ${money(Math.abs(s.balance))}</span>` : `<span class="badge ok">Paid up</span>`}
         ${(s.owed && (c.paymentReminderCount||0) >= 2) ? `<span class="badge escalate" title="${c.paymentReminderCount} payment reminders sent, still unpaid">⚠ Chase</span>` : ''}
         ${(s.owed && c.paymentReminderSent) ? `<span class="badge paused">🔔 ${fmtDate(c.paymentReminderSentDate).split(' ').slice(0,2).join(' ')}</span>` : ''}
         ${(c.photos && c.photos.length) ? `<span class="badge paused">📷 ${c.photos.length}</span>` : ''}
@@ -1547,6 +1561,7 @@ function custCardHtml(c){
         ${c.propertyType ? `<span class="badge paused" title="${escapeAttr(propertySummaryText(c))}">🏠 ${escapeHtml(PROPERTY_TYPE_ABBR[c.propertyType]||c.propertyType)}${c.frontsOnly?' · Fronts':''}</span>` : (c.frontsOnly ? `<span class="badge paused">Fronts only</span>` : '')}
         ${c.textBeforeVisit ? `<span class="badge anniversary" title="Text before you arrive">📱 Text first</span>` : ''}
         ${showDayBadge ? `<span class="badge anniversary">Day ${c.visitDay||1}</span>` : ''}
+        ${(s.owed && isMobileNumber(c.phone)) ? `<button onclick="event.stopPropagation(); chaseCustomer('${c.id}')" style="display:inline-flex; align-items:center; gap:4px; background:var(--red-dim); color:var(--red); border:none; border-radius:20px; padding:5px 10px; font-size:0.7188rem; font-weight:800; line-height:1;">✉️ Chase</button>` : ''}
         ${(isMobileNumber(c.phone) && s.lastClean===todayISO()) ? (
           c.cleanedTodayTextSentDate === s.lastClean
             ? `<button onclick="event.stopPropagation(); sendTemplate('${c.id}','cleanedToday')" title="Sent — tap to send again" style="display:inline-flex; align-items:center; gap:4px; background:var(--green-dim); color:var(--green); border:none; border-radius:20px; padding:5px 10px; font-size:0.7188rem; font-weight:800; line-height:1;">✓ Text sent</button>`

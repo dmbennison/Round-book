@@ -1032,6 +1032,28 @@ function sendTemplate(id, kind, returnTo){
   openMessagePreview(title, c.phone, msg, afterSend, returnTo, {item: c, kind});
 }
 
+// Sends a single payment-reminder text straight from a customer card — same
+// template, logging, and reminder-count bump as a Remind-all send, just
+// without opening that sheet first.
+function chaseCustomer(id){
+  const c = data.customers.find(x=>x.id===id);
+  if(!c || !isMobileNumber(c.phone)){ toast('No mobile number saved for this customer'); return; }
+  const s = custStatus(c);
+  const tpl = data.settings.payTemplate;
+  const firstName = c.name ? c.name.trim().split(' ')[0] : '';
+  const company = data.settings.companyName || '';
+  const yourname = data.settings.yourName || '';
+  const amt = s.owed ? s.balance : c.price;
+  const msg = applyTemplate(tpl, {name: firstName, amount: amt, company, yourname, address: c.address, daysoverdue: daysSinceLastPayment(c)});
+  sendPhoneMessage(c.phone, msg);
+  logMessage(c, 'pay');
+  c.paymentReminderSent = true;
+  c.paymentReminderSentDate = todayISO();
+  c.paymentReminderCount = (c.paymentReminderCount||0) + 1;
+  saveData();
+  render();
+}
+
 function openBulkReminders(kind, roundName){
   const rounds = groupByRound(data.customers);
   const roundCusts = rounds[roundName] || [];
