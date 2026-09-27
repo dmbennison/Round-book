@@ -790,17 +790,13 @@ function openReports(){
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M17 7h4v4"/></svg>
       <div><div class="t1">Upsell opportunities</div><div class="t2">Fronts-only, conservatory, garage door and gutter add-ons worth offering</div></div>
     </button>
-    <button class="backup-btn" onclick="closeSheet(); openUpsellCampaignSend()">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-      <div><div class="t1">Text upsell opportunities</div><div class="t2">Pick a campaign and send it straight to everyone on that list</div></div>
-    </button>
     <button class="backup-btn" onclick="printPropertyTypesReport()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9.5"/></svg>
       <div><div class="t1">Property types</div><div class="t2">Houses and average price by property type, total and by round</div></div>
     </button>
     <button class="backup-btn" onclick="printMileageReport()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/><path d="M5 17H3v-6l2-5h9l4 5h1a2 2 0 0 1 2 2v4h-2M9 17h6M5 12h13"/></svg>
-      <div><div class="t1">Mileage</div><div class="t2">Daily, weekly, monthly and tax-year-to-date totals</div></div>
+      <div><div class="t1">Mileage</div><div class="t2">Daily, weekly, monthly, tax-year-to-date totals, and mileage allowance</div></div>
     </button>
   `);
 }

@@ -509,11 +509,10 @@ const UPSELL_UPLIFT = {
   garageDoor: 10,
   gutters: 60
 };
-// Shared upsell-opportunity detection, used by both the printed report and
-// the "Text upsell opportunities" campaign send screen, so the two always
-// agree on exactly who qualifies and why. Paused customers are left out —
-// no point suggesting an upsell to someone who's stopped the service,
-// matching how other reports (e.g. property types) treat them as inactive.
+// Detects who qualifies for an upsell suggestion, and why, for the printed
+// Upsell opportunities report. Paused customers are left out — no point
+// suggesting an upsell to someone who's stopped the service, matching how
+// other reports (e.g. property types) treat them as inactive.
 function upsellOpportunitiesList(){
   const today = todayISO();
   const opportunities = [];
@@ -626,6 +625,15 @@ function mondayOfWeek(dateStr){
   d.setDate(d.getDate()-dayIdx);
   return d.toISOString().slice(0,10);
 }
+// HMRC's standard mileage allowance: 45p/mile for the first 10,000 business
+// miles in a tax year, 25p/mile after that. The 10,000-mile threshold resets
+// every tax year, so this only works correctly applied per tax year, never
+// as a single running total across everything ever logged.
+const MILEAGE_RATE_HIGH = 0.45, MILEAGE_RATE_LOW = 0.25, MILEAGE_HIGH_RATE_MILES = 10000;
+function mileageAllowanceForMiles(miles){
+  if(miles <= MILEAGE_HIGH_RATE_MILES) return miles * MILEAGE_RATE_HIGH;
+  return MILEAGE_HIGH_RATE_MILES * MILEAGE_RATE_HIGH + (miles - MILEAGE_HIGH_RATE_MILES) * MILEAGE_RATE_LOW;
+}
 function printMileageReport(){
   const entries = (data.mileageLog||[])
     .filter(e=>e.start!=null && e.end!=null && e.end>=e.start)
@@ -639,6 +647,17 @@ function printMileageReport(){
   const tyStart = taxYearStart(today);
   const tyEnd = (()=>{ const d = new Date(tyStart+'T00:00:00'); d.setFullYear(d.getFullYear()+1); d.setDate(d.getDate()-1); return d.toISOString().slice(0,10); })();
   const tyMiles = entries.filter(e=>e.date >= tyStart).reduce((s,e)=>s+e.miles,0);
+
+  // Every tax year that has any logged mileage, oldest first for the table —
+  // each year's 10,000-mile threshold is worked out independently.
+  const tyTotals = {};
+  entries.forEach(e=>{ const ty = taxYearStart(e.date); tyTotals[ty] = (tyTotals[ty]||0) + e.miles; });
+  const tyAllowanceRows = Object.keys(tyTotals).sort((a,b)=>b.localeCompare(a)).map(ty=>{
+    const miles = tyTotals[ty];
+    const end = new Date(ty+'T00:00:00'); end.setFullYear(end.getFullYear()+1); end.setDate(end.getDate()-1);
+    const label = `6 Apr ${ty.slice(0,4)} – ${fmtDate(end.toISOString().slice(0,10))}`;
+    return `<tr><td>${label}</td><td style="text-align:right;">${miles.toFixed(1)}</td><td style="text-align:right;">${money(mileageAllowanceForMiles(miles))}</td></tr>`;
+  }).join('');
 
   const monthTotals = {};
   entries.forEach(e=>{ const mk = e.date.slice(0,7); monthTotals[mk] = (monthTotals[mk]||0) + e.miles; });
@@ -658,7 +677,14 @@ function printMileageReport(){
 
   const body = `
     <div class="rpt-round-title" style="margin-top:0;">Tax year to date (6 Apr ${tyStart.slice(0,4)} – ${fmtDate(tyEnd)})</div>
-    <table class="rpt-table"><tbody><tr style="font-weight:800;"><td>Total miles</td><td style="text-align:right;">${tyMiles.toFixed(1)}</td></tr></tbody></table>
+    <table class="rpt-table"><tbody>
+      <tr style="font-weight:800;"><td>Total miles</td><td style="text-align:right;">${tyMiles.toFixed(1)}</td></tr>
+      <tr><td>Mileage allowance</td><td style="text-align:right;">${money(mileageAllowanceForMiles(tyMiles))}</td></tr>
+    </tbody></table>
+
+    <div class="rpt-round-title">Mileage allowance by tax year</div>
+    <table class="rpt-table"><thead><tr><th>Tax year</th><th style="text-align:right;">Miles</th><th style="text-align:right;">Allowance</th></tr></thead><tbody>${tyAllowanceRows}</tbody></table>
+    <p style="font-size:11px; color:#66798A; margin-top:8px;">Based on HMRC's standard mileage rate: 45p/mile for the first 10,000 business miles in a tax year, 25p/mile after that. Each tax year's 10,000-mile threshold is worked out separately.</p>
 
     <div class="rpt-round-title">Monthly totals</div>
     <table class="rpt-table"><thead><tr><th>Month</th><th style="text-align:right;">Miles</th></tr></thead><tbody>${monthRows}</tbody></table>

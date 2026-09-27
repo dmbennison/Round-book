@@ -7,9 +7,10 @@
    away into two paths: an existing user goes straight to Backup & restore
    to bring their data back; a new user gets a short 2-step setup instead. */
 function maybeShowFirstRun(){
-  if(data.customers.length > 0) return;
-  if(localStorage.getItem('roundBookOnboardingSeen')) return;
+  if(data.customers.length > 0) return false;
+  if(localStorage.getItem('roundBookOnboardingSeen')) return false;
   openWelcomeSheet();
+  return true;
 }
 function markOnboardingSeen(){ localStorage.setItem('roundBookOnboardingSeen', '1'); }
 
@@ -234,7 +235,7 @@ const FOCUSED_HELP = {
       helpP('A "Getting started" card sits above the hero for anything left outstanding from first-time setup — business details, first customer, first backup — until everything\'s done or you dismiss it with the ✕. Re-run first-time setup any time from the "i" menu.'),
       helpP('Today is the home screen. The top hero card shows what\'s due today, its value, today\'s clean total and paid total, and — if more than one round has anyone due — a row of round chips underneath. Tap a chip to jump straight to that round\'s Due list; the hero then stays scoped to that round (its own due count, and a live "cleaned" count next to it as you work through it) until you pick a different round or a new day starts. Below the hero, four small tiles — text before visit, mileage, jobs today, and quotes needing follow-up — then a full-width "Customers owing" tile at the bottom showing how much is outstanding in each of 0–14, 14–30 and 30+ days. Tap any of them to go straight to the full screen for it.'),
       helpP('Text before visit and quotes needing follow-up show a small "X overdue" / "X well overdue" note underneath the count when there is one, so you can see at a glance if any are genuinely overdue rather than just due today or freshly past their follow-up window.'),
-      helpP('The Mileage tile logs a start-of-day reading on first tap and an end-of-day reading on the next tap — both readings stay visible on the tile once logged, and the day\'s total appears once both are in. Tap again to view, edit, or clear it. See it broken down by day/week/month/tax-year-to-date in Reports.')
+      helpP('The Mileage tile logs a start-of-day reading on first tap and an end-of-day reading on the next tap — both readings stay visible on the tile once logged, and the day\'s total appears once both are in. Tap again to view, edit, or clear it. If the app\'s reopened and an earlier day was left with a start reading but no end reading, it\'ll prompt for that end reading first. See it broken down by day/week/month/tax-year-to-date, plus the mileage tax allowance, in Reports.')
     ]
   },
   work: {
@@ -248,7 +249,7 @@ const FOCUSED_HELP = {
     body: () => [
       helpP('Open Rounds from the Work tab. Use the Rounds / Due / Text first / Owed switch at the top, or open a single round to see its customers. Swipe a card halfway right to mark cleaned, all the way right to mark cleaned AND paid in one go, or left to mark paid alone — the background colour shows which action you\'re about to trigger as you drag. Every swipe action can be undone for a few seconds afterwards via the Undo button on the confirmation. Use Reorder to set your walking order — drag the ⠿ handle on each customer, or use the arrows.'),
       helpP('A round card shows its customer count and value as price/owed, with paused customers left out of both.'),
-      helpP('A round\'s ⋯ menu has: Show map (numbered stops with a route line), Start round (directions for every stop), Print, Defer the whole round 4 weeks, Set whole round due date (pick an exact date for everyone at once), and Apply price uplift (a % or flat £ increase for every active customer in the round).'),
+      helpP('A round\'s ⋯ menu has: Show map (numbered stops with a route line), Start round (directions for every stop), Print, Defer (push everyone\'s due date back by 1 day, 1 week, 4 weeks, or a custom date), and Apply price uplift (a % or flat £ increase for every active customer in the round).'),
       helpP('Suggest a route order is inside Reorder — it works out a shorter visiting order using real road distances where possible, and shows it to you before changing anything (nothing\'s applied unless you tap "Use this order"). Both this and Show map re-check every address\'s location each time, unless it\'s been manually corrected (see below).'),
       helpP('On the map, every address gets a pin — one that couldn\'t be found automatically shows as a grey dashed pin near the others. Drag any pin to fix its spot; dragging locks it there, so it\'s never fetched again and won\'t be moved by a later map or route request.'),
       helpP('The photo icon on the Rounds screen opens the photo gallery.'),
@@ -274,7 +275,7 @@ const FOCUSED_HELP = {
       helpP('Every text (reminders, receipts, quotes) opens a preview you can edit first, and only offers to send to a mobile number. "Messages" under History lists everything actually sent.'),
       helpP('Tick "Text before I arrive" to flag a customer who needs a heads-up text. Tick "Don\'t send marketing texts" to opt them out of every campaign — this doesn\'t affect calls, quotes, or normal reminders.'),
       helpP('Property type, add-ons, and "fronts only" can be recorded here too — fronts-only counts as half a house in average-price figures.'),
-      helpP('An active customer\'s due date can be pushed +4 weeks or set to an exact date, any time — not just once already deferred. "Apply price uplift" increases their price by a % or a flat £ amount in one step, recorded in their price history.')
+      helpP('An active customer\'s due date can be pushed back with "Defer" — 1 day, 1 week, 4 weeks, or a custom date — any time, not just once already deferred. "Apply price uplift" increases their price by a % or a flat £ amount in one step, recorded in their price history.')
     ]
   },
   quotes: {
@@ -304,9 +305,9 @@ const FOCUSED_HELP = {
       helpRow('Monthly schedule', 'Calendar of rounds and jobs due'),
       helpRow('One-off jobs', 'Every job, status and value'),
       helpRow('Property types', 'Houses and average price by type'),
-      helpRow('Mileage', 'Daily, weekly, monthly, tax-year-to-date'),
+      helpRow('Mileage', 'Daily, weekly, monthly, tax-year-to-date, and the mileage tax allowance (45p/mile for the first 10,000 miles in a tax year, 25p after)'),
       helpRow('Price review due', '12+ months since last increase; plus anyone priced below their property type\'s average'),
-      helpRow('Upsell opportunities', 'Fronts-only, conservatory, garage door and gutter add-ons worth offering — print it, or use "Text upsell opportunities" above it to pick a marketing campaign and send straight to that list')
+      helpRow('Upsell opportunities', 'Fronts-only, conservatory, garage door and gutter add-ons worth offering')
     ]
   },
   backup: {

@@ -298,6 +298,46 @@ function clearTodayMileage(){
     render();
   }});
 }
+// Catches the case where a start reading was logged on some earlier day but
+// the app was never opened again that evening to log the end reading — asks
+// for it the next time the app opens, rather than leaving that day's
+// mileage (and the tax allowance calculated from it) permanently missing.
+function maybeShowMissingMileagePrompt(){
+  const today = todayISO();
+  const openEntry = (data.mileageLog||[])
+    .filter(e => e.date !== today && e.start!=null && e.end==null)
+    .sort((a,b)=> b.date.localeCompare(a.date))[0];
+  if(!openEntry) return false;
+  openMissingMileagePrompt(openEntry);
+  return true;
+}
+function openMissingMileagePrompt(entry){
+  openSheet(`
+    <div class="sheet-head">
+      <h2 style="flex:1; min-width:0;">Missing end mileage</h2>
+      <button class="sheet-close" onclick="closeSheet()">✕</button>
+    </div>
+    <p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 16px; line-height:1.5;">You logged a start reading of <b>${entry.start}</b> on ${fmtDate(entry.date)} but never logged an end reading for that day. Enter it now so that day's mileage is counted.</p>
+    <label style="margin-top:0;">End of day odometer reading</label>
+    <input type="number" id="missing_mileage_input" inputmode="decimal" step="0.1" min="${entry.start}" placeholder="e.g. 45260">
+    <div class="form-actions">
+      <button class="btn-primary" onclick="saveMissingMileageEntry('${entry.date}')">Save</button>
+    </div>
+    <button class="btn-danger-text" onclick="closeSheet()">I'll do it later</button>
+  `);
+}
+function saveMissingMileageEntry(date){
+  const raw = document.getElementById('missing_mileage_input').value;
+  const val = parseFloat(raw);
+  const entry = (data.mileageLog||[]).find(e=>e.date===date);
+  if(!entry) return;
+  if(raw === '' || isNaN(val) || val < entry.start){ toast('End mileage should be more than the start reading'); return; }
+  entry.end = val;
+  saveData();
+  toast(`${(val-entry.start).toFixed(1)} miles logged for ${fmtDate(date)}`);
+  closeSheet();
+  render();
+}
 
 function quoteNeedsFollowUp(q, today){
   today = today || todayISO();
@@ -1290,13 +1330,9 @@ function openRoundActionsMenu(rn){
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
       <div><div class="t1">Print this round</div><div class="t2">Customer list with contact details and prices</div></div>
     </button>
-    <button class="backup-btn" onclick="nudgeRoundDue('${escapeAttr(rn)}')">
+    <button class="backup-btn" onclick="closeSheet(); openDeferSheet('round','${escapeAttr(rn)}')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-      <div><div class="t1">Defer whole round 4 weeks</div><div class="t2">Push every active customer's due date back at once</div></div>
-    </button>
-    <button class="backup-btn" onclick="closeSheet(); openSetRoundDueDate('${escapeAttr(rn)}')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-      <div><div class="t1">Set whole round due date</div><div class="t2">Choose an exact due date for every active customer</div></div>
+      <div><div class="t1">Defer</div><div class="t2">Push every active customer's due date back at once</div></div>
     </button>
     <button class="backup-btn" onclick="closeSheet(); openRoundUpliftSheet('${escapeAttr(rn)}')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>

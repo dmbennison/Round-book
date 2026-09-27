@@ -353,29 +353,26 @@ function resumeCustomer(id){
   toast('Customer resumed');
 }
 
-// Pushes a customer's next due date out by 4 weeks without logging a clean — for a
-// short, one-off delay (holiday, bad weather, access issue) where they're still an
-// active customer, unlike Pause which is meant for longer or indefinite breaks.
-// Shared date math for both the single-customer and whole-round defer actions.
-// Bases the new date off whichever is latest: their natural next-due date (so
-// someone not yet due gets their whole cycle pushed out), today (so an
-// already-overdue customer still gets a genuine 4 weeks from now), or an existing
-// deferral (so nudging again while already deferred stacks correctly).
-function deferredDateFor(c){
+// Shared date math for deferring by a fixed number of days. Bases the new
+// date off whichever is latest: their natural next-due date (so someone not
+// yet due gets their whole cycle pushed out), today (so an already-overdue
+// customer still gets a genuine period from now), or an existing deferral
+// (so deferring again while already deferred stacks correctly).
+function deferredDateFor(c, days){
+  days = days || 28;
   const today = todayISO();
   const naturalDue = nextDueISO(c) || today;
   let base = naturalDue > today ? naturalDue : today;
   if(c.deferUntil && c.deferUntil > base) base = c.deferUntil;
   const d = new Date(base+'T00:00:00');
-  d.setDate(d.getDate() + 28);
+  d.setDate(d.getDate() + days);
   return d.toISOString().slice(0,10);
 }
-function deferCustomerDue(id){
-  const c = data.customers.find(x=>x.id===id);
-  if(!c) return;
-  c.deferUntil = deferredDateFor(c);
-  saveData(); openCustomerDetail(id); render();
-  toast(`Due date deferred to ${fmtDate(c.deferUntil)}`);
+function deferLabel(days){
+  if(days===1) return '1 day';
+  if(days===7) return '1 week';
+  if(days===28) return '4 weeks';
+  return `${days} days`;
 }
 function cancelDefer(id){
   const c = data.customers.find(x=>x.id===id);
@@ -384,74 +381,102 @@ function cancelDefer(id){
   saveData(); openCustomerDetail(id); render();
   toast('Defer cancelled');
 }
-// Lets a customer's due date be set to an exact date rather than only ever
-// jumping in fixed 4-week steps — available whether or not they're currently
-// deferred (defaults to their existing deferred date, or the +4-weeks date).
-function editDeferDate(id){
-  const c = data.customers.find(x=>x.id===id);
-  if(!c) return;
+
+/* ---------- Defer ----------
+   One "Defer" entry point, for a single customer or a whole round, offering
+   1 day / 1 week / 4 weeks or an exact custom date — rather than several
+   separate buttons for a fixed +4 weeks and a separate "set exact date". */
+function openDeferSheet(scope, idOrRoundName){
+  const isRound = scope === 'round';
+  const c = isRound ? null : data.customers.find(x=>x.id===idOrRoundName);
+  if(!isRound && !c) return;
+  const custs = isRound ? data.customers.filter(x=>x.round===idOrRoundName && !x.paused) : [c];
+  if(isRound && !custs.length){ toast('No active customers in this round'); return; }
+  const currentlyDeferred = !isRound && c.deferUntil;
   openSheet(`
     <div class="sheet-head">
-      <h2 style="flex:1; min-width:0;">Set due date</h2>
+      <h2 style="flex:1; min-width:0;">Defer</h2>
       <button class="sheet-close" onclick="closeSheet()">✕</button>
     </div>
-    <label style="margin-top:0;">Due again from</label>
-    <input type="date" id="defer_date_input" value="${c.deferUntil || deferredDateFor(c)}">
-    <div class="form-actions">
-      <button class="btn-primary" onclick="saveDeferDate('${id}')">Save</button>
-    </div>
-  `, () => openCustomerDetail(id));
+    ${currentlyDeferred ? `<p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 16px;">Currently deferred to ${fmtDate(c.deferUntil)}.</p>`
+      : (isRound ? `<p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 16px;">Applies to all ${custs.length} active customer${custs.length===1?'':'s'} in "${escapeHtml(idOrRoundName)}".</p>` : '')}
+    <button class="backup-btn" onclick="applyDefer('${scope}','${escapeAttr(idOrRoundName)}',1)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      <div><div class="t1">1 day</div></div>
+    </button>
+    <button class="backup-btn" onclick="applyDefer('${scope}','${escapeAttr(idOrRoundName)}',7)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      <div><div class="t1">1 week</div></div>
+    </button>
+    <button class="backup-btn" onclick="applyDefer('${scope}','${escapeAttr(idOrRoundName)}',28)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      <div><div class="t1">4 weeks</div></div>
+    </button>
+    <button class="backup-btn" onclick="openDeferCustomDate('${scope}','${escapeAttr(idOrRoundName)}')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      <div><div class="t1">Custom date</div></div>
+    </button>
+    ${currentlyDeferred ? `<button class="btn-danger-text" style="margin-top:6px;" onclick="cancelDefer('${idOrRoundName}')">Cancel defer</button>` : ''}
+  `, () => isRound ? openRoundActionsMenu(idOrRoundName) : openCustomerDetail(idOrRoundName));
 }
-function saveDeferDate(id){
-  const c = data.customers.find(x=>x.id===id);
-  if(!c) return;
-  const v = document.getElementById('defer_date_input').value;
-  if(!v){ toast('Pick a date'); return; }
-  c.deferUntil = v;
-  saveData(); openCustomerDetail(id); render();
-  toast(`Due date deferred to ${fmtDate(c.deferUntil)}`);
-}
-// Applies the same defer-by-4-weeks logic to every active (non-paused) customer
-// in a round at once — for things like bad weather or a run of cancellations that
-// affect the whole round rather than one customer.
-function nudgeRoundDue(rn){
-  const custs = data.customers.filter(c => c.round === rn && !c.paused);
-  if(!custs.length){ toast('No active customers in this round'); return; }
-  appConfirm(`Defer the due date by 4 weeks for all ${custs.length} active customer${custs.length===1?'':'s'} in "${rn}"?`, {title:'Defer whole round', confirmLabel:'Defer', danger:false, onConfirm: () => {
-    custs.forEach(c => { c.deferUntil = deferredDateFor(c); });
+function applyDefer(scope, idOrRoundName, days){
+  if(scope === 'round'){
+    const custs = data.customers.filter(x=>x.round===idOrRoundName && !x.paused);
+    if(!custs.length){ toast('No active customers in this round'); return; }
+    custs.forEach(c => { c.deferUntil = deferredDateFor(c, days); });
     saveData();
     closeSheet();
     render();
-    toast(`Deferred ${custs.length} customer${custs.length===1?'':'s'} in "${rn}" by 4 weeks`);
-  }});
+    toast(`Deferred ${custs.length} customer${custs.length===1?'':'s'} in "${idOrRoundName}" by ${deferLabel(days)}`);
+  } else {
+    const c = data.customers.find(x=>x.id===idOrRoundName);
+    if(!c) return;
+    c.deferUntil = deferredDateFor(c, days);
+    saveData();
+    closeSheet();
+    openCustomerDetail(idOrRoundName);
+    render();
+    toast(`Due date deferred to ${fmtDate(c.deferUntil)}`);
+  }
 }
-// Lets a whole round's due date be set to one exact date in one step, as an
-// alternative to nudging everyone forward a fixed 4 weeks (see nudgeRoundDue).
-function openSetRoundDueDate(rn){
-  const custs = data.customers.filter(c => c.round === rn && !c.paused);
-  if(!custs.length){ toast('No active customers in this round'); return; }
+function openDeferCustomDate(scope, idOrRoundName){
+  const isRound = scope === 'round';
+  const c = isRound ? null : data.customers.find(x=>x.id===idOrRoundName);
+  const custs = isRound ? data.customers.filter(x=>x.round===idOrRoundName && !x.paused) : (c ? [c] : []);
+  if(!custs.length) return;
   openSheet(`
     <div class="sheet-head">
-      <h2 style="flex:1; min-width:0;">Set due date</h2>
+      <h2 style="flex:1; min-width:0;">Defer — custom date</h2>
       <button class="sheet-close" onclick="closeSheet()">✕</button>
     </div>
     <label style="margin-top:0;">Due again from</label>
-    <input type="date" id="round_due_date_input" value="${deferredDateFor(custs[0])}">
-    <p style="color:var(--ink-muted); font-size:0.75rem; margin:6px 2px 16px; line-height:1.5;">Applies to all ${custs.length} active customer${custs.length===1?'':'s'} in "${escapeHtml(rn)}".</p>
+    <input type="date" id="defer_date_input" value="${isRound ? deferredDateFor(custs[0],28) : (c.deferUntil || deferredDateFor(c,28))}">
+    ${isRound ? `<p style="color:var(--ink-muted); font-size:0.75rem; margin:6px 2px 16px; line-height:1.5;">Applies to all ${custs.length} active customer${custs.length===1?'':'s'} in "${escapeHtml(idOrRoundName)}".</p>` : ''}
     <div class="form-actions">
-      <button class="btn-primary" onclick="saveRoundDueDate('${escapeAttr(rn)}')">Save</button>
+      <button class="btn-primary" onclick="saveDeferCustomDate('${scope}','${escapeAttr(idOrRoundName)}')">Save</button>
     </div>
-  `, () => openRoundActionsMenu(rn));
+  `, () => openDeferSheet(scope, idOrRoundName));
 }
-function saveRoundDueDate(rn){
-  const v = document.getElementById('round_due_date_input').value;
+function saveDeferCustomDate(scope, idOrRoundName){
+  const v = document.getElementById('defer_date_input').value;
   if(!v){ toast('Pick a date'); return; }
-  const custs = data.customers.filter(c => c.round === rn && !c.paused);
-  custs.forEach(c => { c.deferUntil = v; });
-  saveData();
-  closeSheet();
-  render();
-  toast(`Due date set to ${fmtDate(v)} for ${custs.length} customer${custs.length===1?'':'s'} in "${rn}"`);
+  if(scope === 'round'){
+    const custs = data.customers.filter(x=>x.round===idOrRoundName && !x.paused);
+    custs.forEach(c => { c.deferUntil = v; });
+    saveData();
+    closeSheet();
+    render();
+    toast(`Due date set to ${fmtDate(v)} for ${custs.length} customer${custs.length===1?'':'s'} in "${idOrRoundName}"`);
+  } else {
+    const c = data.customers.find(x=>x.id===idOrRoundName);
+    if(!c) return;
+    c.deferUntil = v;
+    saveData();
+    closeSheet();
+    openCustomerDetail(idOrRoundName);
+    render();
+    toast(`Due date deferred to ${fmtDate(v)}`);
+  }
 }
 
 /* ---------- Price uplift ----------
@@ -1361,71 +1386,6 @@ function sendMarketingText(id){
   c.marketingFollowUpDate = '';
   c.marketingCampaign = activeCampaign ? activeCampaign.id : '';
   saveData();
-}
-
-/* ---------- Text upsell opportunities ----------
-   Lets a marketing campaign be picked and sent straight to everyone the
-   Upsell opportunities report (see upsellOpportunitiesList) has flagged —
-   same one-tap-per-customer send flow as Send group text, but scoped to
-   that specific list instead of a round/property-type filter. */
-let upsellSelectedCampaignId = null;
-function openUpsellCampaignSend(){
-  const campaigns = (data.settings.marketingCampaigns && data.settings.marketingCampaigns.length) ? data.settings.marketingCampaigns : DEFAULT_MARKETING_CAMPAIGNS;
-  if(!upsellSelectedCampaignId || !campaigns.some(c=>c.id===upsellSelectedCampaignId)){
-    upsellSelectedCampaignId = campaigns[0].id;
-  }
-  const activeCampaign = campaigns.find(c=>c.id===upsellSelectedCampaignId);
-  const opportunities = upsellOpportunitiesList().filter(o=>isMobileNumber(o.c.phone) && !o.c.marketingOptOut);
-  const tpl = document.getElementById('upsell_msg') ? document.getElementById('upsell_msg').value : (activeCampaign ? activeCampaign.body : DEFAULT_MARKETING_TEMPLATE);
-
-  openSheet(`
-    <div class="sheet-head">
-      <h2 style="flex:1; min-width:0;">Text upsell opportunities</h2>
-      <button class="sheet-close" onclick="closeSheet()">✕</button>
-    </div>
-    <label style="margin-top:0;">Campaign</label>
-    <select id="upsell_campaign_id" onchange="selectUpsellCampaign(this.value)" style="margin-bottom:16px;">
-      ${campaigns.map(c=>`<option value="${c.id}" ${c.id===upsellSelectedCampaignId?'selected':''}>${escapeHtml(c.name)}</option>`).join('')}
-    </select>
-    <label style="margin-top:0;">Message <span style="text-transform:none; font-weight:500; opacity:0.7;">({name}, {company}, {yourname})</span></label>
-    <textarea id="upsell_msg" rows="4">${escapeHtml(tpl)}</textarea>
-    <p style="color:var(--ink-muted); font-size:0.7812rem; margin:10px 2px 14px; line-height:1.5;">
-      Tap Send for each customer — it opens ${data.settings.messagingApp==='whatsapp'?'WhatsApp':'Messages'} pre-filled and ready to go. Come back here for the next one.
-    </p>
-    <div style="color:var(--ink-muted); font-size:0.75rem; font-weight:700; margin:0 2px 8px;">${opportunities.length} customer${opportunities.length===1?'':'s'} with an upsell opportunity and a mobile number</div>
-    ${opportunities.length ? opportunities.map(({c, reason, uplift})=>`
-      <div class="cust-card" id="bulkrow-${c.id}" style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
-        <div style="min-width:0;">
-          <div class="cust-addr" style="font-weight:800; font-size:0.9062rem;">${escapeHtml(c.address||c.name||'Customer')}</div>
-          <div style="font-size:0.75rem; color:var(--ink-muted); margin-top:2px;">${escapeHtml(reason)} · ${money(uplift)}</div>
-        </div>
-        <button class="btn btn-clean" style="flex:0 0 auto; padding:9px 16px;" onclick="sendUpsellCampaignText('${c.id}')">Send</button>
-      </div>`).join('') : `<p style="color:var(--ink-muted); font-size:0.8438rem; margin:0 2px;">Nobody with an upsell opportunity has a usable mobile number right now.</p>`}
-  `, () => openReports());
-}
-function selectUpsellCampaign(id){ upsellSelectedCampaignId = id; openUpsellCampaignSend(); }
-function sendUpsellCampaignText(id){
-  const c = data.customers.find(x=>x.id===id);
-  if(!c || !isMobileNumber(c.phone)){ toast('No mobile number saved for this customer'); return; }
-  if(c.marketingOptOut){ toast("This customer has opted out of marketing texts"); return; }
-  const campaigns = (data.settings.marketingCampaigns && data.settings.marketingCampaigns.length) ? data.settings.marketingCampaigns : DEFAULT_MARKETING_CAMPAIGNS;
-  const activeCampaign = campaigns.find(c=>c.id===upsellSelectedCampaignId) || campaigns[0];
-  const msgField = document.getElementById('upsell_msg');
-  const tpl = msgField ? msgField.value : (activeCampaign ? activeCampaign.body : DEFAULT_MARKETING_TEMPLATE);
-  const firstName = c.name ? c.name.trim().split(' ')[0] : '';
-  const company = data.settings.companyName || '';
-  const yourname = data.settings.yourName || '';
-  const msg = applyTemplate(tpl, {name: firstName, company, yourname});
-  sendPhoneMessage(c.phone, msg);
-  logMessage(c, 'marketing', activeCampaign ? {campaign: activeCampaign.id} : null);
-  c.marketingStatus = 'awaiting';
-  c.marketingNextAction = 'none';
-  c.marketingActionDone = false;
-  c.marketingFollowUpDate = '';
-  c.marketingCampaign = activeCampaign ? activeCampaign.id : '';
-  saveData();
-  toast(`Sent to ${c.name || c.address || 'customer'}`);
-  openUpsellCampaignSend();
 }
 
 function openAddCleanForm(id){

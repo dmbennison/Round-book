@@ -6,7 +6,7 @@ const STORE_KEY = 'roundBookData_v1';
 // APP_VERSION is a plain decimal number (e.g. 1.01, 1.02 ... 1.99, 2.00) —
 // bump by 0.01 for every change. formatVersion always renders it to exactly
 // two decimal places, so it's never shown as "1.1" or "1.100".
-const APP_VERSION = 2.02;
+const APP_VERSION = 2.03;
 function formatVersion(v){ return Number(v).toFixed(2); }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
@@ -15,6 +15,7 @@ function formatVersion(v){ return Number(v).toFixed(2); }
 // the most recent 10 entries (oldest ones can be left in the array or trimmed,
 // either is fine, since the display always slices to 10).
 const VERSION_HISTORY = [
+  {version: 2.03, changes: ['Opening the app now prompts for an end mileage reading if an earlier day was left with a start reading but no end reading', 'Removed "Text upsell opportunities" from Reports', 'Every "defer 4 weeks" option is now just "Defer", offering 1 day / 1 week / 4 weeks / a custom date, for a single customer or a whole round', 'Mileage report now shows the mileage tax allowance (45p/mile for the first 10,000 miles in a tax year, 25p/mile after), both for the current tax year to date and broken down by tax year']},
   {version: 2.02, changes: ['Fixed the owed amounts on the Today tab (and the Owed list\'s sort order, and the {daysoverdue} in payment reminder texts) — they were measured from a customer\'s last payment date rather than from when their current balance actually became outstanding, so a fresh charge could wrongly land in the 30+ days bucket', 'Fixed tapping the Today hero once a round was selected not taking you through to that round\'s Due list']},
   {version: 2.01, changes: ['Added "Business" as a property type', 'The Today tab\'s payment tile no longer says "Payment reminders" — it now leads with how many customers owe money, then breaks the total down into 0–14, 14–30 and 30+ days outstanding. It\'s now full-width and moved to the bottom of the tiles, so those amounts can be shown bigger']},
   {version: 2.00, changes: ['Version numbers now start from 2.xx', 'Fixed the app not updating itself — it now checks for a new version whenever it\'s opened, brought back to the foreground, or every 30 minutes while left open, and shows a small "tap to update" banner instead of needing Safari reloaded and re-added to the Home Screen', 'Reorder screen: customers can now be dragged into order by their ⠿ handle, as well as the existing up/down arrows']},
