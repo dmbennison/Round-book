@@ -6,7 +6,7 @@ const STORE_KEY = 'roundBookData_v1';
 // APP_VERSION is a plain decimal number (e.g. 1.01, 1.02 ... 1.99, 2.00) —
 // bump by 0.01 for every change. formatVersion always renders it to exactly
 // two decimal places, so it's never shown as "1.1" or "1.100".
-const APP_VERSION = 2.06;
+const APP_VERSION = 2.07;
 function formatVersion(v){ return Number(v).toFixed(2); }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
@@ -15,6 +15,7 @@ function formatVersion(v){ return Number(v).toFixed(2); }
 // the most recent 10 entries (oldest ones can be left in the array or trimmed,
 // either is fine, since the display always slices to 10).
 const VERSION_HISTORY = [
+  {version: 2.07, changes: ['Rounds: the property type average price summary now always shows a maximum of 3 across, wrapping to a new row instead of squeezing more in', 'Customer info box (press and hold): property type, extras, price and frequency now sit as small text under the address; last cleaned and last paid are now side by side, with total revenue, average time to pay and since last price review underneath']},
   {version: 2.06, changes: ['Price history now has a "Set last price review date" button, so customers imported from a spreadsheet can be given their real last price review date instead of none (or the day they were added)', 'Price history entries now say "Edit date or price" rather than "Edit amount"']},
   {version: 2.05, changes: ['Press and hold a customer card to pop up a quick info box: property type, extras, price, frequency, date last cleaned, date last paid, total revenue, average time to pay, and months since the last price review']},
   {version: 2.04, changes: ['Round cleaning dates reports (list and calendar) now only count a day if 4+ houses in that round were cleaned on it, oldest first — no more single stragglers or one-off recleans cluttering the list', 'The Owed view — both the Rounds tab\'s and a single round\'s — can now be filtered by age of debt: 0–14, 14–30, or 30+ days', 'Every owed customer\'s card now shows how many days the balance has been outstanding, and a "✉️ Chase" button to send them a reminder straight from the card']},

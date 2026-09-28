@@ -423,6 +423,12 @@ function openCustomerInfoBox(id){
     payHtml = `${d===0 ? 'Same day' : d===1 ? '1 day' : d+' days'}<div class="ib-sub">across ${pay.count} paid clean${pay.count===1?'':'s'}</div>`;
   }
   const row = (label, valueHtml)=>`<div class="ib-row"><div class="ib-label">${label}</div><div class="ib-value">${valueHtml}</div></div>`;
+  const quickLine = [
+    escapeHtml(c.propertyType || 'Not recorded') + (c.frontsOnly ? ' (fronts only)' : ''),
+    extras.length ? extras.map(escapeHtml).join(', ') : 'No extras',
+    money(c.price),
+    `Every ${weeks} week${weeks===1?'':'s'}`
+  ].join(' · ');
   openSheet(`
     <style>
       .ib-row{display:flex; align-items:flex-start; justify-content:space-between; gap:16px; padding:11px 2px; border-bottom:1px solid var(--line);}
@@ -430,20 +436,30 @@ function openCustomerInfoBox(id){
       .ib-label{font-size:0.8125rem; font-weight:700; color:var(--ink-muted); padding-top:2px;}
       .ib-value{font-size:1.0625rem; font-weight:800; color:var(--ink); text-align:right;}
       .ib-sub{font-size:0.7188rem; font-weight:600; color:var(--ink-muted); margin-top:1px;}
+      .ib-half{flex:1; min-width:0; padding:8px 10px; background:var(--card-tint); border-radius:10px;}
+      .ib-half-label{font-size:0.7188rem; font-weight:700; color:var(--ink-muted);}
+      .ib-half-value{font-size:0.9375rem; font-weight:800; color:var(--ink); margin-top:2px;}
     </style>
     <div class="sheet-head">
       <div style="flex:1; min-width:0;">
         <h2 style="margin:0;">${escapeHtml(c.address||'No address')}</h2>
         ${c.name ? `<div style="font-size:0.8125rem; font-weight:600; color:var(--ink-muted); margin-top:2px;">${escapeHtml(c.name)}</div>` : ''}
+        <div style="font-size:0.75rem; font-weight:600; color:var(--ink-muted); margin-top:4px; line-height:1.4;">${quickLine}</div>
       </div>
       <button class="sheet-close" onclick="closeSheet()">✕</button>
     </div>
-    ${row('Property type', `${escapeHtml(c.propertyType || 'Not recorded')}${c.frontsOnly ? '<div class="ib-sub">Fronts only</div>' : ''}`)}
-    ${row('Extras', extras.length ? extras.map(escapeHtml).join('<br>') : '<span style="color:var(--ink-muted);">None</span>')}
-    ${row('Price', money(c.price))}
-    ${row('Frequency', `Every ${weeks} week${weeks===1?'':'s'}`)}
-    ${row('Last cleaned', s.lastClean ? `${fmtDate(s.lastClean)}<div class="ib-sub">${ago(s.lastClean)}</div>` : '<span style="color:var(--ink-muted);">Never</span>')}
-    ${row('Last paid', s.lastPaid ? `${fmtDate(s.lastPaid)}<div class="ib-sub">${ago(s.lastPaid)}</div>` : '<span style="color:var(--ink-muted);">Never</span>')}
+    <div style="display:flex; gap:8px; margin:4px 0 4px;">
+      <div class="ib-half">
+        <div class="ib-half-label">Last cleaned</div>
+        <div class="ib-half-value">${s.lastClean ? fmtDate(s.lastClean) : '<span style="color:var(--ink-muted);">Never</span>'}</div>
+        ${s.lastClean ? `<div class="ib-sub">${ago(s.lastClean)}</div>` : ''}
+      </div>
+      <div class="ib-half">
+        <div class="ib-half-label">Last paid</div>
+        <div class="ib-half-value">${s.lastPaid ? fmtDate(s.lastPaid) : '<span style="color:var(--ink-muted);">Never</span>'}</div>
+        ${s.lastPaid ? `<div class="ib-sub">${ago(s.lastPaid)}</div>` : ''}
+      </div>
+    </div>
     ${row('Total revenue', money(totalRevenue))}
     ${row('Average time to pay', payHtml)}
     ${row('Since last price review', reviewHtml)}

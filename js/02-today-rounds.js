@@ -1095,8 +1095,8 @@ function propertyTypeAvgSummaryHtml(list){
     return {cat, weight, avg};
   }).filter(Boolean);
   if(!rows.length) return '';
-  return `<div class="summary-overall" style="flex-wrap:wrap;">
-    ${rows.map(r=>`<div class="stat" style="flex:1 1 72px; min-width:72px;"><div class="num">${money(r.avg)}</div><div class="lbl">${escapeHtml(PROPERTY_TYPE_ABBR[r.cat]||r.cat)} (${formatHouseCount(r.weight)})</div></div>`).join('')}
+  return `<div class="summary-overall" style="display:grid; grid-template-columns:repeat(3, 1fr); row-gap:6px;">
+    ${rows.map(r=>`<div class="stat"><div class="num">${money(r.avg)}</div><div class="lbl">${escapeHtml(PROPERTY_TYPE_ABBR[r.cat]||r.cat)} (${formatHouseCount(r.weight)})</div></div>`).join('')}
   </div>`;
 }
 
