@@ -169,6 +169,7 @@
     background:linear-gradient(to bottom, var(--card-surface), var(--card-tint));
     border-radius:var(--radius); padding:14px 16px;
     border:1px solid var(--card-border); box-shadow:var(--card-shadow); position:relative; z-index:1; touch-action:pan-y; overflow:hidden;
+    -webkit-touch-callout:none; -webkit-user-select:none; user-select:none;
   }
   .cust-card::before{
     content:""; position:absolute; left:0; top:0; bottom:0; width:5px; background:var(--blue);
@@ -439,7 +440,7 @@
   <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
 </button>
 
-<div class="overlay" id="overlay" onclick="if(event.target===this) closeSheet()">
+<div class="overlay" id="overlay" onclick="if(event.target===this && Date.now() > overlayIgnoreUntil) closeSheet()">
   <div class="sheet" id="sheet"></div>
 </div>
 
