@@ -6,7 +6,7 @@ const STORE_KEY = 'roundBookData_v1';
 // APP_VERSION is a plain decimal number (e.g. 1.01, 1.02 ... 1.99, 2.00) —
 // bump by 0.01 for every change. formatVersion always renders it to exactly
 // two decimal places, so it's never shown as "1.1" or "1.100".
-const APP_VERSION = 2.07;
+const APP_VERSION = 2.08;
 function formatVersion(v){ return Number(v).toFixed(2); }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
@@ -15,6 +15,7 @@ function formatVersion(v){ return Number(v).toFixed(2); }
 // the most recent 10 entries (oldest ones can be left in the array or trimmed,
 // either is fine, since the display always slices to 10).
 const VERSION_HISTORY = [
+  {version: 2.08, changes: ['Backup reminder now triggers after 24 hours of un-backed-up changes instead of 48, and its wording now suggests saving to iCloud Drive or Google Drive in the share sheet rather than just this phone', 'Importing customers from a spreadsheet now shows the best-guess column matching first, so it can be checked and corrected before anything is actually imported, instead of only being told afterwards']},
   {version: 2.07, changes: ['Rounds: the property type average price summary now always shows a maximum of 3 across, wrapping to a new row instead of squeezing more in', 'Customer info box (press and hold): property type, extras, price and frequency now sit as small text under the address; last cleaned and last paid are now side by side, with total revenue, average time to pay and since last price review underneath']},
   {version: 2.06, changes: ['Price history now has a "Set last price review date" button, so customers imported from a spreadsheet can be given their real last price review date instead of none (or the day they were added)', 'Price history entries now say "Edit date or price" rather than "Edit amount"']},
   {version: 2.05, changes: ['Press and hold a customer card to pop up a quick info box: property type, extras, price, frequency, date last cleaned, date last paid, total revenue, average time to pay, and months since the last price review']},
@@ -756,7 +757,7 @@ let jobAnniversaryDismissed = false;
 let importReviewDismissed = false;
 const IMPORT_HOLDING_ROUND = 'Needs review (imported)';
 const BACKUP_REMINDER_DAYS = 7; // still used for the "last backup: X days ago" wording in the Backup screen
-const BACKUP_REMINDER_HOURS = 48;
+const BACKUP_REMINDER_HOURS = 24; // daily
 
 function daysSinceBackup(){
   const last = localStorage.getItem('roundBookLastBackup');
@@ -766,7 +767,7 @@ function daysSinceBackup(){
 // Marks the moment data first became un-backed-up. Called from saveData() on
 // every successful save, but only starts the clock once — it doesn't reset on
 // every subsequent change, or someone using the app daily (which is everyone)
-// would never sit un-backed-up for 48 hours and the reminder would never fire.
+// would never sit un-backed-up for 24 hours and the reminder would never fire.
 function markPendingBackupChange(){
   if(!localStorage.getItem('roundBookPendingChangeAt')){
     localStorage.setItem('roundBookPendingChangeAt', String(Date.now()));
@@ -777,7 +778,7 @@ function clearPendingBackupChange(){
 }
 // The actual reminder trigger: true once there's been at least one change that
 // still isn't reflected in any backup file, and it's been sitting that way for
-// 48+ hours. No pending change (fully backed up) never triggers, no matter how
+// 24+ hours. No pending change (fully backed up) never triggers, no matter how
 // many days go by with the app untouched.
 function backupReminderDue(){
   const pending = localStorage.getItem('roundBookPendingChangeAt');
@@ -864,7 +865,8 @@ function renderBackupBanner(){
     <div style="position:absolute; inset:0; background:rgba(0,0,0,0.4);" onclick="dismissBackupBanner()"></div>
     <div style="position:relative; background:var(--bg); width:100%; max-width:480px; border-radius:16px 16px 0 0; padding:20px; padding-bottom:calc(20px + env(safe-area-inset-bottom)); box-shadow:0 -4px 24px rgba(0,0,0,0.25);">
       <h3 style="margin:0 0 8px; font-size:1.0625rem; font-weight:800; color:var(--ink);">📦 Back up your data</h3>
-      <p style="color:var(--ink-muted); font-size:0.875rem; margin:0 0 18px; line-height:1.5;">You've made changes that haven't been backed up in over 48 hours. If something happens to this phone before then, that work is gone for good.</p>
+      <p style="color:var(--ink-muted); font-size:0.875rem; margin:0 0 12px; line-height:1.5;">You've made changes that haven't been backed up in over 24 hours. If something happens to this phone, that work is gone for good.</p>
+      <p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 0 18px; line-height:1.5;">Tap Back up now, then choose <b>Save to Files → iCloud Drive</b> (or <b>Drive</b>, if you have Google Drive) in the share sheet, so the backup lives somewhere other than just this phone.</p>
       <button class="btn btn-primary" style="width:100%; margin-bottom:10px;" onclick="exportData(); dismissBackupBanner();">Back up now</button>
       <button class="btn btn-clean" style="width:100%; border:none;" onclick="dismissBackupBanner()">Not now</button>
     </div>

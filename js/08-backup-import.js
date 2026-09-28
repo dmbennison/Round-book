@@ -425,13 +425,13 @@ async function openBackup(){
       <button class="sheet-close" onclick="closeSheet()">✕</button>
     </div>
     <p style="color:var(--ink-muted); font-size:0.8438rem; line-height:1.5; margin:0 2px 4px;">
-      Everything is stored only on this phone, in this browser. Nothing is sent anywhere. Export a backup regularly in case the app data is ever cleared.
+      Everything is stored only on this phone, in this browser. Nothing is sent anywhere. Export a backup regularly — when the share sheet appears, choose <b>Save to Files → iCloud Drive</b> (or <b>Drive</b>, if you have Google Drive) rather than just saving to this phone, in case the app data is ever cleared.
     </p>
     <p style="color:${backupReminderDue()?'var(--amber)':'var(--ink-muted)'}; font-size:0.7812rem; font-weight:700; margin:0 2px 16px;">${lastText}</p>
     ${storageWarning}
     <button class="backup-btn" onclick="exportData()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
-      <div><div class="t1">Export backup</div><div class="t2">${count} customer${count===1?'':'s'} · saves a .json file</div></div>
+      <div><div class="t1">Export backup</div><div class="t2">${count} customer${count===1?'':'s'} · saves a .json file — choose iCloud Drive or Google Drive when prompted</div></div>
     </button>
     <button class="backup-btn" onclick="exportExcel()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v16H4z"/><path d="M4 10h16M10 4v16"/></svg>
@@ -447,7 +447,7 @@ async function openBackup(){
     </button>
     <button class="backup-btn" onclick="document.getElementById('importSpreadsheetFile').click()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v16H4z"/><path d="M4 10h16M10 4v16"/><path d="M14 14l3 3 3-3" transform="translate(0,-2)"/></svg>
-      <div><div class="t1">Import customers from spreadsheet</div><div class="t2">.csv or .xlsx — added to a "needs review" round to check over</div></div>
+
     </button>
   `);
 }
@@ -564,6 +564,11 @@ document.getElementById('importFile').addEventListener('change', function(e){
 });
 
 /* ---------- import customers from spreadsheet ---------- */
+// Parsed rows/headers held between picking a file and confirming the column
+// mapping (see openImportColumnMapping) — nothing is actually imported until
+// the user confirms.
+let pendingImportRows = null;
+let pendingImportHeaders = null;
 const IMPORT_COLUMN_SYNONYMS = {
   address:   ['address','addr','street','street address','property','location'],
   name:      ['name','customer','customer name','client','clientname','contact name'],
@@ -613,77 +618,142 @@ document.getElementById('importSpreadsheetFile').addEventListener('change', func
       const rows = XLSX.utils.sheet_to_json(ws, {defval:''});
       if(!rows.length){ alert('That spreadsheet looks empty — no rows found on the first sheet.'); e.target.value=''; return; }
       const headers = Object.keys(rows[0]);
-      const map = guessColumnMap(headers);
-      if(!map.address && !map.name){
-        alert("Couldn't find an address or name column in that spreadsheet. Make sure the first row has column headers like \"Address\" and \"Name\".");
-        e.target.value = '';
-        return;
-      }
-
-      const existingAddresses = new Set(data.customers.map(c => (c.address||'').trim().toLowerCase()).filter(Boolean));
-      let imported = 0, skipped = 0;
-      const roundCusts = data.customers.filter(x=>(x.round||'Unassigned')===IMPORT_HOLDING_ROUND);
-      let nextOrder = roundCusts.reduce((m,x)=>Math.max(m, x.order!=null?x.order:-1), -1) + 1;
-
-      rows.forEach(row=>{
-        const address = map.address ? String(row[map.address]||'').trim() : '';
-        const name = map.name ? String(row[map.name]||'').trim() : '';
-        if(!address && !name) return; // blank row
-
-        const normalized = address.toLowerCase();
-        if(address && existingAddresses.has(normalized)){ skipped++; return; }
-
-        const suggestedRound = map.round ? String(row[map.round]||'').trim() : '';
-        const priceRaw = map.price ? parseFloat(String(row[map.price]).replace(/[^0-9.]/g,'')) : NaN;
-        const freqRaw = map.frequency ? parseInt(String(row[map.frequency]).replace(/[^0-9]/g,''),10) : NaN;
-
-        const notesParts = [];
-        if(suggestedRound) notesParts.push(`Imported — suggested round: ${suggestedRound}`);
-        else notesParts.push('Imported from spreadsheet');
-
-        data.customers.push({
-          id: uid(),
-          name, address,
-          phone: map.phone ? String(row[map.phone]||'').trim() : '',
-          email: map.email ? String(row[map.email]||'').trim() : '',
-          round: IMPORT_HOLDING_ROUND,
-          order: nextOrder++,
-          price: Number.isFinite(priceRaw) ? priceRaw : 0,
-          frequencyWeeks: Number.isFinite(freqRaw) && freqRaw>0 ? freqRaw : 4,
-          notes: notesParts.join(' · '),
-          cleanHistory: [], paymentHistory: [], priceHistory: []
-        });
-        if(address) existingAddresses.add(normalized);
-        imported++;
-      });
-
-      saveData();
-      closeSheet();
-      render();
-
-      const summary = skipped
-        ? `Imported ${imported} customer${imported===1?'':'s'} — ${skipped} skipped as likely duplicates`
-        : `Imported ${imported} customer${imported===1?'':'s'}`;
-      if(imported){
-        openSheet(`
-          <div class="sheet-head">
-            <h2>Import complete</h2>
-            <button class="sheet-close" onclick="closeSheet()">✕</button>
-          </div>
-          <p style="color:var(--ink); font-size:0.875rem; line-height:1.6; margin:0 2px 10px;">${escapeHtml(summary)}.</p>
-          <p style="color:var(--ink-muted); font-size:0.8125rem; line-height:1.6; margin:0 2px 18px;">They've been placed in a <b>"${escapeHtml(IMPORT_HOLDING_ROUND)}"</b> round rather than their real round, since columns were matched automatically and might not be perfect. Open each one to check the details and assign it to the right round.</p>
-          <button class="btn-primary" style="width:100%;" onclick="closeSheet(); setTab('rounds'); openRound(IMPORT_HOLDING_ROUND);">Review imported customers</button>
-        `);
-      } else {
-        toast(skipped ? `All ${skipped} rows already exist — nothing imported` : 'Nothing to import');
-      }
+      pendingImportRows = rows;
+      pendingImportHeaders = headers;
+      openImportColumnMapping(guessColumnMap(headers));
     }catch(err){
       alert('That file could not be read. Make sure it\'s a .csv or .xlsx spreadsheet with a header row.');
     }
+    e.target.value = '';
   };
   reader.readAsArrayBuffer(file);
-  e.target.value = '';
 });
+
+const IMPORT_FIELD_META = [
+  {key:'address', label:'Address', required:true},
+  {key:'name', label:'Name', required:false},
+  {key:'phone', label:'Phone', required:false},
+  {key:'email', label:'Email', required:false},
+  {key:'round', label:'Round', required:false},
+  {key:'price', label:'Price', required:false},
+  {key:'frequency', label:'Frequency (weeks)', required:false}
+];
+// Shows the best-guess column mapping (see guessColumnMap) for confirmation —
+// or correction — before anything is actually imported, rather than importing
+// on the guess and only finding out afterwards that a column was matched wrong.
+function openImportColumnMapping(map){
+  const headers = pendingImportHeaders;
+  const sample = pendingImportRows[0] || {};
+  const previewFor = (key)=>{
+    const col = map[key];
+    return col && sample[col] !== undefined && sample[col] !== '' ? `e.g. "${escapeHtml(String(sample[col]))}"` : '';
+  };
+  const rowsHtml = IMPORT_FIELD_META.map(f=>`
+    <label style="margin-top:14px;">${escapeHtml(f.label)}${f.required?' <span style="color:var(--red);">*</span>':''}</label>
+    <select id="colmap_${f.key}" onchange="previewImportColumn('${f.key}')">
+      <option value="">— Not mapped —</option>
+      ${headers.map(h=>`<option value="${escapeAttr(h)}" ${h===map[f.key]?'selected':''}>${escapeHtml(h)}</option>`).join('')}
+    </select>
+    <div id="colmap_${f.key}_preview" style="font-size:0.75rem; color:var(--ink-muted); margin:4px 2px 0; min-height:1.2em;">${previewFor(f.key)}</div>
+  `).join('');
+  openSheet(`
+    <div class="sheet-head">
+      <h2 style="flex:1; min-width:0;">Match columns</h2>
+      <button class="sheet-close" onclick="cancelSpreadsheetImport()">✕</button>
+    </div>
+    <p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 4px; line-height:1.5;">${pendingImportRows.length} row${pendingImportRows.length===1?'':'s'} found. Columns are matched automatically below — check them and adjust any that aren't right, then import.</p>
+    ${rowsHtml}
+    <div class="form-actions" style="margin-top:20px;">
+      <button class="btn-primary" onclick="confirmSpreadsheetImport()">Import</button>
+    </div>
+  `);
+}
+function previewImportColumn(key){
+  const sel = document.getElementById(`colmap_${key}`);
+  const preview = document.getElementById(`colmap_${key}_preview`);
+  if(!sel || !preview || !pendingImportRows || !pendingImportRows.length) return;
+  const val = sel.value;
+  const sampleVal = val ? pendingImportRows[0][val] : '';
+  preview.textContent = (val && sampleVal !== undefined && sampleVal !== '') ? `e.g. "${sampleVal}"` : '';
+}
+function cancelSpreadsheetImport(){
+  pendingImportRows = null;
+  pendingImportHeaders = null;
+  closeSheet();
+}
+function confirmSpreadsheetImport(){
+  if(!pendingImportRows){ closeSheet(); return; }
+  const map = {};
+  IMPORT_FIELD_META.forEach(f=>{
+    const sel = document.getElementById(`colmap_${f.key}`);
+    map[f.key] = sel && sel.value ? sel.value : null;
+  });
+  if(!map.address && !map.name){
+    toast('Map at least an Address or a Name column before importing');
+    return;
+  }
+
+  const rows = pendingImportRows;
+  const existingAddresses = new Set(data.customers.map(c => (c.address||'').trim().toLowerCase()).filter(Boolean));
+  let imported = 0, skipped = 0;
+  const roundCusts = data.customers.filter(x=>(x.round||'Unassigned')===IMPORT_HOLDING_ROUND);
+  let nextOrder = roundCusts.reduce((m,x)=>Math.max(m, x.order!=null?x.order:-1), -1) + 1;
+
+  rows.forEach(row=>{
+    const address = map.address ? String(row[map.address]||'').trim() : '';
+    const name = map.name ? String(row[map.name]||'').trim() : '';
+    if(!address && !name) return; // blank row
+
+    const normalized = address.toLowerCase();
+    if(address && existingAddresses.has(normalized)){ skipped++; return; }
+
+    const suggestedRound = map.round ? String(row[map.round]||'').trim() : '';
+    const priceRaw = map.price ? parseFloat(String(row[map.price]).replace(/[^0-9.]/g,'')) : NaN;
+    const freqRaw = map.frequency ? parseInt(String(row[map.frequency]).replace(/[^0-9]/g,''),10) : NaN;
+
+    const notesParts = [];
+    if(suggestedRound) notesParts.push(`Imported — suggested round: ${suggestedRound}`);
+    else notesParts.push('Imported from spreadsheet');
+
+    data.customers.push({
+      id: uid(),
+      name, address,
+      phone: map.phone ? String(row[map.phone]||'').trim() : '',
+      email: map.email ? String(row[map.email]||'').trim() : '',
+      round: IMPORT_HOLDING_ROUND,
+      order: nextOrder++,
+      price: Number.isFinite(priceRaw) ? priceRaw : 0,
+      frequencyWeeks: Number.isFinite(freqRaw) && freqRaw>0 ? freqRaw : 4,
+      notes: notesParts.join(' · '),
+      cleanHistory: [], paymentHistory: [], priceHistory: []
+    });
+    if(address) existingAddresses.add(normalized);
+    imported++;
+  });
+
+  pendingImportRows = null;
+  pendingImportHeaders = null;
+  saveData();
+  closeSheet();
+  render();
+
+  const summary = skipped
+    ? `Imported ${imported} customer${imported===1?'':'s'} — ${skipped} skipped as likely duplicates`
+    : `Imported ${imported} customer${imported===1?'':'s'}`;
+  if(imported){
+    openSheet(`
+      <div class="sheet-head">
+        <h2>Import complete</h2>
+        <button class="sheet-close" onclick="closeSheet()">✕</button>
+      </div>
+      <p style="color:var(--ink); font-size:0.875rem; line-height:1.6; margin:0 2px 10px;">${escapeHtml(summary)}.</p>
+      <p style="color:var(--ink-muted); font-size:0.8125rem; line-height:1.6; margin:0 2px 18px;">They've been placed in a <b>"${escapeHtml(IMPORT_HOLDING_ROUND)}"</b> round rather than their real round. Open each one to check the details and assign it to the right round.</p>
+      <button class="btn-primary" style="width:100%;" onclick="closeSheet(); setTab('rounds'); openRound(IMPORT_HOLDING_ROUND);">Review imported customers</button>
+    `);
+  } else {
+    toast(skipped ? `All ${skipped} rows already exist — nothing imported` : 'Nothing to import');
+  }
+}
 
 async function exportExcel(){
   if(typeof XLSX === 'undefined'){
