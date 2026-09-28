@@ -598,13 +598,54 @@ function openCustomerHistoryList(id, kind){
     rowsHtml = (c.priceHistory||[]).slice().sort((a,b)=>a.date<b.date?1:-1)
       .map((p,i)=>`<li style="cursor:pointer;" onclick="openHistEntryActions('${id}','price','${p.date}',${p.price})">${fmtDate(p.date)} — ${money(p.price)}${i===0?' <span style="color:var(--ink-muted); font-weight:500;">(current)</span>':''}</li>`).join('') || '<li style="color:var(--ink-muted)">No price changes recorded</li>';
   }
+  const reviewBtn = kind === 'price' ? `
+    <button class="backup-btn" onclick="openSetPriceReviewDate('${id}')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      <div><div class="t1">Set last price review date</div><div class="t2">${getLastPriceIncreaseDate(c) ? `Currently ${fmtDate(getLastPriceIncreaseDate(c))}` : 'Not set yet'} — for customers brought over from a spreadsheet</div></div>
+    </button>` : '';
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">${title}</h2>
       <button class="sheet-close" onclick="closeSheet()">✕</button>
     </div>
+    ${reviewBtn}
     <ul class="hist-list">${rowsHtml}</ul>
   `, () => openCustomerDetail(id));
+}
+// The "last price review" date is the date of the customer's most recent price
+// increase (see getLastPriceIncreaseDate). This changes that date directly —
+// or, for a customer with no price history at all (e.g. imported from a
+// spreadsheet), creates an entry at their current price with the date given.
+function openSetPriceReviewDate(id){
+  const c = data.customers.find(x=>x.id===id);
+  if(!c) return;
+  openSheet(`
+    <div class="sheet-head">
+      <h2 style="flex:1; min-width:0;">Last price review</h2>
+      <button class="sheet-close" onclick="openCustomerHistoryList('${id}','price')">✕</button>
+    </div>
+    <p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 14px; line-height:1.5;">The date this customer's price was last set or increased. The price review reminder counts from here.</p>
+    <label style="margin-top:0;">Date</label>
+    <input type="date" id="pr_date" value="${getLastPriceIncreaseDate(c) || todayISO()}" max="${todayISO()}">
+    <div class="form-actions">
+      <button class="btn-primary" onclick="saveSetPriceReviewDate('${id}')">Save</button>
+    </div>
+  `);
+}
+function saveSetPriceReviewDate(id){
+  const c = data.customers.find(x=>x.id===id);
+  if(!c) return;
+  const newDate = document.getElementById('pr_date').value;
+  if(!newDate){ toast('Please choose a date'); return; }
+  c.priceHistory = c.priceHistory || [];
+  const current = getLastPriceIncreaseDate(c);
+  const entry = current ? c.priceHistory.find(p=>p.date===current) : null;
+  if(entry) entry.date = newDate;
+  else c.priceHistory.push({date: newDate, price: Number(c.price||0)});
+  saveData();
+  openCustomerHistoryList(id, 'price');
+  render();
+  toast(`Last price review set to ${fmtDate(newDate)}`);
 }
 
 // Read-only log of every message actually sent for a customer or job — reminders,
@@ -646,7 +687,7 @@ function openHistEntryActions(id, kind, dateVal, amount){
     </button>` : ''}
     <button class="backup-btn" onclick="${kind==='price'?`editPriceHistoryEntry('${id}','${dateVal}')`:`editHistAmount('${id}','${kind}','${dateVal}')`}">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4z"/></svg>
-      <div><div class="t1">Edit amount</div><div class="t2">Change the ${kind==='clean'?'amount charged':kind==='pay'?'amount paid':'price'}</div></div>
+      <div><div class="t1">${kind==='price'?'Edit date or price':'Edit amount'}</div><div class="t2">${kind==='price'?'Change when this price took effect, or the price itself':`Change the ${kind==='clean'?'amount charged':'amount paid'}`}</div></div>
     </button>
     <button class="backup-btn" style="color:var(--red);" onclick="${kind==='price'?`removePriceHistoryEntry('${id}','${dateVal}')`:`removeHist('${id}','${kind}','${dateVal}')`}">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--red);"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
