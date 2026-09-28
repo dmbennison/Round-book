@@ -367,6 +367,90 @@ function deleteCustomer(id){
   }});
 }
 
+/* ---------- quick info box (press and hold a customer card) ----------
+   Everything worth knowing at the door, without opening the full record. */
+// Average number of days between a clean and the payment that covered it.
+// There's no per-invoice tracking, so payments are matched to cleans oldest
+// first (FIFO): each clean counts as paid on the date cumulative payments
+// first reached the cumulative total of cleans up to and including it. Cleans
+// not yet fully covered are left out; a payment made before the clean counts
+// as 0 days. Returns null if nothing's been paid off yet.
+function averageDaysToPay(c){
+  const byDate = (a,b)=> a.date<b.date ? -1 : a.date>b.date ? 1 : 0;
+  const charges = (c.cleanHistory||[]).filter(e=>e.date).map(e=>({date:e.date, amount:Number(e.amount||0)})).sort(byDate);
+  const payments = (c.paymentHistory||[]).filter(p=>p.date && Number(p.amount||0) > 0).map(p=>({date:p.date, amount:Number(p.amount)})).sort(byDate);
+  if(!charges.length || !payments.length) return null;
+  let cumCharge = 0, cumPaid = 0, pi = 0;
+  const gaps = [];
+  for(const ch of charges){
+    if(ch.amount <= 0) continue;
+    cumCharge += ch.amount;
+    while(pi < payments.length && cumPaid < cumCharge - 0.005){ cumPaid += payments[pi].amount; pi++; }
+    if(cumPaid < cumCharge - 0.005) break; // this clean (and any after it) isn't paid off yet
+    gaps.push(Math.max(0, daysBetween(ch.date, payments[pi-1].date)));
+  }
+  if(!gaps.length) return null;
+  return { days: gaps.reduce((a,b)=>a+b,0) / gaps.length, count: gaps.length };
+}
+function openCustomerInfoBox(id){
+  const c = data.customers.find(x=>x.id===id);
+  if(!c) return;
+  const s = custStatus(c);
+  const today = todayISO();
+  const ago = (iso)=>{
+    const d = daysBetween(iso, today);
+    return d<=0 ? 'today' : d===1 ? 'yesterday' : `${d} days ago`;
+  };
+  const extras = [];
+  if(c.addOnConservatory) extras.push('Conservatory');
+  if(c.addOnExtension) extras.push('Extension');
+  if(c.addOnGarageDoor) extras.push('Garage door');
+  if(c.addOnOther) extras.push(c.addOnOther);
+  const totalRevenue = (c.paymentHistory||[]).reduce((sum,p)=>sum+Number(p.amount||0), 0);
+  const weeks = c.frequencyWeeks || 4;
+  const pay = averageDaysToPay(c);
+  const lastReview = getLastPriceIncreaseDate(c);
+  let reviewHtml = '<span style="color:var(--ink-muted);">No price history</span>';
+  if(lastReview){
+    const months = daysBetween(lastReview, today) / 30.4375;
+    const whole = Math.floor(months);
+    const text = whole < 1 ? 'Under a month' : `${whole} month${whole===1?'':'s'}`;
+    reviewHtml = `<span style="${months>=12?'color:var(--red);':''}">${text}</span><div class="ib-sub">since ${fmtDate(lastReview)}</div>`;
+  }
+  let payHtml = '<span style="color:var(--ink-muted);">Not enough history</span>';
+  if(pay){
+    const d = Math.round(pay.days);
+    payHtml = `${d===0 ? 'Same day' : d===1 ? '1 day' : d+' days'}<div class="ib-sub">across ${pay.count} paid clean${pay.count===1?'':'s'}</div>`;
+  }
+  const row = (label, valueHtml)=>`<div class="ib-row"><div class="ib-label">${label}</div><div class="ib-value">${valueHtml}</div></div>`;
+  openSheet(`
+    <style>
+      .ib-row{display:flex; align-items:flex-start; justify-content:space-between; gap:16px; padding:11px 2px; border-bottom:1px solid var(--line);}
+      .ib-row:last-child{border-bottom:none;}
+      .ib-label{font-size:0.8125rem; font-weight:700; color:var(--ink-muted); padding-top:2px;}
+      .ib-value{font-size:1.0625rem; font-weight:800; color:var(--ink); text-align:right;}
+      .ib-sub{font-size:0.7188rem; font-weight:600; color:var(--ink-muted); margin-top:1px;}
+    </style>
+    <div class="sheet-head">
+      <div style="flex:1; min-width:0;">
+        <h2 style="margin:0;">${escapeHtml(c.address||'No address')}</h2>
+        ${c.name ? `<div style="font-size:0.8125rem; font-weight:600; color:var(--ink-muted); margin-top:2px;">${escapeHtml(c.name)}</div>` : ''}
+      </div>
+      <button class="sheet-close" onclick="closeSheet()">✕</button>
+    </div>
+    ${row('Property type', `${escapeHtml(c.propertyType || 'Not recorded')}${c.frontsOnly ? '<div class="ib-sub">Fronts only</div>' : ''}`)}
+    ${row('Extras', extras.length ? extras.map(escapeHtml).join('<br>') : '<span style="color:var(--ink-muted);">None</span>')}
+    ${row('Price', money(c.price))}
+    ${row('Frequency', `Every ${weeks} week${weeks===1?'':'s'}`)}
+    ${row('Last cleaned', s.lastClean ? `${fmtDate(s.lastClean)}<div class="ib-sub">${ago(s.lastClean)}</div>` : '<span style="color:var(--ink-muted);">Never</span>')}
+    ${row('Last paid', s.lastPaid ? `${fmtDate(s.lastPaid)}<div class="ib-sub">${ago(s.lastPaid)}</div>` : '<span style="color:var(--ink-muted);">Never</span>')}
+    ${row('Total revenue', money(totalRevenue))}
+    ${row('Average time to pay', payHtml)}
+    ${row('Since last price review', reviewHtml)}
+    <button class="btn" style="width:100%; background:var(--blue-dim); color:var(--blue-deep); margin-top:14px;" onclick="closeSheet(); openCustomerDetail('${c.id}')">Open full details</button>
+  `);
+}
+
 function openCustomerDetail(id){
   const c = data.customers.find(x=>x.id===id);
   const s = custStatus(c);

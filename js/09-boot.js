@@ -26,6 +26,52 @@ function initSwipeHandlers(){
   main.addEventListener('touchmove', onSwipeMove, {passive:false});
   main.addEventListener('touchend', onSwipeEnd, {passive:true});
   main.addEventListener('touchcancel', onSwipeCancel, {passive:true});
+  // Press-and-hold on a customer card pops up the quick info box (see
+  // openCustomerInfoBox). Uses its own listeners alongside the swipe ones.
+  main.addEventListener('touchstart', onLongPressStart, {passive:true});
+  main.addEventListener('touchmove', onLongPressMove, {passive:true});
+  main.addEventListener('touchend', cancelLongPress, {passive:true});
+  main.addEventListener('touchcancel', cancelLongPress, {passive:true});
+  // Android fires a context menu on long-press (and desktop on right-click) —
+  // swallow it on customer cards and show the info box instead.
+  main.addEventListener('contextmenu', (e)=>{
+    const card = e.target.closest('.cust-card[data-id][data-kind="customer"]');
+    if(!card) return;
+    e.preventDefault();
+    if(Date.now() - lastLongPressAt > 1000) fireLongPress(card.dataset.id);
+  });
+}
+/* ---------- press-and-hold info box ---------- */
+const LONG_PRESS_MS = 500;
+const LONG_PRESS_MOVE_TOLERANCE = 10; // px of finger drift before it counts as a scroll/swipe instead
+let longPressTimer = null, longPressOrigin = null, lastLongPressAt = 0;
+function onLongPressStart(e){
+  cancelLongPress();
+  const card = e.target.closest('.cust-card[data-id][data-kind="customer"]');
+  if(!card || e.touches.length !== 1) return;
+  const t = e.touches[0];
+  longPressOrigin = {x:t.clientX, y:t.clientY};
+  const id = card.dataset.id;
+  longPressTimer = setTimeout(()=>{ longPressTimer = null; fireLongPress(id); }, LONG_PRESS_MS);
+}
+function onLongPressMove(e){
+  if(!longPressTimer || !longPressOrigin) return;
+  const t = e.touches[0];
+  if(Math.abs(t.clientX-longPressOrigin.x) > LONG_PRESS_MOVE_TOLERANCE || Math.abs(t.clientY-longPressOrigin.y) > LONG_PRESS_MOVE_TOLERANCE) cancelLongPress();
+}
+function cancelLongPress(){
+  if(longPressTimer){ clearTimeout(longPressTimer); longPressTimer = null; }
+  longPressOrigin = null;
+}
+function fireLongPress(id){
+  lastLongPressAt = Date.now();
+  // The lift-off of the same touch can register as a tap on whatever's now
+  // under the finger (the overlay) — ignore overlay taps for a moment so the
+  // box doesn't close the instant it opens.
+  overlayIgnoreUntil = Date.now() + 700;
+  if(swipeState){ swipeState.card.style.transform = 'translateX(0)'; swipeState = null; }
+  if(navigator.vibrate) navigator.vibrate(25);
+  openCustomerInfoBox(id);
 }
 function onSwipeStart(e){
   const card = e.target.closest('.cust-card[data-id]');
