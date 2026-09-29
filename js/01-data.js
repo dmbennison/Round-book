@@ -6,7 +6,7 @@ const STORE_KEY = 'roundBookData_v1';
 // APP_VERSION is a plain decimal number (e.g. 1.01, 1.02 ... 1.99, 2.00) —
 // bump by 0.01 for every change. formatVersion always renders it to exactly
 // two decimal places, so it's never shown as "1.1" or "1.100".
-const APP_VERSION = 2.11;
+const APP_VERSION = 2.12;
 function formatVersion(v){ return Number(v).toFixed(2); }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
@@ -15,6 +15,7 @@ function formatVersion(v){ return Number(v).toFixed(2); }
 // the most recent 10 entries (oldest ones can be left in the array or trimmed,
 // either is fine, since the display always slices to 10).
 const VERSION_HISTORY = [
+  {version: 2.12, changes: ['Suggest a route order: when the road-routing services can\'t be reached and it falls back to straight-line distances, it now plans a route that starts from where your phone is and ends wherever is shortest (rather than treating your nearest customer as the start), and does a deeper search for a shorter order']},
   {version: 2.11, changes: ['The \"Windows cleaned today\" text now tells the customer what they actually owe — their whole balance after any earlier unpaid cleans, payments and credit — instead of just the price of today\'s clean (or £0.00 if they\'re fully paid or in credit). The default wording changes to \"The amount now owing is…\"; a message you\'ve customised yourself is left alone, but will now show the balance in {amount}', 'New look: the whole app now follows Apple\'s Liquid Glass style — translucent, softly blurred header, tabs, sheets, pop-ups and buttons that pick up your colour scheme, with rounder corners and light-catching edges, in both light and dark mode']},
   {version: 2.10, changes: ['Added "Export for accounting software" to Backup & restore — a CSV of payments received (Date, Description, Amount) for a chosen date range, in a generic format FreeAgent, Xero and QuickBooks can all import or match against a bank feed']},
   {version: 2.09, changes: ['A brand new customer with no clean history no longer shows as due the moment they\'re added — if the round already has a due date most other customers share, they\'re lined up with that date instead (shown as deferred until then), rather than needing cleaning straight away']},

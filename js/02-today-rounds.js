@@ -639,50 +639,127 @@ async function geocodeAddress(address){
     return { lat: parseFloat(results[0].lat), lng: parseFloat(results[0].lon) };
   }catch(e){ return null; }
 }
-// Nearest-neighbour route starting from points[startIdx], refined with a 2-opt
-// pass (repeatedly reversing a stretch of the route if doing so shortens it) —
-// a cheap, well-known way to get a genuinely decent stop order for a modest
-// number of points. Returns an array of indices into `points`, in visiting order.
-function computeRouteOrder(points, startIdx){
+// Straight-line fallback route ordering: nearest-neighbour to build a first
+// order, then 2-opt (reverse a stretch of the route if that shortens it) and
+// 3-opt (cut the route into three pieces and reconnect them a different way if
+// that shortens it), repeated until neither finds anything. Returns an array of
+// indices into `points`, in visiting order.
+//
+// Two modes:
+//  - No `depot` (no GPS): starts at points[startIdx], and — exactly as before —
+//    both the first and last stop of the nearest-neighbour route stay pinned
+//    while the stops in between are improved.
+//  - With `depot` ({lat,lng}, e.g. the phone's position): the depot is a virtual
+//    start that is NOT one of the points. The route begins at the depot, visits
+//    every point once, and ends wherever is shortest — it never returns to the
+//    depot, and `startIdx` is ignored. Internally the depot is pinned at the
+//    front of the path and a zero-cost "end" sentinel is pinned at the back, so
+//    the same 2-opt/3-opt moves can reshape the tail (the final stop is free to
+//    change) while the depot can never move. The depot itself is not returned.
+function computeRouteOrder(points, startIdx, depot){
   const n = points.length;
+  const useDepot = !!(depot && depot.lat != null && depot.lng != null);
+  if(n === 0) return [];
   if(n <= 1) return points.map((_,i)=>i);
   // Still respect the requested starting point even with nothing to optimise —
   // with exactly 2 stops there's only one possible order once you fix which one
-  // comes first, but which one that is still matters (e.g. whichever's closer
-  // to the current location).
-  if(n === 2) return startIdx === 0 ? [0,1] : [1,0];
+  // comes first, but which one that is still matters. (With a depot the general
+  // code below handles this: it picks whichever of the two is nearer the depot
+  // first, or the cheaper overall open path.)
+  if(!useDepot && n === 2) return startIdx === 0 ? [0,1] : [1,0];
+
+  // Node ids: 0..n-1 are the points; with a depot, n is the depot; the last id
+  // (P) is the zero-distance "end" sentinel used to make the path's end free.
+  const pts = useDepot ? points.concat([{lat:depot.lat, lng:depot.lng}]) : points;
+  const P = pts.length;
+  const END = P;
+  const D = [];
+  for(let a=0;a<=P;a++) D.push(new Float64Array(P+1));
+  for(let a=0;a<P;a++){
+    for(let b=a+1;b<P;b++){
+      const d = haversineKm(pts[a].lat,pts[a].lng,pts[b].lat,pts[b].lng);
+      D[a][b] = d; D[b][a] = d;
+    }
+  }
+  // (row/column END stays all zeros — ending anywhere costs nothing extra)
+
+  // Nearest-neighbour walk, seeded from the depot if there is one.
   const visited = new Array(n).fill(false);
-  const order = [startIdx];
-  visited[startIdx] = true;
-  for(let step=1; step<n; step++){
-    const last = points[order[order.length-1]];
+  const first = useDepot ? n : startIdx;
+  let t = [first];
+  if(!useDepot) visited[startIdx] = true;
+  for(let step=useDepot?0:1; step<n; step++){
+    const last = t[t.length-1];
     let bestIdx = -1, bestDist = Infinity;
     for(let i=0;i<n;i++){
       if(visited[i]) continue;
-      const d = haversineKm(last.lat,last.lng,points[i].lat,points[i].lng);
-      if(d < bestDist){ bestDist = d; bestIdx = i; }
+      if(D[last][i] < bestDist){ bestDist = D[last][i]; bestIdx = i; }
     }
-    order.push(bestIdx);
+    t.push(bestIdx);
     visited[bestIdx] = true;
   }
-  let improved = true, guard = 0;
-  while(improved && guard < 40){
-    improved = false; guard++;
-    for(let i=1;i<order.length-2;i++){
-      for(let j=i+1;j<order.length-1;j++){
-        const before = haversineKm(points[order[i-1]].lat,points[order[i-1]].lng,points[order[i]].lat,points[order[i]].lng)
-                      + haversineKm(points[order[j]].lat,points[order[j]].lng,points[order[j+1]].lat,points[order[j+1]].lng);
-        const after = haversineKm(points[order[i-1]].lat,points[order[i-1]].lng,points[order[j]].lat,points[order[j]].lng)
-                     + haversineKm(points[order[i]].lat,points[order[i]].lng,points[order[j+1]].lat,points[order[j+1]].lng);
+  if(useDepot) t.push(END);
+  const L = t.length; // t[0] and t[L-1] are never moved
+
+  // 2-opt: reverse t[i..j] whenever that shortens the path.
+  function twoOptPass(){
+    let any = false;
+    for(let i=1;i<L-2;i++){
+      for(let j=i+1;j<L-1;j++){
+        const before = D[t[i-1]][t[i]] + D[t[j]][t[j+1]];
+        const after = D[t[i-1]][t[j]] + D[t[i]][t[j+1]];
         if(after + 1e-9 < before){
           let lo=i, hi=j;
-          while(lo<hi){ const t=order[lo]; order[lo]=order[hi]; order[hi]=t; lo++; hi--; }
-          improved = true;
+          while(lo<hi){ const x=t[lo]; t[lo]=t[hi]; t[hi]=x; lo++; hi--; }
+          any = true;
         }
       }
     }
+    return any;
   }
-  return order;
+
+  // 3-opt: drop three edges, splitting the path into head | S1 | S2 | tail, and
+  // try the four ways of rejoining them that 2-opt can't reach in one move
+  // (swap S1 and S2; swap them with one or both reversed).
+  const deadline = Date.now() + 1500; // never freeze the UI on a very big round
+  function threeOptPass(){
+    let any = false;
+    for(let i=1;i<L-2;i++){
+      if(Date.now() > deadline) return any;
+      for(let j=i+1;j<L-1;j++){
+        for(let k=j+1;k<L;k++){
+          const a=t[i-1], b=t[i], c=t[j-1], d=t[j], e=t[k-1], f=t[k];
+          const removed = D[a][b] + D[c][d] + D[e][f];
+          const c1 = D[a][d] + D[e][b] + D[c][f]; // head S2 S1 tail
+          const c2 = D[a][d] + D[e][c] + D[b][f]; // head S2 rev(S1) tail
+          const c3 = D[a][e] + D[d][b] + D[c][f]; // head rev(S2) S1 tail
+          const c4 = D[a][c] + D[b][e] + D[d][f]; // head rev(S1) rev(S2) tail
+          let best = 1, bestCost = c1;
+          if(c2 < bestCost){ best = 2; bestCost = c2; }
+          if(c3 < bestCost){ best = 3; bestCost = c3; }
+          if(c4 < bestCost){ best = 4; bestCost = c4; }
+          if(bestCost + 1e-9 < removed){
+            const head = t.slice(0,i), s1 = t.slice(i,j), s2 = t.slice(j,k), tail = t.slice(k);
+            if(best === 1)      t = head.concat(s2, s1, tail);
+            else if(best === 2) t = head.concat(s2, s1.reverse(), tail);
+            else if(best === 3) t = head.concat(s2.reverse(), s1, tail);
+            else                t = head.concat(s1.reverse(), s2.reverse(), tail);
+            any = true;
+          }
+        }
+      }
+    }
+    return any;
+  }
+
+  let guard = 0;
+  while(guard < 40){
+    guard++;
+    let twoGuard = 0;
+    while(twoGuard < 40 && twoOptPass()) twoGuard++;
+    if(!threeOptPass()) break; // 3-opt found nothing new, so 2-opt is still converged
+  }
+  return useDepot ? t.slice(1, L-1) : t;
 }
 // Entry point from the round actions menu. Geocodes whatever isn't already
 // cached (one request at a time, a beat apart), then previews a suggested
@@ -804,7 +881,10 @@ async function suggestRouteOrder(rn){
     method = 'valhalla';
   }
   if(!order){
-    order = computeRouteOrder(points, startIdx);
+    // Straight-line fallback: the phone's position (if we got it) goes in as a
+    // separate depot rather than as a customer, so this solves an open path
+    // starting there and ending wherever is shortest. No GPS: startIdx as before.
+    order = computeRouteOrder(points, startIdx, gotLocation || undefined);
     method = 'straight-line';
   }
   renderSuggestedRoutePreview(rn, order.map(i=>located[i]), notLocated, !!gotLocation, method);
