@@ -323,7 +323,7 @@ const FOCUSED_HELP = {
   settings: {
     title: 'Settings',
     body: () => [
-      helpP('Appearance, text size, colour scheme, and messaging app (text or WhatsApp) live on the main Settings screen. Light/Dark/Auto picks whether the app follows your phone\'s system setting or a fixed choice. Business details and message templates each have their own screen, opened from a button here.')
+      helpP('Appearance, text size, colour scheme, and messaging app (text or WhatsApp) live on the main Settings screen. Light/Dark/Auto picks whether the app follows your phone\'s system setting or a fixed choice. The app uses a Liquid Glass look — translucent, blurred panels that take on your chosen colour scheme. Business details and message templates each have their own screen, opened from a button here. The "Windows cleaned today" text uses {amount} for the customer\'s actual balance owing (earlier unpaid cleans, payments and credit all taken into account), not just today\'s price.')
     ]
   },
   reminders: {

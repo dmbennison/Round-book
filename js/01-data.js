@@ -6,7 +6,7 @@ const STORE_KEY = 'roundBookData_v1';
 // APP_VERSION is a plain decimal number (e.g. 1.01, 1.02 ... 1.99, 2.00) —
 // bump by 0.01 for every change. formatVersion always renders it to exactly
 // two decimal places, so it's never shown as "1.1" or "1.100".
-const APP_VERSION = 2.10;
+const APP_VERSION = 2.11;
 function formatVersion(v){ return Number(v).toFixed(2); }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
@@ -15,6 +15,7 @@ function formatVersion(v){ return Number(v).toFixed(2); }
 // the most recent 10 entries (oldest ones can be left in the array or trimmed,
 // either is fine, since the display always slices to 10).
 const VERSION_HISTORY = [
+  {version: 2.11, changes: ['The \"Windows cleaned today\" text now tells the customer what they actually owe — their whole balance after any earlier unpaid cleans, payments and credit — instead of just the price of today\'s clean (or £0.00 if they\'re fully paid or in credit). The default wording changes to \"The amount now owing is…\"; a message you\'ve customised yourself is left alone, but will now show the balance in {amount}', 'New look: the whole app now follows Apple\'s Liquid Glass style — translucent, softly blurred header, tabs, sheets, pop-ups and buttons that pick up your colour scheme, with rounder corners and light-catching edges, in both light and dark mode']},
   {version: 2.10, changes: ['Added "Export for accounting software" to Backup & restore — a CSV of payments received (Date, Description, Amount) for a chosen date range, in a generic format FreeAgent, Xero and QuickBooks can all import or match against a bank feed']},
   {version: 2.09, changes: ['A brand new customer with no clean history no longer shows as due the moment they\'re added — if the round already has a due date most other customers share, they\'re lined up with that date instead (shown as deferred until then), rather than needing cleaning straight away']},
   {version: 2.08, changes: ['Backup reminder now triggers after 24 hours of un-backed-up changes instead of 48, and its wording now suggests saving to iCloud Drive or Google Drive in the share sheet rather than just this phone', 'Importing customers from a spreadsheet now shows the best-guess column matching first, so it can be checked and corrected before anything is actually imported, instead of only being told afterwards']},
@@ -308,7 +309,7 @@ const DEFAULT_MARKETING_CAMPAIGNS = [
   { id: 'winback', name: "We've missed you", body: DEFAULT_WINBACK_TEMPLATE },
   { id: 'seasonal', name: 'Seasonal reminder', body: DEFAULT_SEASONAL_TEMPLATE }
 ];
-const DEFAULT_CLEANED_TODAY_TEMPLATE = "Hi {name}, your windows have been cleaned today! The cost for this clean is {amount}.\n\n{bankdetails}Thanks,\n{yourname}\n{company}";
+const DEFAULT_CLEANED_TODAY_TEMPLATE = "Hi {name}, your windows have been cleaned today! The amount now owing is {amount}.\n\n{bankdetails}Thanks,\n{yourname}\n{company}";
 function migrateData(parsed){
   parsed.customers = parsed.customers || [];
   parsed.oneOffJobs = parsed.oneOffJobs || [];
@@ -349,7 +350,7 @@ function migrateData(parsed){
     "Hi {name}, great to clean for you again. For regular cleans I'd quote {amount} — let me know if you'd like to set up a round. Thanks, {yourname}",
     "Hi {name}, hope you're well! I cleaned your windows for you before and wondered if you'd like the same job done again? I'd quote {amount}, same as last time — just let me know and I'll get you booked back in.\n\nThanks,\n{yourname}\n{company}"
   ];
-  const OLD_CLEANED_TODAY_TEMPLATES = ["Hi {name}, your windows have been cleaned today!\n\n{bankdetails}Thanks,\n{yourname}\n{company}"];
+  const OLD_CLEANED_TODAY_TEMPLATES = ["Hi {name}, your windows have been cleaned today!\n\n{bankdetails}Thanks,\n{yourname}\n{company}", "Hi {name}, your windows have been cleaned today! The cost for this clean is {amount}.\n\n{bankdetails}Thanks,\n{yourname}\n{company}"];
   if(!parsed.settings.cleanTemplate || OLD_CLEAN_TEMPLATES.includes(parsed.settings.cleanTemplate)) parsed.settings.cleanTemplate = DEFAULT_CLEAN_TEMPLATE;
   if(!parsed.settings.payTemplate || OLD_PAY_TEMPLATES.includes(parsed.settings.payTemplate)) parsed.settings.payTemplate = DEFAULT_PAY_TEMPLATE;
   if(!parsed.settings.payFollowUpTemplate) parsed.settings.payFollowUpTemplate = DEFAULT_PAY_FOLLOWUP_TEMPLATE;

@@ -88,11 +88,14 @@ function applyTheme(){
   // the theme too, mixed toward the card's own dark-mode base rather than the
   // plain --surface colour, so schemes stay visibly distinct from each other in
   // dark mode instead of converging on the same neutral dark card.
-  root.setProperty('--card-surface', darkMode ? mixHex(t.blue, '#16212C', 0.86) : '#FFFFFF');
-  root.setProperty('--card-border', darkMode ? 'transparent' : mixHex(t.blue, '#FFFFFF', 0.82));
+  // Liquid Glass: cards are translucent, tinted by the chosen scheme, with a
+  // bright specular top edge. (Fill fades from surface to tint, top to bottom.)
+  root.setProperty('--card-surface', darkMode ? hexToRgba(mixHex(t.blue, '#16212C', 0.80), 0.55) : 'rgba(255,255,255,0.66)');
+  root.setProperty('--card-tint', darkMode ? hexToRgba(t.blue, 0.10) : hexToRgba(t.blue, 0.07));
+  root.setProperty('--card-border', darkMode ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.85)');
   root.setProperty('--card-shadow', darkMode
-    ? `inset 0 1px 0 rgba(255,255,255,0.06), 0 2px 8px ${hexToRgba(mixHex(t.navy, '#000000', 0.6), 0.45)}, 0 1px 2px ${hexToRgba(mixHex(t.navy, '#000000', 0.6), 0.35)}`
-    : '0 1px 3px rgba(0,0,0,0.06)');
+    ? `inset 0 1px 0 rgba(255,255,255,0.22), inset 0 0 0 1px rgba(255,255,255,0.05), 0 10px 28px ${hexToRgba(mixHex(t.navy, '#000000', 0.6), 0.50)}`
+    : `inset 0 1px 0 rgba(255,255,255,0.95), inset 0 -1px 0 rgba(255,255,255,0.35), 0 8px 24px ${hexToRgba(t.navy, 0.12)}, 0 1px 3px rgba(0,0,0,0.06)`);
   const meta = document.querySelector('meta[name="theme-color"]');
   if(meta) meta.setAttribute('content', t.navy);
 }

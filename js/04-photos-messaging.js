@@ -1005,7 +1005,11 @@ function sendTemplate(id, kind, returnTo){
     msg = applyTemplate(data.settings.cleanTemplate, {name: firstName, company, yourname});
     title = 'Cleaning reminder';
   } else if(kind === 'cleanedToday'){
-    msg = applyTemplate(data.settings.cleanedTodayTemplate, {name: firstName, amount: c.price, company, yourname, address: c.address});
+    // Uses the customer's real running balance (all charges minus all payments and
+    // credit), not just this clean's price — so someone who owes a previous clean, or
+    // who's in credit, is told what they actually owe. In credit or fully paid = £0.
+    const st = custStatus(c);
+    msg = applyTemplate(data.settings.cleanedTodayTemplate, {name: firstName, amount: st.owed ? st.balance : 0, company, yourname, address: c.address});
     title = 'Windows cleaned today';
     afterSend = () => {
       // Tied to today's date rather than just a flat boolean, so the flag
