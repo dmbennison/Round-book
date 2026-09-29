@@ -6,7 +6,7 @@ const STORE_KEY = 'roundBookData_v1';
 // APP_VERSION is a plain decimal number (e.g. 1.01, 1.02 ... 1.99, 2.00) —
 // bump by 0.01 for every change. formatVersion always renders it to exactly
 // two decimal places, so it's never shown as "1.1" or "1.100".
-const APP_VERSION = 2.09;
+const APP_VERSION = 2.10;
 function formatVersion(v){ return Number(v).toFixed(2); }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
@@ -15,6 +15,7 @@ function formatVersion(v){ return Number(v).toFixed(2); }
 // the most recent 10 entries (oldest ones can be left in the array or trimmed,
 // either is fine, since the display always slices to 10).
 const VERSION_HISTORY = [
+  {version: 2.10, changes: ['Added "Export for accounting software" to Backup & restore — a CSV of payments received (Date, Description, Amount) for a chosen date range, in a generic format FreeAgent, Xero and QuickBooks can all import or match against a bank feed']},
   {version: 2.09, changes: ['A brand new customer with no clean history no longer shows as due the moment they\'re added — if the round already has a due date most other customers share, they\'re lined up with that date instead (shown as deferred until then), rather than needing cleaning straight away']},
   {version: 2.08, changes: ['Backup reminder now triggers after 24 hours of un-backed-up changes instead of 48, and its wording now suggests saving to iCloud Drive or Google Drive in the share sheet rather than just this phone', 'Importing customers from a spreadsheet now shows the best-guess column matching first, so it can be checked and corrected before anything is actually imported, instead of only being told afterwards']},
   {version: 2.07, changes: ['Rounds: the property type average price summary now always shows a maximum of 3 across, wrapping to a new row instead of squeezing more in', 'Customer info box (press and hold): property type, extras, price and frequency now sit as small text under the address; last cleaned and last paid are now side by side, with total revenue, average time to pay and since last price review underneath']},
@@ -165,6 +166,124 @@ async function exportContacts(){
   setTimeout(()=>URL.revokeObjectURL(url), 2000);
   toast('Contacts file saved');
 }
+
+/* ---------- accounting software export ----------
+   A plain 3-column CSV of payments received -- Date, Description, Amount --
+   rather than any one platform's own file format. FreeAgent, Xero and
+   QuickBooks all accept this shape as a generic bank statement/transaction
+   import: their own import wizard is what maps these three columns and
+   confirms the date format, the same way spreadsheet import into Round Book
+   itself works (see openImportColumnMapping). One format that all three can
+   read beats maintaining three separate exports. */
+function csvField(v){
+  const s = String(v==null?'':v);
+  return /[",\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s;
+}
+function csvDateUK(iso){
+  const parts = iso.split('-');
+  return parts[2] + '/' + parts[1] + '/' + parts[0];
+}
+function accountingExportRows(fromISO, toISO){
+  const rows = [];
+  data.customers.forEach(c=>{
+    (c.paymentHistory||[]).forEach(p=>{
+      if(!p.date || !(Number(p.amount) > 0)) return;
+      if(fromISO && p.date < fromISO) return;
+      if(toISO && p.date > toISO) return;
+      rows.push({
+        date: p.date,
+        description: 'Window cleaning \u2014 ' + (c.name || c.address || 'Customer') + (c.accountNumber ? ' (Acct #' + c.accountNumber + ')' : ''),
+        amount: Number(p.amount)
+      });
+    });
+  });
+  rows.sort((a,b)=> a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+  return rows;
+}
+function openAccountingExport(){
+  const today = todayISO();
+  const tyStart = taxYearStart(today);
+  openSheet(`
+    <div class="sheet-head">
+      <h2 style="flex:1; min-width:0;">Export for accounting software</h2>
+      <button class="sheet-close" onclick="closeSheet()">\u2715</button>
+    </div>
+    <p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 16px; line-height:1.5;">
+      A plain CSV of payments received \u2014 Date, Description, Amount. FreeAgent, Xero and QuickBooks all accept this for importing or matching bank transactions; their import screen is where you confirm these columns and the date format (DD/MM/YYYY here).
+    </p>
+    <label style="margin-top:0;">Date range</label>
+    <select id="acct_range" onchange="toggleAcctCustomRange()">
+      <option value="tytd">This tax year to date (from ${fmtDate(tyStart)})</option>
+      <option value="lasty">Last tax year</option>
+      <option value="all">All time</option>
+      <option value="custom">Custom range</option>
+    </select>
+    <div id="acct_custom_range" style="display:none;">
+      <label>From</label>
+      <input type="date" id="acct_from" value="${tyStart}">
+      <label>To</label>
+      <input type="date" id="acct_to" value="${today}">
+    </div>
+    <div class="form-actions" style="margin-top:20px;">
+      <button class="btn-primary" onclick="exportAccountingCSV()">Export CSV</button>
+    </div>
+  `, () => openBackup());
+}
+function toggleAcctCustomRange(){
+  const v = document.getElementById('acct_range').value;
+  document.getElementById('acct_custom_range').style.display = v==='custom' ? '' : 'none';
+}
+async function exportAccountingCSV(){
+  const today = todayISO();
+  const tyStart = taxYearStart(today);
+  const range = document.getElementById('acct_range').value;
+  let fromISO = null, toISO = null;
+  if(range === 'tytd'){
+    fromISO = tyStart; toISO = today;
+  } else if(range === 'lasty'){
+    const lastYEnd = new Date(tyStart+'T00:00:00'); lastYEnd.setDate(lastYEnd.getDate()-1);
+    toISO = lastYEnd.toISOString().slice(0,10);
+    fromISO = taxYearStart(toISO);
+  } else if(range === 'custom'){
+    fromISO = document.getElementById('acct_from').value || null;
+    toISO = document.getElementById('acct_to').value || null;
+  }
+  // 'all' leaves both fromISO/toISO null
+
+  const rows = accountingExportRows(fromISO, toISO);
+  if(!rows.length){ toast('No payments found in that date range'); return; }
+
+  const lines = ['Date,Description,Amount'].concat(rows.map(function(r){
+    return [csvDateUK(r.date), csvField(r.description), r.amount.toFixed(2)].join(',');
+  }));
+  const csvStr = lines.join('\r\n');
+  const filename = `round-book-accounting-${todayISO()}.csv`;
+  const doneToast = () => toast(`${rows.length} payment${rows.length===1?'':'s'} exported`);
+
+  if(navigator.canShare){
+    try{
+      const file = new File([csvStr], filename, {type:'text/csv'});
+      if(navigator.canShare({files:[file]})){
+        await navigator.share({files:[file], title:'Round Book Accounting Export'});
+        doneToast();
+        return;
+      }
+    }catch(e){
+      if(e && e.name === 'AbortError') return;
+    }
+  }
+  const blob = new Blob([csvStr], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url), 2000);
+  doneToast();
+}
+
 const DEFAULT_CLEAN_TEMPLATE = "Hi {name}, just a reminder I'll be round to clean your windows soon. Let me know if that's not convenient.\n\nThanks,\n{yourname}\n{company}";
 const DEFAULT_PAY_TEMPLATE = "Hi {name}, a friendly reminder that your window cleaning payment of {amount} is outstanding.\n\n{bankdetails}Thanks,\n{yourname}\n{company}";
 const DEFAULT_PAY_FOLLOWUP_TEMPLATE = "Hi {name}, following up again — your window cleaning payment of {amount} is now {daysoverdue} days overdue. Could you sort this when you get a chance?\n\n{bankdetails}Thanks,\n{yourname}\n{company}";

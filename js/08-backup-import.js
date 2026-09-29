@@ -316,6 +316,7 @@ const FOCUSED_HELP = {
     title: 'Backup and restore',
     body: () => [
       helpP('Everything lives only on this phone. Back up regularly from the Backup icon — export a full backup, export to Excel, export everyone as a contacts file, restore from a backup file, or import customers from a spreadsheet.'),
+      helpP('"Export for accounting software" produces a CSV of payments received (Date, Description, Amount) for a chosen date range, in a plain format FreeAgent, Xero and QuickBooks can all import or match against a bank feed — their own import screen is where you confirm the columns and date format.'),
       helpP('A pop-up appears if a change hasn\'t been backed up for 48 hours. "Not now" only puts it off for this visit to the app — it reappears next time you open Round Book until you actually back up.')
     ]
   },
@@ -441,17 +442,23 @@ async function openBackup(){
       ${ADD_CONTACT_ICON}
       <div><div class="t1">Export contacts</div><div class="t2">Every customer with a phone, email, or address · .vcf file</div></div>
     </button>
+    <button class="backup-btn" onclick="openAccountingExport()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+      <div><div class="t1">Export for accounting software</div><div class="t2">Payments received as a CSV — for FreeAgent, Xero, or QuickBooks</div></div>
+    </button>
     <button class="backup-btn" onclick="document.getElementById('importFile').click()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>
       <div><div class="t1">Restore from backup</div><div class="t2">Replaces current data with a backup file</div></div>
     </button>
     <button class="backup-btn" onclick="document.getElementById('importSpreadsheetFile').click()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v16H4z"/><path d="M4 10h16M10 4v16"/><path d="M14 14l3 3 3-3" transform="translate(0,-2)"/></svg>
-
+      <div><div class="t1">Import customers from spreadsheet</div><div class="t2">.csv or .xlsx — match columns yourself, then added to a "needs review" round</div></div>
     </button>
   `);
 }
 async function exportData(){
+
+
   toast('Preparing backup…');
   // Photos live in IndexedDB, not in `data` — bundle them into the export as base64
   // under `_photoBlobs` so a single backup file stays a complete, portable copy of
