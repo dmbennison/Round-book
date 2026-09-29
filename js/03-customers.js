@@ -338,12 +338,19 @@ function finishSavingCustomerForm(id, afterAttempt){
       // up after whatever's actually been used.
       data.settings.nextAccountNumber = parseInt(accountNumber,10) + 1;
     }
-    data.customers.push(Object.assign({
+    // A customer with no clean history yet would otherwise show up as
+    // immediately due (see custStatus) the moment they're added — instead,
+    // line their first due date up with whenever the rest of the round is
+    // actually next due, if that's known and still in the future.
+    const majorityDue = roundMajorityDueDate(payload.round || 'Unassigned');
+    const newCust = Object.assign({
       id: uid(), cleanHistory: [], paymentHistory: [],
       priceHistory: [{date: todayISO(), price: payload.price}],
       order: maxOrder + 1, accountNumber
-    }, payload));
-    toast('Customer added');
+    }, payload);
+    if(majorityDue && majorityDue > todayISO()) newCust.deferUntil = majorityDue;
+    data.customers.push(newCust);
+    toast('Customer added' + (newCust.deferUntil ? ` — due ${fmtDate(newCust.deferUntil)} with the rest of the round` : ''));
   }
   if(dupeAccount){
     // Fires after the "Customer added/updated" toast above (same reasoning as the

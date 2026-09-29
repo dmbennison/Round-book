@@ -6,7 +6,7 @@ const STORE_KEY = 'roundBookData_v1';
 // APP_VERSION is a plain decimal number (e.g. 1.01, 1.02 ... 1.99, 2.00) —
 // bump by 0.01 for every change. formatVersion always renders it to exactly
 // two decimal places, so it's never shown as "1.1" or "1.100".
-const APP_VERSION = 2.08;
+const APP_VERSION = 2.09;
 function formatVersion(v){ return Number(v).toFixed(2); }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
@@ -15,6 +15,7 @@ function formatVersion(v){ return Number(v).toFixed(2); }
 // the most recent 10 entries (oldest ones can be left in the array or trimmed,
 // either is fine, since the display always slices to 10).
 const VERSION_HISTORY = [
+  {version: 2.09, changes: ['A brand new customer with no clean history no longer shows as due the moment they\'re added — if the round already has a due date most other customers share, they\'re lined up with that date instead (shown as deferred until then), rather than needing cleaning straight away']},
   {version: 2.08, changes: ['Backup reminder now triggers after 24 hours of un-backed-up changes instead of 48, and its wording now suggests saving to iCloud Drive or Google Drive in the share sheet rather than just this phone', 'Importing customers from a spreadsheet now shows the best-guess column matching first, so it can be checked and corrected before anything is actually imported, instead of only being told afterwards']},
   {version: 2.07, changes: ['Rounds: the property type average price summary now always shows a maximum of 3 across, wrapping to a new row instead of squeezing more in', 'Customer info box (press and hold): property type, extras, price and frequency now sit as small text under the address; last cleaned and last paid are now side by side, with total revenue, average time to pay and since last price review underneath']},
   {version: 2.06, changes: ['Price history now has a "Set last price review date" button, so customers imported from a spreadsheet can be given their real last price review date instead of none (or the day they were added)', 'Price history entries now say "Edit date or price" rather than "Edit amount"']},
@@ -646,6 +647,27 @@ function nextDueISO(c){
   const d = new Date(lastClean+'T00:00:00');
   d.setDate(d.getDate() + freqDays(c));
   return d.toISOString().slice(0,10);
+}
+// The next-due date shared by the most customers in a round (their next-due
+// date, not their price — see nextDueISO) — used to give a brand new
+// customer with no clean history yet a sensible starting due date instead of
+// showing up as due the moment they're added. Only looks at customers who've
+// actually been cleaned at least once; ties go to whichever date comes first
+// alphabetically (they're ISO dates, so that's also chronologically first).
+function roundMajorityDueDate(roundName){
+  const counts = {};
+  data.customers.forEach(c=>{
+    if(c.paused) return;
+    if((c.round||'Unassigned') !== roundName) return;
+    const due = nextDueISO(c);
+    if(!due) return;
+    counts[due] = (counts[due]||0) + 1;
+  });
+  let best = null, bestCount = 0;
+  Object.keys(counts).sort().forEach(d=>{
+    if(counts[d] > bestCount){ bestCount = counts[d]; best = d; }
+  });
+  return best;
 }
 function custStatus(c){
   const lastClean = lastDateOf(c.cleanHistory);

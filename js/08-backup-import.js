@@ -277,7 +277,7 @@ const FOCUSED_HELP = {
       helpP('Every text (reminders, receipts, quotes) opens a preview you can edit first, and only offers to send to a mobile number. "Messages" under History lists everything actually sent.'),
       helpP('Tick "Text before I arrive" to flag a customer who needs a heads-up text. Tick "Don\'t send marketing texts" to opt them out of every campaign — this doesn\'t affect calls, quotes, or normal reminders.'),
       helpP('Property type, add-ons, and "fronts only" can be recorded here too — fronts-only counts as half a house in average-price figures.'),
-      helpP('An active customer\'s due date can be pushed back with "Defer" — 1 day, 1 week, 4 weeks, or a custom date — any time, not just once already deferred. "Apply price uplift" increases their price by a % or a flat £ amount in one step, recorded in their price history.')
+
     ]
   },
   quotes: {
