@@ -617,6 +617,13 @@
       width:100%;
       padding:0;
     }
+    /* Liquid Glass extras must never reach paper: the fixed colour wash behind the
+       app (body::before) was printing as a dark tinted block over the report. */
+    html, body{ background:#ffffff !important; }
+    body::before, body::after{ display:none !important; content:none !important; background:none !important; }
+    .print-area, .print-area *{
+      -webkit-backdrop-filter:none !important; backdrop-filter:none !important;
+    }
   }
 </style>
 </head>
