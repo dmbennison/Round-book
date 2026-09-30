@@ -820,15 +820,37 @@ async function getValhallaTripOrder(points, startIdx){
     return locs.map(l => reordered[l.original_index]);
   }catch(e){ return null; }
 }
-async function suggestRouteOrder(rn){
+// `day` is which visit day to plan when the round spans several. The Reorder
+// screen has no day tabs to pick from, so when a multi-day round is asked for
+// without a day this pops up a small picker first, which then calls back in here
+// with the chosen day. Single-day rounds go straight through as before.
+function openSuggestDayPicker(rn, days, custs){
+  openSheet(`
+    <div class="sheet-head">
+      <h2 style="flex:1; min-width:0;">Which day?</h2>
+      <button class="sheet-close" onclick="closeSheet()">✕</button>
+    </div>
+    <p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 14px; line-height:1.5;">This round is split over ${days.length} days. Pick the day you want a route suggested for — only that day's customers are re-ordered, and the other days are left as they are.</p>
+    ${days.map(d=>{
+      const n = custs.filter(c=>(c.visitDay||1)===d).length;
+      return `<button class="backup-btn" onclick="suggestRouteOrder('${escapeAttr(rn)}', ${d})">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h8a4 4 0 0 0 4-4V7a4 4 0 0 0-4-4H8"/></svg>
+        <div><div class="t1">Day ${d}</div><div class="t2">${n} customer${n===1?'':'s'}</div></div>
+      </button>`;
+    }).join('')}
+  `);
+}
+async function suggestRouteOrder(rn, day){
   let custs = sortByRoute(data.customers.filter(c=>(c.round||'Unassigned')===rn && !c.paused));
   const days = roundDaysUsed(custs);
+  let chosenDay = null;
   if(days.length > 1){
-    if(roundDayFilter === 'all'){
-      toast('This round spans multiple days — pick a day above first');
+    if(day == null){
+      openSuggestDayPicker(rn, days, custs);
       return;
     }
-    custs = custs.filter(c=>(c.visitDay||1) === roundDayFilter);
+    chosenDay = Number(day);
+    custs = custs.filter(c=>(c.visitDay||1) === chosenDay);
   }
   const withAddress = custs.filter(c=>c.address);
   const withoutAddress = custs.filter(c=>!c.address);
@@ -887,17 +909,17 @@ async function suggestRouteOrder(rn){
     order = computeRouteOrder(points, startIdx, gotLocation || undefined);
     method = 'straight-line';
   }
-  renderSuggestedRoutePreview(rn, order.map(i=>located[i]), notLocated, !!gotLocation, method);
+  renderSuggestedRoutePreview(rn, order.map(i=>located[i]), notLocated, !!gotLocation, method, chosenDay);
 }
 let suggestedRouteState = null;
-function renderSuggestedRoutePreview(rn, orderedCusts, notLocated, usedCurrentLocation, method){
-  suggestedRouteState = { rn, orderedIds: orderedCusts.map(c=>c.id), notLocatedIds: notLocated.map(c=>c.id) };
+function renderSuggestedRoutePreview(rn, orderedCusts, notLocated, usedCurrentLocation, method, day){
+  suggestedRouteState = { rn, day: day || null, orderedIds: orderedCusts.map(c=>c.id), notLocatedIds: notLocated.map(c=>c.id) };
   const methodText = method === 'straight-line'
     ? `${usedCurrentLocation ? 'Worked out from your current location, based' : 'Based'} on straight-line distance between addresses — the road-routing service wasn't reachable just now, so this is a fallback estimate. It can't know about one-way streets or which roads actually connect two places, so use your own judgement too.`
     : `Worked out ${usedCurrentLocation ? 'from your current location, ' : ''}using real road distances via ${method==='osrm'?'OSRM':'Valhalla'} (a free OpenStreetMap-based routing service) — more accurate than a straight-line guess, though still worth a sanity check before setting off.`;
   openSheet(`
     <div class="sheet-head">
-      <h2 style="flex:1; min-width:0;">Suggested order</h2>
+      <h2 style="flex:1; min-width:0;">Suggested order${day ? ` · Day ${day}` : ''}</h2>
       <button class="sheet-close" onclick="suggestedRouteState=null; closeSheet();">✕</button>
     </div>
     <p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 14px; line-height:1.5;">
@@ -917,16 +939,24 @@ function renderSuggestedRoutePreview(rn, orderedCusts, notLocated, usedCurrentLo
 }
 function applySuggestedRouteOrder(){
   if(!suggestedRouteState) return;
-  const { rn, orderedIds, notLocatedIds } = suggestedRouteState;
-  let i = 0;
-  orderedIds.forEach(id=>{
-    const c = data.customers.find(x=>x.id===id);
-    if(c) c.order = i++;
-  });
+  const { rn, day, orderedIds, notLocatedIds } = suggestedRouteState;
   // Anyone who couldn't be placed keeps their relative order among themselves
   // (same address-alphabetical fallback sortByRoute already uses) but goes at
-  // the very end, so the round stays complete rather than losing them.
-  sortByRoute(notLocatedIds.map(id=>data.customers.find(x=>x.id===id)).filter(Boolean)).forEach(c=>{ c.order = i++; });
+  // the very end of the list being re-ordered, so nobody gets lost.
+  const notLocatedSorted = sortByRoute(notLocatedIds.map(id=>data.customers.find(x=>x.id===id)).filter(Boolean));
+  const finalList = orderedIds.map(id=>data.customers.find(x=>x.id===id)).filter(Boolean).concat(notLocatedSorted);
+  // A single day of a multi-day round: hand the new order back using the same
+  // set of order numbers those customers already held, so the other days' order
+  // numbers (and where each day sits in the whole round) aren't disturbed.
+  // Falls back to plain 0,1,2… if their existing numbers are missing or repeated.
+  let slots = null;
+  if(day){
+    const existing = finalList.map(c=>c.order);
+    if(existing.every(o=>o!=null) && new Set(existing).size === existing.length){
+      slots = existing.slice().sort((a,b)=>a-b);
+    }
+  }
+  finalList.forEach((c,k)=>{ c.order = slots ? slots[k] : k; });
   suggestedRouteState = null;
   saveData();
   closeSheet();
