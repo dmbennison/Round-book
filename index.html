@@ -429,9 +429,12 @@
     width:36px; height:36px; border-radius:50%;
     background:rgba(255,255,255,0.16);
     box-shadow:inset 0 1px 0 rgba(255,255,255,0.40), inset 0 0 0 1px rgba(255,255,255,0.14);
-    -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px);
+    /* No backdrop-filter here: the header behind it already blurs, and a blur
+       nested inside another blur made iPad Safari paint the circle but drop the
+       icon. */
     transition:transform .15s ease, background .15s ease;
   }
+  .icon-btn svg{display:block; flex:none; pointer-events:none;}
   .icon-btn:active{background:rgba(255,255,255,0.30); transform:scale(0.92);}
   .brand-mark{border-radius:12px; box-shadow:inset 0 1px 0 rgba(255,255,255,0.45), inset 0 0 0 1px rgba(255,255,255,0.22);}
 
@@ -441,7 +444,6 @@
   .tab.active{
     background:rgba(255,255,255,0.24); color:#fff;
     box-shadow:inset 0 1px 0 rgba(255,255,255,0.50), inset 0 0 0 1px rgba(255,255,255,0.18), 0 2px 8px rgba(0,0,0,0.18);
-    -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px);
   }
 
   /* Cards: translucent fill, specular edge, no per-card blur (long lists) */
@@ -500,7 +502,6 @@
   .seg-btn{
     background:var(--glass-fill); border-radius:999px;
     box-shadow:var(--glass-hi);
-    -webkit-backdrop-filter:blur(14px) saturate(160%); backdrop-filter:blur(14px) saturate(160%);
     transition:background .2s ease, color .2s ease, transform .15s ease;
   }
   .seg-btn:active{transform:scale(0.97);}
@@ -514,11 +515,14 @@
   /* Sheets: a floating glass panel with the app visible, blurred, behind it */
   .overlay{
     background:rgba(10,25,40,0.28);
-    -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px);
   }
   .sheet{
     background:var(--bg);
     width:calc(100% - 16px); max-width:560px;
+    /* Always leave room above for the status bar / notch / Dynamic Island so the
+       close button can never slide underneath it (92vh ignored the safe areas,
+       and on iPad the sheet's top edge ended up under the system bar). */
+    max-height:calc(100% - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 28px);
     margin:0 auto calc(env(safe-area-inset-bottom) + 8px);
     padding:8px 16px 20px;
     border-radius:32px;
@@ -590,7 +594,7 @@
   @media (prefers-reduced-transparency: reduce){
     :root{--glass-fill:rgba(255,255,255,0.96); --sheet-fill:#F5F7F8;}
     body.dark{--glass-fill:rgba(32,46,60,0.96); --sheet-fill:#16212C;}
-    .today-tile, .stat, .seg-btn, .sheet, .overlay, header, .fab, .toast{-webkit-backdrop-filter:none; backdrop-filter:none;}
+    .today-tile, .stat, .sheet, header, .fab, .toast{-webkit-backdrop-filter:none; backdrop-filter:none;}
   }
   @media (prefers-reduced-motion: reduce){
     .btn, .fab, .icon-btn, .today-tile, .today-hero, .seg-btn{transition:none;}
