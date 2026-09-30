@@ -500,7 +500,9 @@ async function exportData(){
     try{
       const file = new File([jsonStr], filename, {type:'application/json'});
       if(navigator.canShare({files:[file]})){
-        await navigator.share({files:[file], title:'Round Book Backup'});
+        // File only — no title/text. Some Android share targets turn a shared
+        // title into a separate little .txt file saved alongside the backup.
+        await navigator.share({files:[file]});
         markBackedUp();
         backedUpToast('Backup shared');
         return;
