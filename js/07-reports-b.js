@@ -637,9 +637,28 @@ function mondayOfWeek(dateStr){
 // every tax year, so this only works correctly applied per tax year, never
 // as a single running total across everything ever logged.
 const MILEAGE_RATE_HIGH = 0.45, MILEAGE_RATE_LOW = 0.25, MILEAGE_HIGH_RATE_MILES = 10000;
-function mileageAllowanceForMiles(miles){
-  if(miles <= MILEAGE_HIGH_RATE_MILES) return miles * MILEAGE_RATE_HIGH;
-  return MILEAGE_HIGH_RATE_MILES * MILEAGE_RATE_HIGH + (miles - MILEAGE_HIGH_RATE_MILES) * MILEAGE_RATE_LOW;
+// The rates can be changed per tax year in Settings → Mileage rates, stored as
+// data.settings.mileageRates = { '2026': {high, low, threshold}, ... } keyed by the
+// calendar year the tax year starts in (so '2026' = 6 Apr 2026 – 5 Apr 2027).
+// A tax year with nothing saved uses HMRC's standard 45p / 25p / 10,000 miles.
+// Because the rate is looked up from the tax year, changing it re-prices ALL the
+// mileage in that tax year — past and future — not just entries logged afterwards.
+function mileageRatesForTaxYear(tyStart){
+  const saved = ((data.settings && data.settings.mileageRates) || {})[String(tyStart).slice(0,4)];
+  return {
+    high: saved && saved.high != null ? Number(saved.high) : MILEAGE_RATE_HIGH,
+    low: saved && saved.low != null ? Number(saved.low) : MILEAGE_RATE_LOW,
+    threshold: saved && saved.threshold != null ? Number(saved.threshold) : MILEAGE_HIGH_RATE_MILES
+  };
+}
+function mileageAllowanceForMiles(miles, tyStart){
+  const r = mileageRatesForTaxYear(tyStart || taxYearStart(todayISO()));
+  if(miles <= r.threshold) return miles * r.high;
+  return r.threshold * r.high + (miles - r.threshold) * r.low;
+}
+function mileageRateText(r){
+  const pence = v => { const p = Math.round(v*10000)/100; return (p % 1 ? p.toFixed(2).replace(/0$/,'') : p) + 'p'; };
+  return `${pence(r.high)}/mile for the first ${Number(r.threshold).toLocaleString('en-GB')} miles, ${pence(r.low)}/mile after that`;
 }
 function printMileageReport(){
   const entries = (data.mileageLog||[])
@@ -663,7 +682,7 @@ function printMileageReport(){
     const miles = tyTotals[ty];
     const end = new Date(ty+'T00:00:00'); end.setFullYear(end.getFullYear()+1); end.setDate(end.getDate()-1);
     const label = `6 Apr ${ty.slice(0,4)} – ${fmtDate(end.toISOString().slice(0,10))}`;
-    return `<tr><td>${label}</td><td style="text-align:right;">${miles.toFixed(1)}</td><td style="text-align:right;">${money(mileageAllowanceForMiles(miles))}</td></tr>`;
+    return `<tr><td>${label}</td><td style="text-align:right;">${miles.toFixed(1)}</td><td style="text-align:right;">${money(mileageAllowanceForMiles(miles, ty))}</td></tr>`;
   }).join('');
 
   const monthTotals = {};
@@ -686,12 +705,12 @@ function printMileageReport(){
     <div class="rpt-round-title" style="margin-top:0;">Tax year to date (6 Apr ${tyStart.slice(0,4)} – ${fmtDate(tyEnd)})</div>
     <table class="rpt-table"><tbody>
       <tr style="font-weight:800;"><td>Total miles</td><td style="text-align:right;">${tyMiles.toFixed(1)}</td></tr>
-      <tr><td>Mileage allowance</td><td style="text-align:right;">${money(mileageAllowanceForMiles(tyMiles))}</td></tr>
+      <tr><td>Mileage allowance</td><td style="text-align:right;">${money(mileageAllowanceForMiles(tyMiles, tyStart))}</td></tr>
     </tbody></table>
 
     <div class="rpt-round-title">Mileage allowance by tax year</div>
     <table class="rpt-table"><thead><tr><th>Tax year</th><th style="text-align:right;">Miles</th><th style="text-align:right;">Allowance</th></tr></thead><tbody>${tyAllowanceRows}</tbody></table>
-    <p style="font-size:11px; color:#66798A; margin-top:8px;">Based on HMRC's standard mileage rate: 45p/mile for the first 10,000 business miles in a tax year, 25p/mile after that. Each tax year's 10,000-mile threshold is worked out separately.</p>
+    <p style="font-size:11px; color:#66798A; margin-top:8px;">Rates used (change them in Settings → Mileage rates; a tax year's rates apply to all mileage in that year, and each year's mile threshold is worked out separately):${Object.keys(tyTotals).sort((a,b)=>b.localeCompare(a)).map(ty=>`<br>${ty.slice(0,4)}/${String(Number(ty.slice(0,4))+1).slice(2)}: ${mileageRateText(mileageRatesForTaxYear(ty))}`).join('')}</p>
 
     <div class="rpt-round-title">Monthly totals</div>
     <table class="rpt-table"><thead><tr><th>Month</th><th style="text-align:right;">Miles</th></tr></thead><tbody>${monthRows}</tbody></table>

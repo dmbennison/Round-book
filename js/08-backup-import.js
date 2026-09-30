@@ -307,7 +307,7 @@ const FOCUSED_HELP = {
       helpRow('Monthly schedule', 'Calendar of rounds and jobs due'),
       helpRow('One-off jobs', 'Every job, status and value'),
       helpRow('Property types', 'Houses and average price by type'),
-      helpRow('Mileage', 'Daily, weekly, monthly, tax-year-to-date, and the mileage tax allowance (45p/mile for the first 10,000 miles in a tax year, 25p after)'),
+      helpRow('Mileage', 'Daily, weekly, monthly, tax-year-to-date, and the mileage tax allowance (45p/mile for the first 10,000 miles in a tax year, 25p after, unless you\'ve changed the rates for that year in Settings → Mileage rates — new rates apply to all mileage in that tax year)'),
       helpRow('Price review due', '12+ months since last increase; plus anyone priced below their property type\'s average'),
       helpRow('Upsell opportunities', 'Fronts-only, conservatory, garage door and gutter add-ons worth offering')
     ]

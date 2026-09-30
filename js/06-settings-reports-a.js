@@ -152,7 +152,70 @@ function openSettings(){
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
       <div><div class="t1">Message templates</div><div class="t2">Wording for reminders, receipts, and quotes</div></div>
     </button>
+    <div class="section-label">Mileage</div>
+    <button class="backup-btn" onclick="openMileageRates()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+      <div><div class="t1">Mileage rates</div><div class="t2">HMRC pence-per-mile rates for each tax year</div></div>
+    </button>
   `);
+}
+
+/* ---------- mileage rates ----------
+   Per-tax-year HMRC mileage rates. Saved as data.settings.mileageRates[<start year>]
+   = {high, low, threshold} (rates in pounds per mile). Every mileage figure for that
+   tax year is worked out from whatever is saved here, so changing a rate re-prices
+   the whole year's mileage, including entries already logged. */
+function taxYearLabel(startYear){ startYear = Number(startYear); return `${startYear}/${String(startYear+1).slice(2)}`; }
+function openMileageRates(year){
+  const curYear = Number(taxYearStart(todayISO()).slice(0,4));
+  year = Number(year) || curYear;
+  const years = new Set([curYear, curYear-1, curYear+1, year]);
+  (data.mileageLog||[]).forEach(e=>{ if(e.date) years.add(Number(taxYearStart(e.date).slice(0,4))); });
+  Object.keys((data.settings.mileageRates)||{}).forEach(y=>years.add(Number(y)));
+  const list = Array.from(years).sort((a,b)=>b-a);
+  const r = mileageRatesForTaxYear(year+'-04-06');
+  const p = v => String(Math.round(v*10000)/100);
+  const isCustom = !!((data.settings.mileageRates||{})[String(year)]);
+  openSheet(`
+    <div class="sheet-head">
+      <h2 style="flex:1; min-width:0;">Mileage rates</h2>
+      <button class="sheet-close" onclick="closeSheet()">✕</button>
+    </div>
+    <p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 14px; line-height:1.5;">HMRC's approved mileage rates are set per tax year (6 April – 5 April). Whatever you save here applies to <b>all</b> the mileage in that tax year — including days you've already logged — in the mileage report. Other tax years aren't affected. The standard car/van rate is 45p for the first 10,000 miles, then 25p.</p>
+    <div class="section-label" style="margin-top:0;">Tax year</div>
+    <select id="mr_year" onchange="openMileageRates(this.value)">
+      ${list.map(y=>`<option value="${y}" ${y===year?'selected':''}>${taxYearLabel(y)}${y===curYear?' (current)':''}${(data.settings.mileageRates||{})[String(y)]?' – custom':''}</option>`).join('')}
+    </select>
+    <label>Rate up to the mile threshold (pence per mile)</label>
+    <input type="number" id="mr_high" inputmode="decimal" step="0.01" min="0" value="${p(r.high)}">
+    <label>Rate after the threshold (pence per mile)</label>
+    <input type="number" id="mr_low" inputmode="decimal" step="0.01" min="0" value="${p(r.low)}">
+    <label>Mile threshold for the higher rate</label>
+    <input type="number" id="mr_threshold" inputmode="numeric" step="1" min="0" value="${r.threshold}">
+    <div class="form-actions">
+      <button class="btn-primary" onclick="saveMileageRates(${year})">Save ${taxYearLabel(year)} rates</button>
+    </div>
+    ${isCustom ? `<button class="btn-danger-text" onclick="resetMileageRates(${year})">Reset ${taxYearLabel(year)} to HMRC standard</button>` : ''}
+  `, () => openSettings());
+}
+function saveMileageRates(year){
+  const high = parseFloat(document.getElementById('mr_high').value);
+  const low = parseFloat(document.getElementById('mr_low').value);
+  const threshold = parseFloat(document.getElementById('mr_threshold').value);
+  if(isNaN(high) || isNaN(low) || isNaN(threshold) || high < 0 || low < 0 || threshold < 0){
+    toast('Enter valid rates and a mile threshold'); return;
+  }
+  data.settings.mileageRates = data.settings.mileageRates || {};
+  data.settings.mileageRates[String(year)] = { high: Math.round(high*100)/10000, low: Math.round(low*100)/10000, threshold: Math.round(threshold) };
+  saveData();
+  toast(`${taxYearLabel(year)} mileage rates saved`);
+  openMileageRates(year);
+}
+function resetMileageRates(year){
+  if(data.settings.mileageRates) delete data.settings.mileageRates[String(year)];
+  saveData();
+  toast(`${taxYearLabel(year)} reset to HMRC standard`);
+  openMileageRates(year);
 }
 
 // Each entry drives one row on the Message Templates screen and its edit dialog —
