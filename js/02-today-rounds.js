@@ -1613,6 +1613,13 @@ function custCardHtml(c){
   const typeBenchmark = priceReviewBenchmark(c);
   const ownPerHouse = Number(c.price||0) / houseWeight(c);
   const belowTypeAvg = typeBenchmark != null && typeBenchmark > 0 && ownPerHouse < typeBenchmark * 0.85;
+  // How far under the benchmark they are, for their own house count (a fronts-only
+  // customer counts as half a house, matching how the benchmark is worked out).
+  const lowBy = belowTypeAvg ? Math.max(0, Math.round((typeBenchmark * houseWeight(c) - Number(c.price||0)) * 100) / 100) : 0;
+  // Next due date: shown for active customers with a clean history. Skipped when
+  // paused, when deferred (the "Deferred to" badge already says it) and when
+  // never cleaned (the "Never cleaned" badge covers that).
+  const nextDue = (!c.paused && s.lastClean && !(s.cleanBadge && s.cleanBadge.type === 'deferred')) ? nextDueISO(c) : null;
   return `<div class="swipe-wrap">
     <div class="swipe-bg swipe-bg-left">✓ Cleaned</div>
     <div class="swipe-bg swipe-bg-right">💷 Paid</div>
@@ -1632,12 +1639,13 @@ function custCardHtml(c){
       </div>
       <div class="cust-meta">
         ${s.cleanBadge ? `<span class="badge ${s.cleanBadge.type}"${c.paused&&c.pauseDate?` title="Paused since ${fmtDate(c.pauseDate)}"`:''}>${s.cleanBadge.text}</span>` : `<span class="badge ok">Cleaned ${fmtDate(s.lastClean)}</span>`}
+        ${nextDue ? `<span class="badge paused" title="Next clean due">Next due ${fmtDate(nextDue)}</span>` : ''}
         ${s.owed ? `<span class="badge owed">Owes ${money(s.balance)}${daysSinceLastPayment(c) ? ` · ${daysSinceLastPayment(c)}d` : ''}</span>` : s.credit ? `<span class="badge ok">Credit ${money(Math.abs(s.balance))}</span>` : `<span class="badge ok">Paid up</span>`}
         ${(s.owed && (c.paymentReminderCount||0) >= 2) ? `<span class="badge escalate" title="${c.paymentReminderCount} payment reminders sent, still unpaid">⚠ Chase</span>` : ''}
         ${(s.owed && c.paymentReminderSent) ? `<span class="badge paused">🔔 ${fmtDate(c.paymentReminderSentDate).split(' ').slice(0,2).join(' ')}</span>` : ''}
         ${(c.photos && c.photos.length) ? `<span class="badge paused">📷 ${c.photos.length}</span>` : ''}
         ${needsPriceReview(c) ? `<span class="badge due" title="12+ months since last price increase">📈 Review</span>` : ''}
-        ${belowTypeAvg ? `<span class="badge due" title="Below the average for ${escapeAttr(c.propertyType||'Not recorded')}">💷 Low</span>` : ''}
+        ${belowTypeAvg ? `<span class="badge due" title="${money(lowBy)} below the average for ${escapeAttr(c.propertyType||'Not recorded')}">💷 Low by ${money(lowBy)}</span>` : ''}
         ${c.propertyType ? `<span class="badge paused" title="${escapeAttr(propertySummaryText(c))}">🏠 ${escapeHtml(PROPERTY_TYPE_ABBR[c.propertyType]||c.propertyType)}${c.frontsOnly?' · Fronts':''}</span>` : (c.frontsOnly ? `<span class="badge paused">Fronts only</span>` : '')}
         ${c.textBeforeVisit ? `<span class="badge anniversary" title="Text before you arrive">📱 Text first</span>` : ''}
         ${showDayBadge ? `<span class="badge anniversary">Day ${c.visitDay||1}</span>` : ''}
