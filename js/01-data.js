@@ -6,7 +6,7 @@ const STORE_KEY = 'roundBookData_v1';
 // APP_VERSION is a plain decimal number (e.g. 1.01, 1.02 ... 1.99, 2.00) —
 // bump by 0.01 for every change. formatVersion always renders it to exactly
 // two decimal places, so it's never shown as "1.1" or "1.100".
-const APP_VERSION = 2.16;
+const APP_VERSION = 2.17;
 function formatVersion(v){ return Number(v).toFixed(2); }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
@@ -15,6 +15,7 @@ function formatVersion(v){ return Number(v).toFixed(2); }
 // the most recent 10 entries (oldest ones can be left in the array or trimmed,
 // either is fine, since the display always slices to 10).
 const VERSION_HISTORY = [
+  {version: 2.17, changes: ['Fixed printed reports coming out with a dark background block that made them hard to read — printouts are plain white again']},
   {version: 2.16, changes: ['New Settings → Mileage rates: set the HMRC pence-per-mile rates (and the mile threshold) for each tax year. A tax year\'s rates apply to all the mileage in that year, including days already logged, and the mileage report uses them']},
   {version: 2.15, changes: ['Suggest a route order now works on rounds split over several days — it asks which day you want, then only re-orders that day\'s customers and leaves the other days\' order alone']},
   {version: 2.14, changes: ['Customer cards now show the next due date, and the \"💷 Low\" badge now says how much lower than average the price is (e.g. \"Low by £3\")', 'Fixed next-due dates (cards, reports and exports) coming out a day early during British Summer Time']},
