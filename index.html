@@ -602,6 +602,75 @@
     .btn:active, .fab:active, .icon-btn:active, .today-tile:active, .today-hero:active, .seg-btn:active{transform:none;}
   }
 
+  /* =====================================================================
+     Landscape split view (iPad / large screens held sideways).
+     Left column = header, tabs and the current list (rounds, jobs, quotes,
+     campaigns...). Whatever you tap — a customer, quote, job, campaign, a
+     settings screen — opens in a pane on the right instead of sliding up as
+     a sheet. It's the same sheet underneath (so every existing screen, back
+     step and close button keeps working); only where it's drawn changes.
+     Phones and portrait stay exactly as they were: this only applies when
+     the screen is wide AND tall enough, so a phone on its side is excluded.
+     The Today tab, when nothing is open, uses the whole width as a dashboard
+     (see below) and drops back into the split as soon as something opens.
+     ===================================================================== */
+  @media screen and (orientation: landscape) and (min-width: 960px) and (min-height: 600px){
+    :root{ --list-w: clamp(400px, 40vw, 520px); }
+
+    header{ width:var(--list-w); box-sizing:border-box; border-radius:0 0 26px 0; }
+    #backupBanner, #marketingFollowUpBanner, #jobAnniversaryBanner, #importReviewBanner{ width:var(--list-w); box-sizing:border-box; }
+    main{ width:var(--list-w); box-sizing:border-box; min-height:calc(100vh - 120px); }
+    .fab{ right:auto; left:calc(var(--list-w) - 74px); }
+
+    /* The overlay becomes the always-present right-hand pane */
+    .overlay{
+      display:flex; position:fixed; top:0; bottom:0; right:0; left:var(--list-w);
+      background:transparent; -webkit-backdrop-filter:none; backdrop-filter:none;
+      align-items:stretch; justify-content:stretch; z-index:15;
+      border-left:1px solid var(--glass-edge-soft);
+    }
+    .overlay:not(.show) .sheet{ display:none; }
+    .overlay:not(.show)::after{
+      content:"Select something on the left to see its details here";
+      margin:auto; padding:0 40px; max-width:340px; text-align:center;
+      font-size:0.9375rem; font-weight:700; line-height:1.5; color:var(--ink-muted); opacity:0.75;
+    }
+    .sheet{
+      width:100%; max-width:none; height:100%; max-height:none; margin:0;
+      border-radius:0; border:none; animation:none;
+      padding:calc(env(safe-area-inset-top, 0px) + 14px) 28px calc(env(safe-area-inset-bottom, 0px) + 28px);
+      box-shadow:none;
+    }
+    .sheet-handle{ display:none; }
+
+    /* Today, nothing open: use the full width as a dashboard instead of a
+       phone-width column with an empty pane beside it. */
+    body[data-tab="today"]:not(:has(#overlay.show)){
+      --list-w: 100%;
+    }
+    body[data-tab="today"]:not(:has(#overlay.show)) .overlay{ display:none; }
+    body[data-tab="today"]:not(:has(#overlay.show)) header{ border-radius:0 0 26px 26px; }
+    body[data-tab="today"]:not(:has(#overlay.show)) .fab{ right:18px; left:auto; }
+    body[data-tab="today"]:not(:has(#overlay.show)) main{
+      display:grid; grid-template-columns:minmax(300px, 34%) 1fr; column-gap:16px; align-items:start;
+      padding-bottom:40px; min-height:0;
+    }
+    body[data-tab="today"]:not(:has(#overlay.show)) main > *{ grid-column:1 / -1; }
+    body[data-tab="today"]:not(:has(#overlay.show)) main > .today-hero{ grid-column:1; grid-row:2; margin-bottom:0; }
+    body[data-tab="today"]:not(:has(#overlay.show)) main > .today-grid{
+      grid-column:2; grid-row:2; grid-template-columns:repeat(3, 1fr); margin-bottom:0;
+    }
+    body[data-tab="today"]:not(:has(#overlay.show)) main > .today-grid > .today-tile:last-child{ grid-column:1 / -1; }
+
+    /* Today in the split (something open): compact so it fits without scrolling */
+    body[data-tab="today"]:has(#overlay.show) .today-hero{ padding:12px 14px; margin-bottom:8px; }
+    body[data-tab="today"]:has(#overlay.show) .today-hero .num{ font-size:1.75rem; }
+    body[data-tab="today"]:has(#overlay.show) .today-hero .value{ margin-top:6px; }
+    body[data-tab="today"]:has(#overlay.show) .today-tile{ padding:10px 12px; }
+    body[data-tab="today"]:has(#overlay.show) .today-tile .num{ font-size:1.3rem; }
+    body[data-tab="today"]:has(#overlay.show) .today-grid{ gap:8px; }
+  }
+
   @media print{
     body, body.dark{
       --bg:#ffffff !important;
