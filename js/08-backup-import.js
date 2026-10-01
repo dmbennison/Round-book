@@ -320,7 +320,9 @@ const FOCUSED_HELP = {
     body: () => [
       helpP('Everything lives only on this phone. Back up regularly from the Backup icon — export a full backup, export to Excel, export everyone as a contacts file, restore from a backup file, or import customers from a spreadsheet.'),
       helpP('"Export for accounting software" produces a CSV of payments received (Date, Description, Amount) for a chosen date range, in a plain format FreeAgent, Xero and QuickBooks can all import or match against a bank feed — their own import screen is where you confirm the columns and date format.'),
-      helpP('A pop-up appears if a change hasn\'t been backed up for 48 hours. "Not now" only puts it off for this visit to the app — it reappears next time you open Round Book until you actually back up.')
+      helpP('A pop-up appears if a change hasn\'t been backed up for 24 hours. "Not now" only puts it off for this visit to the app — it reappears next time you open Round Book until you actually back up.'),
+      helpP('<b>Safety copies</b> are kept automatically, about once a day when you open the app, and just before you restore a backup. The latest 10 are kept on the phone; open Safety copies to roll back to one after a mistake or a bad import (photos aren\'t included). They can\'t protect you if the phone is lost or wiped — an iPhone app isn\'t allowed to save to iCloud Drive by itself, so exporting a backup there is still something you do with a tap.'),
+      helpP('Round Book also asks your phone to protect its data from being cleared automatically when storage runs low. The Backup screen shows a green padlock line when the phone has agreed, or an amber warning when it hasn\'t.')
     ]
   },
   settings: {
@@ -422,6 +424,19 @@ async function openBackup(){
     }
   }
 
+  // Whether the phone has agreed to keep this app's data from being cleared automatically.
+  let persistLine = '';
+  try{
+    if(navigator.storage && navigator.storage.persisted){
+      const persisted = await navigator.storage.persisted();
+      persistLine = persisted
+        ? `<p style="color:var(--green); font-size:0.7812rem; font-weight:700; margin:-10px 2px 16px;">🔒 Your phone has agreed to protect this data from automatic clean-ups</p>`
+        : `<p style="color:var(--amber); font-size:0.7812rem; font-weight:700; line-height:1.5; margin:-10px 2px 16px;">⚠️ Your phone hasn't promised to protect this data if it runs low on space, so keeping a backup in iCloud Drive or Google Drive matters</p>`;
+    }
+  }catch(e){}
+  let safetyCount = 0;
+  try{ safetyCount = (await listSafetyCopies()).length; }catch(e){}
+
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">Backup &amp; restore</h2>
@@ -432,10 +447,15 @@ async function openBackup(){
       Everything is stored only on this phone, in this browser. Nothing is sent anywhere. Export a backup regularly — when the share sheet appears, choose <b>Save to Files → iCloud Drive</b> (or <b>Drive</b>, if you have Google Drive) rather than just saving to this phone, in case the app data is ever cleared.
     </p>
     <p style="color:${backupReminderDue()?'var(--amber)':'var(--ink-muted)'}; font-size:0.7812rem; font-weight:700; margin:0 2px 16px;">${lastText}</p>
+    ${persistLine}
     ${storageWarning}
     <button class="backup-btn" onclick="exportData()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
       <div><div class="t1">Export backup</div><div class="t2">${count} customer${count===1?'':'s'} · saves a .json file — choose iCloud Drive or Google Drive when prompted</div></div>
+    </button>
+    <button class="backup-btn" onclick="openSafetyCopies()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      <div><div class="t1">Safety copies</div><div class="t2">${safetyCount} kept automatically on this phone · roll back after a mistake</div></div>
     </button>
     <button class="backup-btn" onclick="exportExcel()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v16H4z"/><path d="M4 10h16M10 4v16"/></svg>
@@ -459,7 +479,38 @@ async function openBackup(){
     </button>
   `);
 }
+async function openSafetyCopies(){
+  let copies = [];
+  try{ copies = await listSafetyCopies(); }catch(e){}
+  const rows = copies.map(c => {
+    const d = new Date(c.at);
+    const when = d.toLocaleDateString('en-GB',{weekday:'short', day:'numeric', month:'short'}) + ' · ' + d.toLocaleTimeString('en-GB',{hour:'2-digit', minute:'2-digit'});
+    const counts = `${c.customers} customer${c.customers===1?'':'s'} · ${c.jobs} job${c.jobs===1?'':'s'} · ${c.quotes} quote${c.quotes===1?'':'s'}`;
+    return `<div style="display:flex; align-items:center; gap:10px; background:var(--card-surface); border-radius:12px; padding:12px 14px; margin-bottom:10px;">
+      <div style="flex:1; min-width:0;">
+        <div style="font-weight:800; font-size:0.875rem; color:var(--ink);">${when}</div>
+        <div style="font-size:0.75rem; color:var(--ink-muted); margin-top:2px;">${counts}</div>
+        <div style="font-size:0.6875rem; color:var(--ink-muted); margin-top:2px;">${escapeHtml(c.reason || 'Automatic')}</div>
+      </div>
+      <button class="btn" style="flex-shrink:0; border:none; background:var(--blue-dim); color:var(--blue-deep, var(--blue)); padding:8px 12px;" onclick="confirmRestoreSafetyCopy(${c.at})">Restore</button>
+    </div>`;
+  }).join('');
+  openSheet(`
+    <div class="sheet-head">
+      <h2 style="flex:1; min-width:0;">Safety copies</h2>
+      <button class="sheet-close" onclick="closeSheet()">✕</button>
+    </div>
+    <p style="color:var(--ink-muted); font-size:0.8438rem; line-height:1.5; margin:0 2px 14px;">
+      Round Book keeps a copy of your customers, jobs, quotes and settings automatically about once a day, and just before you restore a backup. The latest ${SAFETY_KEEP} are kept. They stay on this phone, so they protect against a mistake or a bad import — not against losing the phone. For that, keep exporting backups to iCloud Drive or Google Drive. Photos aren't part of safety copies.
+    </p>
+    ${rows || '<p style="color:var(--ink-muted); font-size:0.875rem; margin:0 2px;">No safety copies yet — the first is taken next time you open the app.</p>'}
+  `, () => openBackup());
+}
+function confirmRestoreSafetyCopy(at){
+  appConfirm('Replace everything on this phone with this safety copy? What\'s here now is saved as a safety copy first, so you can switch back.', {title:'Restore safety copy', confirmLabel:'Restore', onConfirm: () => restoreSafetyCopy(at)});
+}
 async function exportData(){
+  requestPersistentStorage(); // a tap is a good moment to ask; harmless if already granted
 
 
   toast('Preparing backup…');
@@ -548,6 +599,7 @@ document.getElementById('importFile').addEventListener('change', function(e){
     appConfirm(`Import ${parsed.customers.length} customers? This will replace all data currently on this phone.`, {title:'Import backup', confirmLabel:'Import', onConfirm: async () => {
       try{
         toast('Restoring backup…');
+        await takeSafetyCopy('Before restoring a backup file');
         const migrated = migrateData(parsed);
         // Handles both a backup from this version (photos bundled under
         // _photoBlobs) and an older backup from before photos moved to IndexedDB

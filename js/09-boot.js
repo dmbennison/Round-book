@@ -259,6 +259,13 @@ initStorage().catch(()=>{}).finally(()=>{
   render();
   initSwipeHandlers();
   if(!maybeShowFirstRun()) maybeShowMissingMileagePrompt();
+  requestPersistentStorage();
+  maybeAutoSafetyCopy();
+});
+// A home-screen app can stay open for days, so also check each time it comes
+// back to the foreground whether a daily safety copy is due.
+document.addEventListener('visibilitychange', () => {
+  if(document.visibilityState === 'visible') maybeAutoSafetyCopy();
 });
 
 if ('serviceWorker' in navigator) {

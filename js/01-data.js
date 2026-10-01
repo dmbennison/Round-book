@@ -6,7 +6,7 @@ const STORE_KEY = 'roundBookData_v1';
 // APP_VERSION is a plain decimal number (e.g. 1.01, 1.02 ... 1.99, 2.00) —
 // bump by 0.01 for every change. formatVersion always renders it to exactly
 // two decimal places, so it's never shown as "1.1" or "1.100".
-const APP_VERSION = 2.23;
+const APP_VERSION = 2.24;
 function formatVersion(v){ return Number(v).toFixed(2); }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
@@ -15,6 +15,7 @@ function formatVersion(v){ return Number(v).toFixed(2); }
 // the most recent 10 entries (oldest ones can be left in the array or trimmed,
 // either is fine, since the display always slices to 10).
 const VERSION_HISTORY = [
+  {version: 2.24, changes: ['Data protection: Round Book now asks your phone to protect its data from being cleared automatically when storage runs low, and Backup & restore shows whether that has been agreed', 'New automatic safety copies: once a day (when you open the app) Round Book quietly keeps a copy of your customers, jobs, quotes and settings on the phone — the last 10 are kept, and a copy is also taken just before you restore a backup file or a safety copy. Restore any of them from Backup & restore → Safety copies. These live on the phone only, so keep exporting backups to iCloud Drive or Google Drive for protection if the phone is lost', 'Fixed the user guide saying the backup pop-up appears after 48 hours — it is 24']},
   {version: 2.23, changes: ['One-off jobs now use the same line items as quotes — a description and price for each, a subtotal, a discount percentage and a total — and invoices list every line. Quotes and jobs convert into each other with their lines and discount carried across', 'Printed / PDF / Word invoices, quotes and receipts no longer start with the bold \"Quote — address\" heading, and the company address and phone number now sit to the right of the logo', 'Mileage report: each day\'s mileage now shows the round worked that day']},
   {version: 2.22, changes: ['Quotes now have line items — each with its own description and price — a running subtotal, an optional discount percentage and a total. The detail screen and the printed / PDF quote show the breakdown. Older quotes appear as a single line item', 'Backup files are now named with the date and time (e.g. round-book-backup-2026-10-01-1432.json)']},
   {version: 2.21, changes: ['Landscape layout on iPad and other large screens: the list (rounds, jobs, quotes, campaigns...) stays on the left and whatever you tap — customer, quote, job, campaign, settings — opens on the right. The Today tab spreads across the full width as a dashboard when nothing is open. Phones and portrait are unchanged']},
@@ -941,6 +942,119 @@ function backupReminderDue(){
   if(!pending) return false;
   return (Date.now() - Number(pending)) >= BACKUP_REMINDER_HOURS * 3600000;
 }
+/* ---------- persistent storage + automatic safety copies ----------
+   A web app on iOS can't write to iCloud/Drive by itself in the background —
+   the share sheet needs a tap — so true automatic off-phone backup isn't
+   possible. What IS possible, and what this does:
+   1. Ask the browser to mark this site's storage as "persistent" so it isn't
+      cleared when the phone runs low on space.
+   2. Keep rolling safety copies (data only, no photos) in a SEPARATE
+      IndexedDB database, so a bad edit/import or a damaged main record can be
+      rolled back. They live on the phone, so they do not replace exporting a
+      backup to iCloud Drive / Google Drive. */
+async function requestPersistentStorage(){
+  let status = 'unsupported';
+  try{
+    if(navigator.storage && navigator.storage.persist){
+      let already = false;
+      if(navigator.storage.persisted) already = await navigator.storage.persisted();
+      status = (already || await navigator.storage.persist()) ? 'granted' : 'denied';
+    }
+  }catch(e){}
+  try{ localStorage.setItem('roundBookPersistStatus', status); }catch(e){}
+  return status;
+}
+const SAFETY_DB_NAME = 'roundBookSafetyCopies';
+const SAFETY_STORE = 'copies';
+const SAFETY_KEEP = 10;
+const SAFETY_EVERY_MS = 20 * 3600000; // roughly daily, without drifting later each day
+let safetyDbPromise = null;
+function openSafetyDb(){
+  if(safetyDbPromise) return safetyDbPromise;
+  safetyDbPromise = new Promise((resolve, reject)=>{
+    if(!('indexedDB' in window)){ reject(new Error('IndexedDB not available')); return; }
+    const req = indexedDB.open(SAFETY_DB_NAME, 1);
+    req.onupgradeneeded = ()=>{
+      const db = req.result;
+      if(!db.objectStoreNames.contains(SAFETY_STORE)) db.createObjectStore(SAFETY_STORE);
+    };
+    req.onsuccess = ()=> resolve(req.result);
+    req.onerror = ()=> reject(req.error);
+  });
+  safetyDbPromise.catch(()=>{ safetyDbPromise = null; });
+  return safetyDbPromise;
+}
+// Newest first.
+async function listSafetyCopies(){
+  const db = await openSafetyDb();
+  return new Promise((resolve, reject)=>{
+    const req = db.transaction(SAFETY_STORE, 'readonly').objectStore(SAFETY_STORE).getAll();
+    req.onsuccess = ()=> resolve((req.result || []).sort((a,b)=> b.at - a.at));
+    req.onerror = ()=> reject(req.error);
+  });
+}
+async function takeSafetyCopy(reason){
+  try{
+    if(!data || !data.customers) return false;
+    const jobs = (data.oneOffJobs||[]).length, quotes = (data.quotes||[]).length;
+    // Never store an empty copy — it would only push a useful one out of the list.
+    if(!data.customers.length && !jobs && !quotes) return false;
+    const db = await openSafetyDb();
+    const at = Date.now();
+    const rec = {
+      at, reason: reason || 'Automatic',
+      customers: data.customers.length, jobs, quotes,
+      data: JSON.parse(JSON.stringify(data))
+    };
+    await new Promise((resolve, reject)=>{
+      const tx = db.transaction(SAFETY_STORE, 'readwrite');
+      tx.objectStore(SAFETY_STORE).put(rec, at);
+      tx.oncomplete = ()=>resolve();
+      tx.onerror = ()=>reject(tx.error);
+      tx.onabort = ()=>reject(tx.error);
+    });
+    try{ localStorage.setItem('roundBookLastSafetyCopy', String(at)); }catch(e){}
+    const extra = (await listSafetyCopies()).slice(SAFETY_KEEP);
+    if(extra.length){
+      await new Promise((resolve)=>{
+        const tx = db.transaction(SAFETY_STORE, 'readwrite');
+        extra.forEach(c => tx.objectStore(SAFETY_STORE).delete(c.at));
+        tx.oncomplete = ()=>resolve();
+        tx.onerror = ()=>resolve();
+        tx.onabort = ()=>resolve();
+      });
+    }
+    return true;
+  }catch(e){ return false; }
+}
+// Called when the app opens and whenever it comes back to the foreground.
+function maybeAutoSafetyCopy(){
+  let last = 0;
+  try{ last = Number(localStorage.getItem('roundBookLastSafetyCopy')) || 0; }catch(e){}
+  if(Date.now() - last >= SAFETY_EVERY_MS) takeSafetyCopy('Automatic');
+}
+async function restoreSafetyCopy(at){
+  try{
+    const db = await openSafetyDb();
+    const rec = await new Promise((resolve, reject)=>{
+      const req = db.transaction(SAFETY_STORE, 'readonly').objectStore(SAFETY_STORE).get(at);
+      req.onsuccess = ()=>resolve(req.result || null);
+      req.onerror = ()=>reject(req.error);
+    });
+    if(!rec) throw new Error('missing');
+    // Keep what's on the phone right now as a safety copy too, so restoring is itself undoable.
+    await takeSafetyCopy('Before restoring a safety copy');
+    data = migrateData(JSON.parse(JSON.stringify(rec.data)));
+    await saveData();
+    sheetOnClose = null;
+    closeSheet();
+    render();
+    toast('Safety copy restored');
+  }catch(e){
+    toast('Couldn\'t restore that safety copy');
+  }
+}
+
 function dismissBackupBanner(){ bannerDismissed = true; removeBackupPopup(); }
 function removeBackupPopup(){
   const el = document.getElementById('backupPopup');
