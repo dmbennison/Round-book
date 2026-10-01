@@ -390,8 +390,14 @@ function printQuote(id){
     q.email ? escapeHtml(q.email) : ''
   ].filter(Boolean).map(l=>`<div>${l}</div>`).join('');
 
-  const description = q.notes ? escapeHtml(q.notes) : 'Window cleaning';
+  const pItems = quoteItems(q);
+  const pTot = quoteTotals(pItems, q.discountPct);
   const propertyLine = propertySummaryText(q);
+  const itemRows = (pItems.length ? pItems : [{desc:'', price: q.price||0}]).map(i=>
+    `<tr><td>${escapeHtml(i.desc || 'Window cleaning')}</td><td style="text-align:right;">${money(i.price)}</td></tr>`).join('');
+  const discountRows = pTot.pct > 0 ? `
+        <tr><td style="color:#66798A; font-weight:700;">Subtotal</td><td style="text-align:right;">${money(pTot.subtotal)}</td></tr>
+        <tr><td style="color:#66798A; font-weight:700;">Discount (${pTot.pct}%)</td><td style="text-align:right;">\u2212${money(pTot.discount)}</td></tr>` : '';
 
   const body = `
     ${logoBlock}${nameBlock}${addressBlock}${phoneBlock}${letterheadSpacer}
@@ -406,13 +412,14 @@ function printQuote(id){
 
     <div class="rpt-round-title">Details</div>
     <table class="rpt-table" style="margin-bottom:4px;">
-      <thead><tr><th>Description</th><th style="text-align:right;">Quoted price</th></tr></thead>
+      <thead><tr><th>Description</th><th style="text-align:right;">Price</th></tr></thead>
       <tbody>
-        <tr><td>${description}${propertyLine ? `<br><span style="color:#66798A; font-size:12px;">${escapeHtml(propertyLine)}</span>` : ''}</td><td style="text-align:right;">${money(q.price)}</td></tr>
+        ${itemRows}${discountRows}
       </tbody>
     </table>
-    <div class="rpt-total inv-total-box"><span>Quoted price</span><span class="inv-total-amount">${money(q.price)}</span></div>
-    <div style="margin-top:14px;"><span class="inv-stamp quote">Quote — no payment due</span></div>
+    ${propertyLine ? `<div style="color:#66798A; font-size:12px; margin:4px 0 8px;">${escapeHtml(propertyLine)}</div>` : ''}
+    <div class="rpt-total inv-total-box"><span>Quoted price</span><span class="inv-total-amount">${money(pTot.total)}</span></div>
+    <div style="margin-top:14px;"><span class="inv-stamp quote">Quote \u2014 no payment due</span></div>
 
     <div class="rpt-footer" style="text-align:left; border-top:none; margin-top:28px; padding-top:0;">
       This is a quotation only — nothing is due for payment now. If you would like to go ahead, or have any questions, please get in touch.<br>

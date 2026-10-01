@@ -497,6 +497,16 @@ function openQuoteDetail(id){
   const canSend = hasMobile || !!q.email;
   const sentCount = q.quoteFollowUpCount || 0;
   const history = quoteHistoryEntries(q);
+  const dItems = quoteItems(q);
+  const dTot = quoteTotals(dItems, q.discountPct);
+  // Line-item breakdown: shown whenever there's more to say than one bare price.
+  const breakdownHtml = (dItems.length > 1 || dTot.pct > 0 || (dItems.length === 1 && dItems[0].desc)) ? `
+    <div style="background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:10px 14px; margin-bottom:14px;">
+      ${dItems.map(i=>`<div style="display:flex; justify-content:space-between; gap:12px; font-size:0.875rem; font-weight:600; padding:4px 0;"><span style="min-width:0;">${escapeHtml(i.desc || 'Window cleaning')}</span><span style="flex:none;">${money(i.price)}</span></div>`).join('')}
+      ${dTot.pct > 0 ? `
+        <div style="display:flex; justify-content:space-between; font-size:0.8125rem; color:var(--ink-muted); font-weight:700; padding:4px 0; border-top:1px solid var(--line); margin-top:4px;"><span>Subtotal</span><span>${money(dTot.subtotal)}</span></div>
+        <div style="display:flex; justify-content:space-between; font-size:0.8125rem; color:var(--ink-muted); font-weight:700; padding:2px 0;"><span>Discount (${dTot.pct}%)</span><span>−${money(dTot.discount)}</span></div>` : ''}
+    </div>` : '';
   const chev = `<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>`;
   const statusBtn = (st, label) => `<button class="seg-btn ${(q.status||'pending')===st?'active':''}" onclick="setQuoteStatusFromDetail('${id}','${st}')">${label}</button>`;
   const histRows = history.map(e=>{
@@ -529,6 +539,8 @@ function openQuoteDetail(id){
       </div>
     </div>
 
+    ${breakdownHtml}
+
     <details class="cust-section" open>
       <summary>Actions ${chev}</summary>
       <div class="cust-section-body">
@@ -560,7 +572,7 @@ function openQuoteDetail(id){
     <details class="cust-section"${(q.notes || q.declinedReason || q.status==='declined') ? ' open' : ''}>
       <summary>Notes${q.status==='declined' ? ' &amp; declined reason' : ''} ${chev}</summary>
       <div class="cust-section-body">
-        <label style="margin-top:0;">Notes <span style="text-transform:none; font-weight:500; opacity:0.7;">(also used as the “work” wording in quote texts)</span></label>
+        <label style="margin-top:0;">Notes <span style="text-transform:none; font-weight:500; opacity:0.7;">(internal — the quote texts use the line item descriptions)</span></label>
         <textarea id="qd_notes" rows="3" placeholder="Access notes, size of job...">${escapeHtml(q.notes||'')}</textarea>
         ${q.status==='declined' ? `
           <label>Why was it declined?</label>
@@ -625,8 +637,83 @@ function logQuoteCall(id){
   closeSheet();
 }
 
+/* ---------- quote line items ----------
+   A quote is a list of line items (each with its own description and price), an
+   optional discount percentage, and a total. q.items = [{desc, price}],
+   q.discountPct = 0-100, and q.price is ALWAYS kept as the final total after
+   discount, so the quote cards, texts, "convert to customer/job" and anything else
+   that reads q.price carries on working unchanged. Quotes made before line items
+   existed have no q.items; quoteItems() presents their single price (with the old
+   notes as its description) as one line. */
+function round2(n){ return Math.round((Number(n)||0) * 100) / 100; }
+function quoteItems(q){
+  if(q && Array.isArray(q.items) && q.items.length) return q.items;
+  if(q && (Number(q.price) || q.notes)) return [{desc: q.notes || '', price: Number(q.price)||0}];
+  return [];
+}
+function quoteTotals(items, discountPct){
+  const subtotal = round2((items||[]).reduce((s,i)=>s + (Number(i.price)||0), 0));
+  const pct = Math.min(100, Math.max(0, Number(discountPct)||0));
+  const discount = round2(subtotal * pct / 100);
+  return { subtotal, pct, discount, total: round2(subtotal - discount) };
+}
+// What the quote texts call the work ({work}): the line descriptions, else the notes.
+function quoteWorkText(q){
+  const descs = (Array.isArray(q.items) ? q.items : []).map(i=>(i.desc||'').trim()).filter(Boolean);
+  return descs.length ? descs.join(', ') : (q.notes || '');
+}
+function quoteItemRowHtml(item){
+  item = item || {};
+  return `<div class="q-item-row" style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+    <input type="text" class="q-item-desc" value="${escapeAttr(item.desc||'')}" placeholder="e.g. Windows, gutters, conservatory" style="flex:1 1 auto; min-width:0; margin:0;">
+    <input type="number" class="q-item-price" value="${item.price!=null && item.price!=='' ? item.price : ''}" placeholder="£" inputmode="decimal" min="0" step="0.5" oninput="recalcQuoteTotals()" style="width:96px; flex:none; margin:0;">
+    <button type="button" class="sheet-close" style="flex:none;" onclick="removeQuoteItemRow(this)" aria-label="Remove line">✕</button>
+  </div>`;
+}
+function addQuoteItemRow(){
+  const wrap = document.getElementById('quoteItemRows');
+  if(!wrap) return;
+  wrap.insertAdjacentHTML('beforeend', quoteItemRowHtml({}));
+  const rows = wrap.querySelectorAll('.q-item-row');
+  const last = rows[rows.length-1];
+  if(last) last.querySelector('.q-item-desc').focus();
+}
+function removeQuoteItemRow(btn){
+  const row = btn.closest('.q-item-row');
+  const wrap = document.getElementById('quoteItemRows');
+  if(!row || !wrap) return;
+  if(wrap.querySelectorAll('.q-item-row').length <= 1){
+    // Keep one empty line rather than leaving the section with nothing to type into.
+    row.querySelector('.q-item-desc').value = '';
+    row.querySelector('.q-item-price').value = '';
+  } else {
+    row.remove();
+  }
+  recalcQuoteTotals();
+}
+function readQuoteFormItems(){
+  return Array.from(document.querySelectorAll('#quoteItemRows .q-item-row')).map(r=>({
+    desc: r.querySelector('.q-item-desc').value.trim(),
+    price: round2(parseFloat(r.querySelector('.q-item-price').value) || 0)
+  }));
+}
+function recalcQuoteTotals(){
+  const discEl = document.getElementById('q_discount');
+  const t = quoteTotals(readQuoteFormItems(), discEl ? discEl.value : 0);
+  const set = (id, txt) => { const el = document.getElementById(id); if(el) el.textContent = txt; };
+  set('q_subtotal', money(t.subtotal));
+  set('q_discountAmt', t.discount ? '\u2212' + money(t.discount) : money(0));
+  set('q_total', money(t.total));
+}
+
 function openQuoteForm(existing, prefill, returnTo){
   const q = existing || prefill || {};
+  // Older quotes (and ones prefilled from a job) have one price and notes: show
+  // that as a single line item, with the notes text moved into its description.
+  const hasItems = Array.isArray(q.items) && q.items.length;
+  const formItems = hasItems ? q.items : ((q.price || q.notes) ? [{desc: q.notes||'', price: q.price||0}] : [{desc:'', price:''}]);
+  const notesValue = hasItems ? (q.notes||'') : '';
+  const formTotals = quoteTotals(formItems, q.discountPct);
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">${existing?'Edit quote':'Add quote'}</h2>
@@ -652,12 +739,22 @@ function openQuoteForm(existing, prefill, returnTo){
     </div>
     <label>Date</label>
     <input type="date" id="q_date" value="${q.date||todayISO()}">
-    <label>Quoted price</label>
-    <input type="number" id="q_price" value="${q.price!=null?q.price:''}" placeholder="£" min="0" step="0.5">
+    <label>Line items <span style="text-transform:none; font-weight:500; opacity:0.7;">(description and price for each)</span></label>
+    <div id="quoteItemRows">${formItems.map(quoteItemRowHtml).join('')}</div>
+    <button type="button" class="btn" style="width:100%; background:var(--blue-dim); color:var(--blue-deep); margin:2px 0 12px;" onclick="addQuoteItemRow()">+ Add line item</button>
+    <div style="background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:10px 14px; margin-bottom:6px;">
+      <div style="display:flex; justify-content:space-between; font-size:0.875rem; color:var(--ink-muted); font-weight:700; padding:3px 0;"><span>Subtotal</span><span id="q_subtotal">${money(formTotals.subtotal)}</span></div>
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; font-size:0.875rem; color:var(--ink-muted); font-weight:700; padding:3px 0;">
+        <span style="display:flex; align-items:center; gap:8px;">Discount
+          <input type="number" id="q_discount" value="${q.discountPct ? q.discountPct : ''}" placeholder="0" inputmode="decimal" min="0" max="100" step="0.5" oninput="recalcQuoteTotals()" style="width:72px; margin:0; padding:6px 8px;"> %</span>
+        <span id="q_discountAmt">${formTotals.discount ? '−' + money(formTotals.discount) : money(0)}</span>
+      </div>
+      <div style="display:flex; justify-content:space-between; font-size:1.0625rem; color:var(--emphasis); font-weight:800; padding:6px 0 2px; border-top:1px solid var(--line); margin-top:4px;"><span>Total</span><span id="q_total">${money(formTotals.total)}</span></div>
+    </div>
     <label>Follow up after <span style="text-transform:none; font-weight:500; opacity:0.7;">(days, if still pending)</span></label>
     <input type="number" id="q_followup" value="${q.followUpDays!=null?q.followUpDays:7}" min="0" step="1">
     <label>Notes</label>
-    <textarea id="q_notes" rows="2" placeholder="Access notes, size of job...">${escapeHtml(q.notes||'')}</textarea>
+    <textarea id="q_notes" rows="2" placeholder="Access notes, size of job...">${escapeHtml(notesValue)}</textarea>
     ${propertyFieldsHtml(q, 'q')}
     <label style="margin-top:0;">Status</label>
     <div class="seg-row">
@@ -694,12 +791,17 @@ function saveQuoteForm(id){
   if(!address && !name){ toast('Please enter at least an address or a name'); return; }
   const fromJobField = document.getElementById('q_fromJobId');
   const marketingCustomerField = document.getElementById('q_marketingCustomerId');
+  // Drop completely empty lines; q.price is stored as the total after discount.
+  const quoteItemsForSave = readQuoteFormItems().filter(i => i.desc || i.price);
+  const quoteTot = quoteTotals(quoteItemsForSave, document.getElementById('q_discount').value);
   const payload = {
     address, name,
     phone: document.getElementById('q_phone').value.trim(),
     email: document.getElementById('q_email').value.trim(),
     date: document.getElementById('q_date').value || todayISO(),
-    price: parseFloat(document.getElementById('q_price').value) || 0,
+    items: quoteItemsForSave,
+    discountPct: quoteTot.pct,
+    price: quoteTot.total,
     followUpDays: (()=>{ const v = parseInt(document.getElementById('q_followup').value,10); return Number.isFinite(v) && v>=0 ? v : 7; })(),
     notes: document.getElementById('q_notes').value.trim(),
     status: document.getElementById('q_status').value || 'pending',

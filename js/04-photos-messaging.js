@@ -987,7 +987,7 @@ function sendQuoteText(id, mode){
   const kind = isFollowUp ? 'quoteFollowUp' : (q.fromJobId ? 'repeatQuote' : 'quote');
   const countsAsChase = isFollowUp || count === 0;
   const msg = applyTemplate(tpl, {
-    name: firstName, amount: Number(q.price||0), company, date: fmtDate(q.date), yourname, work: q.notes||''
+    name: firstName, amount: Number(q.price||0), company, date: fmtDate(q.date), yourname, work: quoteWorkText(q)
   });
   if(mobile){
     const afterSend = () => {
