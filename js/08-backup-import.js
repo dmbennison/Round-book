@@ -283,6 +283,7 @@ const FOCUSED_HELP = {
   quotes: {
     title: 'Quotes',
     body: () => [
+      helpP('Tap a quote to open its detail screen: the quoted price and status at the top, then Actions (send the quote, print it or send it as a PDF, follow up, convert to a customer or one-off job), History (every send, follow-up and status change) and Notes, which also holds the reason if the quote was declined. The pencil edits the full quote. The printed/PDF quote looks like an invoice but is clearly marked as a quote, with no payment due.'),
       helpP('Swipe right to accept, left to decline. Accepted quotes convert into a job or customer — if the address matches an existing customer, it links automatically. Quotes left Pending past their follow-up window (7 days by default) are flagged on the Today tab. Each follow-up text sent gets a little softer in wording, and automatically pushes the next one further out, so an unanswered quote doesn\'t nag forever on a fixed weekly cycle.'),
       helpP('Start a quote from an existing customer\'s screen with "Get a quote for this customer" to pre-fill their details.')
     ]

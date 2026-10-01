@@ -886,8 +886,10 @@ let pendingReportTitle = '';
 let pendingReportBody = '';
 let pendingReportHideCompany = false;
 let pendingReportPhone = '';
+let pendingReportOnPdfShared = null; // optional callback, e.g. to log a quote PDF send
 
-function runPrint(titleHtml, bodyHtml, hideCompanyHeader, allowPdfShare, returnTo, phone){
+function runPrint(titleHtml, bodyHtml, hideCompanyHeader, allowPdfShare, returnTo, phone, onPdfShared){
+  pendingReportOnPdfShared = onPdfShared || null;
   pendingReportTitle = titleHtml;
   pendingReportBody = bodyHtml;
   pendingReportHideCompany = !!hideCompanyHeader;
@@ -1027,8 +1029,10 @@ async function sendPendingReportPdf(){
   toast('Preparing PDF…');
   try{
     const blob = await generatePendingReportPdfBlob();
+    const onShared = pendingReportOnPdfShared;
     closeSheet();
-    await sharePdfBlob(blob, sanitizeFilename(pendingReportTitle) + '.pdf', pendingReportPhone);
+    const shared = await sharePdfBlob(blob, sanitizeFilename(pendingReportTitle) + '.pdf', pendingReportPhone);
+    if(shared && onShared){ try{ onShared(); }catch(e){} }
   }catch(e){
     toast('Could not create the PDF — try Print instead');
     if(btn){ btn.style.opacity = ''; btn.style.pointerEvents = ''; }

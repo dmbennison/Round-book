@@ -345,7 +345,7 @@ function saveJobForm(id){
     data.oneOffJobs.push(newJob);
     if(fromQuoteField && fromQuoteField.value){
       const q = data.quotes.find(x=>x.id===fromQuoteField.value);
-      if(q){ q.status = 'converted'; q.convertedToJobId = newJob.id; }
+      if(q){ setQuoteStatus(q, 'converted', 'Converted to a one-off job'); q.convertedToJobId = newJob.id; }
     }
     toast('Job added');
   }
@@ -413,7 +413,7 @@ function quoteCardHtml(q){
     <div class="swipe-bg swipe-bg-left">✓ Accept</div>
     <div class="swipe-bg swipe-bg-right">✕ Decline</div>
     <div class="cust-card" data-id="${q.id}" data-kind="quote">
-      <div class="cust-top" onclick="openQuoteForm(data.quotes.find(x=>x.id==='${q.id}'))">
+      <div class="cust-top" onclick="openQuoteDetail('${q.id}')">
         <div>
           <div class="cust-addr" style="font-size:1rem; font-weight:800; color:var(--ink);">${escapeHtml(q.address||'No address')}</div>
           ${(q.name||q.phone) ? `<div class="cust-name" style="font-size:0.8125rem; font-weight:600; color:var(--ink-muted); margin-top:2px;">${[escapeHtml(q.name||''), q.phone?escapeHtml(q.phone):''].filter(Boolean).join(' · ')}</div>` : ''}
@@ -430,14 +430,26 @@ function quoteCardHtml(q){
   </div>`;
 }
 
+// Every status change goes through here so the quote's History can list it
+// (q.statusLog = [{date, time, from, to, note?}]). Returns true if it changed.
+const QUOTE_STATUS_LABELS = {pending:'Pending', accepted:'Accepted', declined:'Declined', converted:'Converted'};
+function setQuoteStatus(q, to, note){
+  const from = q.status || 'pending';
+  if(from === to) return false;
+  q.status = to;
+  if(!q.statusLog) q.statusLog = [];
+  q.statusLog.push(Object.assign({date: todayISO(), time: Date.now(), from, to}, note ? {note} : {}));
+  return true;
+}
 function markQuoteAccepted(id){
   const q = data.quotes.find(x=>x.id===id);
   if(!q) return;
   const prevStatus = q.status;
-  q.status = 'accepted';
+  const logged = setQuoteStatus(q, 'accepted');
   saveData(); render();
   toast('Quote marked accepted', 'Undo', () => {
     q.status = prevStatus;
+    if(logged && q.statusLog) q.statusLog.pop();
     saveData(); render();
   });
 }
@@ -445,12 +457,172 @@ function markQuoteDeclined(id){
   const q = data.quotes.find(x=>x.id===id);
   if(!q) return;
   const prevStatus = q.status;
-  q.status = 'declined';
+  const logged = setQuoteStatus(q, 'declined');
   saveData(); render();
   toast('Quote marked declined', 'Undo', () => {
     q.status = prevStatus;
+    if(logged && q.statusLog) q.statusLog.pop();
     saveData(); render();
   });
+}
+
+/* ---------- quote detail screen ----------
+   Mirrors openCustomerDetail: a header (amount + status), then collapsible Actions,
+   History and Notes sections. The full edit form is one tap away via the pencil. */
+function quoteHistoryEntries(q){
+  const dayMs = d => d ? new Date(d + 'T12:00:00').getTime() : 0;
+  const entries = [];
+  (q.messageLog||[]).forEach(m=>{
+    const label = MESSAGE_LOG_LABELS[m.kind] || m.kind;
+    const icon = (m.kind === 'quoteFollowUp' || m.kind === 'quoteCall') ? '🔔' : (m.kind === 'quotePdf' ? '📄' : '💬');
+    entries.push({t: m.time || dayMs(m.date), date: m.date, time: m.time, icon, text: label + (m.channel === 'email' ? ' (by email)' : '')});
+  });
+  (q.statusLog||[]).forEach(s=>{
+    entries.push({t: s.time || dayMs(s.date), date: s.date, time: s.time, icon: '🔁',
+      text: `Status: ${QUOTE_STATUS_LABELS[s.from]||s.from} → ${QUOTE_STATUS_LABELS[s.to]||s.to}`, note: s.note});
+  });
+  entries.sort((a,b)=>b.t - a.t);
+  // The quote's own date is when it was given — always the oldest line.
+  entries.push({t: -1, date: q.date, icon: '📝', text: 'Quote created'});
+  return entries;
+}
+
+function openQuoteDetail(id){
+  const q = data.quotes.find(x=>x.id===id);
+  if(!q){ closeSheet(); return; }
+  const today = todayISO();
+  const needsFollowUp = quoteNeedsFollowUp(q, today);
+  const converted = q.status === 'converted';
+  const hasMobile = isMobileNumber(q.phone);
+  const canSend = hasMobile || !!q.email;
+  const sentCount = q.quoteFollowUpCount || 0;
+  const history = quoteHistoryEntries(q);
+  const chev = `<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>`;
+  const statusBtn = (st, label) => `<button class="seg-btn ${(q.status||'pending')===st?'active':''}" onclick="setQuoteStatusFromDetail('${id}','${st}')">${label}</button>`;
+  const histRows = history.map(e=>{
+    const time = e.time ? new Date(e.time).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '';
+    return `<li>${e.icon} ${escapeHtml(e.text)} <span style="color:var(--ink-muted); font-weight:500;">— ${fmtDate(e.date)}${time?` at ${time}`:''}</span>${e.note?`<div style="color:var(--ink-muted); font-size:0.75rem; font-weight:500; margin-top:2px;">${escapeHtml(e.note)}</div>`:''}</li>`;
+  }).join('');
+
+  openSheet(`
+    <div class="sheet-head">
+      <h2 style="flex:1; min-width:0;">${escapeHtml(q.address || q.name || 'Quote')}</h2>
+      <button class="sheet-close" style="flex-shrink:0; margin-right:6px;" onclick="openQuoteForm(data.quotes.find(x=>x.id==='${id}'), null, () => openQuoteDetail('${id}'))" aria-label="Edit quote">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+      </button>
+      <button class="sheet-close" style="flex-shrink:0;" onclick="closeSheet()">✕</button>
+    </div>
+    ${(q.name && q.address) ? `<div style="color:var(--ink); font-size:0.9375rem; font-weight:700; margin-bottom:2px;">${escapeHtml(q.name)}</div>` : ''}
+    ${(q.phone || q.email) ? `<div style="color:var(--ink-muted); font-size:0.8125rem; margin-bottom:10px;">${[q.phone?escapeHtml(q.phone):'', q.email?escapeHtml(q.email):''].filter(Boolean).join(' · ')}</div>` : ''}
+    ${propertySummaryText(q) ? `<div style="color:var(--ink-muted); font-size:0.75rem; font-weight:700; margin:0 2px 10px;">🏠 ${escapeHtml(propertySummaryText(q))}</div>` : ''}
+
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:14px 16px; margin-bottom:14px;">
+      <div>
+        <div style="font-size:0.6875rem; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-muted);">Quoted price</div>
+        <div style="font-size:1.75rem; font-weight:800; color:var(--emphasis); line-height:1.15;">${money(q.price)}</div>
+        <div style="font-size:0.75rem; color:var(--ink-muted); margin-top:2px;">Quoted ${fmtDate(q.date)}</div>
+      </div>
+      <div style="text-align:right; display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
+        ${quoteStatusBadge(q)}
+        ${q.fromJobId ? `<span class="badge anniversary">🔁 Repeat work</span>` : ''}
+        ${needsFollowUp ? `<span class="badge overdue">🔔 Follow up · ${daysBetween(q.date, today)}d</span>` : ''}
+      </div>
+    </div>
+
+    <details class="cust-section" open>
+      <summary>Actions ${chev}</summary>
+      <div class="cust-section-body">
+        ${converted ? `<p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 12px;">✓ This quote has been converted${q.convertedToCustomerId ? ' to a customer' : (q.convertedToJobId ? ' to a one-off job' : '')}.</p>` : `
+          <div class="seg-row" style="margin-bottom:12px;">
+            ${statusBtn('pending','Pending')}${statusBtn('accepted','Accepted')}${statusBtn('declined','Declined')}
+          </div>`}
+        ${canSend ? '' : `<p style="color:var(--amber); font-size:0.75rem; font-weight:700; margin:0 2px 10px;">Add a mobile number or email (pencil, top right) to send this quote.</p>`}
+        <div class="row2" style="margin-bottom:10px;">
+          <button class="btn" style="background:var(--amber-dim); color:var(--amber); ${canSend?'':'opacity:0.45; pointer-events:none;'}" onclick="sendQuoteText('${id}','initial')">💬 Send quote</button>
+          <button class="btn" style="background:var(--blue-dim); color:var(--blue-deep);" onclick="printQuote('${id}')">🖨️ Print quote</button>
+        </div>
+        ${!converted ? `
+          <button class="btn" style="width:100%; background:var(--amber-dim); color:var(--amber); margin-bottom:10px;" onclick="openQuoteFollowUp('${id}')">🔔 Follow up${sentCount ? ` <span style="font-weight:600; opacity:0.8;">(chased ${sentCount} time${sentCount===1?'':'s'})</span>` : ''}</button>
+          <button class="btn" style="width:100%; background:var(--blue-dim); color:var(--blue-deep); margin-bottom:10px;" onclick="openConvertQuoteToCustomer('${id}')">👤 Convert to customer</button>
+          <button class="btn" style="width:100%; background:var(--green-dim); color:var(--green);" onclick="convertQuoteToJob('${id}')">🔧 Convert to job</button>
+        ` : ''}
+      </div>
+    </details>
+
+    <details class="cust-section">
+      <summary>History (${history.length}) ${chev}</summary>
+      <div class="cust-section-body">
+        <ul class="hist-list">${histRows}</ul>
+        <p style="color:var(--ink-muted); font-size:0.7188rem; margin:8px 2px 0; line-height:1.5;">Every send, follow-up and status change from now on is listed here. Quotes made before this screen existed only show their sends.</p>
+      </div>
+    </details>
+
+    <details class="cust-section"${(q.notes || q.declinedReason || q.status==='declined') ? ' open' : ''}>
+      <summary>Notes${q.status==='declined' ? ' &amp; declined reason' : ''} ${chev}</summary>
+      <div class="cust-section-body">
+        <label style="margin-top:0;">Notes <span style="text-transform:none; font-weight:500; opacity:0.7;">(also used as the “work” wording in quote texts)</span></label>
+        <textarea id="qd_notes" rows="3" placeholder="Access notes, size of job...">${escapeHtml(q.notes||'')}</textarea>
+        ${q.status==='declined' ? `
+          <label>Why was it declined?</label>
+          <textarea id="qd_reason" rows="2" placeholder="e.g. Found someone cheaper, no longer needed...">${escapeHtml(q.declinedReason||'')}</textarea>
+        ` : (q.declinedReason ? `<p style="color:var(--ink-muted); font-size:0.75rem; margin:8px 2px 0;">Earlier declined reason: ${escapeHtml(q.declinedReason)}</p>` : '')}
+        <button class="btn" style="width:100%; background:var(--blue-dim); color:var(--blue-deep); margin-top:10px;" onclick="saveQuoteDetailNotes('${id}')">Save notes</button>
+      </div>
+    </details>
+  `);
+}
+
+function setQuoteStatusFromDetail(id, status){
+  const q = data.quotes.find(x=>x.id===id);
+  if(!q) return;
+  if(!setQuoteStatus(q, status)) return;
+  saveData(); render();
+  toast(`Quote marked ${QUOTE_STATUS_LABELS[status].toLowerCase()}`);
+  openQuoteDetail(id);
+}
+function saveQuoteDetailNotes(id){
+  const q = data.quotes.find(x=>x.id===id);
+  if(!q) return;
+  const notesEl = document.getElementById('qd_notes');
+  const reasonEl = document.getElementById('qd_reason');
+  if(notesEl) q.notes = notesEl.value.trim();
+  if(reasonEl) q.declinedReason = reasonEl.value.trim();
+  saveData(); render();
+  toast('Notes saved');
+}
+
+// Follow up = either send the (softer each time) follow-up text/email, or just
+// record a call you made. Both count as a chase, so the next reminder is pushed
+// further out the same way a sent follow-up already does.
+function openQuoteFollowUp(id){
+  const q = data.quotes.find(x=>x.id===id);
+  if(!q) return;
+  const canSend = isMobileNumber(q.phone) || !!q.email;
+  const n = q.quoteFollowUpCount || 0;
+  openSheet(`
+    <div class="sheet-head">
+      <h2 style="flex:1; min-width:0;">Follow up</h2>
+      <button class="sheet-close" onclick="closeSheet()">✕</button>
+    </div>
+    <p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 14px; line-height:1.5;">${n ? `You've chased this quote ${n} time${n===1?'':'s'} so far. Each follow-up gets a little softer in wording.` : 'This quote hasn\'t been chased yet.'}</p>
+    <button class="backup-btn" style="${canSend?'':'opacity:0.45; pointer-events:none;'}" onclick="sendQuoteText('${id}','followup')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      <div><div class="t1">Send a follow-up ${isMobileNumber(q.phone)?'text':'email'}</div><div class="t2">${canSend ? 'Opens the message so you can check it first' : 'Needs a mobile number or email'}</div></div>
+    </button>
+    <button class="backup-btn" onclick="logQuoteCall('${id}')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+      <div><div class="t1">I called them</div><div class="t2">Record a follow-up call in the history</div></div>
+    </button>
+  `, () => openQuoteDetail(id));
+}
+function logQuoteCall(id){
+  const q = data.quotes.find(x=>x.id===id);
+  if(!q) return;
+  logMessage(q, 'quoteCall');
+  q.quoteFollowUpCount = (q.quoteFollowUpCount||0) + 1;
+  saveData(); render();
+  toast('Follow-up call recorded');
+  closeSheet();
 }
 
 function openQuoteForm(existing, prefill, returnTo){
@@ -535,7 +707,9 @@ function saveQuoteForm(id){
   };
   if(id){
     const q = data.quotes.find(x=>x.id===id);
+    const prevStatus = q.status || 'pending';
     Object.assign(q, payload);
+    if(payload.status !== prevStatus){ q.status = prevStatus; setQuoteStatus(q, payload.status); }
     toast('Quote updated');
     saveData(); closeSheet(); render();
   } else {
@@ -618,7 +792,7 @@ function openConvertQuoteToCustomer(quoteId){
     <div class="form-actions">
       <button class="btn-primary" onclick="confirmConvertQuoteToCustomer('${quoteId}')">Create customer</button>
     </div>
-  `, () => openQuoteForm(data.quotes.find(x=>x.id===quoteId)));
+  `, () => openQuoteDetail(quoteId));
 }
 function confirmConvertQuoteToCustomer(quoteId){
   const q = data.quotes.find(x=>x.id===quoteId);
@@ -640,7 +814,7 @@ function confirmConvertQuoteToCustomer(quoteId){
     ...propertyDetailsOf(q)
   };
   data.customers.push(newCustomer);
-  q.status = 'converted';
+  setQuoteStatus(q, 'converted', 'Converted to a customer in ' + round);
   q.convertedToCustomerId = newCustomer.id;
   saveData(); closeSheet(); render();
   toast('Customer created from quote');

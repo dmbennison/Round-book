@@ -347,6 +347,88 @@ function printJobInvoice(id){
   runPrint(`Invoice — ${j.address || j.name || invoiceNumber}`, body, true, true, () => openJobForm(data.oneOffJobs.find(x=>x.id===id)), j.phone);
 }
 
+function printQuote(id){
+  const q = data.quotes.find(x=>x.id===id);
+  if(!q) return;
+  const quoteNumber = 'QUO-' + (q.date||todayISO()).replace(/-/g,'') + '-' + q.id.slice(-4).toUpperCase();
+  const company = data.settings.companyName || '';
+  const companyAddress = data.settings.companyAddress || '';
+  const companyPhone = data.settings.companyPhone || '';
+  const yourName = data.settings.yourName || '';
+  const hasLogo = !!data.settings.logo;
+  const fromLine = [yourName, company].filter(Boolean).join(' · ');
+
+  // Same letterhead construction as printJobInvoice (see the notes there on why the
+  // logo / name / address / phone are kept as separate sibling blocks for the Word export).
+  const logoBlock = hasLogo
+    ? `<div style="text-align:left; margin-bottom:4px;"><img class="inv-logo" src="${data.settings.logo}" style="display:block; max-height:60px; max-width:200px; object-fit:contain;"></div>`
+    : '';
+  const nameBlock = (!hasLogo && company)
+    ? `<div style="text-align:left; font-size:15px; font-weight:800; color:#10344C; margin-bottom:2px;">${escapeHtml(company)}</div>`
+    : '';
+  const addressBlock = companyAddress
+    ? `<div style="text-align:left; font-size:11px; color:#66798A; line-height:1.5;">${escapeHtml(companyAddress).replace(/\n/g,'<br>')}</div>`
+    : '';
+  const phoneBlock = companyPhone
+    ? `<div style="text-align:left; font-size:11px; color:#66798A; line-height:1.5;">${escapeHtml(companyPhone)}</div>`
+    : '';
+  const letterheadSpacer = (logoBlock || nameBlock || addressBlock || phoneBlock)
+    ? `<div style="margin-bottom:16px;"></div>` : '';
+
+  // A quote deliberately has no "Status: Payment due" row, no due date and no
+  // payment stamp — it must read as an estimate, not a bill.
+  const metaRows = [
+    ['Quote number', quoteNumber],
+    ['Quote date', fmtDate(q.date || todayISO())],
+    ['Document type', 'Quotation (not an invoice)']
+  ].map(([label,val])=>`<tr><td style="font-weight:700; width:140px; color:#66798A;">${label}</td><td>${escapeHtml(String(val))}</td></tr>`).join('');
+
+  const quoteForLines = [
+    q.name ? escapeHtml(q.name) : '',
+    q.address ? escapeHtml(q.address) : '',
+    q.phone ? escapeHtml(q.phone) : '',
+    q.email ? escapeHtml(q.email) : ''
+  ].filter(Boolean).map(l=>`<div>${l}</div>`).join('');
+
+  const description = q.notes ? escapeHtml(q.notes) : 'Window cleaning';
+  const propertyLine = propertySummaryText(q);
+
+  const body = `
+    ${logoBlock}${nameBlock}${addressBlock}${phoneBlock}${letterheadSpacer}
+    <div class="rpt-round-title" style="margin-top:0;">Quote</div>
+    <table class="rpt-table inv-meta-table" style="margin-bottom:20px;"><tbody>${metaRows}</tbody></table>
+
+    <div class="rpt-round-title">Quote for</div>
+    <div class="inv-billto">
+      <span class="inv-label">Customer</span>
+      ${quoteForLines || '<div style="color:#66798A;">No customer details on file</div>'}
+    </div>
+
+    <div class="rpt-round-title">Details</div>
+    <table class="rpt-table" style="margin-bottom:4px;">
+      <thead><tr><th>Description</th><th style="text-align:right;">Quoted price</th></tr></thead>
+      <tbody>
+        <tr><td>${description}${propertyLine ? `<br><span style="color:#66798A; font-size:12px;">${escapeHtml(propertyLine)}</span>` : ''}</td><td style="text-align:right;">${money(q.price)}</td></tr>
+      </tbody>
+    </table>
+    <div class="rpt-total inv-total-box"><span>Quoted price</span><span class="inv-total-amount">${money(q.price)}</span></div>
+    <div style="margin-top:14px;"><span class="inv-stamp quote">Quote — no payment due</span></div>
+
+    <div class="rpt-footer" style="text-align:left; border-top:none; margin-top:28px; padding-top:0;">
+      This is a quotation only — nothing is due for payment now. If you would like to go ahead, or have any questions, please get in touch.<br>
+      Thank you for the opportunity to quote.${fromLine ? '<br>' + escapeHtml(fromLine) : ''}
+    </div>
+  `;
+  // Sending the PDF counts as sending the quote: it's recorded in the quote's
+  // History, and (the first time) starts the follow-up clock like a text would.
+  const onPdfShared = () => {
+    logMessage(q, 'quotePdf');
+    if(!q.quoteFollowUpCount) q.quoteFollowUpCount = 1;
+    saveData(); render();
+  };
+  runPrint(`Quote — ${q.address || q.name || quoteNumber}`, body, true, true, () => openQuoteDetail(id), q.phone, onPdfShared);
+}
+
 function printJobRecord(id){
   const j = data.oneOffJobs.find(x=>x.id===id);
   if(!j) return;

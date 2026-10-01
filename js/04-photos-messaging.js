@@ -595,7 +595,7 @@ function bankDetailsBlock(address){
 // Human-readable labels for the message log shown on a customer/job's screen.
 const MESSAGE_LOG_LABELS = {
   clean: 'Cleaning reminder', cleanedToday: 'Windows cleaned today', pay: 'Payment reminder',
-  receipt: 'Receipt', quote: 'Quote', repeatQuote: 'Repeat work quote', marketing: 'Marketing text'
+  receipt: 'Receipt', quote: 'Quote', repeatQuote: 'Repeat work quote', quoteFollowUp: 'Quote follow-up', quoteCall: 'Follow-up call made', quotePdf: 'Quote sent as PDF', marketing: 'Marketing text'
 };
 // Marketing response pipeline — tracked manually, since there's no way for the app
 // to see actual text replies (they land in the phone's own Messages/WhatsApp app).
@@ -967,7 +967,11 @@ function sendJobPaymentReminder(id){
 }
 
 
-function sendQuoteText(id){
+// mode: 'initial' = the original quote wording (a re-send of the quote itself);
+// 'followup' = the softer chase wording; omitted = whichever the send count says,
+// as before. Sending the quote for the first time, or any follow-up, counts as a
+// chase (quoteFollowUpCount) so the next reminder is pushed further out.
+function sendQuoteText(id, mode){
   const q = data.quotes.find(x=>x.id===id);
   if(!q) return;
   const mobile = isMobileNumber(q.phone);
@@ -975,7 +979,13 @@ function sendQuoteText(id){
   const firstName = q.name ? q.name.trim().split(' ')[0] : '';
   const company = data.settings.companyName || '';
   const yourname = data.settings.yourName || '';
-  const tpl = quoteTemplateFor(q.quoteFollowUpCount) || (q.fromJobId ? data.settings.repeatQuoteTemplate : data.settings.quoteTemplate);
+  const count = q.quoteFollowUpCount || 0;
+  const isFollowUp = mode === 'followup' || (mode !== 'initial' && count > 0);
+  const tpl = isFollowUp
+    ? quoteTemplateFor(Math.max(1, count))
+    : (q.fromJobId ? data.settings.repeatQuoteTemplate : data.settings.quoteTemplate);
+  const kind = isFollowUp ? 'quoteFollowUp' : (q.fromJobId ? 'repeatQuote' : 'quote');
+  const countsAsChase = isFollowUp || count === 0;
   const msg = applyTemplate(tpl, {
     name: firstName, amount: Number(q.price||0), company, date: fmtDate(q.date), yourname, work: q.notes||''
   });
@@ -984,12 +994,17 @@ function sendQuoteText(id){
       // Mirrors payTemplateFor/paymentReminderCount: each send escalates the
       // wording next time, and (via quoteNeedsFollowUp) widens the due window
       // so a quote just chased doesn't immediately look overdue again tomorrow.
-      q.quoteFollowUpCount = (q.quoteFollowUpCount||0) + 1;
+      if(countsAsChase) q.quoteFollowUpCount = (q.quoteFollowUpCount||0) + 1;
       saveData();
       render();
     };
-    openMessagePreview('Send quote', q.phone, msg, afterSend, () => openQuoteForm(data.quotes.find(x=>x.id===id)), {item: q, kind: q.fromJobId ? 'repeatQuote' : 'quote'});
+    openMessagePreview(isFollowUp ? 'Quote follow-up' : 'Send quote', q.phone, msg, afterSend, () => openQuoteDetail(id), {item: q, kind});
   } else {
+    // Email: the mail app takes over from here, so this is logged when it's opened.
+    logMessage(q, kind, {channel: 'email'});
+    if(countsAsChase) q.quoteFollowUpCount = (q.quoteFollowUpCount||0) + 1;
+    saveData();
+    render();
     window.location.href = `mailto:${q.email}?subject=${encodeURIComponent('Your window cleaning quote')}&body=${encodeURIComponent(msg)}`;
   }
 }
