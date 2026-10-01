@@ -6,7 +6,7 @@ const STORE_KEY = 'roundBookData_v1';
 // APP_VERSION is a plain decimal number (e.g. 1.01, 1.02 ... 1.99, 2.00) —
 // bump by 0.01 for every change. formatVersion always renders it to exactly
 // two decimal places, so it's never shown as "1.1" or "1.100".
-const APP_VERSION = 2.20;
+const APP_VERSION = 2.21;
 function formatVersion(v){ return Number(v).toFixed(2); }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
@@ -15,6 +15,7 @@ function formatVersion(v){ return Number(v).toFixed(2); }
 // the most recent 10 entries (oldest ones can be left in the array or trimmed,
 // either is fine, since the display always slices to 10).
 const VERSION_HISTORY = [
+  {version: 2.21, changes: ['Landscape layout on iPad and other large screens: the list (rounds, jobs, quotes, campaigns...) stays on the left and whatever you tap — customer, quote, job, campaign, settings — opens on the right. The Today tab spreads across the full width as a dashboard when nothing is open. Phones and portrait are unchanged']},
   {version: 2.20, changes: ['New quote detail screen (tap a quote): price and status up top, Actions (send quote, print quote / PDF, follow up, convert to customer or job), History of every send, follow-up and status change, and Notes with a declined reason', 'Print quote: looks like the invoice but is clearly marked as a quote with no payment due, and can be sent as a PDF', 'Quote follow-ups can now also be logged as a call you made']},
   {version: 2.19, changes: ['Route map: pins you haven\'t moved yourself are now orange, and pins you\'ve moved and locked stay navy (grey dashed is still an approximate address), with a small key under the map', 'Suggest a route order now shows a clear label saying which method worked out the order — OSRM, Valhalla, or the straight-line fallback']},
   {version: 2.18, changes: ['Fixed pop-up sheets (e.g. a marketing campaign) growing taller than the screen so the ✕ ended up under the status bar — sheets now always leave room at the top', 'Fixed the small round buttons in the header showing as empty circles on iPad']},

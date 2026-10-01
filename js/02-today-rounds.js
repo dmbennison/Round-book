@@ -1139,6 +1139,7 @@ function render(){
   renderImportReviewBanner();
   const main = document.getElementById('main');
   main.innerHTML = '';
+  document.body.setAttribute('data-tab', currentTab); // lets the landscape CSS lay Today out differently
 
   if(currentTab === 'today'){
     renderTodayHome(main);
