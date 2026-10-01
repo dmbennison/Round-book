@@ -6,7 +6,7 @@ const STORE_KEY = 'roundBookData_v1';
 // APP_VERSION is a plain decimal number (e.g. 1.01, 1.02 ... 1.99, 2.00) —
 // bump by 0.01 for every change. formatVersion always renders it to exactly
 // two decimal places, so it's never shown as "1.1" or "1.100".
-const APP_VERSION = 2.22;
+const APP_VERSION = 2.23;
 function formatVersion(v){ return Number(v).toFixed(2); }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
@@ -15,6 +15,7 @@ function formatVersion(v){ return Number(v).toFixed(2); }
 // the most recent 10 entries (oldest ones can be left in the array or trimmed,
 // either is fine, since the display always slices to 10).
 const VERSION_HISTORY = [
+  {version: 2.23, changes: ['One-off jobs now use the same line items as quotes — a description and price for each, a subtotal, a discount percentage and a total — and invoices list every line. Quotes and jobs convert into each other with their lines and discount carried across', 'Printed / PDF / Word invoices, quotes and receipts no longer start with the bold \"Quote — address\" heading, and the company address and phone number now sit to the right of the logo', 'Mileage report: each day\'s mileage now shows the round worked that day']},
   {version: 2.22, changes: ['Quotes now have line items — each with its own description and price — a running subtotal, an optional discount percentage and a total. The detail screen and the printed / PDF quote show the breakdown. Older quotes appear as a single line item', 'Backup files are now named with the date and time (e.g. round-book-backup-2026-10-01-1432.json)']},
   {version: 2.21, changes: ['Landscape layout on iPad and other large screens: the list (rounds, jobs, quotes, campaigns...) stays on the left and whatever you tap — customer, quote, job, campaign, settings — opens on the right. The Today tab spreads across the full width as a dashboard when nothing is open. Phones and portrait are unchanged']},
   {version: 2.20, changes: ['New quote detail screen (tap a quote): price and status up top, Actions (send quote, print quote / PDF, follow up, convert to customer or job), History of every send, follow-up and status change, and Notes with a declined reason', 'Print quote: looks like the invoice but is clearly marked as a quote with no payment due, and can be sent as a PDF', 'Quote follow-ups can now also be logged as a call you made']},

@@ -890,23 +890,10 @@ function printReceipt(customerId, dateISO, amount){
 
   // See printJobInvoice for why the logo/name/address/phone blocks are kept as
   // separate top-level siblings rather than nested in one div.
-  const logoBlock = hasLogo
-    ? `<div style="text-align:left; margin-bottom:4px;"><img class="inv-logo" src="${data.settings.logo}" style="display:block; max-height:60px; max-width:200px; object-fit:contain;"></div>`
-    : '';
-  const nameBlock = (!hasLogo && company)
-    ? `<div style="text-align:left; font-size:15px; font-weight:800; color:#10344C; margin-bottom:2px;">${escapeHtml(company)}</div>`
-    : '';
-  const addressBlock = companyAddress
-    ? `<div style="text-align:left; font-size:11px; color:#66798A; line-height:1.5;">${escapeHtml(companyAddress).replace(/\n/g,'<br>')}</div>`
-    : '';
-  const phoneBlock = companyPhone
-    ? `<div style="text-align:left; font-size:11px; color:#66798A; line-height:1.5;">${escapeHtml(companyPhone)}</div>`
-    : '';
-  const letterheadSpacer = (logoBlock || nameBlock || addressBlock || phoneBlock)
-    ? `<div style="margin-bottom:16px;"></div>` : '';
+  const letterheadHtml = invoiceLetterheadHtml();
 
   const body = `
-    ${logoBlock}${nameBlock}${addressBlock}${phoneBlock}${letterheadSpacer}
+    ${letterheadHtml}
     <div class="rpt-round-title" style="margin-top:0;">Receipt</div>
     <table class="rpt-table inv-meta-table" style="margin-bottom:20px;"><tbody>${metaRows}</tbody></table>
 

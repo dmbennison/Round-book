@@ -888,6 +888,27 @@ let pendingReportHideCompany = false;
 let pendingReportPhone = '';
 let pendingReportOnPdfShared = null; // optional callback, e.g. to log a quote PDF send
 
+// Letterhead for customer-facing documents (invoice, quote, receipt): the logo on the
+// left with the company address and phone number to its RIGHT. With no logo, the company
+// name leads the same text block. One .inv-letterhead wrapper so the Word export can
+// recognise it and rebuild it as a borderless two-column table (see htmlToDocxElements).
+function invoiceLetterheadHtml(){
+  const company = data.settings.companyName || '';
+  const companyAddress = data.settings.companyAddress || '';
+  const companyPhone = data.settings.companyPhone || '';
+  const hasLogo = !!data.settings.logo;
+  const lines = [
+    (!hasLogo && company) ? `<div style="font-size:15px; font-weight:800; color:#10344C; margin-bottom:2px;">${escapeHtml(company)}</div>` : '',
+    companyAddress ? `<div>${escapeHtml(companyAddress).replace(/\n/g,'<br>')}</div>` : '',
+    companyPhone ? `<div>${escapeHtml(companyPhone)}</div>` : ''
+  ].filter(Boolean).join('');
+  if(!hasLogo && !lines) return '';
+  return `<div class="inv-letterhead" style="display:flex; align-items:center; gap:18px; margin-bottom:18px;">
+    ${hasLogo ? `<img class="inv-logo" src="${data.settings.logo}" style="display:block; flex:none; max-height:60px; max-width:200px; object-fit:contain;">` : ''}
+    ${lines ? `<div class="inv-lh-text" style="flex:1 1 auto; min-width:0; font-size:11px; color:#66798A; line-height:1.5; text-align:left;">${lines}</div>` : ''}
+  </div>`;
+}
+
 function runPrint(titleHtml, bodyHtml, hideCompanyHeader, allowPdfShare, returnTo, phone, onPdfShared){
   pendingReportOnPdfShared = onPdfShared || null;
   pendingReportTitle = titleHtml;
@@ -917,14 +938,16 @@ function runPrint(titleHtml, bodyHtml, hideCompanyHeader, allowPdfShare, returnT
 
 function printPendingReport(){
   const company = pendingReportHideCompany ? '' : (data.settings.companyName || '');
+  // Customer-facing documents (invoice, quote, receipt) have their own letterhead and
+  // details, so they skip the generic bold "Title — address" report header.
   document.getElementById('printArea').innerHTML = `
-    <div class="rpt-header">
+    ${pendingReportHideCompany ? '' : `<div class="rpt-header">
       <div>
         <h1>${pendingReportTitle}</h1>
         ${company ? `<div style="font-size:13px; color:#66798A; font-weight:700; margin-top:2px;">${escapeHtml(company)}</div>` : ''}
       </div>
       <div class="rpt-date">${reportDate()}</div>
-    </div>
+    </div>`}
     ${pendingReportBody}
   `;
   closeSheet();
@@ -946,13 +969,13 @@ async function generatePendingReportPdfBlob(){
   const container = document.createElement('div');
   container.style.cssText = 'position:fixed; left:-9999px; top:0; width:794px; background:#ffffff; padding:32px; color:#1C2B36;';
   container.innerHTML = `
-    <div class="rpt-header">
+    ${pendingReportHideCompany ? '' : `<div class="rpt-header">
       <div>
         <h1>${pendingReportTitle}</h1>
         ${company ? `<div style="font-size:13px; color:#66798A; font-weight:700; margin-top:2px;">${escapeHtml(company)}</div>` : ''}
       </div>
       <div class="rpt-date">${reportDate()}</div>
-    </div>
+    </div>`}
     ${pendingReportBody}
   `;
   document.body.appendChild(container);
@@ -1072,9 +1095,64 @@ function htmlToDocxElements(bodyHtml){
   };
   const cellMargins = { top: 60, bottom: 60, left: 100, right: 100 };
 
+  // Builds a Word ImageRun from an <img> with a data: URL (null if it can't be embedded).
+  const imageRunFor = (img) => {
+    const src = img.getAttribute('src') || '';
+    if(!src.startsWith('data:image')) return null;
+    try{
+      const base64 = src.split(',')[1];
+      const binary = atob(base64);
+      const bytes = new Uint8Array(binary.length);
+      for(let i=0;i<binary.length;i++) bytes[i] = binary.charCodeAt(i);
+      let w = 160, h = 160;
+      if(img.classList.contains('inv-logo') && src.startsWith('data:image/png')){
+        // Logos are PNGs from compressLogo() — read the natural size straight out of the
+        // PNG IHDR chunk so the logo keeps its own aspect ratio instead of being forced square.
+        const nw = ((bytes[16]<<24) | (bytes[17]<<16) | (bytes[18]<<8) | bytes[19]) >>> 0;
+        const nh = ((bytes[20]<<24) | (bytes[21]<<16) | (bytes[22]<<8) | bytes[23]) >>> 0;
+        if(nw > 0 && nh > 0){
+          const maxW = 200, maxH = 90;
+          const scale = Math.min(maxW/nw, maxH/nh, 1);
+          w = Math.round(nw*scale); h = Math.round(nh*scale);
+        }
+      }
+      return new ImageRun({ data: bytes, transformation: { width: w, height: h } });
+    }catch(e){ return null; }
+  };
+
   Array.from(root.children).forEach(node=>{
     const tag = node.tagName;
     const imgs = node.querySelectorAll ? node.querySelectorAll('img') : [];
+    if(tag === 'DIV' && node.classList.contains('inv-letterhead')){
+      // Logo on the left, address / phone on the right: a borderless two-column table.
+      const none = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' };
+      const noBorders = { top: none, bottom: none, left: none, right: none };
+      const textNode = node.querySelector('.inv-lh-text');
+      const textParas = textNode ? Array.from(textNode.children).map(line=>{
+        const isName = /font-weight\s*:\s*(bold|[7-9]00)/i.test(line.getAttribute('style')||'');
+        return new Paragraph({ children:[new TextRun({ text: textOf(line), bold: isName })] });
+      }).filter(p=>p) : [];
+      const imgEl = node.querySelector('img');
+      const run = imgEl ? imageRunFor(imgEl) : null;
+      if(run && textParas.length){
+        elements.push(new Table({
+          rows: [ new TableRow({ children: [
+            new TableCell({ children:[ new Paragraph({ children:[run] }) ], width:{ size: 3400, type: WidthType.DXA }, borders: noBorders, verticalAlign: 'center' }),
+            new TableCell({ children: textParas, width:{ size: PAGE_WIDTH_DXA - 3400, type: WidthType.DXA }, borders: noBorders, verticalAlign: 'center' })
+          ] }) ],
+          columnWidths: [3400, PAGE_WIDTH_DXA - 3400],
+          width: { size: PAGE_WIDTH_DXA, type: WidthType.DXA },
+          borders: { top: none, bottom: none, left: none, right: none, insideHorizontal: none, insideVertical: none },
+          layout: (TableLayoutType && TableLayoutType.FIXED) ? TableLayoutType.FIXED : undefined
+        }));
+      } else if(run){
+        elements.push(new Paragraph({ children:[run] }));
+      } else {
+        textParas.forEach(p=>elements.push(p));
+      }
+      elements.push(new Paragraph({ text: '' }));
+      return;
+    }
     if(tag === 'TABLE'){
       const trs = Array.from(node.querySelectorAll('tr'));
 
@@ -1153,28 +1231,8 @@ function htmlToDocxElements(bodyHtml){
       }
     } else if(imgs.length){
       imgs.forEach(img=>{
-        const src = img.getAttribute('src') || '';
-        if(!src.startsWith('data:image')) return;
-        try{
-          const base64 = src.split(',')[1];
-          const binary = atob(base64);
-          const bytes = new Uint8Array(binary.length);
-          for(let i=0;i<binary.length;i++) bytes[i] = binary.charCodeAt(i);
-          let w = 160, h = 160;
-          if(img.classList.contains('inv-logo') && src.startsWith('data:image/png')){
-            // Logos are PNGs from compressLogo() — read the natural size straight out of the
-            // PNG IHDR chunk (big-endian uint32 width/height at fixed byte offsets) so the
-            // logo keeps its own aspect ratio in the Word export instead of being forced square.
-            const nw = ((bytes[16]<<24) | (bytes[17]<<16) | (bytes[18]<<8) | bytes[19]) >>> 0;
-            const nh = ((bytes[20]<<24) | (bytes[21]<<16) | (bytes[22]<<8) | bytes[23]) >>> 0;
-            if(nw > 0 && nh > 0){
-              const maxW = 200, maxH = 90;
-              const scale = Math.min(maxW/nw, maxH/nh, 1);
-              w = Math.round(nw*scale); h = Math.round(nh*scale);
-            }
-          }
-          elements.push(new Paragraph({ children: [ new ImageRun({ data: bytes, transformation: { width: w, height: h } }) ] }));
-        }catch(e){ /* skip a photo that fails to embed rather than aborting the whole export */ }
+        const run = imageRunFor(img);
+        if(run) elements.push(new Paragraph({ children: [ run ] }));
       });
     } else if(tag === 'DIV' && node.classList.contains('rpt-round-title')){
       const t = textOf(node);
@@ -1203,9 +1261,14 @@ async function exportPendingReportDocx(){
     const plainTitle = pendingReportTitle.replace(/<[^>]+>/g,'');
     const company = pendingReportHideCompany ? '' : (data.settings.companyName || '');
 
-    const headerChildren = [ new Paragraph({ text: plainTitle, heading: HeadingLevel.HEADING_1 }) ];
-    if(company) headerChildren.push(new Paragraph({ children:[new TextRun({ text: company, italics:true })] }));
-    headerChildren.push(new Paragraph({ children:[new TextRun({ text: reportDate(), color:'666666' })], spacing:{ after:300 } }));
+    // Customer-facing documents (invoice, quote, receipt) carry their own letterhead and
+    // details, so they don't get the generic title / company / date lines on top.
+    const headerChildren = [];
+    if(!pendingReportHideCompany){
+      headerChildren.push(new Paragraph({ text: plainTitle, heading: HeadingLevel.HEADING_1 }));
+      if(company) headerChildren.push(new Paragraph({ children:[new TextRun({ text: company, italics:true })] }));
+      headerChildren.push(new Paragraph({ children:[new TextRun({ text: reportDate(), color:'666666' })], spacing:{ after:300 } }));
+    }
 
     const bodyChildren = htmlToDocxElements(pendingReportBody);
 

@@ -291,7 +291,9 @@ function printJobInvoice(id){
     linkedCustomer && linkedCustomer.accountNumber ? `Account: ${escapeHtml(linkedCustomer.accountNumber)}` : ''
   ].filter(Boolean).map(l=>`<div>${l}</div>`).join('');
 
-  const description = j.notes ? escapeHtml(j.notes) : 'Window cleaning — one-off job';
+  const invItems = jobItems(j);
+  const invRows = (invItems.length ? invItems : [{desc:'', price: j.price||0}]).map(i=>
+    `<tr><td>${escapeHtml(i.desc || 'Window cleaning — one-off job')}</td><td style="text-align:right;">${money(i.price)}</td></tr>`).join('');
   const discountPct = Math.max(0, Math.min(100, Number(j.discountPercent||0)));
   const total = jobDiscountedTotal(j);
 
@@ -300,23 +302,10 @@ function printJobInvoice(id){
   // fall through to the exporter's plain-paragraph handling) are kept as siblings rather than
   // nested inside one div — a div mixing an <img> with text would have its text silently
   // dropped by the exporter, which only pulls images out of an image-bearing node.
-  const logoBlock = hasLogo
-    ? `<div style="text-align:left; margin-bottom:4px;"><img class="inv-logo" src="${data.settings.logo}" style="display:block; max-height:60px; max-width:200px; object-fit:contain;"></div>`
-    : '';
-  const nameBlock = (!hasLogo && company)
-    ? `<div style="text-align:left; font-size:15px; font-weight:800; color:#10344C; margin-bottom:2px;">${escapeHtml(company)}</div>`
-    : '';
-  const addressBlock = companyAddress
-    ? `<div style="text-align:left; font-size:11px; color:#66798A; line-height:1.5;">${escapeHtml(companyAddress).replace(/\n/g,'<br>')}</div>`
-    : '';
-  const phoneBlock = companyPhone
-    ? `<div style="text-align:left; font-size:11px; color:#66798A; line-height:1.5;">${escapeHtml(companyPhone)}</div>`
-    : '';
-  const letterheadSpacer = (logoBlock || nameBlock || addressBlock || phoneBlock)
-    ? `<div style="margin-bottom:16px;"></div>` : '';
+  const letterheadHtml = invoiceLetterheadHtml();
 
   const body = `
-    ${logoBlock}${nameBlock}${addressBlock}${phoneBlock}${letterheadSpacer}
+    ${letterheadHtml}
     <div class="rpt-round-title" style="margin-top:0;">Invoice</div>
     <table class="rpt-table inv-meta-table" style="margin-bottom:20px;"><tbody>${metaRows}</tbody></table>
 
@@ -330,8 +319,9 @@ function printJobInvoice(id){
     <table class="rpt-table" style="margin-bottom:4px;">
       <thead><tr><th>Description</th><th style="text-align:right;">Amount</th></tr></thead>
       <tbody>
-        <tr><td>${description}</td><td style="text-align:right;">${money(j.price)}</td></tr>
-        ${discountPct ? `<tr><td>Discount (${discountPct}%)</td><td style="text-align:right;">-${money(j.price - total)}</td></tr>` : ''}
+        ${invRows}
+        ${discountPct ? `<tr><td style="color:#66798A; font-weight:700;">Subtotal</td><td style="text-align:right;">${money(j.price)}</td></tr>
+        <tr><td style="color:#66798A; font-weight:700;">Discount (${discountPct}%)</td><td style="text-align:right;">−${money(j.price - total)}</td></tr>` : ''}
       </tbody>
     </table>
     <div class="rpt-total inv-total-box"><span>Total</span><span class="inv-total-amount">${money(total)}</span></div>
@@ -360,20 +350,7 @@ function printQuote(id){
 
   // Same letterhead construction as printJobInvoice (see the notes there on why the
   // logo / name / address / phone are kept as separate sibling blocks for the Word export).
-  const logoBlock = hasLogo
-    ? `<div style="text-align:left; margin-bottom:4px;"><img class="inv-logo" src="${data.settings.logo}" style="display:block; max-height:60px; max-width:200px; object-fit:contain;"></div>`
-    : '';
-  const nameBlock = (!hasLogo && company)
-    ? `<div style="text-align:left; font-size:15px; font-weight:800; color:#10344C; margin-bottom:2px;">${escapeHtml(company)}</div>`
-    : '';
-  const addressBlock = companyAddress
-    ? `<div style="text-align:left; font-size:11px; color:#66798A; line-height:1.5;">${escapeHtml(companyAddress).replace(/\n/g,'<br>')}</div>`
-    : '';
-  const phoneBlock = companyPhone
-    ? `<div style="text-align:left; font-size:11px; color:#66798A; line-height:1.5;">${escapeHtml(companyPhone)}</div>`
-    : '';
-  const letterheadSpacer = (logoBlock || nameBlock || addressBlock || phoneBlock)
-    ? `<div style="margin-bottom:16px;"></div>` : '';
+  const letterheadHtml = invoiceLetterheadHtml();
 
   // A quote deliberately has no "Status: Payment due" row, no due date and no
   // payment stamp — it must read as an estimate, not a bill.
@@ -400,7 +377,7 @@ function printQuote(id){
         <tr><td style="color:#66798A; font-weight:700;">Discount (${pTot.pct}%)</td><td style="text-align:right;">\u2212${money(pTot.discount)}</td></tr>` : '';
 
   const body = `
-    ${logoBlock}${nameBlock}${addressBlock}${phoneBlock}${letterheadSpacer}
+    ${letterheadHtml}
     <div class="rpt-round-title" style="margin-top:0;">Quote</div>
     <table class="rpt-table inv-meta-table" style="margin-bottom:20px;"><tbody>${metaRows}</tbody></table>
 
@@ -754,6 +731,20 @@ function printMileageReport(){
     .filter(e=>e.start!=null && e.end!=null && e.end>=e.start)
     .map(e=>({date:e.date, miles: e.end-e.start}))
     .sort((a,b)=>a.date.localeCompare(b.date));
+  // The round(s) worked each day, taken from the cleans logged on that date (a customer's
+  // cleanHistory entry on that day counts as working their round). Days with only one-off
+  // jobs show those instead; days with nothing recorded show a dash.
+  const roundsByDate = {};
+  data.customers.forEach(c=>{
+    (c.cleanHistory||[]).forEach(h=>{
+      if(!h || !h.date) return;
+      (roundsByDate[h.date] = roundsByDate[h.date] || new Set()).add(c.round || 'Unassigned');
+    });
+  });
+  (data.oneOffJobs||[]).forEach(j=>{
+    if(j.done && j.date) (roundsByDate[j.date] = roundsByDate[j.date] || new Set()).add('One-off jobs');
+  });
+  const roundWorkedText = date => roundsByDate[date] ? Array.from(roundsByDate[date]).sort((a,b)=>a.localeCompare(b)).join(', ') : '—';
   if(!entries.length){
     runPrint('Mileage Report', '<div class="rpt-empty-note">No mileage logged yet — use the mileage tile on the Today tab to start.</div>', false, false, () => openReports());
     return;
@@ -788,7 +779,7 @@ function printMileageReport(){
     return `<tr><td>${fmtDate(wk)} – ${fmtDate(end.toISOString().slice(0,10))}</td><td style="text-align:right;">${weekTotals[wk].toFixed(1)}</td></tr>`;
   }).join('');
 
-  const dailyRows = entries.slice().reverse().map(e=>`<tr><td>${fmtDate(e.date)}</td><td style="text-align:right;">${e.miles.toFixed(1)}</td></tr>`).join('');
+  const dailyRows = entries.slice().reverse().map(e=>`<tr><td>${fmtDate(e.date)}</td><td>${escapeHtml(roundWorkedText(e.date))}</td><td style="text-align:right;">${e.miles.toFixed(1)}</td></tr>`).join('');
 
   const body = `
     <div class="rpt-round-title" style="margin-top:0;">Tax year to date (6 Apr ${tyStart.slice(0,4)} – ${fmtDate(tyEnd)})</div>
@@ -808,7 +799,7 @@ function printMileageReport(){
     <table class="rpt-table"><thead><tr><th>Week (Mon–Sun)</th><th style="text-align:right;">Miles</th></tr></thead><tbody>${weekRows}</tbody></table>
 
     <div class="rpt-round-title">Daily mileage</div>
-    <table class="rpt-table"><thead><tr><th>Date</th><th style="text-align:right;">Miles</th></tr></thead><tbody>${dailyRows}</tbody></table>
+    <table class="rpt-table"><thead><tr><th>Date</th><th>Round worked</th><th style="text-align:right;">Miles</th></tr></thead><tbody>${dailyRows}</tbody></table>
   `;
   runPrint('Mileage Report', body, false, false, () => openReports());
 }

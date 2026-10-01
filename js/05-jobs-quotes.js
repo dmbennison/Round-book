@@ -137,7 +137,16 @@ function fillJobFromCustomer(id){
   document.getElementById('j_address').value = c.address||'';
   document.getElementById('j_name').value = c.name||'';
   document.getElementById('j_phone').value = c.phone||'';
-  if(c.price!=null) document.getElementById('j_price').value = c.price;
+  if(c.price!=null){
+    // Put the customer's price on the first line item (and name it if it's still blank).
+    const firstRow = document.querySelector('#j_itemRows .q-item-row');
+    if(firstRow){
+      firstRow.querySelector('.q-item-price').value = c.price;
+      const d = firstRow.querySelector('.q-item-desc');
+      if(!d.value.trim()) d.value = 'Window cleaning';
+      recalcQuoteTotals('j');
+    }
+  }
   fillPropertyFields('j', c);
   if(linkNote) linkNote.textContent = `🔗 Linked to ${c.address||c.name||'this customer'} — will show in their history`;
 }
@@ -158,6 +167,11 @@ function fillPropertyFields(prefix, src){
 
 function openJobForm(existing, prefill, returnTo){
   const j = existing || prefill || {};
+  // Older jobs (and ones prefilled from an old quote) have one price + notes: show
+  // that as a single line item, with the notes text moved into its description.
+  const jHasItems = Array.isArray(j.items) && j.items.length;
+  const jFormItems = jHasItems ? j.items : ((j.price || j.notes) ? [{desc: j.notes||'', price: j.price||0}] : [{desc:'', price:''}]);
+  const jNotesValue = jHasItems ? (j.notes||'') : '';
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">${existing?'Edit job':'Add one-off job'}</h2>
@@ -197,18 +211,9 @@ function openJobForm(existing, prefill, returnTo){
         <input type="time" id="j_time" value="${j.time||''}">
       </div>
     </div>
-    <div class="row2">
-      <div>
-        <label style="margin-top:0">Price</label>
-        <input type="number" id="j_price" value="${j.price!=null?j.price:''}" placeholder="£" min="0" step="0.5">
-      </div>
-      <div>
-        <label style="margin-top:0">Discount %</label>
-        <input type="number" id="j_discount" value="${j.discountPercent!=null?j.discountPercent:0}" placeholder="0" min="0" max="100" step="1">
-      </div>
-    </div>
+    ${lineItemsEditorHtml('j', jFormItems, j.discountPercent)}
     <label>Notes</label>
-    <textarea id="j_notes" rows="2" placeholder="What's the job...">${escapeHtml(j.notes||'')}</textarea>
+    <textarea id="j_notes" rows="2" placeholder="Access notes, anything else about the job...">${escapeHtml(jNotesValue)}</textarea>
     ${propertyFieldsHtml(j, 'j')}
     ${(existing && existing.done && !existing.paid && existing.paymentReminderSent) ? `<div style="font-size:0.75rem; font-weight:700; margin:10px 2px 0; color:var(--amber);">🔔 Payment reminder sent ${fmtDate(existing.paymentReminderSentDate)}</div>` : ''}
     ${existing?`<div class="row2" style="margin-top:14px;">
@@ -323,13 +328,17 @@ function saveJobForm(id){
   if(!address && !name){ toast('Please enter at least an address or a name'); return; }
   const customerIdField = document.getElementById('j_customerId');
   const fromQuoteField = document.getElementById('j_fromQuoteId');
+  // Empty lines dropped; j.price stays the undiscounted subtotal (see jobItems()).
+  const jobItemsForSave = readQuoteFormItems('j').filter(i => i.desc || i.price);
+  const jobTot = quoteTotals(jobItemsForSave, document.getElementById('j_discount').value);
   const payload = {
     address, name,
     phone: document.getElementById('j_phone').value.trim(),
     date: document.getElementById('j_date').value || todayISO(),
     time: document.getElementById('j_time').value || '',
-    price: parseFloat(document.getElementById('j_price').value) || 0,
-    discountPercent: Math.max(0, Math.min(100, parseFloat(document.getElementById('j_discount').value) || 0)),
+    items: jobItemsForSave,
+    price: jobTot.subtotal,
+    discountPercent: jobTot.pct,
     notes: document.getElementById('j_notes').value.trim(),
     remind24h: document.getElementById('j_remind').checked,
     anniversaryReminder: document.getElementById('j_anniversary').checked,
@@ -662,25 +671,47 @@ function quoteWorkText(q){
   const descs = (Array.isArray(q.items) ? q.items : []).map(i=>(i.desc||'').trim()).filter(Boolean);
   return descs.length ? descs.join(', ') : (q.notes || '');
 }
-function quoteItemRowHtml(item){
+// The line-item editor is shared by quotes (prefix 'q') and one-off jobs (prefix 'j'):
+// rows live in #<prefix>_itemRows, with #<prefix>_discount, #<prefix>_subtotal,
+// #<prefix>_discountAmt and #<prefix>_total beneath them.
+function quoteItemRowHtml(item, prefix){
   item = item || {};
+  const p = typeof prefix === 'string' ? prefix : 'q';
   return `<div class="q-item-row" style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
     <input type="text" class="q-item-desc" value="${escapeAttr(item.desc||'')}" placeholder="e.g. Windows, gutters, conservatory" style="flex:1 1 auto; min-width:0; margin:0;">
-    <input type="number" class="q-item-price" value="${item.price!=null && item.price!=='' ? item.price : ''}" placeholder="£" inputmode="decimal" min="0" step="0.5" oninput="recalcQuoteTotals()" style="width:96px; flex:none; margin:0;">
-    <button type="button" class="sheet-close" style="flex:none;" onclick="removeQuoteItemRow(this)" aria-label="Remove line">✕</button>
+    <input type="number" class="q-item-price" value="${item.price!=null && item.price!=='' ? item.price : ''}" placeholder="£" inputmode="decimal" min="0" step="0.5" oninput="recalcQuoteTotals('${p}')" style="width:96px; flex:none; margin:0;">
+    <button type="button" class="sheet-close" style="flex:none;" onclick="removeQuoteItemRow(this,'${p}')" aria-label="Remove line">✕</button>
   </div>`;
 }
-function addQuoteItemRow(){
-  const wrap = document.getElementById('quoteItemRows');
+function lineItemsEditorHtml(prefix, items, discountPct){
+  const t = quoteTotals(items, discountPct);
+  return `
+    <label>Line items <span style="text-transform:none; font-weight:500; opacity:0.7;">(description and price for each)</span></label>
+    <div id="${prefix}_itemRows">${items.map(i=>quoteItemRowHtml(i, prefix)).join('')}</div>
+    <button type="button" class="btn" style="width:100%; background:var(--blue-dim); color:var(--blue-deep); margin:2px 0 12px;" onclick="addQuoteItemRow('${prefix}')">+ Add line item</button>
+    <div style="background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:10px 14px; margin-bottom:6px;">
+      <div style="display:flex; justify-content:space-between; font-size:0.875rem; color:var(--ink-muted); font-weight:700; padding:3px 0;"><span>Subtotal</span><span id="${prefix}_subtotal">${money(t.subtotal)}</span></div>
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; font-size:0.875rem; color:var(--ink-muted); font-weight:700; padding:3px 0;">
+        <span style="display:flex; align-items:center; gap:8px;">Discount
+          <input type="number" id="${prefix}_discount" value="${t.pct ? t.pct : ''}" placeholder="0" inputmode="decimal" min="0" max="100" step="0.5" oninput="recalcQuoteTotals('${prefix}')" style="width:72px; margin:0; padding:6px 8px;"> %</span>
+        <span id="${prefix}_discountAmt">${t.discount ? '\u2212' + money(t.discount) : money(0)}</span>
+      </div>
+      <div style="display:flex; justify-content:space-between; font-size:1.0625rem; color:var(--emphasis); font-weight:800; padding:6px 0 2px; border-top:1px solid var(--line); margin-top:4px;"><span>Total</span><span id="${prefix}_total">${money(t.total)}</span></div>
+    </div>`;
+}
+function addQuoteItemRow(prefix){
+  const p = prefix || 'q';
+  const wrap = document.getElementById(p + '_itemRows');
   if(!wrap) return;
-  wrap.insertAdjacentHTML('beforeend', quoteItemRowHtml({}));
+  wrap.insertAdjacentHTML('beforeend', quoteItemRowHtml({}, p));
   const rows = wrap.querySelectorAll('.q-item-row');
   const last = rows[rows.length-1];
   if(last) last.querySelector('.q-item-desc').focus();
 }
-function removeQuoteItemRow(btn){
+function removeQuoteItemRow(btn, prefix){
+  const p = prefix || 'q';
   const row = btn.closest('.q-item-row');
-  const wrap = document.getElementById('quoteItemRows');
+  const wrap = document.getElementById(p + '_itemRows');
   if(!row || !wrap) return;
   if(wrap.querySelectorAll('.q-item-row').length <= 1){
     // Keep one empty line rather than leaving the section with nothing to type into.
@@ -689,21 +720,33 @@ function removeQuoteItemRow(btn){
   } else {
     row.remove();
   }
-  recalcQuoteTotals();
+  recalcQuoteTotals(p);
 }
-function readQuoteFormItems(){
-  return Array.from(document.querySelectorAll('#quoteItemRows .q-item-row')).map(r=>({
+function readQuoteFormItems(prefix){
+  const p = prefix || 'q';
+  return Array.from(document.querySelectorAll('#' + p + '_itemRows .q-item-row')).map(r=>({
     desc: r.querySelector('.q-item-desc').value.trim(),
     price: round2(parseFloat(r.querySelector('.q-item-price').value) || 0)
   }));
 }
-function recalcQuoteTotals(){
-  const discEl = document.getElementById('q_discount');
-  const t = quoteTotals(readQuoteFormItems(), discEl ? discEl.value : 0);
+function recalcQuoteTotals(prefix){
+  const p = prefix || 'q';
+  const discEl = document.getElementById(p + '_discount');
+  const t = quoteTotals(readQuoteFormItems(p), discEl ? discEl.value : 0);
   const set = (id, txt) => { const el = document.getElementById(id); if(el) el.textContent = txt; };
-  set('q_subtotal', money(t.subtotal));
-  set('q_discountAmt', t.discount ? '\u2212' + money(t.discount) : money(0));
-  set('q_total', money(t.total));
+  set(p + '_subtotal', money(t.subtotal));
+  set(p + '_discountAmt', t.discount ? '\u2212' + money(t.discount) : money(0));
+  set(p + '_total', money(t.total));
+}
+
+// One-off jobs use the same structure. j.items = [{desc, price}] and j.price is the
+// SUBTOTAL (the full undiscounted price, as it always was), j.discountPercent is the
+// existing discount field, and jobDiscountedTotal() still gives the amount charged —
+// so every place that already reads j.price / jobDiscountedTotal() is unaffected.
+function jobItems(j){
+  if(j && Array.isArray(j.items) && j.items.length) return j.items;
+  if(j && (Number(j.price) || j.notes)) return [{desc: j.notes || '', price: Number(j.price)||0}];
+  return [];
 }
 
 function openQuoteForm(existing, prefill, returnTo){
@@ -713,7 +756,6 @@ function openQuoteForm(existing, prefill, returnTo){
   const hasItems = Array.isArray(q.items) && q.items.length;
   const formItems = hasItems ? q.items : ((q.price || q.notes) ? [{desc: q.notes||'', price: q.price||0}] : [{desc:'', price:''}]);
   const notesValue = hasItems ? (q.notes||'') : '';
-  const formTotals = quoteTotals(formItems, q.discountPct);
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">${existing?'Edit quote':'Add quote'}</h2>
@@ -739,18 +781,7 @@ function openQuoteForm(existing, prefill, returnTo){
     </div>
     <label>Date</label>
     <input type="date" id="q_date" value="${q.date||todayISO()}">
-    <label>Line items <span style="text-transform:none; font-weight:500; opacity:0.7;">(description and price for each)</span></label>
-    <div id="quoteItemRows">${formItems.map(quoteItemRowHtml).join('')}</div>
-    <button type="button" class="btn" style="width:100%; background:var(--blue-dim); color:var(--blue-deep); margin:2px 0 12px;" onclick="addQuoteItemRow()">+ Add line item</button>
-    <div style="background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:10px 14px; margin-bottom:6px;">
-      <div style="display:flex; justify-content:space-between; font-size:0.875rem; color:var(--ink-muted); font-weight:700; padding:3px 0;"><span>Subtotal</span><span id="q_subtotal">${money(formTotals.subtotal)}</span></div>
-      <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; font-size:0.875rem; color:var(--ink-muted); font-weight:700; padding:3px 0;">
-        <span style="display:flex; align-items:center; gap:8px;">Discount
-          <input type="number" id="q_discount" value="${q.discountPct ? q.discountPct : ''}" placeholder="0" inputmode="decimal" min="0" max="100" step="0.5" oninput="recalcQuoteTotals()" style="width:72px; margin:0; padding:6px 8px;"> %</span>
-        <span id="q_discountAmt">${formTotals.discount ? '−' + money(formTotals.discount) : money(0)}</span>
-      </div>
-      <div style="display:flex; justify-content:space-between; font-size:1.0625rem; color:var(--emphasis); font-weight:800; padding:6px 0 2px; border-top:1px solid var(--line); margin-top:4px;"><span>Total</span><span id="q_total">${money(formTotals.total)}</span></div>
-    </div>
+    ${lineItemsEditorHtml('q', formItems, q.discountPct)}
     <label>Follow up after <span style="text-transform:none; font-weight:500; opacity:0.7;">(days, if still pending)</span></label>
     <input type="number" id="q_followup" value="${q.followUpDays!=null?q.followUpDays:7}" min="0" step="1">
     <label>Notes</label>
@@ -856,8 +887,10 @@ function convertQuoteToJob(quoteId){
   // adding a customer.
   const normalized = (q.address||'').trim().toLowerCase();
   const matchedCustomer = normalized ? data.customers.find(x => (x.address||'').trim().toLowerCase() === normalized) : null;
+  const qItems = quoteItems(q).map(i=>({desc:i.desc, price:i.price}));
+  const qTot = quoteTotals(qItems, q.discountPct);
   openJobForm(null, Object.assign({
-    address:q.address||'', name:q.name||'', phone:q.phone||'', price:q.price||0, fromQuoteId:q.id,
+    address:q.address||'', name:q.name||'', phone:q.phone||'', items: qItems, price: qTot.subtotal, discountPercent: qTot.pct, fromQuoteId:q.id,
     customerId: matchedCustomer ? matchedCustomer.id : null
   }, propertyDetailsOf(q)));
 }
@@ -865,7 +898,8 @@ function convertQuoteToJob(quoteId){
 function convertJobToQuote(jobId){
   const j = data.oneOffJobs.find(x=>x.id===jobId);
   if(!j) return;
-  openQuoteForm(null, Object.assign({ address:j.address||'', name:j.name||'', phone:j.phone||'', price:j.price||0, notes:j.notes||'', fromJobId:j.id }, propertyDetailsOf(j)));
+  const jItems = Array.isArray(j.items) && j.items.length ? j.items.map(i=>({desc:i.desc, price:i.price})) : null;
+  openQuoteForm(null, Object.assign({ address:j.address||'', name:j.name||'', phone:j.phone||'', price:j.price||0, notes:j.notes||'', discountPct:j.discountPercent||0, fromJobId:j.id }, jItems ? {items: jItems} : {}, propertyDetailsOf(j)));
 }
 
 function openConvertQuoteToCustomer(quoteId){
