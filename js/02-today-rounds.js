@@ -917,11 +917,16 @@ function renderSuggestedRoutePreview(rn, orderedCusts, notLocated, usedCurrentLo
   const methodText = method === 'straight-line'
     ? `${usedCurrentLocation ? 'Worked out from your current location, based' : 'Based'} on straight-line distance between addresses — the road-routing service wasn't reachable just now, so this is a fallback estimate. It can't know about one-way streets or which roads actually connect two places, so use your own judgement too.`
     : `Worked out ${usedCurrentLocation ? 'from your current location, ' : ''}using real road distances via ${method==='osrm'?'OSRM':'Valhalla'} (a free OpenStreetMap-based routing service) — more accurate than a straight-line guess, though still worth a sanity check before setting off.`;
+  const methodName = method === 'osrm' ? 'OSRM road distances' : (method === 'valhalla' ? 'Valhalla road distances' : 'Straight-line fallback');
+  const methodPill = method === 'straight-line'
+    ? `<span style="display:inline-block; padding:5px 12px; border-radius:999px; font-size:0.75rem; font-weight:800; background:var(--amber-dim, rgba(232,135,30,0.16)); color:var(--amber, #B86A10);">⚠ Method: ${methodName}</span>`
+    : `<span style="display:inline-block; padding:5px 12px; border-radius:999px; font-size:0.75rem; font-weight:800; background:var(--blue-dim); color:var(--blue-deep);">✓ Method: ${methodName}</span>`;
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">Suggested order${day ? ` · Day ${day}` : ''}</h2>
       <button class="sheet-close" onclick="suggestedRouteState=null; closeSheet();">✕</button>
     </div>
+    <div style="margin:0 2px 10px;">${methodPill}</div>
     <p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 14px; line-height:1.5;">
       ${methodText}
     </p>
@@ -1030,6 +1035,11 @@ function renderRoundMapSheet(rn, customers, fallbackCoords){
     </div>
     ${approxCount ? `<p style="color:var(--amber); font-size:0.75rem; margin:0 2px 10px; line-height:1.4; font-weight:700;">📍 ${approxCount} address${approxCount===1?'':'es'} couldn't be found automatically — shown as a grey dashed pin near the others. Drag ${approxCount===1?'it':'them'} to the right spot to fix.</p>` : ''}
     <div id="roundMapEl" style="height:min(65vh, 520px); border-radius:14px; overflow:hidden; background:var(--surface); border:1px solid var(--box-border); margin-bottom:12px;"></div>
+    <div style="display:flex; flex-wrap:wrap; gap:6px 14px; margin:0 2px 8px; font-size:0.75rem; font-weight:700; color:var(--ink-muted);">
+      <span><span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:${PIN_COLOUR_UNMOVED}; margin-right:5px;"></span>Not moved by you</span>
+      <span><span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:${PIN_COLOUR_MOVED}; margin-right:5px;"></span>Moved &amp; locked</span>
+      ${approxCount ? `<span><span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:${PIN_COLOUR_APPROX}; margin-right:5px;"></span>Approximate</span>` : ''}
+    </div>
     <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 14px; line-height:1.4;">Numbered in your current visiting order. Tap a pin for the address, or drag any pin to correct its spot — dragging locks it there so it won't move again.</p>
     <button class="btn btn-primary" style="width:100%;" onclick="startRoundDirections('${escapeAttr(rn)}')">Start round — directions</button>
   `, destroyRoundMap);
@@ -1037,10 +1047,15 @@ function renderRoundMapSheet(rn, customers, fallbackCoords){
   // measures its container, or the map renders as a grey box.
   setTimeout(()=> initRoundMapLeaflet(customers, fallbackCoords), 50);
 }
-function roundMapPinIcon(num, isApprox){
+// Pin colours: navy = location has been moved/locked by you (latLocked), orange =
+// not moved by you yet (position comes from the address lookup), grey dashed =
+// address couldn't be found at all so it's only an approximate spot.
+const PIN_COLOUR_MOVED = '#10344C', PIN_COLOUR_UNMOVED = '#E8871E', PIN_COLOUR_APPROX = '#8A97A3';
+function roundMapPinIcon(num, isApprox, isMoved){
+  const pinColour = isApprox ? PIN_COLOUR_APPROX : (isMoved ? PIN_COLOUR_MOVED : PIN_COLOUR_UNMOVED);
   return L.divIcon({
     className: 'round-map-pin',
-    html: `<div style="background:${isApprox ? '#8A97A3' : '#10344C'}; color:#fff; width:26px; height:26px; border-radius:50% 50% 50% 0; transform:rotate(-45deg); display:flex; align-items:center; justify-content:center; box-shadow:0 2px 6px rgba(0,0,0,0.35); border:2px solid #fff; ${isApprox ? 'border-style:dashed;' : ''}"><span style="transform:rotate(45deg); font-weight:800; font-size:0.75rem;">${num}</span></div>`,
+    html: `<div style="background:${pinColour}; color:#fff; width:26px; height:26px; border-radius:50% 50% 50% 0; transform:rotate(-45deg); display:flex; align-items:center; justify-content:center; box-shadow:0 2px 6px rgba(0,0,0,0.35); border:2px solid #fff; ${isApprox ? 'border-style:dashed;' : ''}"><span style="transform:rotate(45deg); font-weight:800; font-size:0.75rem;">${num}</span></div>`,
     iconSize: [26,26], iconAnchor: [13,26]
   });
 }
@@ -1064,14 +1079,14 @@ function initRoundMapLeaflet(customers, fallbackCoords){
   customers.forEach((c,i)=>{
     const isApprox = fallbackCoords.has(c.id);
     const pos = pointOf(c);
-    const marker = L.marker([pos.lat, pos.lng], {icon: roundMapPinIcon(i+1, isApprox), draggable:true}).addTo(map)
-      .bindPopup(`<b>${i+1}. ${escapeHtml(c.address||c.name||'Customer')}</b>${isApprox ? '<br><span style="color:#8A97A3;">Approximate — drag to the right spot</span>' : ''}`);
+    const marker = L.marker([pos.lat, pos.lng], {icon: roundMapPinIcon(i+1, isApprox, !!c.latLocked), draggable:true}).addTo(map)
+      .bindPopup(`<b>${i+1}. ${escapeHtml(c.address||c.name||'Customer')}</b>${isApprox ? '<br><span style="color:#8A97A3;">Approximate — drag to the right spot</span>' : (c.latLocked ? '' : '<br><span style="color:#E8871E;">Not moved by you yet</span>')}`);
     marker.on('dragend', (e)=>{
       const p = e.target.getLatLng();
       c.lat = p.lat; c.lng = p.lng; c.latLocked = true;
       fallbackCoords.delete(c.id);
       saveData();
-      marker.setIcon(roundMapPinIcon(i+1, false));
+      marker.setIcon(roundMapPinIcon(i+1, false, true));
       marker.setPopupContent(`<b>${i+1}. ${escapeHtml(c.address||c.name||'Customer')}</b>`);
       toast('Location saved — locked so it stays put next time');
       redrawRoundMapRoute(customers, fallbackCoords, map);

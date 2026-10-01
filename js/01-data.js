@@ -6,7 +6,7 @@ const STORE_KEY = 'roundBookData_v1';
 // APP_VERSION is a plain decimal number (e.g. 1.01, 1.02 ... 1.99, 2.00) —
 // bump by 0.01 for every change. formatVersion always renders it to exactly
 // two decimal places, so it's never shown as "1.1" or "1.100".
-const APP_VERSION = 2.17;
+const APP_VERSION = 2.19;
 function formatVersion(v){ return Number(v).toFixed(2); }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
@@ -15,6 +15,8 @@ function formatVersion(v){ return Number(v).toFixed(2); }
 // the most recent 10 entries (oldest ones can be left in the array or trimmed,
 // either is fine, since the display always slices to 10).
 const VERSION_HISTORY = [
+  {version: 2.19, changes: ['Route map: pins you haven\'t moved yourself are now orange, and pins you\'ve moved and locked stay navy (grey dashed is still an approximate address), with a small key under the map', 'Suggest a route order now shows a clear label saying which method worked out the order — OSRM, Valhalla, or the straight-line fallback']},
+  {version: 2.18, changes: ['Fixed pop-up sheets (e.g. a marketing campaign) growing taller than the screen so the ✕ ended up under the status bar — sheets now always leave room at the top', 'Fixed the small round buttons in the header showing as empty circles on iPad']},
   {version: 2.17, changes: ['Fixed printed reports coming out with a dark background block that made them hard to read — printouts are plain white again']},
   {version: 2.16, changes: ['New Settings → Mileage rates: set the HMRC pence-per-mile rates (and the mile threshold) for each tax year. A tax year\'s rates apply to all the mileage in that year, including days already logged, and the mileage report uses them']},
   {version: 2.15, changes: ['Suggest a route order now works on rounds split over several days — it asks which day you want, then only re-orders that day\'s customers and leaves the other days\' order alone']},
