@@ -289,7 +289,7 @@ function openMileageSummary(){
   `, () => setTab('today'));
 }
 function clearTodayMileage(){
-  appConfirm("Clear today's mileage entry?", {confirmLabel:'Clear', onConfirm: () => {
+  appConfirm("Clear today's mileage entry?", {title:'Clear mileage', confirmLabel:'Clear', onConfirm: () => {
     const today = todayISO();
     data.mileageLog = (data.mileageLog||[]).filter(e=>e.date!==today);
     saveData();
@@ -1169,19 +1169,6 @@ const PROPERTY_TYPE_ABBR = {'Detached':'Det', 'Semi-detached':'Semi', 'Terraced'
 // otherwise a handful of cheap fronts-only jobs would drag the average down
 // as if they were full cleans.
 function houseWeight(c){ return c.frontsOnly ? 0.5 : 1; }
-// Median £-per-house across a round's active (non-paused) customers — a
-// house-weighted figure (via houseWeight) so fronts-only customers don't skew
-// it the way a flat per-customer average would. Used to flag anyone priced
-// well below what the rest of the round is actually getting.
-function roundMedianPricePerHouse(roundName){
-  const values = data.customers
-    .filter(c=>!c.paused && (c.round||'Unassigned')===roundName)
-    .map(c=> Number(c.price||0) / houseWeight(c))
-    .sort((a,b)=>a-b);
-  if(!values.length) return null;
-  const mid = Math.floor(values.length/2);
-  return values.length % 2 ? values[mid] : (values[mid-1]+values[mid])/2;
-}
 function formatHouseCount(w){ return Number.isInteger(w) ? String(w) : w.toFixed(1); }
 // Weighted average £-per-house (via houseWeight) for one property type category,
 // over a given list of active customers. Returns null if none of that type.

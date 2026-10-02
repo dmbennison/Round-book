@@ -6,103 +6,23 @@ const STORE_KEY = 'roundBookData_v1';
 // APP_VERSION is a plain decimal number (e.g. 1.01, 1.02 ... 1.99, 2.00) —
 // bump by 0.01 for every change. formatVersion always renders it to exactly
 // two decimal places, so it's never shown as "1.1" or "1.100".
-const APP_VERSION = 2.24;
+const APP_VERSION = 2.25;
 function formatVersion(v){ return Number(v).toFixed(2); }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
-// entry here (newest first) describing what changed, in plain terms a user would
-// understand — not technical/implementation detail. The screen only ever displays
-// the most recent 10 entries (oldest ones can be left in the array or trimmed,
-// either is fine, since the display always slices to 10).
+// entry (newest first) with ONE very short plain-English summary, then delete
+// entries so only the latest ten remain.
 const VERSION_HISTORY = [
-  {version: 2.24, changes: ['Data protection: Round Book now asks your phone to protect its data from being cleared automatically when storage runs low, and Backup & restore shows whether that has been agreed', 'New automatic safety copies: once a day (when you open the app) Round Book quietly keeps a copy of your customers, jobs, quotes and settings on the phone — the last 10 are kept, and a copy is also taken just before you restore a backup file or a safety copy. Restore any of them from Backup & restore → Safety copies. These live on the phone only, so keep exporting backups to iCloud Drive or Google Drive for protection if the phone is lost', 'Fixed the user guide saying the backup pop-up appears after 48 hours — it is 24']},
-  {version: 2.23, changes: ['One-off jobs now use the same line items as quotes — a description and price for each, a subtotal, a discount percentage and a total — and invoices list every line. Quotes and jobs convert into each other with their lines and discount carried across', 'Printed / PDF / Word invoices, quotes and receipts no longer start with the bold \"Quote — address\" heading, and the company address and phone number now sit to the right of the logo', 'Mileage report: each day\'s mileage now shows the round worked that day']},
-  {version: 2.22, changes: ['Quotes now have line items — each with its own description and price — a running subtotal, an optional discount percentage and a total. The detail screen and the printed / PDF quote show the breakdown. Older quotes appear as a single line item', 'Backup files are now named with the date and time (e.g. round-book-backup-2026-10-01-1432.json)']},
-  {version: 2.21, changes: ['Landscape layout on iPad and other large screens: the list (rounds, jobs, quotes, campaigns...) stays on the left and whatever you tap — customer, quote, job, campaign, settings — opens on the right. The Today tab spreads across the full width as a dashboard when nothing is open. Phones and portrait are unchanged']},
-  {version: 2.20, changes: ['New quote detail screen (tap a quote): price and status up top, Actions (send quote, print quote / PDF, follow up, convert to customer or job), History of every send, follow-up and status change, and Notes with a declined reason', 'Print quote: looks like the invoice but is clearly marked as a quote with no payment due, and can be sent as a PDF', 'Quote follow-ups can now also be logged as a call you made']},
-  {version: 2.19, changes: ['Route map: pins you haven\'t moved yourself are now orange, and pins you\'ve moved and locked stay navy (grey dashed is still an approximate address), with a small key under the map', 'Suggest a route order now shows a clear label saying which method worked out the order — OSRM, Valhalla, or the straight-line fallback']},
-  {version: 2.18, changes: ['Fixed pop-up sheets (e.g. a marketing campaign) growing taller than the screen so the ✕ ended up under the status bar — sheets now always leave room at the top', 'Fixed the small round buttons in the header showing as empty circles on iPad']},
-  {version: 2.17, changes: ['Fixed printed reports coming out with a dark background block that made them hard to read — printouts are plain white again']},
-  {version: 2.16, changes: ['New Settings → Mileage rates: set the HMRC pence-per-mile rates (and the mile threshold) for each tax year. A tax year\'s rates apply to all the mileage in that year, including days already logged, and the mileage report uses them']},
-  {version: 2.15, changes: ['Suggest a route order now works on rounds split over several days — it asks which day you want, then only re-orders that day\'s customers and leaves the other days\' order alone']},
-  {version: 2.14, changes: ['Customer cards now show the next due date, and the \"💷 Low\" badge now says how much lower than average the price is (e.g. \"Low by £3\")', 'Fixed next-due dates (cards, reports and exports) coming out a day early during British Summer Time']},
-  {version: 2.13, changes: ['Saving a backup now shares just the backup file — no extra title text — so it should no longer leave a stray text file next to the .json on some phones']},
-  {version: 2.12, changes: ['Suggest a route order: when the road-routing services can\'t be reached and it falls back to straight-line distances, it now plans a route that starts from where your phone is and ends wherever is shortest (rather than treating your nearest customer as the start), and does a deeper search for a shorter order']},
-  {version: 2.11, changes: ['The \"Windows cleaned today\" text now tells the customer what they actually owe — their whole balance after any earlier unpaid cleans, payments and credit — instead of just the price of today\'s clean (or £0.00 if they\'re fully paid or in credit). The default wording changes to \"The amount now owing is…\"; a message you\'ve customised yourself is left alone, but will now show the balance in {amount}', 'New look: the whole app now follows Apple\'s Liquid Glass style — translucent, softly blurred header, tabs, sheets, pop-ups and buttons that pick up your colour scheme, with rounder corners and light-catching edges, in both light and dark mode']},
-  {version: 2.10, changes: ['Added "Export for accounting software" to Backup & restore — a CSV of payments received (Date, Description, Amount) for a chosen date range, in a generic format FreeAgent, Xero and QuickBooks can all import or match against a bank feed']},
-  {version: 2.09, changes: ['A brand new customer with no clean history no longer shows as due the moment they\'re added — if the round already has a due date most other customers share, they\'re lined up with that date instead (shown as deferred until then), rather than needing cleaning straight away']},
-  {version: 2.08, changes: ['Backup reminder now triggers after 24 hours of un-backed-up changes instead of 48, and its wording now suggests saving to iCloud Drive or Google Drive in the share sheet rather than just this phone', 'Importing customers from a spreadsheet now shows the best-guess column matching first, so it can be checked and corrected before anything is actually imported, instead of only being told afterwards']},
-  {version: 2.07, changes: ['Rounds: the property type average price summary now always shows a maximum of 3 across, wrapping to a new row instead of squeezing more in', 'Customer info box (press and hold): property type, extras, price and frequency now sit as small text under the address; last cleaned and last paid are now side by side, with total revenue, average time to pay and since last price review underneath']},
-  {version: 2.06, changes: ['Price history now has a "Set last price review date" button, so customers imported from a spreadsheet can be given their real last price review date instead of none (or the day they were added)', 'Price history entries now say "Edit date or price" rather than "Edit amount"']},
-  {version: 2.05, changes: ['Press and hold a customer card to pop up a quick info box: property type, extras, price, frequency, date last cleaned, date last paid, total revenue, average time to pay, and months since the last price review']},
-  {version: 2.04, changes: ['Round cleaning dates reports (list and calendar) now only count a day if 4+ houses in that round were cleaned on it, oldest first — no more single stragglers or one-off recleans cluttering the list', 'The Owed view — both the Rounds tab\'s and a single round\'s — can now be filtered by age of debt: 0–14, 14–30, or 30+ days', 'Every owed customer\'s card now shows how many days the balance has been outstanding, and a "✉️ Chase" button to send them a reminder straight from the card']},
-  {version: 2.03, changes: ['Opening the app now prompts for an end mileage reading if an earlier day was left with a start reading but no end reading', 'Removed "Text upsell opportunities" from Reports', 'Every "defer 4 weeks" option is now just "Defer", offering 1 day / 1 week / 4 weeks / a custom date, for a single customer or a whole round', 'Mileage report now shows the mileage tax allowance (45p/mile for the first 10,000 miles in a tax year, 25p/mile after), both for the current tax year to date and broken down by tax year']},
-  {version: 2.02, changes: ['Fixed the owed amounts on the Today tab (and the Owed list\'s sort order, and the {daysoverdue} in payment reminder texts) — they were measured from a customer\'s last payment date rather than from when their current balance actually became outstanding, so a fresh charge could wrongly land in the 30+ days bucket', 'Fixed tapping the Today hero once a round was selected not taking you through to that round\'s Due list']},
-  {version: 2.01, changes: ['Added "Business" as a property type', 'The Today tab\'s payment tile no longer says "Payment reminders" — it now leads with how many customers owe money, then breaks the total down into 0–14, 14–30 and 30+ days outstanding. It\'s now full-width and moved to the bottom of the tiles, so those amounts can be shown bigger']},
-  {version: 2.00, changes: ['Version numbers now start from 2.xx', 'Fixed the app not updating itself — it now checks for a new version whenever it\'s opened, brought back to the foreground, or every 30 minutes while left open, and shows a small "tap to update" banner instead of needing Safari reloaded and re-added to the Home Screen', 'Reorder screen: customers can now be dragged into order by their ⠿ handle, as well as the existing up/down arrows']},
-  {version: 1.02, changes: ['Added first-time setup: a brand new install now asks straight away whether you\'re new here (a short 2-step setup for your business details) or an existing user (taken straight to Backup & restore to bring your data back)', 'Added a dismissible "Getting started" checklist on the Today tab for anything left outstanding — business details, first customer, first backup — re-runnable any time from the "i" menu', 'The "No customers yet" screen and the Work tab\'s empty state now have direct buttons to add a customer or import a spreadsheet, instead of just an instruction to find the + button']},
-  {version: 1.01, changes: ['Today tab no longer labels the hero "Due today" — the tab itself already says that', 'The "💷 Low" price badge and the Price review report now judge a customer against the average for their own property type (their round\'s, or the overall average for that type if the round doesn\'t have enough of that type yet), instead of the round\'s overall average', 'Due dates can now be set to an exact date, for one customer or a whole round, as well as the existing +4 weeks option', 'Added price uplift — apply a percentage or flat £ increase to one customer or a whole round in one go, recorded in price history', 'Added "Text upsell opportunities" — pick a marketing campaign and send it straight to everyone the Upsell opportunities report has flagged', 'The Mileage tile is now just called "Mileage", Start/Finish readings are larger, and the total only shows once both readings are logged']},
-  {version: 1.00, changes: ['Fixed buttons like Show map, Reorder, and the ⋮ menu showing a stray box/border around them (a side effect of last update\'s border cleanup)', 'The Today hero now lists which rounds have anyone due — tap one to jump straight to that round\'s Due list, and the hero stays focused on that round (its own due count, plus a live cleaned-today count) until you pick another round or a new day starts', 'Added a Paid total under the Clean total on the Today hero', 'Today\'s Mileage tile: Start and Finish now sit side by side, and the total is aligned higher on the tile']},
-  {version: 0.99, changes: ['Softened the outline icons on buttons like Show map and Reorder — no longer stark white in dark mode', 'Redesigned the Today\'s Mileage tile to always show the title with small Start/Finish readings underneath and the day\'s total on the right, instead of switching between a car icon and a number']},
-  {version: 0.98, changes: ['Customer cards now flag a "💷 Low" badge if their price is 15%+ below their round\'s average (rounds need 4+ active customers before this shows), and the Price review report has a second table listing everyone below their round\'s average, biggest gap first', 'Quote follow-up texts now get progressively softer wording each time (checking in, then no pressure) and automatically become due again sooner after each chase, rather than staying on a fixed weekly reminder forever', 'Added an Upsell opportunities report — fronts-only customers who could add backs, conservatories with no roof clean, detached/semi-detached houses with no garage door clean, and long-standing customers with no add-ons at all']},
-  {version: 0.97, changes: ['Added an Auto option alongside Light and Dark under Settings > Appearance, which follows your phone\'s system setting automatically', 'Removed the black/white outline from buttons, Today tiles, stat boxes, and the round-view switcher — they now use a themed background instead, so they stay visible (especially in dark mode) without a hard border, and follow your chosen colour scheme']},
-  {version: 0.96, changes: ['Cards (customers, rounds, backup screen) now use a softer themed border and shadow instead of the black/white outline, and follow your colour scheme in dark mode instead of all looking the same dark grey']},
-  {version: 0.95, changes: ['Owed list and "Remind all" now sort by how long a balance has been outstanding, not just its size, so the most overdue customer comes first', 'Payment reminders now automatically switch to a firmer follow-up wording from the second reminder onwards — edit both under Settings > Message templates', 'Added a {daysoverdue} option for the payment reminder wording', 'One-off jobs now get the same red "⚠ Chase" badge as customers once 2+ payment reminders have gone unpaid']},
-  {version: 0.94, changes: ['Fixed the card background shown while swiping — dragging right now actually shows the green "cleaned" colour instead of always showing blue "paid"', 'Swipe actions (cleaned, paid, job done, quote accepted, etc.) can now be undone for a few seconds via an Undo button', 'Payment reminders on one-off jobs can no longer be sent until the job is marked done', 'Added a discount percentage field next to price on one-off jobs, applied automatically to that job\'s invoice and receipt', 'The backup reminder is now a pop-up instead of a dismissible banner, and reliably reappears next time the app is opened if you dismiss it without backing up', 'All confirmation pop-ups in the app (delete, reset, import, etc.) now use the same on-screen style, for consistency and reliability on iPhone', 'Today tab: reordered tiles so text before visit and mileage come first, removed the separate Marketing tile (marketing follow-ups still surface as a banner when due), and added an overdue count under the Text before visit and Quotes tiles']},
-  {version: 0.93, changes: ['Swiping a customer card right now has two stops: halfway marks cleaned, all the way across marks cleaned AND paid in one go', 'Added a universal search to the header, available on every tab -- searches customers, one-off jobs, quotes, and rounds together, replacing the old Rounds-only search', 'Send group text in Marketing can now also be narrowed by property type, add-ons (conservatory/extension/garage door), and fronts-only']},
-  {version: 0.92, changes: ['Show map now gives every address a pin, even one that fails to find automatically (shown as an approximate grey pin near the others)', 'Pins on the map can now be dragged to correct their position — dragging locks that location so it is never re-fetched by a later map or route request, only by dragging it again']},
-  {version: 0.91, changes: ['Added a mileage tracker to the Today tab -- tap to log a start-of-day reading, tap again at the end of the day for an end reading, tap once more to see/edit/clear the total', 'Added a Mileage report -- daily, weekly, monthly and UK tax-year-to-date (6 Apr) totals']},
-  {version: 0.90, changes: ['No user-visible changes -- the app itself has just been split from one very large JavaScript file into 9 smaller ones by feature area, to make it easier to find and edit code going forward']},
-  {version: 0.89, changes: ['Today large Due button now shows the running value of work actually completed today, on the right', 'Round names on Rounds > Due now tap straight through to that round, pre-filtered to Due']},
-  {version: 0.88, changes: ['Work tab now remembers which round and view you were in when you step away to another tab (e.g. to quote someone) and resumes there instead of going back to the hub every time — tap Work again once you are back in it to return to the hub on purpose']},
-  {version: 0.87, changes: ['Payment reminders tile on Today now shows the total amount owed', 'Show map and Suggest a route order now re-check every address location each time, instead of trusting a previously cached one', 'Moved Suggest a route order from the round menu into the Reorder screen', 'Address lookup now checks the postcode first via a dedicated UK postcode service, which should fix pins landing hundreds of miles from the right place']},
-  {version: 0.86, changes: ['Removed the weather card from Today, plus the separate quote follow-up and one-off jobs reminder banners, since Today already covers both', 'Rounds and One-off jobs are now under a single new Work tab, opening to two square buttons with the overall customer/value figures moved underneath them', 'Marketing is now a list of campaigns — tap one to see its editable text, its sent texts, and a Send group text button, or add a new campaign at the bottom', 'Rewrote the user guide to be shorter and to match the current app']},
-  {version: 0.85, changes: ['Added a "Show map" button at the top of each round — numbered pins for every stop in your current visiting order, with a route line between them (a real road route where available, straight lines as a fallback)']},
-  {version: 0.84, changes: ['Today is now the home tab you land on, showing just the headline numbers (due today, value today, text before visit, jobs today, payment reminders, quotes needing follow-up, marketing actions, and the weather) — tap any of them to go straight to the full screen for it', 'Added a "Text first" view under Rounds, grouped by round with a Text all button, replacing the old Today popup version of the same list', 'Removed the separate Today button now that it is the home tab']},
-  {version: 0.83, changes: ['Fronts-only properties now count as half a house in average-price-by-property-type figures (summary boxes and the Property Types report), so a handful of cheaper fronts-only jobs no longer drags the average down as if they were full cleans', 'The Today screen now groups "Text before you arrive" by round, with a "Text all" button that opens a tap-to-send queue for everyone in it', 'Property type (and fronts-only) now shows on the customer card']},
-  {version: 0.82, changes: ['Today button is now the same size as the Add button and lines up next to it', 'The "Due for a clean" list on the Today screen now shows one card per round instead of every customer — tap a round to jump straight to it']},
-  {version: 0.81, changes: ['Property type summary is now square boxes matching the round summary stats above it, with short labels (Det, Semi, Terr, Bung, Flat, NA)', 'Weather now refreshes itself every 30 minutes while the app stays open, instead of only on load', 'Added a Today button (next to Add) — a one-screen briefing of who is due for a clean, who needs a text before you arrive, one-off jobs dated today, quotes overdue for a follow-up, and marketing follow-ups that have come due']},
-  {version: 0.80, changes: ['Added a "Flat" property type', 'Rounds overview and each round\'s own summary now show average price by property type underneath the Customers / Round value / Avg per customer figures', 'Weather now starts with the time it was last updated (HH:MM)']},
-  {version: 0.79, changes: ['Backup reminder now triggers 48 hours after any un-backed-up change, instead of a fixed 7-day gap regardless of whether anything actually changed', 'Photos can now be annotated — circle, arrow, and freehand draw tools, in a choice of colours — saved as a new photo alongside the original from the "Annotate" button in the photo viewer']},
-  {version: 0.78, changes: ['Fixed the ✕ button still not working in one specific case — saving from the "unsaved changes" prompt when closing a customer\'s edit screen could leave the next screen\'s ✕ silently broken', 'Added a "Property types" report — houses and average price by property type, with a total and a breakdown for each round']},
-  {version: 0.77, changes: ['Converting a quote to a one-off job now automatically links it to an existing customer if the address matches, so it shows up in that customer\'s history', 'Added property type (detached/semi-detached/terraced/bungalow), add-ons (conservatory, extension, garage door, or other), and a "fronts only" tick box — recorded on customers, quotes and one-off jobs, and carried across automatically when a quote becomes a job or customer']},
-  {version: 0.76, changes: ['Fixed the ✕ button not working after saving changes on a customer\'s edit screen — saving could leave the unsaved-changes prompt stuck showing on the next close attempt', 'Moved the weather info to its own line so it has room to show in full underneath the top buttons, which sit slightly higher now']},
-  {version: 0.75, changes: ['"Suggest a route order" now tries real road-based routing first (via free OSRM/Valhalla services), only falling back to the straight-line estimate if neither is reachable — the suggestion screen says which one was actually used']},
-  {version: 0.74, changes: ['Fixed the ✕ button not working when editing a customer with unsaved changes — the save/discard prompt now uses the app\'s own screen instead of the phone\'s native pop-up, which could fail silently on some devices', 'Added a "✓ Text sent" flag once the windows-cleaned-today text has actually been sent, so it\'s clear at a glance who\'s been told — tap it again any time to resend']},
-  {version: 0.73, changes: ['The price/owed round value format now also shows on an individual round\'s own screen, not just the Rounds tab overview']},
-  {version: 0.72, changes: ['Round totals (on each round card, and at the top of the Rounds tab) now show as price/owed — the plain round value, followed by what\'s currently outstanding in red, instead of one blended figure', 'Added wind speed to the weather banner', 'Editing a customer now asks whether to save if you close the screen with unsaved changes, however you close it']},
-  {version: 0.71, changes: ['Added round optimisation and route planning, from the ⋯ menu on any round: "Start round" opens Google Maps with every stop already queued up in one go, and "Suggest a route order" works out a shorter visiting order to review before applying (using a free address lookup the first time, then remembered after that)']},
-  {version: 0.70, changes: ['Fixed the payment reference added to bank details in messages — now shows just the house number and road, not the whole address, for anyone who\'s stored a fuller address with town/postcode']},
-  {version: 0.69, changes: ['Payment reminders and "windows cleaned today" texts now include the customer\'s address as a payment reference alongside your bank details, so it\'s easy to see who a bank transfer\'s from once it lands in your account']},
-  {version: 0.68, changes: ['Round value now adds on anything currently owed and subtracts anything currently in credit, rather than just adding up normal prices — a truer picture of what a round is actually worth right now. Credit only ever cancels out one clean\'s worth per customer, so someone who\'s paid several months ahead doesn\'t make a round look emptier than it is']},
-  {version: 0.67, changes: ['Each round on the Rounds tab now shows its value (price per clean, added up) alongside the customer count — paused customers are left out of both, but anyone owing or in credit is still counted at their normal price']},
-  {version: 0.66, changes: ['Added a "Don\'t send marketing texts to this customer" tick box on a customer\'s own screen — they\'re then always excluded from group marketing sends, on every campaign', 'Fixed a bug where switching campaigns on the group send screen didn\'t update the message text at the bottom']},
-  {version: 0.65, changes: ['Marketing texts now support several named campaigns (general offer, ask for a referral, win back lapsed customers, seasonal reminder, or your own) instead of one fixed message — manage them from the Marketing tab', 'Group sends can now skip anyone already Interested/Booked in, or anyone texted recently, and can target paused/lapsed customers as their own group', 'A follow-up call or text can be given a target date, with a reminder banner once it\'s due', 'The Marketing tab shows which campaign each response belongs to, filter chips once more than one is in use, and a quick sent/responded/booked count', 'Added an optional "Referred by" note on a customer\'s own screen']},
-  {version: 0.64, changes: ['All customer/job/quote data now lives in the same storage as photos, so the only real limit is your phone\'s own free space rather than a tight ~5-10MB pool', 'Removed the two storage bars on the Backup screen — a warning only appears there if storage is actually getting close to full']},
-  {version: 0.63, changes: ['Fixed a bug where a single problem photo could silently drop every photo from a backup, or disable photo storage for the rest of the session — backups and restores now handle each photo on its own, and tell you if any couldn\'t be included or recovered']},
-  {version: 0.62, changes: ['Photo gallery now also includes standalone one-off jobs (ones not linked to a customer) that have their own photos']},
-  {version: 0.61, changes: ['Adding a new quote now keeps you on its screen afterwards, so you can send it by text or email straight away', 'Marketing response cards now show a ✓ once a pending action (like sending a quote) has been done', 'Fixed the ✕ button on a marketing response not closing the screen', 'Sending a PDF invoice or receipt via WhatsApp now jumps straight to that customer\'s own chat', 'Photos can now be swiped left/right to browse through the rest, instead of one at a time', 'Added a Photo gallery (photo icon on the Rounds tab) — every customer with photos, listed by address']},
-  {version: 0.60, changes: ['Marketing moved to its own tab, next to Quotes', 'Group marketing texts can now be sent to several rounds at once, not just one', 'Response entries needing action are now sorted to the top, above ones still awaiting a reply', 'Anyone unresponded to for 30 days quietly drops off the list — nothing about them is deleted, and a fresh text brings them straight back']},
-  {version: 0.59, changes: ['Marketing responses now has its own search box', 'Added Call, Text, and Quote buttons directly on each marketing response entry']},
-  {version: 0.58, changes: ['Added Marketing responses — tracks who\'s been sent a marketing text, with a response status and a next action you set yourself, reachable via a new megaphone icon on the Rounds tab']},
-  {version: 0.57, changes: ['The backup reminder banner\'s "Back up" button now saves the backup file straight away, in one tap, instead of taking you to the Backup screen first']},
-  {version: 0.56, changes: ['Search results now highlight the matching text as you type', 'Deleting a customer, job, or quote now shows a persistent "Undo" banner instead of a toast that disappears in a few seconds — stays until you act on it or dismiss it']},
-  {version: 0.55, changes: ['Account numbers now show on every report that lists a customer address, not just invoices and receipts', 'Added a search icon to the Rounds tab — searches name, address, phone, email, notes, round, and account number, with results shown as a tappable list']},
-  {version: 0.54, changes: ['Every customer now has a unique account number, shown on their screen and on printed invoices/receipts — editable if you\'d rather set your own', 'Photos from a customer\'s linked one-off jobs now show up in that customer\'s own Photos section too']},
-  {version: 0.53, changes: ['The directions and call buttons are now always blue and green, whichever colour scheme is chosen', 'The black outline around boxes and buttons now switches to white in dark mode, so it stays visible', 'Fixed the storage screen not showing gigabytes for larger figures']},
-  {version: 0.52, changes: ['Photo storage now shows a real progress bar with your phone\'s actual available space, matching the customer data bar', 'Removed the explanatory text under both storage bars, keeping just the numbers', 'Photos are now saved at higher size and quality, since there\'s much more storage room available now']},
-  {version: 0.51, changes: ['Photos now stored separately from your customer/job records, with far more room — a growing photo library can no longer risk running out of storage', 'Existing photos are automatically moved over the first time this version runs', 'Backup exports still include everything, including photos, in one file']},
-  {version: 0.50, changes: ['Fixed the Time field on a one-off job appearing tiny instead of matching the Date field']},
-  {version: 0.49, changes: ['One-off jobs can now have an optional time as well as a date', 'Added this version history to the About screen']},
-  {version: 0.48, changes: ['Added "Defer due date 4 weeks" for a customer, as a short-term alternative to Pause — the exact date can be edited', 'Added "Defer whole round 4 weeks" to push back everyone in a round at once']},
-  {version: 0.47, changes: ['The totals at the bottom of a round\'s Due view now only count what\'s actually left to clean', 'Fixed a missing gap above the Messages button on the customer screen']},
-  {version: 0.46, changes: ['Moved the One-off jobs report to its own tab', 'Added a new Quotes report', 'Added a help icon to the Rounds, One-off jobs, and Quotes tabs']},
-  {version: 0.45, changes: ['Moved Windows due / Money owed / Full round lists reports to a new printer icon on the Rounds tab']},
-  {version: 0.44, changes: ['Made the Customers / Round value / Avg per customer numbers bigger']},
-  {version: 0.43, changes: ['Fixed Add to Contacts not offering a way to actually add the contact', 'A customer marked cleaned now stays visible in the Due view until the end of the day']},
-  {version: 0.42, changes: ['Fixed Add to Contacts doing nothing when tapped']},
-  {version: 0.41, changes: ['Added "Add to Contacts" for a customer or job, plus a bulk export of everyone from Backup & Restore']},
-  {version: 0.40, changes: ['Added a tap-to-call button', 'Added a warning flag for customers chased for payment 2+ times with no payment', 'Added a message log showing what\'s actually been sent to a customer or job']}
+  {version: 2.25, changes: ['Customer CSV export for moving to another app; tidier confirmation dialogs']},
+  {version: 2.24, changes: ['Protected storage request and automatic daily safety copies']},
+  {version: 2.23, changes: ['Job line items like quotes; invoice header tidy; mileage report shows round']},
+  {version: 2.22, changes: ['Quote line items and discounts; backup files named with date and time']},
+  {version: 2.21, changes: ['Two-column landscape layout on iPad']},
+  {version: 2.20, changes: ['New quote detail screen and printable quotes']},
+  {version: 2.19, changes: ['Route map pin colours and route-method label']},
+  {version: 2.18, changes: ['Fixed tall pop-up sheets and iPad header buttons']},
+  {version: 2.17, changes: ['Printed reports back to plain white']},
+  {version: 2.16, changes: ['Settings: HMRC mileage rates for each tax year']}
 ];
 const DIRECTIONS_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>';
 const CALL_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>';
@@ -191,7 +111,7 @@ async function exportContacts(){
    read beats maintaining three separate exports. */
 function csvField(v){
   const s = String(v==null?'':v);
-  return /[",\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s;
+  return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s;
 }
 function csvDateUK(iso){
   const parts = iso.split('-');
@@ -272,21 +192,25 @@ async function exportAccountingCSV(){
   }));
   const csvStr = lines.join('\r\n');
   const filename = `round-book-accounting-${todayISO()}.csv`;
-  const doneToast = () => toast(`${rows.length} payment${rows.length===1?'':'s'} exported`);
-
+  if(await deliverTextFile(csvStr, filename, 'text/csv', 'Round Book Accounting Export')){
+    toast(`${rows.length} payment${rows.length===1?'':'s'} exported`);
+  }
+}
+// Hands a text file to the share sheet where the phone supports it, otherwise
+// downloads it. Returns false only if the person cancelled the share sheet.
+async function deliverTextFile(text, filename, mime, shareTitle){
   if(navigator.canShare){
     try{
-      const file = new File([csvStr], filename, {type:'text/csv'});
+      const file = new File([text], filename, {type:mime});
       if(navigator.canShare({files:[file]})){
-        await navigator.share({files:[file], title:'Round Book Accounting Export'});
-        doneToast();
-        return;
+        await navigator.share({files:[file], title:shareTitle});
+        return true;
       }
     }catch(e){
-      if(e && e.name === 'AbortError') return;
+      if(e && e.name === 'AbortError') return false;
     }
   }
-  const blob = new Blob([csvStr], {type:'text/csv'});
+  const blob = new Blob([text], {type:mime});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -295,7 +219,7 @@ async function exportAccountingCSV(){
   a.click();
   document.body.removeChild(a);
   setTimeout(()=>URL.revokeObjectURL(url), 2000);
-  doneToast();
+  return true;
 }
 
 const DEFAULT_CLEAN_TEMPLATE = "Hi {name}, just a reminder I'll be round to clean your windows soon. Let me know if that's not convenient.\n\nThanks,\n{yourname}\n{company}";
@@ -913,7 +837,6 @@ let marketingFollowUpDismissed = false;
 let jobAnniversaryDismissed = false;
 let importReviewDismissed = false;
 const IMPORT_HOLDING_ROUND = 'Needs review (imported)';
-const BACKUP_REMINDER_DAYS = 7; // still used for the "last backup: X days ago" wording in the Backup screen
 const BACKUP_REMINDER_HOURS = 24; // daily
 
 function daysSinceBackup(){
@@ -1117,15 +1040,13 @@ function renderLastActionBanner(){
     </span>
   </div>`;
 }
-// Backup reminder — a real popup (like the unsaved-changes prompt below), not just
+// Backup reminder — a real popup (styled like the app's confirm dialog), not just
 // a dismissible strip: it's easy to swipe past a thin banner without registering it,
 // and un-backed-up data is exactly the kind of thing worth interrupting for. "Not
 // now" only dismisses it for this session (bannerDismissed is a plain in-memory
 // flag, never persisted), so it reliably comes back the next time the app is opened
-// as long as the underlying 48-hour condition still holds.
+// as long as the underlying 24-hour condition still holds.
 function renderBackupBanner(){
-  const legacy = document.getElementById('backupBanner');
-  if(legacy) legacy.innerHTML = ''; // no longer used as a banner; kept in the DOM harmlessly
   if(bannerDismissed || !data.customers.length || !backupReminderDue()){ removeBackupPopup(); return; }
   if(document.getElementById('backupPopup')) return; // already showing — don't recreate on every render()
   const el = document.createElement('div');
@@ -1145,12 +1066,15 @@ function renderBackupBanner(){
 }
 
 /* ---------- app-styled confirm dialog ----------
-   Replaces window.confirm() everywhere in the app. Native confirm() is unreliable
-   inside an iOS home-screen PWA (there's no Safari chrome for it to anchor to, so
-   it can fail to appear at all) — this is the same bottom-sheet prompt originally
-   built for the customer-edit "Unsaved changes" warning, generalised so every
-   confirmation in the app looks and behaves the same way. Async by nature: pass
-   what should happen next as onConfirm/onCancel rather than reading a return value. */
+   The ONE dialog used for every confirmation, notice and quick text entry in the
+   app (native confirm()/alert()/prompt() are unreliable inside an iOS home-screen
+   PWA — there's no Safari chrome for them to anchor to, so they can fail to appear
+   at all). Async by nature: pass what should happen next as onConfirm/onCancel
+   rather than reading a return value.
+   Options: title, confirmLabel, cancelLabel, danger (false = blue confirm button),
+   altLabel + onAlt (an optional middle red button, e.g. "Discard changes"),
+   hideCancel (a plain notice with just one button — see appAlert), and
+   input {value, type, placeholder} (adds a text box; its value is passed to onConfirm). */
 let appConfirmState = null;
 function appConfirm(message, opts){
   opts = opts || {};
@@ -1159,17 +1083,34 @@ function appConfirm(message, opts){
   el.id = 'appConfirmPrompt';
   el.style.cssText = 'position:fixed; inset:0; z-index:9999; display:flex; align-items:flex-end; justify-content:center;';
   const danger = opts.danger !== false;
+  const inputHtml = opts.input
+    ? `<input id="appConfirmInput" type="${opts.input.type === 'number' ? 'number' : 'text'}" ${opts.input.type === 'number' ? 'inputmode="decimal" step="any" min="0"' : ''} value="${escapeAttr(opts.input.value == null ? '' : opts.input.value)}" placeholder="${escapeAttr(opts.input.placeholder || '')}" style="width:100%; box-sizing:border-box; margin:0 0 18px;">`
+    : '';
+  const altHtml = opts.altLabel
+    ? `<button class="btn" style="width:100%; margin-bottom:10px; border:none; background:var(--red-dim); color:var(--red);" onclick="appConfirmAlt()">${escapeHtml(opts.altLabel)}</button>`
+    : '';
+  const cancelHtml = opts.hideCancel
+    ? ''
+    : `<button class="btn btn-clean" style="width:100%; border:none;" onclick="appConfirmCancel()">${escapeHtml(opts.cancelLabel || 'Cancel')}</button>`;
   el.innerHTML = `
     <div style="position:absolute; inset:0; background:rgba(0,0,0,0.4);" onclick="appConfirmCancel()"></div>
     <div style="position:relative; background:var(--bg); width:100%; max-width:480px; border-radius:16px 16px 0 0; padding:20px; padding-bottom:calc(20px + env(safe-area-inset-bottom)); box-shadow:0 -4px 24px rgba(0,0,0,0.25);">
       <h3 style="margin:0 0 8px; font-size:1.0625rem; font-weight:800; color:var(--ink);">${escapeHtml(opts.title || 'Are you sure?')}</h3>
-      <p style="color:var(--ink-muted); font-size:0.875rem; margin:0 0 18px; line-height:1.5;">${escapeHtml(message)}</p>
+      <p style="color:var(--ink-muted); font-size:0.875rem; margin:0 0 ${opts.input ? '12px' : '18px'}; line-height:1.5;">${escapeHtml(message)}</p>
+      ${inputHtml}
       <button class="btn" style="width:100%; margin-bottom:10px; border:none; ${danger ? 'background:var(--red-dim); color:var(--red);' : 'background:var(--blue); color:#fff;'}" onclick="appConfirmYes()">${escapeHtml(opts.confirmLabel || 'Confirm')}</button>
-      <button class="btn btn-clean" style="width:100%; border:none;" onclick="appConfirmCancel()">${escapeHtml(opts.cancelLabel || 'Cancel')}</button>
+      ${altHtml}
+      ${cancelHtml}
     </div>
   `;
   document.body.appendChild(el);
-  appConfirmState = {onConfirm: opts.onConfirm || null, onCancel: opts.onCancel || null};
+  appConfirmState = {onConfirm: opts.onConfirm || null, onCancel: opts.onCancel || null, onAlt: opts.onAlt || null, hasInput: !!opts.input};
+  if(opts.input){ const inp = document.getElementById('appConfirmInput'); if(inp){ inp.focus(); inp.select(); } }
+}
+// A notice with a single OK button, in place of native alert().
+function appAlert(message, opts){
+  opts = opts || {};
+  appConfirm(message, {title: opts.title || 'Notice', confirmLabel: opts.confirmLabel || 'OK', danger: false, hideCancel: true, onConfirm: opts.onConfirm});
 }
 function removeAppConfirm(){
   const el = document.getElementById('appConfirmPrompt');
@@ -1177,8 +1118,15 @@ function removeAppConfirm(){
 }
 function appConfirmYes(){
   const st = appConfirmState; appConfirmState = null;
+  const inp = st && st.hasInput ? document.getElementById('appConfirmInput') : null;
+  const value = inp ? inp.value : undefined;
   removeAppConfirm();
-  if(st && st.onConfirm) st.onConfirm();
+  if(st && st.onConfirm) st.onConfirm(value);
+}
+function appConfirmAlt(){
+  const st = appConfirmState; appConfirmState = null;
+  removeAppConfirm();
+  if(st && st.onAlt) st.onAlt();
 }
 function appConfirmCancel(){
   const st = appConfirmState; appConfirmState = null;

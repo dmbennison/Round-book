@@ -208,44 +208,28 @@ function confirmCustomerFormClose(id){
   showUnsavedChangesPrompt(id);
   return false;
 }
-// A small prompt laid over the still-open form — NOT window.confirm(), which is
-// unreliable inside an iOS home-screen PWA (there's no Safari chrome for the
-// native dialog to anchor to, so it can silently fail to appear at all). Laying
-// this over the existing sheet rather than replacing it also means the form's
-// own fields are untouched underneath if the person picks "Keep editing", and
-// Save can still read straight from those same fields exactly as saveCustomerForm
-// normally would.
+// Laid over the still-open form (the app's standard confirm dialog, with a middle
+// "Discard" button) rather than replacing it, so the form's own fields are untouched
+// underneath if the person picks "Keep editing", and Save can still read straight
+// from those same fields exactly as saveCustomerForm normally would.
 function showUnsavedChangesPrompt(id){
-  removeUnsavedChangesPrompt();
-  const el = document.createElement('div');
-  el.id = 'unsavedChangesPrompt';
-  el.style.cssText = 'position:fixed; inset:0; z-index:9999; display:flex; align-items:flex-end; justify-content:center;';
-  el.innerHTML = `
-    <div style="position:absolute; inset:0; background:rgba(0,0,0,0.4);" onclick="unsavedChangesPromptKeepEditing('${id}')"></div>
-    <div style="position:relative; background:var(--bg); width:100%; max-width:480px; border-radius:16px 16px 0 0; padding:20px; padding-bottom:calc(20px + env(safe-area-inset-bottom)); box-shadow:0 -4px 24px rgba(0,0,0,0.25);">
-      <h3 style="margin:0 0 8px; font-size:1.0625rem; font-weight:800; color:var(--ink);">Unsaved changes</h3>
-      <p style="color:var(--ink-muted); font-size:0.875rem; margin:0 0 18px; line-height:1.5;">Save your changes before closing?</p>
-      <button class="btn btn-primary" style="width:100%; margin-bottom:10px;" onclick="unsavedChangesPromptSave('${id}')">Save changes</button>
-      <button class="btn" style="width:100%; margin-bottom:10px; background:var(--red-dim); color:var(--red); border:none;" onclick="unsavedChangesPromptDiscard()">Discard changes</button>
-      <button class="btn btn-clean" style="width:100%; border:none;" onclick="unsavedChangesPromptKeepEditing('${id}')">Keep editing</button>
-    </div>
-  `;
-  document.body.appendChild(el);
-}
-function removeUnsavedChangesPrompt(){
-  const el = document.getElementById('unsavedChangesPrompt');
-  if(el) el.remove();
+  appConfirm('Save your changes before closing?', {
+    title: 'Unsaved changes',
+    confirmLabel: 'Save changes', danger: false,
+    altLabel: 'Discard changes', onAlt: () => closeSheet(),
+    cancelLabel: 'Keep editing',
+    onConfirm: () => unsavedChangesPromptSave(id),
+    onCancel: () => unsavedChangesPromptKeepEditing(id)
+  });
 }
 // "Keep editing" (and tapping the dark backdrop, which means the same thing)
 // dismisses the prompt but the form's still open with unsaved changes sitting in
 // it — the guard needs restoring, or the very next close attempt would silently
 // discard with no warning at all, the same bug this feature exists to prevent.
 function unsavedChangesPromptKeepEditing(id){
-  removeUnsavedChangesPrompt();
   sheetCloseGuard = () => confirmCustomerFormClose(id);
 }
 function unsavedChangesPromptSave(id){
-  removeUnsavedChangesPrompt();
   // reads straight from the still-open form's own fields
   saveCustomerForm(id, (saved) => {
     if(!saved){
@@ -262,17 +246,13 @@ function unsavedChangesPromptSave(id){
     // look identical to a failed save that never closed.
   });
 }
-function unsavedChangesPromptDiscard(){
-  removeUnsavedChangesPrompt();
-  closeSheet();
-}
 
 // Calls afterAttempt(true) if the customer was actually saved (and the form
 // closed), or afterAttempt(false) if it stopped short of saving (missing
 // name/address, or a declined duplicate-address warning) — see
 // unsavedChangesPromptSave, the one caller that needs to tell the difference.
-// Async because the duplicate-address warning now goes through the app's own
-// confirm dialog rather than a synchronous native confirm().
+// Async because the duplicate-address warning goes through the app's own
+// confirm dialog, so the save can finish after this function has returned.
 function saveCustomerForm(id, afterAttempt){
   const name = document.getElementById('f_name').value.trim();
   const address = document.getElementById('f_address').value.trim();

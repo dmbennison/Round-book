@@ -212,10 +212,12 @@ function saveMileageRates(year){
   openMileageRates(year);
 }
 function resetMileageRates(year){
-  if(data.settings.mileageRates) delete data.settings.mileageRates[String(year)];
-  saveData();
-  toast(`${taxYearLabel(year)} reset to HMRC standard`);
-  openMileageRates(year);
+  appConfirm(`Reset ${taxYearLabel(year)} to the HMRC standard rates? Any rates you've set for that year will be lost.`, {title:'Reset mileage rates', confirmLabel:'Reset', onConfirm: () => {
+    if(data.settings.mileageRates) delete data.settings.mileageRates[String(year)];
+    saveData();
+    toast(`${taxYearLabel(year)} reset to HMRC standard`);
+    openMileageRates(year);
+  }});
 }
 
 // Each entry drives one row on the Message Templates screen and its edit dialog —

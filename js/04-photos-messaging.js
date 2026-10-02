@@ -229,12 +229,16 @@ function editHistAmount(id, kind, dateKey){
   const list = kind==='clean' ? c.cleanHistory : c.paymentHistory;
   const entry = list.find(e=>e.date===dateKey);
   if(!entry) return;
-  const val = prompt(`${kind==='clean'?'Amount charged':'Amount paid'} for ${fmtDate(dateKey)}`, entry.amount);
-  if(val===null) return;
-  const num = parseFloat(val);
-  if(isNaN(num) || num<0){ toast('Enter a valid amount'); return; }
-  entry.amount = num;
-  saveData(); openCustomerHistoryList(id, kind); render();
+  appConfirm(`${kind==='clean'?'Amount charged':'Amount paid'} for ${fmtDate(dateKey)}`, {
+    title: 'Edit amount', confirmLabel: 'Save', danger: false,
+    input: {value: entry.amount, type: 'number'},
+    onConfirm: (val) => {
+      const num = parseFloat(val);
+      if(isNaN(num) || num<0){ toast('Enter a valid amount'); return; }
+      entry.amount = num;
+      saveData(); openCustomerHistoryList(id, kind); render();
+    }
+  });
 }
 
 function editPriceHistoryEntry(id, dateKey){

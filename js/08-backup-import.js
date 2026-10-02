@@ -318,9 +318,10 @@ const FOCUSED_HELP = {
   backup: {
     title: 'Backup and restore',
     body: () => [
-      helpP('Everything lives only on this phone. Back up regularly from the Backup icon — export a full backup, export to Excel, export everyone as a contacts file, restore from a backup file, or import customers from a spreadsheet.'),
+      helpP('Everything lives only on this phone. Back up regularly from the Backup icon — export a full backup, export to Excel, export your customers as a CSV file, export everyone as a contacts file, restore from a backup file, or import customers from a spreadsheet.'),
       helpP('"Export for accounting software" produces a CSV of payments received (Date, Description, Amount) for a chosen date range, in a plain format FreeAgent, Xero and QuickBooks can all import or match against a bank feed — their own import screen is where you confirm the columns and date format.'),
       helpP('A pop-up appears if a change hasn\'t been backed up for 24 hours. "Not now" only puts it off for this visit to the app — it reappears next time you open Round Book until you actually back up.'),
+      helpP('<b>Export customers (CSV)</b> gives one row per customer, paused ones included: account number, name, address, phone, email, round and its order, visit day, price, frequency, status, last cleaned, next due, last paid, amount owed, property details, notes and your marketing and text settings. Dates are written as year-month-day and prices as plain numbers, so another app\'s import can read it. It\'s for moving to a different app — use Export backup to protect your data in Round Book.'),
       helpP('<b>Safety copies</b> are kept automatically, about once a day when you open the app, and just before you restore a backup. The latest 10 are kept on the phone; open Safety copies to roll back to one after a mistake or a bad import (photos aren\'t included). They can\'t protect you if the phone is lost or wiped — an iPhone app isn\'t allowed to save to iCloud Drive by itself, so exporting a backup there is still something you do with a tap.'),
       helpP('Round Book also asks your phone to protect its data from being cleared automatically when storage runs low. The Backup screen shows a green padlock line when the phone has agreed, or an amber warning when it hasn\'t.')
     ]
@@ -461,6 +462,10 @@ async function openBackup(){
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v16H4z"/><path d="M4 10h16M10 4v16"/></svg>
       <div><div class="t1">Export as Excel</div><div class="t2">One sheet per round · .xlsx file</div></div>
     </button>
+    <button class="backup-btn" onclick="exportCustomersCSV()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v16H4z"/><path d="M4 9h16M4 14h16M10 4v16"/></svg>
+      <div><div class="t1">Export customers (CSV)</div><div class="t2">Name, address, round, price, frequency, dates and more — for moving to another app</div></div>
+    </button>
     <button class="backup-btn" onclick="exportContacts()">
       ${ADD_CONTACT_ICON}
       <div><div class="t1">Export contacts</div><div class="t2">Every customer with a phone, email, or address · .vcf file</div></div>
@@ -593,7 +598,7 @@ document.getElementById('importFile').addEventListener('change', function(e){
       parsed = JSON.parse(evt.target.result);
       if(!parsed.customers || !Array.isArray(parsed.customers)) throw new Error('bad format');
     }catch(err){
-      alert('That file could not be read as a Round Book backup.');
+      appAlert('That file could not be read as a Round Book backup.', {title:'Import backup'});
       return;
     }
     appConfirm(`Import ${parsed.customers.length} customers? This will replace all data currently on this phone.`, {title:'Import backup', confirmLabel:'Import', onConfirm: async () => {
@@ -623,7 +628,7 @@ document.getElementById('importFile').addEventListener('change', function(e){
           ? `Backup restored, but ${failedPhotos} photo${failedPhotos===1?'':'s'} couldn't be recovered`
           : 'Backup restored');
       }catch(err){
-        alert('That file could not be read as a Round Book backup.');
+        appAlert('That file could not be read as a Round Book backup.', {title:'Import backup'});
       }
     }});
   };
@@ -684,13 +689,13 @@ document.getElementById('importSpreadsheetFile').addEventListener('change', func
       const firstSheetName = wb.SheetNames[0];
       const ws = wb.Sheets[firstSheetName];
       const rows = XLSX.utils.sheet_to_json(ws, {defval:''});
-      if(!rows.length){ alert('That spreadsheet looks empty — no rows found on the first sheet.'); e.target.value=''; return; }
+      if(!rows.length){ appAlert('That spreadsheet looks empty — no rows found on the first sheet.', {title:'Import customers'}); e.target.value=''; return; }
       const headers = Object.keys(rows[0]);
       pendingImportRows = rows;
       pendingImportHeaders = headers;
       openImportColumnMapping(guessColumnMap(headers));
     }catch(err){
-      alert('That file could not be read. Make sure it\'s a .csv or .xlsx spreadsheet with a header row.');
+      appAlert('That file could not be read. Make sure it\'s a .csv or .xlsx spreadsheet with a header row.', {title:'Import customers'});
     }
     e.target.value = '';
   };
@@ -823,6 +828,38 @@ function confirmSpreadsheetImport(){
   }
 }
 
+// One row per customer (paused ones included, marked as such) with plain ISO
+// dates and no currency symbols, so another app's importer can read it without
+// guessing. The first columns use the same headings Round Book's own spreadsheet
+// import recognises. The leading BOM makes Excel read £ and accents correctly.
+async function exportCustomersCSV(){
+  if(!data.customers.length){ toast('No customers to export yet'); return; }
+  const headers = ['Account Number','Name','Address','Phone','Email','Round','Round Order','Visit Day','Price','Frequency (weeks)','Status','Pause Reason','Last Cleaned','Next Due','Deferred Until','Last Paid','Amount Owed','Property Type','Fronts Only','Conservatory','Extension','Garage Door','Other Add-ons','Notes','Referred By','Text Before Visit','Marketing Opt-out'];
+  const yn = v => v ? 'Yes' : 'No';
+  const rounds = groupByRound(data.customers);
+  const lines = [headers.map(csvField).join(',')];
+  let count = 0;
+  Object.keys(rounds).sort((a,b)=>a.localeCompare(b)).forEach(rn => {
+    sortByRoute(rounds[rn]).forEach((c, idx) => {
+      const st = custStatus(c);
+      lines.push([
+        c.accountNumber || '', c.name || '', c.address || '', c.phone || '', c.email || '',
+        rn, idx + 1, c.visitDay || 1,
+        Number(c.price || 0).toFixed(2), c.frequencyWeeks || 4,
+        c.paused ? 'Paused' : 'Active', c.pauseReason || '',
+        st.lastClean || '', nextDueISO(c) || '', (c.deferUntil && c.deferUntil > todayISO()) ? c.deferUntil : '',
+        st.lastPaid || '', (st.owed ? Number(st.balance) : 0).toFixed(2),
+        c.propertyType || '', yn(c.frontsOnly), yn(c.addOnConservatory), yn(c.addOnExtension), yn(c.addOnGarageDoor), c.addOnOther || '',
+        c.notes || '', c.referredBy || '', yn(c.textBeforeVisit), yn(c.marketingOptOut)
+      ].map(csvField).join(','));
+      count++;
+    });
+  });
+  const csvStr = '\uFEFF' + lines.join('\r\n');
+  if(await deliverTextFile(csvStr, `round-book-customers-${todayISO()}.csv`, 'text/csv', 'Round Book customers')){
+    toast(`${count} customer${count===1?'':'s'} exported`);
+  }
+}
 async function exportExcel(){
   if(typeof XLSX === 'undefined'){
     toast('Still loading — try again in a moment, or once you have signal');
