@@ -318,10 +318,11 @@ const FOCUSED_HELP = {
   backup: {
     title: 'Backup and restore',
     body: () => [
-      helpP('Everything lives only on this phone. Back up regularly from the Backup icon — export a full backup, export to Excel, export your customers as a CSV file, export everyone as a contacts file, restore from a backup file, or import customers from a spreadsheet.'),
+      helpP('Everything lives only on this phone. Back up regularly from the Backup icon — export a full backup, sync with your iPad or another phone, export to Excel, export your customers as a CSV file, export everyone as a contacts file, restore from a backup file, or import customers from a spreadsheet.'),
       helpP('"Export for accounting software" produces a CSV of payments received (Date, Description, Amount) for a chosen date range, in a plain format FreeAgent, Xero and QuickBooks can all import or match against a bank feed — their own import screen is where you confirm the columns and date format.'),
       helpP('A pop-up appears if a change hasn\'t been backed up for 24 hours. "Not now" only puts it off for this visit to the app — it reappears next time you open Round Book until you actually back up.'),
       helpP('<b>Export customers (CSV)</b> gives one row per customer, paused ones included: account number, name, address, phone, email, round and its order, visit day, price, frequency, status, last cleaned, next due, last paid, amount owed, property details, notes and your marketing and text settings. Dates are written as year-month-day and prices as plain numbers, so another app\'s import can read it. It\'s for moving to a different app — use Export backup to protect your data in Round Book.'),
+      helpP('<b>Sync with another device</b> keeps a phone and iPad in step without any online account. On one device tap Send to other device: the first time you choose a sync passphrase (long is good — it can\'t be recovered), then AirDrop the encrypted file across. On the other device tap Receive from other device, pick the file and type the same passphrase. The very first receive sets up an empty device; after that each receive merges: a clean marked on one device and a note typed on the other both survive, deleted customers stay deleted, and if the same detail was changed on both devices one version is kept automatically and you\'re told. You always see a summary first and a safety copy is saved. Send in whichever direction you last made changes — or both ways at the end of the day. Photos aren\'t synced. Restoring a backup on a device means its next receive will offer to replace its data, so run a fresh send from the device you trust.'),
       helpP('<b>Safety copies</b> are kept automatically, about once a day when you open the app, and just before you restore a backup. The latest 10 are kept on the phone; open Safety copies to roll back to one after a mistake or a bad import (photos aren\'t included). They can\'t protect you if the phone is lost or wiped — an iPhone app isn\'t allowed to save to iCloud Drive by itself, so exporting a backup there is still something you do with a tap.'),
       helpP('Round Book also asks your phone to protect its data from being cleared automatically when storage runs low. The Backup screen shows a green padlock line when the phone has agreed, or an amber warning when it hasn\'t.')
     ]
@@ -453,6 +454,10 @@ async function openBackup(){
     <button class="backup-btn" onclick="exportData()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
       <div><div class="t1">Export backup</div><div class="t2">${count} customer${count===1?'':'s'} · saves a .json file — choose iCloud Drive or Google Drive when prompted</div></div>
+    </button>
+    <button class="backup-btn" onclick="openSyncSheet()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg>
+      <div><div class="t1">Sync with another device</div><div class="t2">Encrypted file via AirDrop — merges changes both ways</div></div>
     </button>
     <button class="backup-btn" onclick="openSafetyCopies()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
@@ -615,6 +620,7 @@ document.getElementById('importFile').addEventListener('change', function(e){
         const failedLegacy = await migrateLegacyPhotosToIndexedDB(migrated);
         data = migrated;
         saveData();
+        syncForgetBase(); // restored data may be older than what the other device has seen
         // Replacing all data outright — start the photo URL cache fresh rather
         // than trying to reconcile it against whatever was cached before.
         photoUrlCache.forEach(url => URL.revokeObjectURL(url));

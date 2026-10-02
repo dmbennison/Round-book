@@ -6,13 +6,14 @@ const STORE_KEY = 'roundBookData_v1';
 // APP_VERSION is a plain decimal number (e.g. 1.01, 1.02 ... 1.99, 2.00) —
 // bump by 0.01 for every change. formatVersion always renders it to exactly
 // two decimal places, so it's never shown as "1.1" or "1.100".
-const APP_VERSION = 2.26;
+const APP_VERSION = 2.27;
 function formatVersion(v){ return Number(v).toFixed(2); }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
 // entry (newest first) with ONE very short plain-English summary, then delete
 // entries so only the latest ten remain.
 const VERSION_HISTORY = [
+  {version: 2.27, changes: ['Sync with another device: encrypted file via AirDrop, merged safely']},
   {version: 2.26, changes: ['Tap a customer\'s Text first flag to text just them; flag shows when already texted']},
   {version: 2.25, changes: ['Customer CSV export for moving to another app; tidier confirmation dialogs']},
   {version: 2.24, changes: ['Protected storage request and automatic daily safety copies']},
@@ -21,8 +22,7 @@ const VERSION_HISTORY = [
   {version: 2.21, changes: ['Two-column landscape layout on iPad']},
   {version: 2.20, changes: ['New quote detail screen and printable quotes']},
   {version: 2.19, changes: ['Route map pin colours and route-method label']},
-  {version: 2.18, changes: ['Fixed tall pop-up sheets and iPad header buttons']},
-  {version: 2.17, changes: ['Printed reports back to plain white']}
+  {version: 2.18, changes: ['Fixed tall pop-up sheets and iPad header buttons']}
 ];
 const DIRECTIONS_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>';
 const CALL_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>';
@@ -969,6 +969,7 @@ async function restoreSafetyCopy(at){
     await takeSafetyCopy('Before restoring a safety copy');
     data = migrateData(JSON.parse(JSON.stringify(rec.data)));
     await saveData();
+    syncForgetBase(); // this device has jumped back in time — the next sync must start afresh
     sheetOnClose = null;
     closeSheet();
     render();
@@ -1074,7 +1075,7 @@ function renderBackupBanner(){
    Options: title, confirmLabel, cancelLabel, danger (false = blue confirm button),
    altLabel + onAlt (an optional middle red button, e.g. "Discard changes"),
    hideCancel (a plain notice with just one button — see appAlert), and
-   input {value, type, placeholder} (adds a text box; its value is passed to onConfirm). */
+   input {value, type: 'text'|'number'|'password', placeholder} (adds a text box; its value is passed to onConfirm). */
 let appConfirmState = null;
 function appConfirm(message, opts){
   opts = opts || {};
@@ -1084,7 +1085,7 @@ function appConfirm(message, opts){
   el.style.cssText = 'position:fixed; inset:0; z-index:9999; display:flex; align-items:flex-end; justify-content:center;';
   const danger = opts.danger !== false;
   const inputHtml = opts.input
-    ? `<input id="appConfirmInput" type="${opts.input.type === 'number' ? 'number' : 'text'}" ${opts.input.type === 'number' ? 'inputmode="decimal" step="any" min="0"' : ''} value="${escapeAttr(opts.input.value == null ? '' : opts.input.value)}" placeholder="${escapeAttr(opts.input.placeholder || '')}" style="width:100%; box-sizing:border-box; margin:0 0 18px;">`
+    ? `<input id="appConfirmInput" type="${opts.input.type === 'number' ? 'number' : opts.input.type === 'password' ? 'password' : 'text'}" ${opts.input.type === 'number' ? 'inputmode="decimal" step="any" min="0"' : opts.input.type === 'password' ? 'autocomplete="new-password" autocapitalize="none" autocorrect="off" spellcheck="false"' : ''} value="${escapeAttr(opts.input.value == null ? '' : opts.input.value)}" placeholder="${escapeAttr(opts.input.placeholder || '')}" style="width:100%; box-sizing:border-box; margin:0 0 18px;">`
     : '';
   const altHtml = opts.altLabel
     ? `<button class="btn" style="width:100%; margin-bottom:10px; border:none; background:var(--red-dim); color:var(--red);" onclick="appConfirmAlt()">${escapeHtml(opts.altLabel)}</button>`
