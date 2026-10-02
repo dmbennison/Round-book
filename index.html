@@ -306,7 +306,7 @@
   .cust-section .cust-section-body{padding:2px 14px 14px;}
   .cust-section .cust-section-body > *:first-child{margin-top:0;}
 
-  #importFile, #importSpreadsheetFile{display:none;}
+  #importFile, #importSpreadsheetFile, #syncFile{display:none;}
   .toast{
     position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:var(--navy-dark); color:#fff;
     padding:11px 18px; border-radius:24px; font-size:0.8438rem; font-weight:700; z-index:60; opacity:0; transition:opacity .2s;
@@ -682,7 +682,7 @@
       --card-border:transparent;
       --card-shadow:none;
     }
-    header, #lastActionBanner, #marketingFollowUpBanner, #jobAnniversaryBanner, #importReviewBanner, main, .fab, .overlay, #importFile, #importSpreadsheetFile, .toast{
+    header, #lastActionBanner, #marketingFollowUpBanner, #jobAnniversaryBanner, #importReviewBanner, main, .fab, .overlay, #importFile, #importSpreadsheetFile, #syncFile, .toast{
       display:none !important;
     }
     .print-area{
@@ -756,6 +756,7 @@
 </div>
 
 <input type="file" id="importFile" accept="application/json">
+<input type="file" id="syncFile">
 <input type="file" id="importSpreadsheetFile" accept=".csv,.xlsx,.xls,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
 <div class="toast" id="toast"></div>
 <div class="print-area" id="printArea"></div>
@@ -768,6 +769,7 @@
 <script src="./js/06-settings-reports-a.js" defer></script>
 <script src="./js/07-reports-b.js" defer></script>
 <script src="./js/08-backup-import.js" defer></script>
+<script src="./js/08b-sync.js" defer></script>
 <script src="./js/09-boot.js" defer></script>
 </body>
 </html>

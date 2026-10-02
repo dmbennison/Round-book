@@ -1,4 +1,4 @@
-const CACHE_NAME = 'round-book-v2.26';
+const CACHE_NAME = 'round-book-v2.27';
 const ASSETS = [
   './',
   './manifest.json',
@@ -13,6 +13,7 @@ const ASSETS = [
   './js/06-settings-reports-a.js',
   './js/07-reports-b.js',
   './js/08-backup-import.js',
+  './js/08b-sync.js',
   './js/09-boot.js',
   'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',
   'https://cdn.jsdelivr.net/npm/docx@8.2.4/build/index.umd.js',
