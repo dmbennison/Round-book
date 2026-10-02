@@ -10,6 +10,34 @@
 // grouped by round (round names sorted, customers within a round sorted by
 // how overdue they are) — used by both the Today screen and the "Text all"
 // bulk-send screen so the two stay in sync.
+// A "Text first" customer counts as already texted once a text-before-visit
+// message has been logged AFTER their last clean. Tying it to the last clean
+// (rather than a flat flag) means it resets by itself for the next visit, and
+// stays set if the visit slips a few days — so nobody gets texted twice.
+function textFirstSent(c){
+  const lastClean = lastDateOf(c.cleanHistory);
+  return (c.messageLog||[]).some(m => m.kind === 'textBefore' && (!lastClean || m.date > lastClean));
+}
+// The flag on a customer card: tap it to text just that customer. Turns into a
+// green "Texted" tick once sent; tapping that asks before sending again.
+function textFirstBadgeHtml(c){
+  const base = 'border:none; font-family:inherit; cursor:pointer;';
+  const tap = `event.stopPropagation(); textFirstTap('${c.id}')`;
+  if(!isMobileNumber(c.phone)) return `<button class="badge anniversary" style="${base}" title="Text before you arrive — no mobile number saved" onclick="${tap}">📱 Text first</button>`;
+  if(textFirstSent(c)) return `<button class="badge ok" style="${base}" title="Already texted — tap to send again" onclick="${tap}">✓ Texted</button>`;
+  return `<button class="badge anniversary" style="${base}" title="Tap to text this customer now" onclick="${tap}">📱 Text first</button>`;
+}
+function textFirstTap(id){
+  const c = data.customers.find(x=>x.id===id);
+  if(!c) return;
+  if(!isMobileNumber(c.phone)){ toast('No mobile number saved for this customer'); return; }
+  if(textFirstSent(c)){
+    const first = c.name ? c.name.trim().split(' ')[0] : 'This customer';
+    appConfirm(`${first} has already been texted before this visit. Send another?`, {title:'Already texted', confirmLabel:'Send again', danger:false, onConfirm: () => sendBulkReminder(id, 'textBefore')});
+    return;
+  }
+  sendBulkReminder(id, 'textBefore');
+}
 function textBeforeDueList(){
   const today = todayISO();
   const rounds = groupByRound(data.customers);
@@ -27,14 +55,14 @@ function textBeforeDueList(){
     });
     if(list.length){ byRound[rn] = list; all = all.concat(list); }
   });
-  return {byRound, all};
+  return {byRound, all, unsent: all.filter(c=>!textFirstSent(c))};
 }
 // How many of the "text before visit" list are actually overdue rather than
 // just due today. cleanBadge.type is 'due' for both cases (there's no separate
 // 'overdue' badge type in the data model — see custStatus) — the distinction
 // lives in the badge text ("Due today" vs "Due +N" / "Never cleaned").
 function textBeforeOverdueCount(){
-  return textBeforeDueList().all.filter(c=>{
+  return textBeforeDueList().unsent.filter(c=>{
     const s = custStatus(c);
     return s.cleanBadge && s.cleanBadge.type==='due' && s.cleanBadge.text !== 'Due today';
   }).length;
@@ -162,7 +190,7 @@ function renderTodayHome(main){
     </div>
     <div class="today-grid">
       <div class="today-tile" onclick="setTab('rounds'); setRoundsView('text');">
-        <div class="num">${textBefore.all.length}</div>
+        <div class="num">${textBefore.unsent.length}</div>
         <div class="lbl">Text before visit${textBeforeOverdue ? ` · ${textBeforeOverdue} overdue` : ''}</div>
       </div>
       <div class="today-tile" onclick="openMileageEntry();" style="display:flex; align-items:flex-start; justify-content:space-between; gap:10px;">
@@ -1346,7 +1374,7 @@ function renderRoundsList(main){
       html += listTotalHtml(`${dueGrandCount} due · ${money(dueGrandValue)}`);
     }
   } else if(roundsViewMode === 'text'){
-    const { byRound, all } = textBeforeDueList();
+    const { byRound, all, unsent } = textBeforeDueList();
     if(!all.length){
       html += `<div class="empty">
         <svg viewBox="0 0 24 24" fill="none" stroke="#66798A" stroke-width="1.6"><path d="M20 6L9 17l-5-5"/></svg>
@@ -1354,14 +1382,16 @@ function renderRoundsList(main){
         <p>No one due for a clean today needs a text before you arrive.</p>
       </div>`;
     } else {
-      html += `<div style="display:flex; justify-content:flex-end; margin:0 2px 10px;">
+      if(unsent.some(c=>isMobileNumber(c.phone))){
+        html += `<div style="display:flex; justify-content:flex-end; margin:0 2px 10px;">
         <button onclick="openBulkTextBeforeVisit()" style="background:var(--blue-deep); color:#fff; border:none; border-radius:8px; padding:8px 16px; font-weight:800; font-size:0.8125rem;">Text all</button>
       </div>`;
+      }
       Object.keys(byRound).forEach(rn=>{
         html += `<div class="section-label" style="margin:14px 2px 8px;">${escapeHtml(rn)} <span style="font-weight:600; color:var(--ink-muted); text-transform:none; letter-spacing:0;">(${byRound[rn].length})</span></div>`;
         html += byRound[rn].map(custCardHtml).join('');
       });
-      html += listTotalHtml(`${all.length} to text`);
+      html += listTotalHtml(unsent.length === all.length ? `${all.length} to text` : `${unsent.length} to text · ${all.length - unsent.length} texted`);
     }
   } else if(roundsViewMode === 'owed'){
     html += `<div class="seg-row">
@@ -1680,7 +1710,7 @@ function custCardHtml(c){
         ${needsPriceReview(c) ? `<span class="badge due" title="12+ months since last price increase">📈 Review</span>` : ''}
         ${belowTypeAvg ? `<span class="badge due" title="${money(lowBy)} below the average for ${escapeAttr(c.propertyType||'Not recorded')}">💷 Low by ${money(lowBy)}</span>` : ''}
         ${c.propertyType ? `<span class="badge paused" title="${escapeAttr(propertySummaryText(c))}">🏠 ${escapeHtml(PROPERTY_TYPE_ABBR[c.propertyType]||c.propertyType)}${c.frontsOnly?' · Fronts':''}</span>` : (c.frontsOnly ? `<span class="badge paused">Fronts only</span>` : '')}
-        ${c.textBeforeVisit ? `<span class="badge anniversary" title="Text before you arrive">📱 Text first</span>` : ''}
+        ${c.textBeforeVisit ? textFirstBadgeHtml(c) : ''}
         ${showDayBadge ? `<span class="badge anniversary">Day ${c.visitDay||1}</span>` : ''}
         ${(s.owed && isMobileNumber(c.phone)) ? `<button onclick="event.stopPropagation(); chaseCustomer('${c.id}')" style="display:inline-flex; align-items:center; gap:4px; background:var(--red-dim); color:var(--red); border:none; border-radius:20px; padding:5px 10px; font-size:0.7188rem; font-weight:800; line-height:1;">✉️ Chase</button>` : ''}
         ${(isMobileNumber(c.phone) && s.lastClean===todayISO()) ? (

@@ -598,7 +598,7 @@ function bankDetailsBlock(address){
 }
 // Human-readable labels for the message log shown on a customer/job's screen.
 const MESSAGE_LOG_LABELS = {
-  clean: 'Cleaning reminder', cleanedToday: 'Windows cleaned today', pay: 'Payment reminder',
+  clean: 'Cleaning reminder', textBefore: 'Text before visit', cleanedToday: 'Windows cleaned today', pay: 'Payment reminder',
   receipt: 'Receipt', quote: 'Quote', repeatQuote: 'Repeat work quote', quoteFollowUp: 'Quote follow-up', quoteCall: 'Follow-up call made', quotePdf: 'Quote sent as PDF', marketing: 'Marketing text'
 };
 // Marketing response pipeline — tracked manually, since there's no way for the app
@@ -1112,8 +1112,8 @@ function openBulkReminders(kind, roundName){
 // than being scoped to one, so it's grouped with round sub-headers instead.
 function openBulkTextBeforeVisit(){
   const { byRound, all } = textBeforeDueList();
-  const sendable = all.filter(c=>isMobileNumber(c.phone));
-  if(!sendable.length){ toast('No one with a mobile number to text'); return; }
+  const sendable = all.filter(c=>isMobileNumber(c.phone) && !textFirstSent(c));
+  if(!sendable.length){ toast(all.some(c=>isMobileNumber(c.phone)) ? 'Everyone has already been texted' : 'No one with a mobile number to text'); return; }
 
   const tplField = document.getElementById('bulk_msg');
   const tpl = tplField ? tplField.value : data.settings.cleanTemplate;
@@ -1126,19 +1126,19 @@ function openBulkTextBeforeVisit(){
     <label style="margin-top:0;">Message <span style="text-transform:none; font-weight:500; opacity:0.7;">({name}, {company}, {yourname})</span></label>
     <textarea id="bulk_msg" rows="4">${escapeHtml(tpl)}</textarea>
     <p style="color:var(--ink-muted); font-size:0.7812rem; margin:10px 2px 14px; line-height:1.5;">
-      Tap Send for each customer — it opens ${data.settings.messagingApp==='whatsapp'?'WhatsApp':'Messages'} pre-filled and ready to go. Come back here for the next one.
+      Tap Send for each customer — it opens ${data.settings.messagingApp==='whatsapp'?'WhatsApp':'Messages'} pre-filled and ready to go. Come back here for the next one. Anyone already texted is shown as Sent.
     </p>
     ${Object.keys(byRound).map(rn=>{
       const list = byRound[rn].filter(c=>isMobileNumber(c.phone));
       if(!list.length) return '';
       return `<div class="section-label" style="margin:10px 2px 6px; font-size:0.6875rem;">${escapeHtml(rn)}</div>` +
-        list.map(c=>`<div class="cust-card" id="bulkrow-${c.id}" style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+        list.map(c=>{ const sent = textFirstSent(c); return `<div class="cust-card" id="bulkrow-${c.id}" style="display:flex; align-items:center; justify-content:space-between; gap:10px;${sent?' opacity:0.45;':''}">
           <div style="min-width:0;">
             <div class="cust-addr" style="font-weight:800; font-size:0.9062rem;">${escapeHtml(c.address||c.name||'Customer')}</div>
             <div style="font-size:0.75rem; color:var(--ink-muted); margin-top:2px;">${escapeHtml(c.phone)}</div>
           </div>
-          <button class="btn btn-clean" style="flex:0 0 auto; padding:9px 16px;" onclick="sendBulkReminder('${c.id}','textBefore')">Send</button>
-        </div>`).join('');
+          <button class="btn btn-clean" style="flex:0 0 auto; padding:9px 16px;${sent?' background:var(--line); color:var(--ink-muted);':''}" ${sent?'disabled':''} onclick="sendBulkReminder('${c.id}','textBefore')">${sent?'Sent ✓':'Send'}</button>
+        </div>`; }).join('');
     }).join('')}
   `);
 }
@@ -1157,7 +1157,7 @@ function sendBulkReminder(id, kind){
   }
   const msg = applyTemplate(tpl, {name: firstName, amount: amt, company, yourname, address: c.address, daysoverdue: kind==='owed' ? daysSinceLastPayment(c) : undefined});
   sendPhoneMessage(c.phone, msg);
-  logMessage(c, kind === 'owed' ? 'pay' : 'clean');
+  logMessage(c, kind === 'owed' ? 'pay' : kind === 'textBefore' ? 'textBefore' : 'clean');
   if(kind === 'owed'){
     c.paymentReminderSent = true;
     c.paymentReminderSentDate = todayISO();
@@ -1165,6 +1165,8 @@ function sendBulkReminder(id, kind){
   }
   saveData();
   markReminderSent(id);
+  // Sent from a card's Text first flag (no bulk sheet open): refresh so the flag shows Texted.
+  if(kind === 'textBefore' && !document.getElementById('bulkrow-'+id)) render();
 }
 
 function markReminderSent(id){

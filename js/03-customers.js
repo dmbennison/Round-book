@@ -472,7 +472,7 @@ function openCustomerDetail(id){
     ${(c.name && c.address) ? `<div style="color:var(--ink); font-size:0.9375rem; font-weight:700; margin-bottom:2px;">${escapeHtml(c.name)}</div>` : ''}
     <div style="color:var(--ink-muted); font-size:0.8125rem; margin-bottom:10px;">${escapeHtml(c.round||'Unassigned')} · ${money(c.price)} standard · every ${c.frequencyWeeks||4} week${(c.frequencyWeeks||4)===1?'':'s'}${c.accountNumber?` · Acct #${escapeHtml(c.accountNumber)}`:''}${c.paused?` · <span style="color:var(--ink-muted); font-weight:700;">Paused${c.pauseReason?' — '+escapeHtml(c.pauseReason):''}${c.pauseDate?' ('+fmtDate(c.pauseDate)+')':''}</span>`:''}</div>
     ${needsPriceReview(c) ? `<div style="color:var(--amber); font-size:0.75rem; font-weight:700; margin:-6px 2px 10px;">📈 12+ months since last price increase</div>` : ''}
-    ${c.textBeforeVisit ? `<div style="color:var(--blue-deep); font-size:0.75rem; font-weight:700; margin:-6px 2px 10px;">📱 Text before you arrive</div>` : ''}
+    ${c.textBeforeVisit ? `<div style="color:var(--blue-deep); font-size:0.75rem; font-weight:700; margin:-6px 2px 10px;">📱 Text before you arrive${textFirstSent(c) ? ' · ✓ Texted' : ''}</div>` : ''}
     ${c.referredBy ? `<div style="color:var(--ink-muted); font-size:0.75rem; font-weight:700; margin:-6px 2px 10px;">🤝 Referred by ${escapeHtml(c.referredBy)}</div>` : ''}
     ${c.marketingOptOut ? `<div style="color:var(--red); font-size:0.75rem; font-weight:700; margin:-6px 2px 10px;">🚫 Opted out of marketing texts</div>` : ''}
     ${propertySummaryText(c) ? `<div style="color:var(--ink-muted); font-size:0.75rem; font-weight:700; margin:-6px 2px 10px;">🏠 ${escapeHtml(propertySummaryText(c))}</div>` : ''}
