@@ -179,6 +179,19 @@ function onSwipeCancel(){
   swipeState = null;
 }
 
+/* ---------- fixed header ---------- */
+// The header is position:fixed so it never scrolls away; the page content is pushed
+// down by exactly its height (--header-h). The height changes when the weather line
+// appears or wraps, text size changes or the device rotates, so keep it measured.
+(function(){
+  const header = document.querySelector('header');
+  if(!header) return;
+  const sync = () => document.documentElement.style.setProperty('--header-h', header.offsetHeight + 'px');
+  sync();
+  window.addEventListener('resize', sync);
+  window.addEventListener('orientationchange', sync);
+  if(window.ResizeObserver) new ResizeObserver(sync).observe(header);
+})();
 document.getElementById('dateNow').textContent = new Date().toLocaleDateString('en-GB',{weekday:'long', day:'numeric', month:'long'});
 
 /* ---------- weather ---------- */

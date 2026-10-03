@@ -487,11 +487,18 @@ function cycleVisitDay(id){
 function setRoundDayFilter(day){ roundDayFilter = day; render(); }
 
 // Remembers where you were inside Work (which round, which Due/Text/Owed
-// view, which day) whenever you step away to another tab — e.g. to quote a
-// walk-up customer — so tapping back into Work resumes there instead of
-// dumping you back on the hub every time.
+// view, which day) AND how far down the list you had scrolled, whenever you step
+// away to another tab — e.g. to check Today or quote a walk-up customer — so
+// tapping back into Work resumes exactly there instead of dumping you back on
+// the hub (or the top of the list) every time. Other tabs remember their scroll
+// position too (tabScroll). Tapping the tab you're already on goes to its top.
 let lastWorkView = null;
+const tabScroll = {};
 function setTab(tab){
+  const keyOf = t => (t === 'rounds' || t === 'jobs') ? 'work' : t;
+  const fromKey = keyOf(currentTab), toKey = keyOf(tab);
+  const switching = fromKey !== toKey;
+  let restoreY = 0;
   if(tab === 'work'){
     if(currentTab === 'rounds' || currentTab === 'jobs'){
       // Already inside Work — tapping Work again means "take me to the hub",
@@ -504,19 +511,24 @@ function setTab(tab){
       roundsViewMode = lastWorkView.roundsViewMode;
       roundDayFilter = lastWorkView.roundDayFilter;
       reorderMode = false; roundFilterMode = lastWorkView.roundFilterMode || 'all';
+      restoreY = lastWorkView.scrollY || 0;
     } else {
+      if(switching) restoreY = tabScroll.work || 0;
       currentTab = 'work'; currentRound = null; reorderMode = false; roundFilterMode = 'all'; roundDayFilter = 'all';
     }
   } else {
     if(currentTab === 'rounds' || currentTab === 'jobs'){
-      lastWorkView = { screen: currentTab, round: currentRound, roundsViewMode, roundDayFilter, roundFilterMode };
+      lastWorkView = { screen: currentTab, round: currentRound, roundsViewMode, roundDayFilter, roundFilterMode, scrollY: window.scrollY };
+    } else if(switching){
+      tabScroll[fromKey] = window.scrollY;
     }
+    if(switching) restoreY = tabScroll[toKey] || 0;
     currentTab = tab; currentRound = null; reorderMode = false; roundFilterMode = 'all'; roundDayFilter = 'all';
   }
   const activeTabKey = (currentTab === 'rounds' || currentTab === 'jobs') ? 'work' : currentTab;
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===activeTabKey));
   render();
-  window.scrollTo(0, 0);
+  window.scrollTo(0, restoreY);
 }
 function setRoundsView(v){ roundsViewMode = v; render(); }
 function toggleReorder(){ reorderMode = !reorderMode; render(); }

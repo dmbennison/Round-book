@@ -370,7 +370,7 @@ function openHelp(returnTo){
     ${helpP('Round Book is a simple, offline window cleaning round tracker. It keeps track of customers, rounds, cleaning and payment dates, one-off jobs, and quotes — all stored privately on your own phone.')}
 
     ${helpH('Getting around')}
-    ${helpP('Four tabs: <b>Today</b> (your home screen), <b>Work</b> (Rounds and One-off jobs), <b>Quotes</b>, and <b>Marketing</b>. The blue + button adds something appropriate to whichever screen you\'re on. Header icons: <b>Search</b> (customers, jobs, quotes, and rounds, all in one place), <b>About</b>, <b>Reports</b>, <b>Backup</b>, <b>Settings</b>. Look for a <b>?</b> next to a screen\'s print icon for help on just that screen.')}
+    ${helpP('Four tabs: <b>Today</b> (your home screen), <b>Work</b> (Rounds and One-off jobs), <b>Quotes</b>, and <b>Marketing</b>. Each tab remembers where you were — including how far down a list you had scrolled — when you switch away and come back; tapping the tab you are already on takes you to its top. The blue + button adds something appropriate to whichever screen you\'re on. Header icons: <b>Search</b> (customers, jobs, quotes, and rounds, all in one place), <b>About</b>, <b>Reports</b>, <b>Backup</b>, <b>Settings</b>. Look for a <b>?</b> next to a screen\'s print icon for help on just that screen.')}
 
     ${FOCUSED_HELP_ORDER.map(key=>{
       const h = FOCUSED_HELP[key];
