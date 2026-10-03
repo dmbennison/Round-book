@@ -476,6 +476,82 @@ function sortByRoute(custs){
 function roundDaysUsed(custs){
   return Array.from(new Set(custs.map(c=>c.visitDay||1))).sort((a,b)=>a-b);
 }
+/* ---------- "what the list is showing" ----------
+   The round screen can be narrowed by Day (1-5) and by All / Due / Owed. The map,
+   Suggest a route order, directions and Reorder all work from exactly that same
+   set — so what you see in the list is what you map, route and re-order. */
+// Due now, or already cleaned today. Once cleaned, a customer drops out of "due"
+// straight away — but they stay in this view for the rest of the day, so you can
+// still see everyone you've worked through without them vanishing mid-round. They
+// naturally drop off tomorrow once lastClean no longer matches today.
+function roundDuePredicate(c){
+  const s = custStatus(c);
+  const dueNow = s.cleanBadge && s.cleanBadge.type==='due';
+  const cleanedToday = s.lastClean === todayISO();
+  return !c.paused && (dueNow || cleanedToday);
+}
+// In route order. (The Owed view displays its own oldest-first sort on top of this.)
+function roundScopeList(rn){
+  let list = sortByRoute(data.customers.filter(c=>(c.round||'Unassigned')===rn));
+  if(roundDaysUsed(list).length > 1 && roundDayFilter !== 'all'){
+    list = list.filter(c=>(c.visitDay||1) === roundDayFilter);
+  }
+  if(roundFilterMode === 'due') list = list.filter(roundDuePredicate);
+  else if(roundFilterMode === 'owed') list = list.filter(c=>custStatus(c).owed && matchesOwedAgeFilter(c));
+  return list;
+}
+// e.g. "Due · Day 2" — empty when nothing is filtered.
+function roundScopeLabel(rn){
+  const parts = [];
+  const full = data.customers.filter(c=>(c.round||'Unassigned')===rn);
+  if(roundDaysUsed(full).length > 1 && roundDayFilter !== 'all') parts.push('Day ' + roundDayFilter);
+  if(roundFilterMode === 'due') parts.push('Due');
+  else if(roundFilterMode === 'owed') parts.push('Owed');
+  return parts.join(' · ');
+}
+// Gives the customers in `ordered` (any subset of one round) a new relative order
+// while everyone NOT in the subset keeps exactly the place they had: the subset's
+// members simply swap among the positions they already occupied. This is done one
+// visit day at a time, so a customer can never be shuffled into another day's stretch
+// of the route. Then the whole round is renumbered 0,1,2… so no two customers ever
+// share an order number.
+function reorderRoundSubset(rn, ordered){
+  const full = sortByRoute(data.customers.filter(c=>(c.round||'Unassigned')===rn));
+  const inRound = new Set(full.map(c=>c.id));
+  ordered = ordered.filter(c=>inRound.has(c.id));
+  const ids = new Set(ordered.map(c=>c.id));
+  const result = full.slice();
+  new Set(ordered.map(c=>c.visitDay || 1)).forEach(day => {
+    const slots = [];
+    full.forEach((c,i)=>{ if(ids.has(c.id) && (c.visitDay||1) === day) slots.push(i); });
+    ordered.filter(c=>(c.visitDay||1) === day).forEach((c,k)=>{ result[slots[k]] = c; });
+  });
+  result.forEach((c,i)=>{ c.order = i; });
+}
+// The Day / All-Due-Owed filter buttons, shared by the list view and the Reorder view.
+function roundFilterBarsHtml(daysUsed, spansMultipleDays){
+  let html = '';
+  if(spansMultipleDays){
+    html += `<div class="seg-row">
+      <button class="seg-btn ${roundDayFilter==='all'?'active':''}" onclick="setRoundDayFilter('all')">All</button>
+      ${daysUsed.map(d=>`<button class="seg-btn ${roundDayFilter===d?'active':''}" onclick="setRoundDayFilter(${d})">Day ${d}</button>`).join('')}
+    </div>`;
+  }
+  html += `<div class="seg-row">
+    <button class="seg-btn seg-btn-sm ${roundFilterMode==='all'?'active':''}" onclick="setRoundFilterMode('all')">All</button>
+    <button class="seg-btn seg-btn-sm ${roundFilterMode==='due'?'active':''}" onclick="setRoundFilterMode('due')">Due</button>
+    <button class="seg-btn seg-btn-sm ${roundFilterMode==='owed'?'active':''}" onclick="setRoundFilterMode('owed')">Owed</button>
+  </div>`;
+  if(roundFilterMode === 'owed'){
+    html += `<div class="seg-row">
+      <button class="seg-btn seg-btn-sm ${owedAgeFilter==='all'?'active':''}" onclick="setOwedAgeFilter('all')">All</button>
+      <button class="seg-btn seg-btn-sm ${owedAgeFilter==='0-14'?'active':''}" onclick="setOwedAgeFilter('0-14')">0–14 days</button>
+      <button class="seg-btn seg-btn-sm ${owedAgeFilter==='14-30'?'active':''}" onclick="setOwedAgeFilter('14-30')">14–30 days</button>
+      <button class="seg-btn seg-btn-sm ${owedAgeFilter==='30+'?'active':''}" onclick="setOwedAgeFilter('30+')">30+ days</button>
+    </div>`;
+  }
+  return html;
+}
 function cycleVisitDay(id){
   const c = data.customers.find(x=>x.id===id);
   if(!c) return;
@@ -534,12 +610,13 @@ function setRoundsView(v){ roundsViewMode = v; render(); }
 function toggleReorder(){ reorderMode = !reorderMode; render(); }
 function moveInRound(id, direction){
   const rn = currentRound;
-  const custs = sortByRoute(data.customers.filter(c=>(c.round||'Unassigned')===rn));
-  const idx = custs.findIndex(c=>c.id===id);
+  const shown = roundScopeList(rn); // only what the Reorder screen is showing
+  const idx = shown.findIndex(c=>c.id===id);
   const swapIdx = direction==='up' ? idx-1 : idx+1;
-  if(swapIdx<0 || swapIdx>=custs.length) return;
-  const tmp = custs[idx]; custs[idx] = custs[swapIdx]; custs[swapIdx] = tmp;
-  custs.forEach((c,i)=>{ c.order = i; });
+  if(idx<0 || swapIdx<0 || swapIdx>=shown.length) return;
+  const ordered = shown.slice();
+  const tmp = ordered[idx]; ordered[idx] = ordered[swapIdx]; ordered[swapIdx] = tmp;
+  reorderRoundSubset(rn, ordered);
   saveData(); render();
 }
 
@@ -548,8 +625,9 @@ function moveInRound(id, direction){
    this is done by hand with Pointer Events instead: pressing the ⠿ handle
    lifts that row out of the flow so it follows the finger/cursor, swapping
    past whichever row it's currently nearest to; releasing commits the new
-   DOM order back into every customer's `order` field in one go — the same
-   field moveInRound and sortByRoute already use everywhere else. */
+   DOM order back into the customers' `order` field (via reorderRoundSubset, so
+   anyone not on screen keeps their place) — the same field moveInRound and
+   sortByRoute already use everywhere else. */
 let dragState = null;
 function startDragReorder(e, id){
   e.preventDefault();
@@ -614,10 +692,7 @@ function endDragReorder(){
   dragState = null;
 
   const ids = [...list.querySelectorAll('.reorder-row')].map(el=>el.dataset.id);
-  ids.forEach((id,i)=>{
-    const c = data.customers.find(x=>x.id===id);
-    if(c) c.order = i;
-  });
+  reorderRoundSubset(currentRound, ids.map(id=>data.customers.find(x=>x.id===id)).filter(Boolean));
   saveData();
   render();
 }
@@ -864,36 +939,15 @@ async function getValhallaTripOrder(points, startIdx){
 // screen has no day tabs to pick from, so when a multi-day round is asked for
 // without a day this pops up a small picker first, which then calls back in here
 // with the chosen day. Single-day rounds go straight through as before.
-function openSuggestDayPicker(rn, days, custs){
-  openSheet(`
-    <div class="sheet-head">
-      <h2 style="flex:1; min-width:0;">Which day?</h2>
-      <button class="sheet-close" onclick="closeSheet()">✕</button>
-    </div>
-    <p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 14px; line-height:1.5;">This round is split over ${days.length} days. Pick the day you want a route suggested for — only that day's customers are re-ordered, and the other days are left as they are.</p>
-    ${days.map(d=>{
-      const n = custs.filter(c=>(c.visitDay||1)===d).length;
-      return `<button class="backup-btn" onclick="suggestRouteOrder('${escapeAttr(rn)}', ${d})">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h8a4 4 0 0 0 4-4V7a4 4 0 0 0-4-4H8"/></svg>
-        <div><div class="t1">Day ${d}</div><div class="t2">${n} customer${n===1?'':'s'}</div></div>
-      </button>`;
-    }).join('')}
-  `);
-}
-async function suggestRouteOrder(rn, day){
-  let custs = sortByRoute(data.customers.filter(c=>(c.round||'Unassigned')===rn && !c.paused));
+async function suggestRouteOrder(rn){
+  // Plans exactly what the Reorder screen is showing (Day and All/Due/Owed filters),
+  // minus paused customers, who aren't visited. With nothing filtered that's the whole
+  // round. If it spans several days (Day: All) each day is planned on its own and the
+  // days stay in order, so Day 1's stops don't get mixed in with Day 2's.
+  const custs = roundScopeList(rn).filter(c=>!c.paused);
   const days = roundDaysUsed(custs);
-  let chosenDay = null;
-  if(days.length > 1){
-    if(day == null){
-      openSuggestDayPicker(rn, days, custs);
-      return;
-    }
-    chosenDay = Number(day);
-    custs = custs.filter(c=>(c.visitDay||1) === chosenDay);
-  }
+  const groups = days.length > 1 ? days.map(d=>custs.filter(c=>(c.visitDay||1) === d)) : [custs];
   const withAddress = custs.filter(c=>c.address);
-  const withoutAddress = custs.filter(c=>!c.address);
   if(withAddress.length < 2){ toast('Need at least 2 addresses to suggest an order'); return; }
   closeSheet();
 
@@ -911,13 +965,11 @@ async function suggestRouteOrder(rn, day){
   }
   if(toGeocode.length) saveData(); // cache whatever was found, even if this suggestion isn't applied
 
-  const located = withAddress.filter(c=>c.lat!=null && c.lng!=null);
-  const notLocated = withAddress.filter(c=>c.lat==null || c.lng==null).concat(withoutAddress);
-  if(located.length < 2){ toast('Could not locate enough addresses to suggest an order'); return; }
+  const hasPin = c => c.address && c.lat!=null && c.lng!=null;
+  if(withAddress.filter(hasPin).length < 2){ toast('Could not locate enough addresses to suggest an order'); return; }
 
   // Start from wherever the phone currently is, if it'll share that — makes the
   // suggestion "best order from here" rather than an arbitrary starting point.
-  let startIdx = 0;
   const gotLocation = await new Promise(resolve=>{
     if(!navigator.geolocation){ resolve(null); return; }
     const timer = setTimeout(()=>resolve(null), 4000);
@@ -926,34 +978,59 @@ async function suggestRouteOrder(rn, day){
       resolve({lat:pos.coords.latitude, lng:pos.coords.longitude});
     }, ()=>{ clearTimeout(timer); resolve(null); }, {enableHighAccuracy:true, timeout:3500});
   });
-  if(gotLocation){
-    let bestDist = Infinity;
-    located.forEach((c,i)=>{
-      const d = haversineKm(gotLocation.lat, gotLocation.lng, c.lat, c.lng);
-      if(d < bestDist){ bestDist = d; startIdx = i; }
-    });
-  }
 
-  const points = located.map(c=>({lat:c.lat, lng:c.lng}));
   toast('Working out the best route…');
-  let order = await getOsrmTripOrder(points, startIdx);
-  let method = 'osrm';
-  if(!order){
-    order = await getValhallaTripOrder(points, startIdx);
-    method = 'valhalla';
+  const rank = {osrm:0, valhalla:1, 'straight-line':2};
+  let worstMethod = null;
+  const orderedLocated = [], notLocated = [], applyOrder = [];
+  for(const group of groups){
+    const located = group.filter(hasPin);
+    const rest = group.filter(c=>!hasPin(c));
+    let ordered = located;
+    if(located.length >= 2){
+      let startIdx = 0;
+      if(gotLocation){
+        let bestDist = Infinity;
+        located.forEach((c,i)=>{
+          const d = haversineKm(gotLocation.lat, gotLocation.lng, c.lat, c.lng);
+          if(d < bestDist){ bestDist = d; startIdx = i; }
+        });
+      }
+      const points = located.map(c=>({lat:c.lat, lng:c.lng}));
+      let order = await getOsrmTripOrder(points, startIdx);
+      let method = 'osrm';
+      if(!order){
+        order = await getValhallaTripOrder(points, startIdx);
+        method = 'valhalla';
+      }
+      if(!order){
+        // Straight-line fallback: the phone's position (if we got it) goes in as a
+        // separate depot rather than as a customer, so this solves an open path
+        // starting there and ending wherever is shortest. No GPS: startIdx as before.
+        order = computeRouteOrder(points, startIdx, gotLocation || undefined);
+        method = 'straight-line';
+      }
+      if(worstMethod === null || rank[method] > rank[worstMethod]) worstMethod = method;
+      ordered = order.map(i=>located[i]);
+    }
+    orderedLocated.push(...ordered);
+    notLocated.push(...rest);
+    // Anyone who couldn't be placed keeps their relative order but goes at the end
+    // of their own day's block, so nobody gets lost.
+    applyOrder.push(...ordered, ...sortByRoute(rest));
   }
-  if(!order){
-    // Straight-line fallback: the phone's position (if we got it) goes in as a
-    // separate depot rather than as a customer, so this solves an open path
-    // starting there and ending wherever is shortest. No GPS: startIdx as before.
-    order = computeRouteOrder(points, startIdx, gotLocation || undefined);
-    method = 'straight-line';
-  }
-  renderSuggestedRoutePreview(rn, order.map(i=>located[i]), notLocated, !!gotLocation, method, chosenDay);
+  renderSuggestedRoutePreview(rn, orderedLocated, notLocated, !!gotLocation, worstMethod || 'straight-line', roundScopeLabel(rn), applyOrder);
 }
 let suggestedRouteState = null;
-function renderSuggestedRoutePreview(rn, orderedCusts, notLocated, usedCurrentLocation, method, day){
-  suggestedRouteState = { rn, day: day || null, orderedIds: orderedCusts.map(c=>c.id), notLocatedIds: notLocated.map(c=>c.id) };
+// Day divider for the preview list when the suggestion spans several days.
+function suggestDivider(list, i, showDays){
+  if(!showDays) return '';
+  const d = list[i].visitDay || 1;
+  return (i === 0 || d !== (list[i-1].visitDay || 1)) ? `<div class="day-divider">Day ${d}</div>` : '';
+}
+function renderSuggestedRoutePreview(rn, orderedCusts, notLocated, usedCurrentLocation, method, scopeLabel, applyOrder){
+  suggestedRouteState = { rn, applyIds: applyOrder.map(c=>c.id) };
+  const showDays = new Set(orderedCusts.map(c=>c.visitDay||1)).size > 1;
   const methodText = method === 'straight-line'
     ? `${usedCurrentLocation ? 'Worked out from your current location, based' : 'Based'} on straight-line distance between addresses — the road-routing service wasn't reachable just now, so this is a fallback estimate. It can't know about one-way streets or which roads actually connect two places, so use your own judgement too.`
     : `Worked out ${usedCurrentLocation ? 'from your current location, ' : ''}using real road distances via ${method==='osrm'?'OSRM':'Valhalla'} (a free OpenStreetMap-based routing service) — more accurate than a straight-line guess, though still worth a sanity check before setting off.`;
@@ -963,14 +1040,14 @@ function renderSuggestedRoutePreview(rn, orderedCusts, notLocated, usedCurrentLo
     : `<span style="display:inline-block; padding:5px 12px; border-radius:999px; font-size:0.75rem; font-weight:800; background:var(--blue-dim); color:var(--blue-deep);">✓ Method: ${methodName}</span>`;
   openSheet(`
     <div class="sheet-head">
-      <h2 style="flex:1; min-width:0;">Suggested order${day ? ` · Day ${day}` : ''}</h2>
+      <h2 style="flex:1; min-width:0;">Suggested order${scopeLabel ? ` · ${escapeHtml(scopeLabel)}` : ''}</h2>
       <button class="sheet-close" onclick="suggestedRouteState=null; closeSheet();">✕</button>
     </div>
     <div style="margin:0 2px 10px;">${methodPill}</div>
     <p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 14px; line-height:1.5;">
       ${methodText}
     </p>
-    ${orderedCusts.map((c,i)=>`
+    ${orderedCusts.map((c,i)=>suggestDivider(orderedCusts, i, showDays) + `
       <div class="cust-card" style="display:flex; align-items:center; gap:10px;">
         <div style="width:26px; height:26px; border-radius:50%; background:var(--blue-dim); color:var(--blue-deep); display:flex; align-items:center; justify-content:center; font-weight:800; font-size:0.8125rem; flex-shrink:0;">${i+1}</div>
         <div class="cust-addr" style="font-weight:800; font-size:0.9062rem; min-width:0;">${escapeHtml(c.address||c.name||'Customer')}</div>
@@ -984,24 +1061,10 @@ function renderSuggestedRoutePreview(rn, orderedCusts, notLocated, usedCurrentLo
 }
 function applySuggestedRouteOrder(){
   if(!suggestedRouteState) return;
-  const { rn, day, orderedIds, notLocatedIds } = suggestedRouteState;
-  // Anyone who couldn't be placed keeps their relative order among themselves
-  // (same address-alphabetical fallback sortByRoute already uses) but goes at
-  // the very end of the list being re-ordered, so nobody gets lost.
-  const notLocatedSorted = sortByRoute(notLocatedIds.map(id=>data.customers.find(x=>x.id===id)).filter(Boolean));
-  const finalList = orderedIds.map(id=>data.customers.find(x=>x.id===id)).filter(Boolean).concat(notLocatedSorted);
-  // A single day of a multi-day round: hand the new order back using the same
-  // set of order numbers those customers already held, so the other days' order
-  // numbers (and where each day sits in the whole round) aren't disturbed.
-  // Falls back to plain 0,1,2… if their existing numbers are missing or repeated.
-  let slots = null;
-  if(day){
-    const existing = finalList.map(c=>c.order);
-    if(existing.every(o=>o!=null) && new Set(existing).size === existing.length){
-      slots = existing.slice().sort((a,b)=>a-b);
-    }
-  }
-  finalList.forEach((c,k)=>{ c.order = slots ? slots[k] : k; });
+  const { rn, applyIds } = suggestedRouteState;
+  // Only the customers that were planned change places (with each other); everyone
+  // else on the round — other days, not due, not owing, paused — keeps their position.
+  reorderRoundSubset(rn, applyIds.map(id=>data.customers.find(x=>x.id===id)).filter(Boolean));
   suggestedRouteState = null;
   saveData();
   closeSheet();
@@ -1019,17 +1082,11 @@ function applySuggestedRouteOrder(){
 let roundMapLeafletInstance = null;
 let roundMapRouteLine = null;
 async function showRoundMap(rn){
-  let custs = sortByRoute(data.customers.filter(c=>(c.round||'Unassigned')===rn && !c.paused));
-  const days = roundDaysUsed(custs);
-  if(days.length > 1){
-    if(roundDayFilter === 'all'){
-      toast('This round spans multiple days — pick a day above first');
-      return;
-    }
-    custs = custs.filter(c=>(c.visitDay||1) === roundDayFilter);
-  }
+  // Maps exactly what the round list is showing (Day and All/Due/Owed filters), minus
+  // paused customers. With nothing filtered that's the whole round.
+  const custs = roundScopeList(rn).filter(c=>!c.paused);
   const withAddress = custs.filter(c=>c.address);
-  if(!withAddress.length){ toast('No addresses on this round to map'); return; }
+  if(!withAddress.length){ toast('No addresses to map for this view'); return; }
 
   // Skips anyone whose pin has already been dragged and locked — re-fetching
   // would just overwrite a correction the user already made.
@@ -1070,7 +1127,7 @@ function renderRoundMapSheet(rn, customers, fallbackCoords){
   const approxCount = fallbackCoords.size;
   openSheet(`
     <div class="sheet-head">
-      <h2 style="flex:1; min-width:0;">${escapeHtml(rn)} — map</h2>
+      <h2 style="flex:1; min-width:0;">${escapeHtml(rn)} — map${roundScopeLabel(rn) ? ` · ${escapeHtml(roundScopeLabel(rn))}` : ''}</h2>
       <button class="sheet-close" onclick="destroyRoundMap(); closeSheet();">✕</button>
     </div>
     ${approxCount ? `<p style="color:var(--amber); font-size:0.75rem; margin:0 2px 10px; line-height:1.4; font-weight:700;">📍 ${approxCount} address${approxCount===1?'':'es'} couldn't be found automatically — shown as a grey dashed pin near the others. Drag ${approxCount===1?'it':'them'} to the right spot to fix.</p>` : ''}
@@ -1508,6 +1565,7 @@ function openRoundActionsMenu(rn){
 
 function renderRoundDetail(main, rn){
   const allInRound = sortByRoute(data.customers.filter(c=>(c.round||'Unassigned')===rn));
+  const scope = roundScopeList(rn); // what the filters below select — the list, map, route suggestion and Reorder all use it
   const daysUsed = roundDaysUsed(allInRound);
   const spansMultipleDays = daysUsed.length > 1;
 
@@ -1531,14 +1589,19 @@ function renderRoundDetail(main, rn){
   `;
 
   if(reorderMode){
-    shellHtml += `<p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 6px;">Drag the ⠿ handle to set the order you actually visit these customers in (or use the arrows).</p>`;
+    shellHtml += `<p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 6px;">Drag the ⠿ handle to set the order you actually visit these customers in (or use the arrows). Use the filters below to reorder just the Due, Owed or a single day's customers.</p>`;
     shellHtml += `<p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 14px;">If this round takes more than one day, tap the day badge to say which day each customer is visited on (up to 5).</p>`;
     shellHtml += `<button class="btn-open" style="width:100%; margin-bottom:14px; font-weight:800; display:flex; align-items:center; justify-content:center; gap:7px;" onclick="suggestRouteOrder('${escapeAttr(rn)}')">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h8a4 4 0 0 0 4-4V7a4 4 0 0 0-4-4H8"/></svg>
       Suggest a route order
     </button>`;
+    shellHtml += roundFilterBarsHtml(daysUsed, spansMultipleDays);
+    if(scope.length !== allInRound.length){
+      shellHtml += `<p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 12px;">Showing ${scope.length} of ${allInRound.length} customers${roundScopeLabel(rn) ? ` (${escapeHtml(roundScopeLabel(rn))})` : ''}. Reordering and route suggestions only affect these — everyone else keeps their place.</p>`;
+    }
     if(!allInRound.length){ main.innerHTML = shellHtml + emptyState('customers'); return; }
-    shellHtml += `<div id="reorderList">` + allInRound.map((c,i)=>`
+    if(!scope.length){ main.innerHTML = shellHtml + emptyState('filter'); return; }
+    shellHtml += `<div id="reorderList">` + scope.map((c,i)=>`
       <div class="cust-card reorder-row" data-id="${c.id}" style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
         <button type="button" onpointerdown="startDragReorder(event,'${c.id}')" style="background:none; border:none; padding:6px; margin:-6px; color:var(--ink-muted); cursor:grab; touch-action:none; flex-shrink:0;" aria-label="Drag to reorder">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>
@@ -1550,7 +1613,7 @@ function renderRoundDetail(main, rn){
         <button class="btn-open" style="width:auto; padding:6px 10px; font-size:0.75rem; font-weight:800; background:var(--blue-dim); color:var(--blue-deep); flex-shrink:0;" onclick="cycleVisitDay('${c.id}')">Day ${c.visitDay||1}</button>
         <div style="display:flex; flex-direction:column; gap:6px;">
           <button class="btn-open" style="width:34px; height:28px; padding:0; opacity:${i===0?'0.3':'1'};" onclick="moveInRound('${c.id}','up')">▲</button>
-          <button class="btn-open" style="width:34px; height:28px; padding:0; opacity:${i===allInRound.length-1?'0.3':'1'};" onclick="moveInRound('${c.id}','down')">▼</button>
+          <button class="btn-open" style="width:34px; height:28px; padding:0; opacity:${i===scope.length-1?'0.3':'1'};" onclick="moveInRound('${c.id}','down')">▼</button>
         </div>
       </div>
     `).join('') + `</div>`;
@@ -1571,44 +1634,11 @@ function renderRoundDetail(main, rn){
     ${propertyTypeAvgSummaryHtml(activeInRound)}`;
   }
 
-  if(spansMultipleDays){
-    shellHtml += `<div class="seg-row">
-      <button class="seg-btn ${roundDayFilter==='all'?'active':''}" onclick="setRoundDayFilter('all')">All</button>
-      ${daysUsed.map(d=>`<button class="seg-btn ${roundDayFilter===d?'active':''}" onclick="setRoundDayFilter(${d})">Day ${d}</button>`).join('')}
-    </div>`;
-  }
+  shellHtml += roundFilterBarsHtml(daysUsed, spansMultipleDays);
 
-  shellHtml += `<div class="seg-row">
-    <button class="seg-btn seg-btn-sm ${roundFilterMode==='all'?'active':''}" onclick="setRoundFilterMode('all')">All</button>
-    <button class="seg-btn seg-btn-sm ${roundFilterMode==='due'?'active':''}" onclick="setRoundFilterMode('due')">Due</button>
-    <button class="seg-btn seg-btn-sm ${roundFilterMode==='owed'?'active':''}" onclick="setRoundFilterMode('owed')">Owed</button>
-  </div>`;
+  let baseList = scope;
   if(roundFilterMode === 'owed'){
-    shellHtml += `<div class="seg-row">
-      <button class="seg-btn seg-btn-sm ${owedAgeFilter==='all'?'active':''}" onclick="setOwedAgeFilter('all')">All</button>
-      <button class="seg-btn seg-btn-sm ${owedAgeFilter==='0-14'?'active':''}" onclick="setOwedAgeFilter('0-14')">0–14 days</button>
-      <button class="seg-btn seg-btn-sm ${owedAgeFilter==='14-30'?'active':''}" onclick="setOwedAgeFilter('14-30')">14–30 days</button>
-      <button class="seg-btn seg-btn-sm ${owedAgeFilter==='30+'?'active':''}" onclick="setOwedAgeFilter('30+')">30+ days</button>
-    </div>`;
-  }
-
-  let baseList = allInRound;
-  if(spansMultipleDays && roundDayFilter !== 'all'){
-    baseList = baseList.filter(c=>(c.visitDay||1) === roundDayFilter);
-  }
-  if(roundFilterMode === 'due'){
-    baseList = baseList.filter(c=>{
-      const s = custStatus(c);
-      const dueNow = s.cleanBadge && s.cleanBadge.type==='due';
-      // Once cleaned, a customer drops out of "due" straight away — but keep them
-      // visible in this filtered list for the rest of the day, so you can still see
-      // everyone you've worked through today without them vanishing mid-round.
-      // They naturally drop off tomorrow once lastClean no longer matches today.
-      const cleanedToday = s.lastClean === todayISO();
-      return !c.paused && (dueNow || cleanedToday);
-    });
-  } else if(roundFilterMode === 'owed'){
-    baseList = baseList.filter(c=>custStatus(c).owed && matchesOwedAgeFilter(c))
+    baseList = baseList.slice()
       .sort((a,b)=> (daysSinceLastPayment(b)-daysSinceLastPayment(a)) || (custStatus(b).balance-custStatus(a).balance));
   }
   const custs = baseList;

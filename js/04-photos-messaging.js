@@ -715,19 +715,11 @@ function buildMapsLink(addrs){
 }
 // Opens turn-by-turn directions through every stop in a round, in whichever
 // order Reorder (or Suggest route order) has set — one tap instead of routing to
-// each customer one at a time. For a round spanning multiple days, a specific
-// day has to be selected first (via the Day tabs), since a route can't sensibly
-// mix stops that aren't actually visited on the same trip.
+// each customer one at a time. It covers exactly what the round list is showing
+// (the Day and All/Due/Owed filters), so filter first to get directions for just
+// one day or just the customers that are due.
 function startRoundDirections(rn){
-  let custs = sortByRoute(data.customers.filter(c=>(c.round||'Unassigned')===rn && !c.paused));
-  const days = roundDaysUsed(custs);
-  if(days.length > 1){
-    if(roundDayFilter === 'all'){
-      toast('This round spans multiple days — pick a day above first');
-      return;
-    }
-    custs = custs.filter(c=>(c.visitDay||1) === roundDayFilter);
-  }
+  const custs = roundScopeList(rn).filter(c=>!c.paused);
   const addrs = custs.filter(c=>c.address).map(c=>c.address);
   if(!addrs.length){ toast('No addresses to get directions to'); return; }
 
