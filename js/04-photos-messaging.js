@@ -1,7 +1,7 @@
 /* 04-photos-messaging.js -- Photo viewer/annotation, customer history edits, pause/resume/defer, message templates, receipts, directions, and bulk reminder sending (used by rounds, jobs, quotes and marketing alike).
    Part of Round Book's split JS bundle; loaded in numeric order from index.html. */
 
-/* ---------- photo annotation (circle / arrow / freehand draw) ----------
+/* ---------- photo annotation (circle / arrow / freehand draw / text) ----------
    Opened from the photo viewer's "Annotate" button. Draws over a canvas sized
    to the photo's own pixel dimensions (so lines stay crisp and a consistent
    thickness regardless of screen size), then saves the result as a brand new
@@ -15,6 +15,7 @@ let annotateColor = ANNOTATE_COLORS[0];
 let annotateStrokes = [];   // finished shapes: {type, color, ...}
 let annotateDrawing = null; // the in-progress shape while a finger/pointer is down
 let annotatePointerId = null;
+let annotateTextPoint = null; // where a Text-tool tap landed, until its label has been typed
 
 function openPhotoAnnotator(){
   const entry = photoViewerList[photoViewerIndex];
@@ -24,6 +25,7 @@ function openPhotoAnnotator(){
   annotateEntry = entry;
   annotateStrokes = [];
   annotateDrawing = null;
+  annotateTextPoint = null;
   annotateTool = 'circle';
   annotateColor = ANNOTATE_COLORS[0];
   const img = new Image();
@@ -32,7 +34,7 @@ function openPhotoAnnotator(){
   img.src = src;
 }
 function cancelPhotoAnnotation(){
-  annotateEntry = null; annotateImg = null; annotateStrokes = []; annotateDrawing = null;
+  annotateEntry = null; annotateImg = null; annotateStrokes = []; annotateDrawing = null; annotateTextPoint = null;
   renderPhotoViewer(); // back to the plain viewer for the same photo, nothing saved
 }
 function renderPhotoAnnotator(){
@@ -41,7 +43,7 @@ function renderPhotoAnnotator(){
       <h2>Annotate photo</h2>
       <button class="sheet-close" onclick="cancelPhotoAnnotation()">✕</button>
     </div>
-    <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 10px; line-height:1.4;">Circle or draw around anything worth flagging. Saved as a new photo — the original is kept as-is.</p>
+    <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 10px; line-height:1.4;">Circle, point at or draw around anything worth flagging, or choose Text and tap where a label should go. Saved as a new photo — the original is kept as-is.</p>
     <div style="position:relative; background:#000; border-radius:12px; overflow:hidden; margin-bottom:12px;">
       <canvas id="annotateCanvas" style="width:100%; display:block; touch-action:none;"></canvas>
     </div>
@@ -49,6 +51,7 @@ function renderPhotoAnnotator(){
       <button class="seg-btn ${annotateTool==='circle'?'active':''}" onclick="setAnnotateTool('circle')">⭕ Circle</button>
       <button class="seg-btn ${annotateTool==='arrow'?'active':''}" onclick="setAnnotateTool('arrow')">➚ Arrow</button>
       <button class="seg-btn ${annotateTool==='pen'?'active':''}" onclick="setAnnotateTool('pen')">✏️ Draw</button>
+      <button class="seg-btn ${annotateTool==='text'?'active':''}" onclick="setAnnotateTool('text')">Aa Text</button>
     </div>
     <div style="display:flex; gap:10px; align-items:center; margin:2px 2px 14px;">
       ${ANNOTATE_COLORS.map(c=>`<button onclick="setAnnotateColor('${c}')" aria-label="Colour" style="width:30px; height:30px; border-radius:50%; background:${c}; border:3px solid ${annotateColor===c?'var(--ink)':'transparent'}; box-shadow:0 0 0 1px rgba(0,0,0,0.15); padding:0;"></button>`).join('')}
@@ -89,6 +92,19 @@ function annotateLineWidth(canvasWidth){
   // width that could vanish or overwhelm depending on the source image.
   return Math.max(5, Math.round(canvasWidth * 0.007));
 }
+function annotateFontSize(canvasWidth){ return Math.max(26, Math.round(canvasWidth * 0.045)); }
+function askAnnotationText(pt){
+  appConfirm('Type the label to put on the photo.', {
+    title:'Add text', confirmLabel:'Add', danger:false,
+    input:{type:'text', placeholder:'e.g. Cracked seal'},
+    onConfirm: (val) => {
+      const text = (val || '').trim().slice(0, 120);
+      if(!text) return;
+      annotateStrokes.push({type:'text', color:annotateColor, x:pt.x, y:pt.y, text});
+      redrawAnnotateCanvas();
+    }
+  });
+}
 function drawAnnotateStroke(ctx, s, canvasWidth){
   ctx.save();
   ctx.strokeStyle = s.color;
@@ -105,6 +121,35 @@ function drawAnnotateStroke(ctx, s, canvasWidth){
     ctx.beginPath();
     ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI*2);
     ctx.stroke();
+  } else if(s.type === 'text'){
+    // A label centred on where it was tapped, kept inside the photo, wrapped to
+    // fit, with a contrasting outline so it stays readable on any background.
+    const size = annotateFontSize(canvasWidth);
+    ctx.font = `800 ${size}px -apple-system, "SF Pro Text", Helvetica, Arial, sans-serif`;
+    ctx.textBaseline = 'top';
+    const maxW = canvasWidth * 0.8;
+    const lines = [];
+    let line = '';
+    String(s.text).split(/\s+/).forEach(word => {
+      const trial = line ? line + ' ' + word : word;
+      if(line && ctx.measureText(trial).width > maxW){ lines.push(line); line = word; } else line = trial;
+    });
+    if(line) lines.push(line);
+    const lineH = size * 1.2;
+    const w = Math.max.apply(null, lines.map(l => ctx.measureText(l).width));
+    const h = lines.length * lineH;
+    const margin = size * 0.4;
+    const cH = ctx.canvas.height;
+    const x0 = Math.max(margin, Math.min(s.x - w/2, canvasWidth - w - margin));
+    const y0 = Math.max(margin, Math.min(s.y - h/2, cH - h - margin));
+    ctx.lineWidth = Math.max(4, size * 0.28);
+    ctx.strokeStyle = s.color === '#ffffff' ? '#000000' : '#ffffff';
+    ctx.fillStyle = s.color;
+    lines.forEach((l, i) => {
+      const cx = x0 + (w - ctx.measureText(l).width) / 2; // centre each line within the label
+      ctx.strokeText(l, cx, y0 + i * lineH);
+      ctx.fillText(l, cx, y0 + i * lineH);
+    });
   } else if(s.type === 'arrow'){
     const headLen = ctx.lineWidth * 4.5;
     const angle = Math.atan2(s.y1-s.y0, s.x1-s.x0);
@@ -139,6 +184,7 @@ function attachAnnotateCanvasEvents(canvas){
     annotatePointerId = e.pointerId;
     if(canvas.setPointerCapture){ try{ canvas.setPointerCapture(e.pointerId); }catch(err){} }
     const pt = canvasPointFromEvent(canvas, e);
+    if(annotateTool === 'text'){ annotateTextPoint = pt; return; } // a tap, not a stroke — the label is typed on release
     annotateDrawing = annotateTool === 'pen'
       ? {type:'pen', color:annotateColor, points:[pt]}
       : {type:annotateTool, color:annotateColor, x0:pt.x, y0:pt.y, x1:pt.x, y1:pt.y};
@@ -155,6 +201,11 @@ function attachAnnotateCanvasEvents(canvas){
   const finish = (e) => {
     if(annotatePointerId === null || e.pointerId !== annotatePointerId) return;
     annotatePointerId = null;
+    if(annotateTextPoint){
+      const pt = annotateTextPoint; annotateTextPoint = null;
+      askAnnotationText(pt);
+      return;
+    }
     if(annotateDrawing){
       // Drop accidental taps that never actually moved, rather than littering
       // the photo with invisible zero-size shapes.

@@ -6,13 +6,14 @@ const STORE_KEY = 'roundBookData_v1';
 // APP_VERSION is a plain decimal number (e.g. 1.01, 1.02 ... 1.99, 2.00) —
 // bump by 0.01 for every change. formatVersion always renders it to exactly
 // two decimal places, so it's never shown as "1.1" or "1.100".
-const APP_VERSION = 2.31;
+const APP_VERSION = 2.32;
 function formatVersion(v){ return Number(v).toFixed(2); }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
 // entry (newest first) with ONE very short plain-English summary, then delete
 // entries so only the latest ten remain.
 const VERSION_HISTORY = [
+  {version: 2.32, changes: ['Photos now sync; text labels on annotated photos; bigger passphrase box']},
   {version: 2.31, changes: ['Map, route suggestion, directions and reorder follow the list filters']},
   {version: 2.30, changes: ['Tabs remember your scroll position when you switch away and back']},
   {version: 2.29, changes: ['Header with tabs and weather pinned to the top; lists scroll underneath']},
@@ -21,8 +22,7 @@ const VERSION_HISTORY = [
   {version: 2.26, changes: ['Tap a customer\'s Text first flag to text just them; flag shows when already texted']},
   {version: 2.25, changes: ['Customer CSV export for moving to another app; tidier confirmation dialogs']},
   {version: 2.24, changes: ['Protected storage request and automatic daily safety copies']},
-  {version: 2.23, changes: ['Job line items like quotes; invoice header tidy; mileage report shows round']},
-  {version: 2.22, changes: ['Quote line items and discounts; backup files named with date and time']}
+  {version: 2.23, changes: ['Job line items like quotes; invoice header tidy; mileage report shows round']}
 ];
 const DIRECTIONS_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>';
 const CALL_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>';
@@ -199,26 +199,34 @@ async function exportAccountingCSV(){
 // Hands a text file to the share sheet where the phone supports it, otherwise
 // downloads it. Returns false only if the person cancelled the share sheet.
 async function deliverTextFile(text, filename, mime, shareTitle){
+  return deliverTextFiles([{text, filename, mime}], shareTitle);
+}
+// Several files at once (e.g. a sync file plus its photo files). Same rules: share
+// sheet where the phone supports it, otherwise plain downloads.
+async function deliverTextFiles(items, shareTitle){
   if(navigator.canShare){
     try{
-      const file = new File([text], filename, {type:mime});
-      if(navigator.canShare({files:[file]})){
-        await navigator.share({files:[file], title:shareTitle});
+      const files = items.map(it => new File([it.text], it.filename, {type:it.mime}));
+      if(navigator.canShare({files})){
+        await navigator.share({files, title:shareTitle});
         return true;
       }
     }catch(e){
       if(e && e.name === 'AbortError') return false;
     }
   }
-  const blob = new Blob([text], {type:mime});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(()=>URL.revokeObjectURL(url), 2000);
+  for(const it of items){
+    const blob = new Blob([it.text], {type:it.mime});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = it.filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url), 2000);
+    await new Promise(r=>setTimeout(r, 400));
+  }
   return true;
 }
 
@@ -606,8 +614,13 @@ async function cleanupOrphanedPhotos(){
     const referenced = new Set();
     (data.customers||[]).forEach(c => (c.photos||[]).forEach(p=>referenced.add(p.id)));
     (data.oneOffJobs||[]).forEach(j => (j.photos||[]).forEach(p=>referenced.add(p.id)));
+    // Photos that arrived in a sync file but aren't in a merged customer yet (the data
+    // file may follow later) are protected for two weeks.
+    let pending = {};
+    try{ if(typeof syncMetaGet === 'function') pending = (await syncMetaGet()).pendingPhotos || {}; }catch(e){}
+    const cutoff = Date.now() - 14*86400000;
     const all = await idbGetAllPhotos();
-    const toRemove = [...all.keys()].filter(id => !referenced.has(id));
+    const toRemove = [...all.keys()].filter(id => !referenced.has(id) && !(pending[id] && pending[id] > cutoff));
     if(!toRemove.length) return;
     await Promise.all(toRemove.map(id => idbDeletePhoto(id).then(()=> uncachePhoto(id))));
   }catch(e){}
