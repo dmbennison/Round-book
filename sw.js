@@ -1,4 +1,4 @@
-const CACHE_NAME = 'round-book-v2.33';
+const CACHE_NAME = 'round-book-v2.34';
 const ASSETS = [
   './',
   './manifest.json',
@@ -12,6 +12,7 @@ const ASSETS = [
   './js/05-jobs-quotes.js',
   './js/06-settings-reports-a.js',
   './js/07-reports-b.js',
+  './js/07b-fuel.js',
   './js/08-backup-import.js',
   './js/08b-sync.js',
   './js/09-boot.js',
@@ -66,6 +67,10 @@ self.addEventListener('activate', (event) => {
 // and updates the cache in the background when a connection is available.
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
+  // Live data (diesel prices, weather) must always come from the network: serving it
+  // cache-first would show the PREVIOUS reading, which can be hours old.
+  const host = new URL(event.request.url).hostname;
+  if (host === 'fuelcosts.co.uk' || host === 'api.open-meteo.com') return;
 
   event.respondWith((async () => {
     const cached = await caches.match(event.request);
