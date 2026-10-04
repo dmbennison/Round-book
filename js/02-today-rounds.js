@@ -1765,18 +1765,24 @@ function custCardHtml(c){
   </div>`;
 }
 
-function quickClean(id){
+// fromSwipe: true when this came from swiping a card. A swipe-clean then jumps straight
+// to the messaging app with the "windows cleaned today" text ready to send (see
+// prepareCleanedTodayText) — one tap in Messages instead of opening a preview first.
+function quickClean(id, fromSwipe){
   const c = data.customers.find(x=>x.id===id);
   const prevDeferUntil = c.deferUntil;
   c.cleanHistory = c.cleanHistory || [];
   c.cleanHistory.push({date: todayISO(), amount: c.price||0});
   c.deferUntil = null;
+  const text = fromSwipe ? prepareCleanedTodayText(c) : null;
   saveData(); render();
   toast(`Marked ${c.name||c.address||'customer'} as cleaned today`, 'Undo', () => {
     c.cleanHistory.pop();
     c.deferUntil = prevDeferUntil;
+    if(text) text.undo();
     saveData(); render();
   });
+  if(text) sendPhoneMessage(c.phone, text.msg);
 }
 function quickPaid(id){
   const c = data.customers.find(x=>x.id===id);
@@ -1793,7 +1799,7 @@ function quickPaid(id){
     saveData(); render();
   });
 }
-function quickCleanAndPaid(id){
+function quickCleanAndPaid(id, fromSwipe){
   const c = data.customers.find(x=>x.id===id);
   const today = todayISO();
   const prev = { deferUntil: c.deferUntil, paymentReminderSent: c.paymentReminderSent, paymentReminderSentDate: c.paymentReminderSentDate, paymentReminderCount: c.paymentReminderCount };
@@ -1805,13 +1811,16 @@ function quickCleanAndPaid(id){
   c.paymentReminderSent = false;
   c.paymentReminderSentDate = null;
   c.paymentReminderCount = 0;
+  const text = fromSwipe ? prepareCleanedTodayText(c) : null;
   saveData(); render();
   toast(`Marked ${c.name||c.address||'customer'} as cleaned and paid today`, 'Undo', () => {
     c.cleanHistory.pop();
     c.paymentHistory.pop();
     Object.assign(c, prev);
+    if(text) text.undo();
     saveData(); render();
   });
+  if(text) sendPhoneMessage(c.phone, text.msg);
 }
 
 function useCurrentLocation(){

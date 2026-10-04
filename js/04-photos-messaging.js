@@ -1043,6 +1043,40 @@ function sendQuoteText(id, mode){
   }
 }
 
+// The "windows cleaned today" text for a customer, using their real running balance
+// (all charges minus all payments and credit) — so someone who owes a previous clean,
+// or who's in credit, is told what they actually owe. In credit or fully paid = £0.
+function cleanedTodayMessage(c){
+  const st = custStatus(c);
+  const firstName = c.name ? c.name.trim().split(' ')[0] : '';
+  return applyTemplate(data.settings.cleanedTodayTemplate, {name: firstName, amount: st.owed ? st.balance : 0, company: data.settings.companyName || '', yourname: data.settings.yourName || '', address: c.address});
+}
+// Used straight after a swipe-clean: marks the customer as texted for today and logs
+// it, returning the message to open in the messaging app plus an undo for both. Null
+// (do nothing) if the setting is off, there's no mobile number, or they've already
+// been texted today — so a swipe, undo and swipe again never sends twice.
+function prepareCleanedTodayText(c){
+  if(data.settings.autoCleanedText === false || !isMobileNumber(c.phone)) return null;
+  if(c.cleanedTodayTextSentDate === todayISO()) return null;
+  const msg = cleanedTodayMessage(c);
+  const prevSent = c.cleanedTodayTextSentDate;
+  c.cleanedTodayTextSentDate = todayISO();
+  logMessage(c, 'cleanedToday');
+  const entry = c.messageLog[0];
+  return {
+    msg,
+    undo: () => {
+      c.cleanedTodayTextSentDate = prevSent;
+      c.messageLog = (c.messageLog || []).filter(m => m !== entry);
+    }
+  };
+}
+function setAutoCleanedText(on){
+  data.settings.autoCleanedText = !!on;
+  saveData();
+  openSettings();
+}
+
 function sendTemplate(id, kind, returnTo){
   const c = data.customers.find(x=>x.id===id);
   if(!isMobileNumber(c.phone)){ toast('No mobile number saved for this customer'); return; }
@@ -1057,8 +1091,7 @@ function sendTemplate(id, kind, returnTo){
     // Uses the customer's real running balance (all charges minus all payments and
     // credit), not just this clean's price — so someone who owes a previous clean, or
     // who's in credit, is told what they actually owe. In credit or fully paid = £0.
-    const st = custStatus(c);
-    msg = applyTemplate(data.settings.cleanedTodayTemplate, {name: firstName, amount: st.owed ? st.balance : 0, company, yourname, address: c.address});
+    msg = cleanedTodayMessage(c);
     title = 'Windows cleaned today';
     afterSend = () => {
       // Tied to today's date rather than just a flat boolean, so the flag

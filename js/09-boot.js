@@ -159,8 +159,8 @@ function onSwipeEnd(){
     if(currentX >= SWIPE_HALF_THRESHOLD){
       if(kind === 'job') toggleJobDone(id);
       else if(kind === 'quote') markQuoteAccepted(id);
-      else if(kind === 'customer' && currentX >= SWIPE_FULL_THRESHOLD) quickCleanAndPaid(id);
-      else quickClean(id);
+      else if(kind === 'customer' && currentX >= SWIPE_FULL_THRESHOLD) quickCleanAndPaid(id, true);
+      else quickClean(id, true);
     } else if(currentX <= -64){
       if(kind === 'job') toggleJobPaid(id);
       else if(kind === 'quote') markQuoteDeclined(id);

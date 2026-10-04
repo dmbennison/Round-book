@@ -143,6 +143,12 @@ function openSettings(){
       <button class="seg-btn ${data.settings.messagingApp==='whatsapp'?'active':''}" onclick="setMessagingApp('whatsapp')">🟢 WhatsApp</button>
     </div>
     <p style="color:var(--ink-muted); font-size:0.75rem; margin:4px 2px 16px; line-height:1.5;">Used whenever a message is sent straight to a customer's phone — cleaning and payment reminders, receipts, quotes, and group marketing texts.</p>
+    <div class="section-label">After swiping to mark cleaned</div>
+    <div class="seg-row">
+      <button class="seg-btn ${data.settings.autoCleanedText!==false?'active':''}" onclick="setAutoCleanedText(true)">Open the text</button>
+      <button class="seg-btn ${data.settings.autoCleanedText===false?'active':''}" onclick="setAutoCleanedText(false)">Do nothing</button>
+    </div>
+    <p style="color:var(--ink-muted); font-size:0.75rem; margin:4px 2px 16px; line-height:1.5;">When you swipe a customer to mark them cleaned, your messaging app opens with the “Windows cleaned today” text ready to send — you just press send. Customers with no mobile number, or already texted today, are skipped.</p>
     <div class="section-label">Business details</div>
     <button class="backup-btn" onclick="openBusinessDetails()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 9h1M9 13h1M14 9h1M14 13h1"/></svg>
