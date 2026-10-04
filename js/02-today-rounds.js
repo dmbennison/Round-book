@@ -1315,6 +1315,18 @@ function propertyTypeAvgSummaryHtml(list){
   </div>`;
 }
 
+// Collapsible "Statistics" box (same look as History / Actions in customer
+// details) used on the Work hub and on each round. Remembers whether it was
+// left open so a re-render (e.g. after swiping a customer) doesn't snap it shut.
+let statsSectionOpen = false;
+function statisticsDropdownHtml(innerHtml){
+  const chev = '<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
+  return `<details class="cust-section"${statsSectionOpen?' open':''} ontoggle="statsSectionOpen=this.open">
+    <summary>Statistics ${chev}</summary>
+    <div class="cust-section-body">${innerHtml}</div>
+  </details>`;
+}
+
 /* ---------- Work hub ----------
    Landing page for the Work tab: two square buttons for Rounds and One-off
    jobs (previously their own tabs), with the overall money info that used to
@@ -1340,12 +1352,12 @@ function renderWorkHub(main){
   </div>`;
 
   if(data.customers.length){
-    html += `<div class="summary-overall">
+    html += statisticsDropdownHtml(`<div class="summary-overall">
       <div class="stat"><div class="num">${totalCustomers}</div><div class="lbl">Customers</div></div>
       <div class="stat"><div class="num">${roundValueOwedHtml(totalValue, totalOwed)}</div><div class="lbl">Round value</div></div>
       <div class="stat"><div class="num">${money(overallAvg)}</div><div class="lbl">Avg / customer</div></div>
     </div>
-    ${propertyTypeAvgSummaryHtml(activeCustomers)}`;
+    ${propertyTypeAvgSummaryHtml(activeCustomers)}`);
   } else {
     html += emptyState('rounds');
   }
@@ -1362,9 +1374,6 @@ function renderRoundsList(main){
     </button>
     <div style="display:flex; align-items:center; gap:8px;">
       ${mainScreenHelpBtn('rounds', "()=>setTab('rounds')")}
-      <button class="btn-open" style="width:38px; height:38px; padding:0;" onclick="openPhotoGallery()" aria-label="Photo gallery">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></svg>
-      </button>
       <button class="btn-open" style="width:38px; height:38px; padding:0;" onclick="openRoundReports()" aria-label="Print reports">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
       </button>
@@ -1631,12 +1640,12 @@ function renderRoundDetail(main, rn){
     const roundTotal = activeInRound.reduce((sum,c)=>sum+Number(c.price||0),0);
     const roundOwed = activeInRound.reduce((sum,c)=>{ const s=custStatus(c); return sum + (s.owed ? s.balance : 0); },0);
     const roundAvg = activeInRound.length ? roundTotal / activeInRound.length : 0;
-    shellHtml += `<div class="summary-overall">
+    shellHtml += statisticsDropdownHtml(`<div class="summary-overall">
       <div class="stat"><div class="num">${activeInRound.length}</div><div class="lbl">Customers</div></div>
       <div class="stat"><div class="num">${roundValueOwedHtml(roundTotal, roundOwed)}</div><div class="lbl">Round value</div></div>
       <div class="stat"><div class="num">${money(roundAvg)}</div><div class="lbl">Avg / customer</div></div>
     </div>
-    ${propertyTypeAvgSummaryHtml(activeInRound)}`;
+    ${propertyTypeAvgSummaryHtml(activeInRound)}`);
   }
 
   shellHtml += roundFilterBarsHtml(daysUsed, spansMultipleDays);

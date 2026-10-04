@@ -147,6 +147,11 @@ function openInfo(){
     <p style="color:var(--ink); font-size:0.875rem; line-height:1.6; margin:0 2px 16px;">
       Round Book is a simple, offline window cleaning round tracker — built to keep on top of customers, rounds, cleaning and payment dates, all stored privately on your own phone.
     </p>
+    <button onclick="openPhotoGallery()" style="display:flex; align-items:center; gap:10px; width:100%; text-align:left; background:var(--blue-dim); color:var(--blue-deep); border:1px solid var(--box-border); border-radius:12px; padding:13px 14px; font-weight:800; margin-bottom:10px;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px; height:20px; flex-shrink:0;"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></svg>
+      <span style="flex:1;">Photo gallery — every customer's photos</span>
+      <span style="opacity:0.6;">›</span>
+    </button>
     <button onclick="openHelp()" style="display:flex; align-items:center; gap:10px; width:100%; text-align:left; background:var(--blue-dim); color:var(--blue-deep); border:1px solid var(--box-border); border-radius:12px; padding:13px 14px; font-weight:800; font-size:0.9375rem; margin-bottom:10px;">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px; height:20px; flex-shrink:0;"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
       <span style="flex:1;">User guide — how everything works</span>
@@ -242,7 +247,7 @@ const FOCUSED_HELP = {
   work: {
     title: 'Work',
     body: () => [
-      helpP('Work has two buttons: Rounds and One-off jobs, with your customer count, round value, and average price by property type underneath.')
+      helpP('Work has two buttons: Rounds and One-off jobs, with a Statistics dropdown underneath — tap it to open your customer count, round value, average per customer and average price by property type. Each round has the same Statistics dropdown above its customer list.')
     ]
   },
   rounds: {
@@ -255,7 +260,7 @@ const FOCUSED_HELP = {
       helpP('A round\'s ⋯ menu has: Show map (numbered stops with a route line; orange pins are addresses you haven\'t moved yourself, navy pins are ones you\'ve dragged and locked, grey dashed ones are approximate), Start round (directions for every stop), Print, Defer (push everyone\'s due date back by 1 day, 1 week, 4 weeks, or a custom date), and Apply price uplift (a % or flat £ increase for every active customer in the round).'),
       helpP('Suggest a route order is inside Reorder — it works out a shorter visiting order using real road distances where possible (the preview labels which method was used: OSRM, Valhalla, or the straight-line fallback), and shows it to you before changing anything (nothing\'s applied unless you tap "Use this order"). It plans exactly the customers the list is showing — with All selected that is the whole round (each day of a multi-day round is planned separately and the days stay in order), and with Due, Owed or a single Day selected it is just those customers; everyone else keeps their place. If the road-routing services can\'t be reached, it falls back to straight-line distances: with your location available it plans a one-way route that starts from where you are and ends wherever is shortest, and without it, it starts from the first stop. Show map and directions use the same selection. Both this and Show map re-check every address\'s location each time, unless it\'s been manually corrected (see below).'),
       helpP('On the map, every address gets a pin — one that couldn\'t be found automatically shows as a grey dashed pin near the others. Drag any pin to fix its spot; dragging locks it there, so it\'s never fetched again and won\'t be moved by a later map or route request.'),
-      helpP('The photo icon on the Rounds screen opens the photo gallery.'),
+      helpP('The photo gallery is under the ⓘ button at the top of the app — tap it, then Photo gallery.'),
       helpP('The Owed view (and "Remind all") sorts by how long a balance has actually been outstanding, not just its size, so the most overdue customer comes first — filter it down to 0–14, 14–30, or 30+ days with the switch above the list. Every owed customer\'s card shows how many days it\'s been outstanding, and a "✉️ Chase" button to send them a reminder on the spot. The payment reminder wording automatically gets firmer from the second reminder onward — edit both versions under Settings > Message templates.'),
       helpP('The small green phone button calls a customer; the small blue compass button opens directions to their address. A red "⚠ Chase" badge appears after 2+ unpaid payment reminders. A grey "Next due" badge shows when each customer\\\'s next clean is due (not shown for paused, deferred or never-cleaned customers). A "💷 Low by £X" badge appears, showing how far under the average their price is, if a customer\'s price is 15%+ below the average for their property type — their own round\'s average for that type once there are 4+ of them, otherwise the overall average for that type across every round.')
     ]
@@ -304,7 +309,7 @@ const FOCUSED_HELP = {
   reports: {
     title: 'Reports',
     body: () => [
-      helpP('Tap the printer icon for a list of reports. Choose <b>Print</b> (good for saving as a PDF too) or <b>Save as Word document</b> for an editable .docx. Both work offline.'),
+      helpP('Tap the printer icon for a list of reports. Every report, invoice, quote and receipt opens in a full-screen preview first: scroll it in any direction and pinch with two fingers (or use the − and + buttons; tap the percentage to fit the screen again) to zoom. The three buttons along the bottom are <b>Print</b>, <b>Share PDF</b> and <b>Share doc</b> (an editable Word .docx). On a computer, Share PDF and Share doc download the file instead. Close the preview with the ✕. All of it works offline.'),
       helpRow('Round cleaning dates', 'List or calendar, last 5 weeks — only counts a day if 4+ houses were cleaned then, oldest first'),
       helpRow('Earnings report', 'Totals by week/month/year'),
       helpRow('Daily work done', 'Value completed, day by day'),

@@ -756,7 +756,7 @@ function openPhotoGallery(){
     </div>
     <input type="text" id="gallery_search_input" placeholder="Filter by address or name..." oninput="renderPhotoGallery()" style="margin-top:0; margin-bottom:14px;">
     <div id="gallery_results"></div>
-  `, () => setTab('rounds'));
+  `, () => openInfo());
   renderPhotoGallery();
 }
 function renderPhotoGallery(){
@@ -834,7 +834,7 @@ function openReports(){
       <button class="sheet-close" onclick="closeSheet()">✕</button>
     </div>
     <p style="color:var(--ink-muted); font-size:0.8438rem; line-height:1.5; margin:0 2px 16px;">
-      Generates a printer-friendly page. Use your phone's print option (Share → Print) to print it or save it as a PDF — works offline too.
+      Opens a preview you can zoom and scroll, with buttons to Print, Share PDF or Share doc — works offline too.
     </p>
     <button class="backup-btn" onclick="printRoundsLastCleaned()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4M16 2v4M3 10h18"/><rect x="3" y="4" width="18" height="18" rx="2"/></svg>
@@ -917,38 +917,15 @@ function invoiceLetterheadHtml(){
   </div>`;
 }
 
-function runPrint(titleHtml, bodyHtml, hideCompanyHeader, allowPdfShare, returnTo, phone, onPdfShared){
-  pendingReportOnPdfShared = onPdfShared || null;
-  pendingReportTitle = titleHtml;
-  pendingReportBody = bodyHtml;
-  pendingReportHideCompany = !!hideCompanyHeader;
-  pendingReportPhone = phone || '';
-  openSheet(`
-    <div class="sheet-head">
-      <h2 style="flex:1; min-width:0;">${titleHtml}</h2>
-      <button class="sheet-close" onclick="closeSheet()">✕</button>
-    </div>
-    <p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 16px; line-height:1.5;">How would you like this ${allowPdfShare?'document':'report'}?</p>
-    <button class="backup-btn" onclick="printPendingReport()">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
-      <div><div class="t1">Print</div><div class="t2">Opens your printer dialog</div></div>
-    </button>
-    ${allowPdfShare ? `<button class="backup-btn" id="pdfShareBtn" onclick="sendPendingReportPdf()">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-      <div><div class="t1">Send as PDF via WhatsApp</div><div class="t2">Shares a PDF copy</div></div>
-    </button>` : ''}
-    <button class="backup-btn" onclick="exportPendingReportDocx()">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
-      <div><div class="t1">Save as Word document</div><div class="t2">Downloads a .docx file</div></div>
-    </button>
-  `, returnTo);
-}
+let pendingReportAllowPdfShare = false;
+let pendingReportReturnTo = null;
 
-function printPendingReport(){
+// The report exactly as it prints / goes into the PDF / shows in the preview.
+function reportMarkupHtml(){
   const company = pendingReportHideCompany ? '' : (data.settings.companyName || '');
   // Customer-facing documents (invoice, quote, receipt) have their own letterhead and
   // details, so they skip the generic bold "Title — address" report header.
-  document.getElementById('printArea').innerHTML = `
+  return `
     ${pendingReportHideCompany ? '' : `<div class="rpt-header">
       <div>
         <h1>${pendingReportTitle}</h1>
@@ -958,7 +935,130 @@ function printPendingReport(){
     </div>`}
     ${pendingReportBody}
   `;
-  closeSheet();
+}
+
+// Every report, invoice, quote and receipt goes through here. Instead of a menu of
+// choices it opens the full-screen preview (see openReportPreview) with Print,
+// Share PDF and Share doc buttons along the bottom.
+function runPrint(titleHtml, bodyHtml, hideCompanyHeader, allowPdfShare, returnTo, phone, onPdfShared){
+  pendingReportOnPdfShared = onPdfShared || null;
+  pendingReportTitle = titleHtml;
+  pendingReportBody = bodyHtml;
+  pendingReportHideCompany = !!hideCompanyHeader;
+  pendingReportPhone = phone || '';
+  pendingReportAllowPdfShare = !!allowPdfShare;
+  pendingReportReturnTo = returnTo || null;
+  openReportPreview();
+}
+
+/* ---------- report preview ----------
+   A full-screen "paper" view: the report on an A4-width white page that scrolls
+   in both directions and zooms by pinching (two fingers), the +/- buttons, or
+   Ctrl + mouse wheel on a computer. */
+const RP_PAPER_W = 794;      // A4 at 96 dpi, matches the PDF layout
+const RP_MIN = 0.3, RP_MAX = 4;
+let rpScale = 1, rpAtFit = true, rpPinch = null, rpBound = false;
+
+function rpEls(){
+  return { root:document.getElementById('reportPreview'), sc:document.getElementById('rpScroll'),
+           sizer:document.getElementById('rpSizer'), paper:document.getElementById('rpPaper'),
+           lbl:document.getElementById('rpZoomLbl') };
+}
+// Sets the zoom, keeping the content under (fx, fy) — a point in the scroll box —
+// where it is, so pinching zooms toward the fingers rather than the top-left corner.
+function rpApply(scale, fx, fy, keepFit){
+  const { sc, sizer, paper, lbl } = rpEls();
+  scale = Math.max(RP_MIN, Math.min(RP_MAX, scale));
+  const old = rpScale || 1;
+  const oldLeft = sizer.offsetLeft, oldTop = sizer.offsetTop;
+  const cx = (sc.scrollLeft + fx - oldLeft) / old, cy = (sc.scrollTop + fy - oldTop) / old;
+  rpScale = scale;
+  if(!keepFit) rpAtFit = false;
+  paper.style.transform = `scale(${scale})`;
+  sizer.style.width = (RP_PAPER_W * scale) + 'px';
+  sizer.style.height = (paper.offsetHeight * scale) + 'px';
+  sc.scrollLeft = cx * scale + sizer.offsetLeft - fx;
+  sc.scrollTop = cy * scale + sizer.offsetTop - fy;
+  lbl.textContent = Math.round(scale * 100) + '%';
+}
+function rpFit(){
+  const { sc } = rpEls();
+  const fit = Math.min(1.4, Math.max(RP_MIN, (sc.clientWidth - 24) / RP_PAPER_W));
+  rpApply(fit, 0, 0, true);
+  rpAtFit = true;
+  sc.scrollLeft = 0; sc.scrollTop = 0;
+}
+function rpZoomBy(factor){
+  const { sc } = rpEls();
+  rpApply(rpScale * factor, sc.clientWidth/2, sc.clientHeight/2);
+}
+function rpDist(t){ return Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY); }
+function rpBind(){
+  if(rpBound) return;
+  rpBound = true;
+  const { sc } = rpEls();
+  sc.addEventListener('touchstart', e => {
+    if(e.touches.length === 2) rpPinch = { d: rpDist(e.touches), s: rpScale };
+  }, {passive:true});
+  sc.addEventListener('touchmove', e => {
+    if(!rpPinch || e.touches.length !== 2) return;
+    e.preventDefault();
+    const r = sc.getBoundingClientRect();
+    const mx = (e.touches[0].clientX + e.touches[1].clientX)/2 - r.left;
+    const my = (e.touches[0].clientY + e.touches[1].clientY)/2 - r.top;
+    rpApply(rpPinch.s * rpDist(e.touches) / rpPinch.d, mx, my);
+  }, {passive:false});
+  const endPinch = e => { if(!e.touches || e.touches.length < 2) rpPinch = null; };
+  sc.addEventListener('touchend', endPinch, {passive:true});
+  sc.addEventListener('touchcancel', endPinch, {passive:true});
+  // iOS Safari's own page-zoom gesture must not fight ours.
+  ['gesturestart','gesturechange'].forEach(n => sc.addEventListener(n, e => e.preventDefault()));
+  sc.addEventListener('wheel', e => {
+    if(!e.ctrlKey) return;
+    e.preventDefault();
+    const r = sc.getBoundingClientRect();
+    rpApply(rpScale * Math.exp(-e.deltaY * 0.01), e.clientX - r.left, e.clientY - r.top);
+  }, {passive:false});
+  const refit = () => {
+    if(!document.getElementById('reportPreview').classList.contains('show')) return;
+    if(rpAtFit) rpFit(); else rpApply(rpScale, 0, 0);
+  };
+  window.addEventListener('resize', refit);
+  window.addEventListener('orientationchange', refit);
+  document.addEventListener('keydown', e => {
+    if(e.key === 'Escape' && document.getElementById('reportPreview').classList.contains('show')) closeReportPreview();
+  });
+}
+function openReportPreview(){
+  const { root, paper } = rpEls();
+  rpBind();
+  document.getElementById('rpTitle').innerHTML = pendingReportTitle;
+  paper.innerHTML = reportMarkupHtml();
+  root.classList.add('show');
+  rpScale = 1; rpAtFit = true;
+  rpFit();
+  // Logos and photos can finish loading after the page is measured.
+  paper.querySelectorAll('img').forEach(img => {
+    if(!img.complete) img.addEventListener('load', () => { if(rpAtFit) rpFit(); else rpApply(rpScale, 0, 0); }, {once:true});
+  });
+}
+function closeReportPreview(){
+  const { root, paper } = rpEls();
+  root.classList.remove('show');
+  paper.innerHTML = '';
+  const back = pendingReportReturnTo;
+  pendingReportReturnTo = null;
+  // If whatever the report was opened from is still showing underneath, we're
+  // already back there; otherwise take the person back to where they came from.
+  if(back && !document.getElementById('overlay').classList.contains('show')){ try{ back(); }catch(e){} }
+}
+function rpSetBusy(id, busy){
+  const b = document.getElementById(id);
+  if(b){ b.style.opacity = busy ? '0.6' : ''; b.style.pointerEvents = busy ? 'none' : ''; }
+}
+
+function printPendingReport(){
+  document.getElementById('printArea').innerHTML = reportMarkupHtml();
   window.print();
 }
 
@@ -973,19 +1073,9 @@ function sanitizeFilename(str){
 // layout (same markup printPendingReport uses), rasterizes it, and packs it into
 // an A4 PDF — paginating automatically if the content runs longer than one page.
 async function generatePendingReportPdfBlob(){
-  const company = pendingReportHideCompany ? '' : (data.settings.companyName || '');
   const container = document.createElement('div');
-  container.style.cssText = 'position:fixed; left:-9999px; top:0; width:794px; background:#ffffff; padding:32px; color:#1C2B36;';
-  container.innerHTML = `
-    ${pendingReportHideCompany ? '' : `<div class="rpt-header">
-      <div>
-        <h1>${pendingReportTitle}</h1>
-        ${company ? `<div style="font-size:13px; color:#66798A; font-weight:700; margin-top:2px;">${escapeHtml(company)}</div>` : ''}
-      </div>
-      <div class="rpt-date">${reportDate()}</div>
-    </div>`}
-    ${pendingReportBody}
-  `;
+  container.style.cssText = 'position:fixed; left:-9999px; top:0; width:794px; background:#ffffff; padding:32px; color:#1C2B36; --bg:#ffffff; --surface:#ffffff; --ink:#1C2B36; --ink-muted:#66798A; --line:#E3E9EC; --card-surface:#ffffff; --card-border:transparent; --card-shadow:none;';
+  container.innerHTML = reportMarkupHtml();
   document.body.appendChild(container);
   try{
     const imgs = [...container.querySelectorAll('img')];
@@ -1023,7 +1113,7 @@ async function generatePendingReportPdfBlob(){
 // chat (rather than a blank WhatsApp Web screen) since the share sheet's own app/contact
 // picker doesn't accept a phone number from the web — this is the closest practical
 // equivalent, same as the addToContacts hand-off elsewhere in the app.
-async function sharePdfBlob(blob, filename, phone){
+async function sharePdfBlob(blob, filename, phone, whatsappFallback){
   const canJumpToChat = phone && isMobileNumber(phone) && data.settings.messagingApp === 'whatsapp';
   const openCustomerChat = () => { window.location.href = `https://wa.me/${normalizePhoneForWhatsApp(phone)}`; };
   try{
@@ -1047,27 +1137,27 @@ async function sharePdfBlob(blob, filename, phone){
   if(canJumpToChat){
     toast('PDF downloaded — attach it in WhatsApp');
     openCustomerChat();
-  } else {
+  } else if(whatsappFallback){
     toast('PDF downloaded — attach it in WhatsApp');
     window.open('https://wa.me/', '_blank');
+  } else {
+    toast('PDF downloaded');
   }
   return true;
 }
 
 async function sendPendingReportPdf(){
-  const btn = document.getElementById('pdfShareBtn');
-  if(btn){ btn.style.opacity = '0.6'; btn.style.pointerEvents = 'none'; }
+  rpSetBusy('rpBtnPdf', true);
   toast('Preparing PDF…');
   try{
     const blob = await generatePendingReportPdfBlob();
     const onShared = pendingReportOnPdfShared;
-    closeSheet();
-    const shared = await sharePdfBlob(blob, sanitizeFilename(pendingReportTitle) + '.pdf', pendingReportPhone);
+    const shared = await sharePdfBlob(blob, sanitizeFilename(pendingReportTitle) + '.pdf', pendingReportPhone, pendingReportAllowPdfShare);
     if(shared && onShared){ try{ onShared(); }catch(e){} }
   }catch(e){
     toast('Could not create the PDF — try Print instead');
-    if(btn){ btn.style.opacity = ''; btn.style.pointerEvents = ''; }
   }
+  rpSetBusy('rpBtnPdf', false);
 }
 
 function htmlToDocxElements(bodyHtml){
@@ -1264,6 +1354,7 @@ async function exportPendingReportDocx(){
     toast('Still loading — try again in a moment, or once you have signal');
     return;
   }
+  rpSetBusy('rpBtnDoc', true);
   try{
     const { Document, Packer, Paragraph, TextRun, HeadingLevel } = docx;
     const plainTitle = pendingReportTitle.replace(/<[^>]+>/g,'');
@@ -1300,12 +1391,12 @@ async function exportPendingReportDocx(){
         const file = new File([blob], filename, { type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
         if(navigator.canShare({files:[file]})){
           await navigator.share({ files:[file], title: plainTitle });
-          closeSheet();
           toast('Word document shared');
+          rpSetBusy('rpBtnDoc', false);
           return;
         }
       }catch(e){
-        if(e && e.name === 'AbortError'){ closeSheet(); return; }
+        if(e && e.name === 'AbortError'){ rpSetBusy('rpBtnDoc', false); return; }
       }
     }
     const url = URL.createObjectURL(blob);
@@ -1313,10 +1404,10 @@ async function exportPendingReportDocx(){
     a.href = url; a.download = filename;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     setTimeout(()=>URL.revokeObjectURL(url), 2000);
-    closeSheet();
     toast('Word document saved');
   }catch(e){
     toast('Could not create the Word document — try Print instead');
   }
+  rpSetBusy('rpBtnDoc', false);
 }
 
