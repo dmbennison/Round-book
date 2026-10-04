@@ -200,6 +200,7 @@ function renderTodayHome(main){
             <div><div class="lbl" style="font-size:0.625rem;">Start</div><div style="font-size:1.0625rem; font-weight:800; color:var(--ink); margin-top:2px;">${mStartText}</div></div>
             <div><div class="lbl" style="font-size:0.625rem;">Finish</div><div style="font-size:1.0625rem; font-weight:800; color:var(--ink); margin-top:2px;">${mFinishText}</div></div>
           </div>
+          <div id="fuelLine">${fuelLineHtml()}</div>
         </div>
         ${(mEntry && mEntry.start!=null && mEntry.end!=null) ? `
         <div style="text-align:right; flex-shrink:0;">

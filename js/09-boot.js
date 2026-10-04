@@ -274,12 +274,15 @@ initStorage().catch(()=>{}).finally(()=>{
   if(!maybeShowFirstRun()) maybeShowMissingMileagePrompt();
   requestPersistentStorage();
   maybeAutoSafetyCopy();
+  refreshFuelPrices();
 });
 // A home-screen app can stay open for days, so also check each time it comes
 // back to the foreground whether a daily safety copy is due.
 document.addEventListener('visibilitychange', () => {
-  if(document.visibilityState === 'visible') maybeAutoSafetyCopy();
+  if(document.visibilityState === 'visible'){ maybeAutoSafetyCopy(); refreshFuelPrices(); }
 });
+// refreshFuelPrices() itself only looks again once its last reading is 30+ minutes old.
+setInterval(() => refreshFuelPrices(), 30*60*1000);
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
