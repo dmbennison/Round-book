@@ -4,8 +4,9 @@
 /* ---------- Today briefing ----------
    One screen pulling together everything worth checking first thing: who's
    due for a clean (same definition as the Rounds > Due list), which of those
-   need a text before you arrive, any one-off jobs actually dated today, quotes
-   overdue for a follow-up, and marketing follow-ups that have come due. */
+   need a text before you arrive, any one-off jobs actually dated today (the tile
+   only appears when there is one), and marketing follow-ups that have come due.
+   Quotes needing follow-up are shown as a yellow badge on the Quotes tab. */
 // Everyone marked "text before you arrive" who's also due for a clean today,
 // grouped by round (round names sorted, customers within a round sorted by
 // how overdue they are) — used by both the Today screen and the "Text all"
@@ -155,8 +156,6 @@ function renderTodayHome(main){
     else if(days < 30) owed1430 += bal;
     else owed30plus += bal;
   });
-  const followUpQuotes = quotesNeedingFollowUp();
-  const quotesWellOverdue = quotesWellOverdueCount();
   const mEntry = todayMileageEntry();
   const mStartText = (mEntry && mEntry.start!=null) ? mEntry.start : 'Tap to log';
   const mFinishText = (mEntry && mEntry.start!=null) ? ((mEntry.end!=null) ? mEntry.end : 'Tap to log') : '—';
@@ -200,7 +199,6 @@ function renderTodayHome(main){
             <div><div class="lbl" style="font-size:0.625rem;">Start</div><div style="font-size:1.0625rem; font-weight:800; color:var(--ink); margin-top:2px;">${mStartText}</div></div>
             <div><div class="lbl" style="font-size:0.625rem;">Finish</div><div style="font-size:1.0625rem; font-weight:800; color:var(--ink); margin-top:2px;">${mFinishText}</div></div>
           </div>
-          <div id="fuelLine">${fuelLineHtml()}</div>
         </div>
         ${(mEntry && mEntry.start!=null && mEntry.end!=null) ? `
         <div style="text-align:right; flex-shrink:0;">
@@ -208,14 +206,10 @@ function renderTodayHome(main){
           <div class="lbl" style="margin-top:2px;">miles</div>
         </div>` : ''}
       </div>
-      <div class="today-tile" onclick="setTab('jobs');">
+      ${todaysJobs.length ? `<div class="today-tile" onclick="setTab('jobs');">
         <div class="num">${todaysJobs.length}</div>
-        <div class="lbl">Jobs today</div>
-      </div>
-      <div class="today-tile" onclick="setTab('quotes');">
-        <div class="num">${followUpQuotes.length}</div>
-        <div class="lbl">Quotes needing follow-up${quotesWellOverdue ? ` · ${quotesWellOverdue} well overdue` : ''}</div>
-      </div>
+        <div class="lbl">Job${todaysJobs.length===1?'':'s'} today</div>
+      </div>` : ''}
       <div class="today-tile" onclick="setTab('rounds'); setRoundsView('owed');" style="grid-column:1 / -1;">
         <div class="num">${owedCustomers.length}</div>
         <div class="lbl">Customer${owedCustomers.length===1?'':'s'} owing</div>
@@ -381,6 +375,15 @@ function quoteNeedsFollowUp(q, today){
 function quotesNeedingFollowUp(){
   const today = todayISO();
   return (data.quotes||[]).filter(q => quoteNeedsFollowUp(q, today));
+}
+// Yellow number on the Quotes tab in the header: how many quotes need attention.
+// Called from render(), so it stays current after anything that changes a quote.
+function updateQuotesBadge(){
+  const el = document.getElementById('quotesBadge');
+  if(!el) return;
+  const n = quotesNeedingFollowUp().length;
+  el.textContent = n > 99 ? '99+' : String(n);
+  el.hidden = n === 0;
 }
 // Among quotes already needing a follow-up, how many are well overdue — more
 // than double their own follow-up window — worth calling out on the Today tile.
@@ -1230,6 +1233,7 @@ async function getOsrmRouteGeometry(points){
 
 /* ---------- rendering ---------- */
 function render(){
+  updateQuotesBadge();
   renderBackupBanner();
   renderLastActionBanner();
   renderMarketingFollowUpBanner();

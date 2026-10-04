@@ -143,14 +143,6 @@ function openSettings(){
       <button class="seg-btn ${data.settings.messagingApp==='whatsapp'?'active':''}" onclick="setMessagingApp('whatsapp')">🟢 WhatsApp</button>
     </div>
     <p style="color:var(--ink-muted); font-size:0.75rem; margin:4px 2px 16px; line-height:1.5;">Used whenever a message is sent straight to a customer's phone — cleaning and payment reminders, receipts, quotes, and group marketing texts.</p>
-    <div class="section-label">Cheapest diesel on Today</div>
-    <div class="seg-row">
-      <button class="seg-btn ${data.settings.fuelShow!==false?'active':''}" onclick="setFuelShow(true)">Show</button>
-      <button class="seg-btn ${data.settings.fuelShow===false?'active':''}" onclick="setFuelShow(false)">Hide</button>
-    </div>
-    ${data.settings.fuelShow!==false ? `<div class="seg-row">${[5,10,15,25].map(m=>`<button class="seg-btn seg-btn-sm ${fuelRadius()===m?'active':''}" onclick="setFuelRadius(${m})">${m} mi</button>`).join('')}</div>` : ''}
-    <p style="color:var(--ink-muted); font-size:0.75rem; margin:4px 2px 6px; line-height:1.5;">Shows the cheapest standard diesel within the chosen distance in the Mileage box on Today; tap it for the garage and directions. Your location, rounded to about 1 km, is sent to FuelCosts.co.uk to look it up. ${escapeHtml(fuelSettingsStatusText())}</p>
-    <button class="btn btn-clean" style="width:100%; border:none; margin:0 0 16px;" onclick="fuelRefreshNow()">Check diesel prices now</button>
     <div class="section-label">After swiping to mark cleaned</div>
     <div class="seg-row">
       <button class="seg-btn ${data.settings.autoCleanedText!==false?'active':''}" onclick="setAutoCleanedText(true)">Open the text</button>
