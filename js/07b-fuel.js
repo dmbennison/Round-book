@@ -7,8 +7,8 @@
    read through FuelCosts.co.uk's free public API, which needs no key. The official
    Fuel Finder API itself needs a secret login, so it can't be called straight from an
    app like this. Only your approximate location (rounded to about 1 km) is sent.
-   If the service is down, blocks the request, or location is off, the line simply
-   doesn't appear — Settings shows the reason. */
+   The Mileage box always says what is happening (checking / unavailable / no prices /
+   the price); tapping a status opens a screen with the reason and technical details. */
 const FUEL_API = 'https://fuelcosts.co.uk/api/stations';
 const FUEL_CACHE_KEY = 'roundBookFuelCache';
 const FUEL_REFRESH_MS = 30 * 60 * 1000;   // look again at most every 30 minutes
@@ -47,9 +47,21 @@ function fuelListFrom(json){
   }
   return [];
 }
+// "B7_STANDARD", "B7", "Diesel", "Diesel (B7)", "Standard Diesel" — but not premium/super/HVO.
 function fuelIsStandardDiesel(label){
   const t = String(label || '');
-  return /B7.?STANDARD|^B7$|^diesel$|standard.?diesel/i.test(t) && !/premium|super/i.test(t);
+  return /B7|diesel/i.test(t) && !/premium|super|SDV|HVO|B10|heating|red/i.test(t);
+}
+// First numeric value under a key that looks like a price (price, pricePence, pence_per_litre, ppl…).
+function fuelPriceFromObject(o){
+  if(!o || typeof o !== 'object') return null;
+  for(const k of ['price', 'pence', 'pencePerLitre', 'pence_per_litre', 'pricePence', 'price_pence', 'ppl', 'value', 'amount']){
+    if(o[k] != null){ const p = fuelPence(o[k]); if(p != null) return p; }
+  }
+  for(const k of Object.keys(o)){
+    if(/price|pence|ppl/i.test(k)){ const p = fuelPence(o[k]); if(p != null) return p; }
+  }
+  return null;
 }
 function fuelDieselOf(st){
   const stamp = e => e && (e.updatedAt || e.updated_at || e.updated || e.priceLastUpdated || e.lastUpdated || e.timestamp || e.recordedAt);
@@ -58,15 +70,14 @@ function fuelDieselOf(st){
     if(Array.isArray(p)){
       for(const e of p){
         if(fuelIsStandardDiesel(e && (e.fuelType || e.fuel_type || e.fuel || e.type || e.code))){
-          return {pence: fuelPence(e.price != null ? e.price : (e.pencePerLitre != null ? e.pencePerLitre : (e.pence != null ? e.pence : e.value))), at: stamp(e) || stamp(st)};
+          return {pence: fuelPriceFromObject(e), at: stamp(e) || stamp(st)};
         }
       }
     } else if(p && typeof p === 'object'){
       for(const k of Object.keys(p)){
         if(fuelIsStandardDiesel(k)){
           const v = p[k];
-          const raw = (v && typeof v === 'object') ? (v.price != null ? v.price : (v.pence != null ? v.pence : v.value)) : v;
-          return {pence: fuelPence(raw), at: stamp(v && typeof v === 'object' ? v : null) || stamp(st)};
+          return {pence: (v && typeof v === 'object') ? fuelPriceFromObject(v) : fuelPence(v), at: stamp(v && typeof v === 'object' ? v : null) || stamp(st)};
         }
       }
     }
@@ -123,8 +134,45 @@ function fuelGetPosition(){
     );
   });
 }
+let fuelFetching = false;
+function fuelSample(v){
+  let t = '';
+  try{ t = JSON.stringify(v); }catch(e){}
+  return (t || '').slice(0, 700);
+}
+// One request. Returns what happened so the status screen can explain a failure.
+async function fuelAttempt(label, params, here){
+  const url = `${FUEL_API}?${params}`;
+  const rec = {label, url: url.replace(FUEL_API, '/api/stations'), status:null, ok:false, keys:'', listLength:0, parsed:0, sample:'', error:''};
+  let json = null;
+  try{
+    const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timer = ctl ? setTimeout(() => ctl.abort(), 12000) : null;
+    const res = await fetch(url, {headers:{Accept:'application/json'}, signal: ctl ? ctl.signal : undefined});
+    if(timer) clearTimeout(timer);
+    rec.status = res.status;
+    if(!res.ok){ rec.error = 'The price service answered with an error (HTTP ' + res.status + ').'; }
+    else { json = await res.json(); }
+  }catch(e){
+    rec.error = (e && e.name === 'AbortError') ? 'The price service took too long to answer.'
+      : (e && e.name === 'TypeError') ? 'Couldn\'t reach the price service — you may be offline, or it doesn\'t allow requests from apps.'
+      : 'Couldn\'t read the price service\'s answer (' + ((e && e.message) || 'unknown error') + ').';
+  }
+  let stations = [];
+  if(json){
+    rec.keys = Array.isArray(json) ? '[array]' : (json && typeof json === 'object' ? Object.keys(json).slice(0, 12).join(', ') : typeof json);
+    const list = fuelListFrom(json);
+    rec.listLength = list.length;
+    rec.sample = fuelSample(list[0] !== undefined ? list[0] : json);
+    stations = list.map(s => fuelStationFrom(s, here)).filter(Boolean);
+    rec.parsed = stations.length;
+    rec.ok = true;
+    if(!stations.length && !rec.error) rec.error = list.length ? 'The service answered, but no standard-diesel prices could be read from it.' : 'The service found no garages in range.';
+  }
+  return {rec, stations};
+}
 async function refreshFuelPrices(force){
-  if(!fuelEnabled()) return;
+  if(!fuelEnabled() || fuelFetching) return;
   const now = Date.now();
   const prev = fuelCacheGet();
   if(!force && prev){
@@ -132,37 +180,55 @@ async function refreshFuelPrices(force){
     if(prev.ok && age < FUEL_REFRESH_MS && prev.radius === fuelRadius()) return;
     if(!prev.ok && age < FUEL_RETRY_MS) return;
   }
+  fuelFetching = true; fuelUpdateTile();
   const keep = prev && prev.stations ? prev.stations : [];
-  const fail = (msg) => { fuelCacheSet({ok:false, time:now, error:msg, stations:keep, radius:fuelRadius()}); fuelUpdateTile(); };
-  const here = await fuelGetPosition();
-  if(!here){ fail('Location is needed to find nearby garages — allow it for Round Book in your device settings.'); return; }
-  const lat = here.lat.toFixed(2), lng = here.lng.toFixed(2); // ~1 km: all that's sent
-  const url = `${FUEL_API}?lat=${lat}&lon=${lng}&radius=${fuelRadius()}&fuel=B7_STANDARD&sort=price&perPage=20`;
   try{
-    const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
-    const timer = ctl ? setTimeout(() => ctl.abort(), 12000) : null;
-    const res = await fetch(url, {headers:{Accept:'application/json'}, signal: ctl ? ctl.signal : undefined});
-    if(timer) clearTimeout(timer);
-    if(!res.ok) throw new Error('The price service answered with an error (' + res.status + ')');
-    const json = await res.json();
-    const stations = fuelListFrom(json).map(s => fuelStationFrom(s, here)).filter(Boolean)
-      .sort((a, b) => (a.pence - b.pence) || ((a.miles == null ? 99 : a.miles) - (b.miles == null ? 99 : b.miles)));
-    fuelCacheSet({ok:true, time:now, radius:fuelRadius(), count:stations.length, stations:stations.slice(0, 3)});
-  }catch(e){
-    const blocked = e && e.name === 'TypeError';
-    fail(blocked ? 'Couldn\'t reach the price service (you may be offline, or it doesn\'t allow requests from apps).' : (e && e.message) || 'Couldn\'t load prices.');
-    return;
+    const here = await fuelGetPosition();
+    if(!here){
+      fuelCacheSet({ok:false, time:now, error:'Location is needed to find nearby garages — allow it for Round Book in your device settings.', stations:keep, radius:fuelRadius(), attempts:[]});
+      return;
+    }
+    const lat = here.lat.toFixed(2), lng = here.lng.toFixed(2); // ~1 km: all that's sent
+    const base = `lat=${lat}&lon=${lng}&radius=${fuelRadius()}`;
+    const attempts = [], found = [];
+    // First ask for diesel only, cheapest first; if that gives nothing usable, ask for everything nearby and pick the diesel out.
+    for(const [label, params] of [['diesel only', `${base}&fuel=B7_STANDARD&sort=price&perPage=25`], ['all fuels', `${base}&sort=distance&perPage=50`]]){
+      const r = await fuelAttempt(label, params, here);
+      attempts.push(r.rec);
+      if(r.stations.length){ found.push(...r.stations); break; }
+    }
+    found.sort((a, b) => (a.pence - b.pence) || ((a.miles == null ? 99 : a.miles) - (b.miles == null ? 99 : b.miles)));
+    const last = attempts[attempts.length - 1];
+    if(found.length){
+      fuelCacheSet({ok:true, time:now, radius:fuelRadius(), count:found.length, stations:found.slice(0, 3), attempts});
+    } else {
+      // keep showing the previous good reading (if any) behind the failure
+      fuelCacheSet({ok:attempts.some(a => a.ok), time:now, radius:fuelRadius(), count:0, error:(last && last.error) || 'No prices found.', stations:keep, attempts});
+    }
+  }finally{
+    fuelFetching = false;
+    fuelUpdateTile();
   }
-  fuelUpdateTile();
 }
 
 /* ---------- the line in the Mileage box ---------- */
+function fuelPillHtml(inner, color, bg, title){
+  return `<div onclick="event.stopPropagation(); openCheapestDiesel()" title="${title}" style="margin-top:8px; display:inline-flex; align-items:center; gap:5px; background:${bg}; color:${color}; border-radius:20px; padding:4px 10px; font-size:0.75rem; font-weight:800; max-width:100%;">${inner}</div>`;
+}
+// Always says what's going on: the price, "checking", or why there isn't one.
 function fuelLineHtml(){
   if(!fuelEnabled()) return '';
   const c = fuelCacheGet();
-  if(!c || !c.stations || !c.stations.length || Date.now() - (c.time || 0) > FUEL_SHOW_MAX_AGE_MS) return '';
-  const s = c.stations[0];
-  return `<div onclick="event.stopPropagation(); openCheapestDiesel()" title="Cheapest diesel nearby — tap for the garage" style="margin-top:8px; display:inline-flex; align-items:center; gap:5px; background:var(--green-dim); color:var(--green); border-radius:20px; padding:4px 10px; font-size:0.75rem; font-weight:800; max-width:100%;">⛽ <span>${s.pence.toFixed(1)}p</span><span style="font-weight:700; opacity:0.85; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(fuelStationLabel(s))}${s.miles != null ? ' · ' + s.miles + ' mi' : ''}</span></div>`;
+  const fresh = c && c.stations && c.stations.length && Date.now() - (c.time || 0) <= FUEL_SHOW_MAX_AGE_MS;
+  if(fresh && c.ok){
+    const s = c.stations[0];
+    return fuelPillHtml(`⛽ <span>${s.pence.toFixed(1)}p</span><span style="font-weight:700; opacity:0.85; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(fuelStationLabel(s))}${s.miles != null ? ' · ' + s.miles + ' mi' : ''}</span>`, 'var(--green)', 'var(--green-dim)', 'Cheapest diesel nearby — tap for the garage');
+  }
+  if(fuelFetching) return fuelPillHtml('⛽ Checking diesel prices…', 'var(--ink-muted)', 'var(--line)', 'Looking up the cheapest diesel nearby');
+  if(!c) return fuelPillHtml('⛽ Diesel prices — tap to check', 'var(--ink-muted)', 'var(--line)', 'Not checked yet');
+  if(c.ok && !(c.stations && c.stations.length)) return fuelPillHtml(`⛽ No diesel prices found within ${c.radius || fuelRadius()} mi — tap for details`, 'var(--amber)', 'var(--amber-dim, var(--line))', 'No prices found');
+  if(c.stations && c.stations.length) return fuelPillHtml('⛽ Diesel prices out of date — tap to refresh', 'var(--amber)', 'var(--amber-dim, var(--line))', 'The last reading is old');
+  return fuelPillHtml('⛽ Diesel prices unavailable — tap for details', 'var(--amber)', 'var(--amber-dim, var(--line))', 'Couldn\'t get diesel prices');
 }
 function fuelUpdateTile(){
   const el = document.getElementById('fuelLine');
@@ -187,9 +253,31 @@ function fuelUpdatedText(c){
   const d = new Date(c.time || Date.now());
   return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
 }
+function fuelStatusSheet(){
+  const c = fuelCacheGet();
+  const attempts = (c && c.attempts) || [];
+  const details = attempts.map(a => `${a.label}: ${a.url}\n  HTTP ${a.status == null ? 'no response' : a.status}${a.error ? ' — ' + a.error : ''}\n  response keys: ${a.keys || '-'} · items: ${a.listLength} · diesel prices read: ${a.parsed}${a.sample ? '\n  first item: ' + a.sample : ''}`).join('\n\n');
+  const reason = fuelFetching ? 'Checking now…' : !c ? 'Not checked yet.' : (c.error || (c.ok ? 'No diesel prices found nearby.' : 'The last check failed.'));
+  openSheet(`
+    <div class="sheet-head">
+      <h2 style="flex:1; min-width:0;">Diesel prices</h2>
+      <button class="sheet-close" onclick="closeSheet()">✕</button>
+    </div>
+    <p style="color:var(--ink); font-size:0.9375rem; font-weight:700; line-height:1.5; margin:0 2px 8px;">${escapeHtml(reason)}</p>
+    <p style="color:var(--ink-muted); font-size:0.8125rem; line-height:1.5; margin:0 2px 14px;">Round Book looks up the cheapest standard diesel within ${fuelRadius()} miles using your location (rounded to about 1 km). Prices come from the UK Government's Fuel Finder scheme via FuelCosts.co.uk.</p>
+    <button class="btn-primary" style="width:100%; margin-bottom:12px;" onclick="fuelRefreshNow(true)">Check again now</button>
+    ${details ? `<div class="section-label">Technical details</div>
+    <textarea readonly rows="9" style="font-size:0.6875rem; font-family:ui-monospace,Menlo,monospace;" onclick="this.select()">${escapeHtml(details)}</textarea>
+    <p style="color:var(--ink-muted); font-size:0.7188rem; margin:6px 2px 0;">Tap the box to select it all — handy to copy and send if you're asking for help getting this working.</p>` : ''}
+  `);
+}
 function openCheapestDiesel(){
   const c = fuelCacheGet();
-  if(!c || !c.stations || !c.stations.length){ toast('No diesel prices to show yet'); return; }
+  if(!c || !c.ok || !c.stations || !c.stations.length || Date.now() - (c.time || 0) > FUEL_SHOW_MAX_AGE_MS){
+    fuelStatusSheet();
+    if(!fuelFetching && (!c || Date.now() - (c.time || 0) > FUEL_RETRY_MS)) refreshFuelPrices(true).then(() => { const sh = document.getElementById('sheet'); if(sh && /Technical details|Cheapest diesel|Checking now/.test(sh.innerHTML)) fuelStatusSheet(); });
+    return;
+  }
   const top = c.stations[0];
   const others = c.stations.slice(1).map((s, k) => `
     <div style="display:flex; align-items:center; gap:10px; background:var(--card-surface); border-radius:12px; padding:10px 12px; margin-bottom:8px;">
@@ -230,9 +318,9 @@ function setFuelRadius(miles){
   saveData();
   refreshFuelPrices(true).then(() => openSettings());
 }
-function fuelRefreshNow(){
+function fuelRefreshNow(fromStatus){
   toast('Checking diesel prices…');
-  refreshFuelPrices(true).then(() => openSettings());
+  refreshFuelPrices(true).then(() => { if(fromStatus === true) fuelStatusSheet(); else openSettings(); });
 }
 function fuelSettingsStatusText(){
   const c = fuelCacheGet();
