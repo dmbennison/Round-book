@@ -340,6 +340,24 @@
   .summary-overall .stat .lbl{font-size:0.5625rem;}
 
   .print-area{display:none;}
+
+  /* Report preview: full-screen paper view with Print / Share PDF / Share doc */
+  .report-preview{position:fixed; inset:0; z-index:50; display:none; flex-direction:column; background:#4a4f55;}
+  .report-preview.show{display:flex;}
+  .rp-bar, .rp-actions{flex:none; background:#0B2438; color:#fff; display:flex; align-items:center; gap:8px; padding:10px 12px;}
+  .rp-bar{padding-top:calc(env(safe-area-inset-top, 0px) + 10px);}
+  .rp-actions{padding-bottom:calc(env(safe-area-inset-bottom, 0px) + 10px);}
+  .rp-title{flex:1; min-width:0; font-size:0.9375rem; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .rp-btn{flex:none; min-width:38px; height:38px; padding:0 10px; border:none; border-radius:10px; background:rgba(255,255,255,0.16); color:#fff; font-size:1.0625rem; font-weight:800;}
+  .rp-btn:active{background:rgba(255,255,255,0.28);}
+  .rp-zoom-lbl{font-size:0.75rem; font-weight:700; min-width:40px; text-align:center; opacity:0.85;}
+  .rp-scroll{flex:1; min-height:0; position:relative; overflow:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; touch-action:pan-x pan-y; padding:12px; display:flex; box-sizing:border-box;}
+  .rp-sizer{position:relative; flex:none; margin:auto; box-shadow:0 2px 14px rgba(0,0,0,0.45);}
+  .rp-paper{position:absolute; left:0; top:0; width:794px; box-sizing:border-box; padding:32px; background:#fff; color:#1C2B36; transform-origin:0 0;
+    --bg:#ffffff; --surface:#ffffff; --ink:#1C2B36; --ink-muted:#66798A; --line:#E3E9EC; --card-surface:#ffffff; --card-border:transparent; --card-shadow:none;}
+  .rp-action{flex:1; display:flex; align-items:center; justify-content:center; gap:7px; border:none; border-radius:12px; padding:12px 6px; background:rgba(255,255,255,0.16); color:#fff; font-size:0.8125rem; font-weight:800;}
+  .rp-action:active{background:rgba(255,255,255,0.28);}
+  .rp-action svg{width:18px; height:18px; flex:none;}
   .rpt-round-title{font-size:16px; font-weight:800; margin:20px 0 8px; border-bottom:2px solid #10344C; padding-bottom:4px;}
   .rpt-round-title:first-child{margin-top:0;}
   .rpt-table{width:100%; border-collapse:collapse; margin-bottom:4px;}
@@ -691,7 +709,7 @@
       --card-border:transparent;
       --card-shadow:none;
     }
-    header, #lastActionBanner, #marketingFollowUpBanner, #jobAnniversaryBanner, #importReviewBanner, main, .fab, .overlay, #importFile, #importSpreadsheetFile, #syncFile, .toast{
+    header, #lastActionBanner, #marketingFollowUpBanner, #jobAnniversaryBanner, #importReviewBanner, main, .fab, .overlay, .report-preview, #importFile, #importSpreadsheetFile, #syncFile, .toast{
       display:none !important;
     }
     body{ padding-top:0 !important; }
@@ -770,6 +788,21 @@
 <input type="file" id="importSpreadsheetFile" accept=".csv,.xlsx,.xls,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
 <div class="toast" id="toast"></div>
 <div class="print-area" id="printArea"></div>
+<div class="report-preview" id="reportPreview">
+  <div class="rp-bar">
+    <button class="rp-btn" onclick="closeReportPreview()" aria-label="Close preview">✕</button>
+    <div class="rp-title" id="rpTitle"></div>
+    <button class="rp-btn" onclick="rpZoomBy(1/1.25)" aria-label="Zoom out">−</button>
+    <button class="rp-btn rp-zoom-lbl" id="rpZoomLbl" onclick="rpFit()" aria-label="Fit to screen">100%</button>
+    <button class="rp-btn" onclick="rpZoomBy(1.25)" aria-label="Zoom in">+</button>
+  </div>
+  <div class="rp-scroll" id="rpScroll"><div class="rp-sizer" id="rpSizer"><div class="rp-paper" id="rpPaper"></div></div></div>
+  <div class="rp-actions">
+    <button class="rp-action" onclick="printPendingReport()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>Print</button>
+    <button class="rp-action" id="rpBtnPdf" onclick="sendPendingReportPdf()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>Share PDF</button>
+    <button class="rp-action" id="rpBtnDoc" onclick="exportPendingReportDocx()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>Share doc</button>
+  </div>
+</div>
 
 <script src="./js/01-data.js" defer></script>
 <script src="./js/02-today-rounds.js" defer></script>
