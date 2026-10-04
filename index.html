@@ -118,6 +118,12 @@
     color:#B9D2E2; background:transparent; border:none; white-space:nowrap;
   }
   .tab.active{background:rgba(255,255,255,0.14); color:#fff;}
+  .tab{position:relative;}
+  .tab-badge{
+    position:absolute; top:1px; right:2px; min-width:16px; height:16px; padding:0 4px; box-sizing:border-box;
+    border-radius:8px; background:#FFD60A; color:#1a1a1a; font-size:0.625rem; font-weight:800; line-height:16px; text-align:center;
+  }
+  .tab-badge[hidden]{display:none;}
 
   main{padding:14px 14px 100px;}
 
@@ -740,7 +746,7 @@
   <div class="tabs">
     <button class="tab active" data-tab="today" onclick="setTab('today')">Today</button>
     <button class="tab" data-tab="work" onclick="setTab('work')">Work</button>
-    <button class="tab" data-tab="quotes" onclick="setTab('quotes')">Quotes</button>
+    <button class="tab" data-tab="quotes" onclick="setTab('quotes')">Quotes<span class="tab-badge" id="quotesBadge" hidden></span></button>
     <button class="tab" data-tab="marketing" onclick="setTab('marketing')">Marketing</button>
   </div>
 </header>
@@ -772,7 +778,6 @@
 <script src="./js/05-jobs-quotes.js" defer></script>
 <script src="./js/06-settings-reports-a.js" defer></script>
 <script src="./js/07-reports-b.js" defer></script>
-<script src="./js/07b-fuel.js" defer></script>
 <script src="./js/08-backup-import.js" defer></script>
 <script src="./js/08b-sync.js" defer></script>
 <script src="./js/09-boot.js" defer></script>
