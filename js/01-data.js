@@ -6,13 +6,14 @@ const STORE_KEY = 'roundBookData_v1';
 // APP_VERSION is a plain decimal number (e.g. 1.01, 1.02 ... 1.99, 2.00) —
 // bump by 0.01 for every change. formatVersion always renders it to exactly
 // two decimal places, so it's never shown as "1.1" or "1.100".
-const APP_VERSION = 2.41;
+const APP_VERSION = 2.42;
 function formatVersion(v){ return Number(v).toFixed(2); }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
 // entry (newest first) with ONE very short plain-English summary, then delete
 // entries so only the latest ten remain.
 const VERSION_HISTORY = [
+  {version: 2.42, changes: ['Pinch, double-tap and drag to zoom photos; send a photo with an offer text (gutter clearing, conservatory roof, fascias) from the photo viewer']},
   {version: 2.41, changes: ['Payment chase: friendly wording on the first only, firmer on every chase after; new Couldn\'t clean button defers a customer a full cycle and flags the card']},
   {version: 2.40, changes: ['Collapsed Fuel prices box on Today: free local diesel/petrol prices from CheckFuelPrices, loaded only when opened']},
   {version: 2.39, changes: ['Report preview and shared PDFs now laid out as separate A4 sheets with page numbers']},
@@ -22,7 +23,6 @@ const VERSION_HISTORY = [
   {version: 2.35, changes: ['Diesel line always shows its status, with a details screen when it can\'t get prices']},
   {version: 2.34, changes: ['Full-width iPad header; cheapest nearby diesel shown in the Mileage box']},
   {version: 2.33, changes: ['Swiping a clean opens the "windows cleaned" text ready to send']},
-  {version: 2.32, changes: ['Photos now sync; text labels on annotated photos; bigger passphrase box']},
 ];
 const DIRECTIONS_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>';
 const CALL_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>';
@@ -241,6 +241,12 @@ const DEFAULT_QUOTE_FOLLOWUP2_TEMPLATE = "Hi {name}, no worries if the timing's 
 const DEFAULT_MARKETING_TEMPLATE = "Hi {name}, just letting you know we also offer gutter clearing and fascia cleaning alongside your window clean — let me know if you'd like a quote.\n\nThanks,\n{yourname}\n{company}";
 const DEFAULT_REFERRAL_TEMPLATE = "Hi {name}, hope you're happy with your window cleaning! If you know anyone nearby who'd like a regular clean too, we'd really appreciate a mention — just get them to say your name when they get in touch.\n\nThanks,\n{yourname}\n{company}";
 const DEFAULT_WINBACK_TEMPLATE = "Hi {name}, it's been a while since we last cleaned your windows — just checking in to see if you'd like to start up again. Let me know and I'll get you back on the round.\n\nThanks,\n{yourname}\n{company}";
+// Photo + offer texts (sent from the photo viewer). {price} becomes " for £X" when a price
+// is typed in, or disappears when it isn't.
+const DEFAULT_UPSELL_GUTTER_TEMPLATE = "Hi {name}, while I was cleaning your windows I noticed your gutters are blocked (photo attached). I can clear them{price} if you'd like — just let me know and I'll fit it in.\n\nThanks,\n{yourname}\n{company}";
+const DEFAULT_UPSELL_CONSERVATORY_TEMPLATE = "Hi {name}, while I was at your property I noticed your conservatory roof could do with a clean (photo attached). I can sort that{price} if you'd like — just let me know and I'll fit it in.\n\nThanks,\n{yourname}\n{company}";
+const DEFAULT_UPSELL_FASCIAS_TEMPLATE = "Hi {name}, while I was at your property I noticed your fascias and soffits are looking grubby (photo attached). I can clean them{price} if you'd like — just let me know and I'll fit it in.\n\nThanks,\n{yourname}\n{company}";
+const DEFAULT_UPSELL_OTHER_TEMPLATE = "Hi {name}, while I was at your property I noticed something I can help with (photo attached). I can sort it{price} if you'd like — just let me know and I'll fit it in.\n\nThanks,\n{yourname}\n{company}";
 const DEFAULT_SEASONAL_TEMPLATE = "Hi {name}, with the seasons changing it's a good time to get your gutters cleared before they cause problems — let me know if you'd like a quote alongside your usual window clean.\n\nThanks,\n{yourname}\n{company}";
 // Marketing "campaigns" — named, reusable templates picked at send time (see
 // openGroupMarketingText). Seeded once in migrateData below, from then on fully

@@ -255,6 +255,109 @@ async function savePhotoAnnotation(){
   }, 'image/jpeg', 0.9);
 }
 
+/* ---------- photo + offer text ----------
+   From the photo viewer: pick an offer (gutter clearing, conservatory roof...),
+   optionally add a price, tweak the wording, and share the photo together with the
+   message through the phone's share sheet (so it can go by Messages or WhatsApp).
+   Some apps drop the text when a photo is attached, so the message is also copied. */
+const UPSELL_OFFERS = {
+  gutter:       { label:'Gutter clearing',      key:'upsellGutterTemplate',       def:DEFAULT_UPSELL_GUTTER_TEMPLATE },
+  conservatory: { label:'Conservatory roof',    key:'upsellConservatoryTemplate', def:DEFAULT_UPSELL_CONSERVATORY_TEMPLATE },
+  fascias:      { label:'Fascias & soffits',    key:'upsellFasciasTemplate',      def:DEFAULT_UPSELL_FASCIAS_TEMPLATE },
+  other:        { label:'Something else',       key:'upsellOtherTemplate',        def:DEFAULT_UPSELL_OTHER_TEMPLATE }
+};
+let upsellState = { offer:'gutter', price:'', edited:false };
+function upsellOwner(entry){
+  if(!entry) return null;
+  return entry.kind === 'customer' ? data.customers.find(x=>x.id===entry.ownerId) : (data.oneOffJobs||[]).find(x=>x.id===entry.ownerId);
+}
+function buildUpsellMessage(entry){
+  const o = UPSELL_OFFERS[upsellState.offer] || UPSELL_OFFERS.gutter;
+  const owner = upsellOwner(entry);
+  const tpl = data.settings[o.key] || o.def;
+  const price = parseFloat(upsellState.price);
+  const priceText = price > 0 ? ' for ' + money(price) : '';
+  const firstName = owner && owner.name ? owner.name.trim().split(' ')[0] : '';
+  return applyTemplate(tpl.replace(/\{price\}/g, priceText), {
+    name: firstName, company: data.settings.companyName || '', yourname: data.settings.yourName || ''
+  }).trim();
+}
+function openPhotoUpsell(){
+  const entry = photoViewerList[photoViewerIndex];
+  if(!entry) return;
+  upsellState = { offer: upsellState.offer || 'gutter', price:'', edited:false };
+  renderUpsellSheet();
+}
+function renderUpsellSheet(){
+  const entry = photoViewerList[photoViewerIndex];
+  if(!entry){ closeSheet(); return; }
+  const src = photoEntrySrc(entry);
+  const chips = Object.keys(UPSELL_OFFERS).map(k => {
+    const on = k === upsellState.offer;
+    return `<button onclick="setUpsellOffer('${k}')" style="border:none; border-radius:20px; padding:9px 14px; font-size:0.8125rem; font-weight:800; background:${on?'var(--navy)':'var(--line)'}; color:${on?'#fff':'var(--ink)'};">${UPSELL_OFFERS[k].label}</button>`;
+  }).join('');
+  openSheet(`
+    <div class="sheet-head">
+      <h2 style="flex:1; min-width:0;">Send photo with an offer</h2>
+      <button class="sheet-close" onclick="closeSheet()">✕</button>
+    </div>
+    ${src ? `<img src="${src}" style="display:block; max-height:130px; max-width:100%; border-radius:10px; margin:0 auto 12px;">` : ''}
+    <label style="margin-top:0;">What are you offering?</label>
+    <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:6px;">${chips}</div>
+    <label>Price <span style="text-transform:none; font-weight:500; opacity:0.7;">(optional)</span></label>
+    <input type="number" id="upsell_price" inputmode="decimal" step="0.01" min="0" placeholder="e.g. 40" value="${escapeAttr(upsellState.price)}" oninput="onUpsellPrice(this.value)">
+    <label>Message <span style="text-transform:none; font-weight:500; opacity:0.7;">(edit freely)</span></label>
+    <textarea id="upsell_msg" rows="7" oninput="upsellState.edited=true">${escapeHtml(buildUpsellMessage(entry))}</textarea>
+    <div class="form-actions">
+      <button class="btn-primary" onclick="sendPhotoUpsell()">📤 Send photo + message</button>
+    </div>
+    <p style="color:var(--ink-muted); font-size:0.7188rem; margin:10px 2px 0; text-align:center; line-height:1.5;">Opens your share sheet — pick Messages or WhatsApp and the customer. The message is also copied, so paste it if your app leaves it out. Wording for each offer can be changed under Settings → Message templates.</p>
+  `, () => renderPhotoViewer());
+}
+function setUpsellOffer(k){
+  if(!UPSELL_OFFERS[k]) return;
+  upsellState.offer = k;
+  upsellState.edited = false;
+  renderUpsellSheet();
+}
+function onUpsellPrice(v){
+  upsellState.price = v;
+  if(upsellState.edited) return; // don't overwrite wording they've changed by hand
+  const ta = document.getElementById('upsell_msg');
+  const entry = photoViewerList[photoViewerIndex];
+  if(ta && entry) ta.value = buildUpsellMessage(entry);
+}
+async function sendPhotoUpsell(){
+  const entry = photoViewerList[photoViewerIndex];
+  const ta = document.getElementById('upsell_msg');
+  if(!entry || !ta) return;
+  const msg = ta.value.trim();
+  if(!msg){ toast('The message is empty'); return; }
+  // Copy first, while still inside the tap — a safety net for apps that discard the text.
+  try{ if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(msg).catch(()=>{}); }catch(e){}
+  const owner = upsellOwner(entry);
+  const p = owner && (owner.photos||[]).find(x=>x.id===entry.photoId);
+  if(!p){ toast('Could not find that photo'); return; }
+  try{
+    const blob = photoStorageAvailable ? await idbGetPhoto(entry.photoId) : await (await fetch(p.dataUrl)).blob();
+    if(!blob) throw new Error('photo not found');
+    const safeName = (owner.address || owner.name || 'photo').replace(/[^a-z0-9]+/gi, '-').toLowerCase();
+    const file = new File([blob], `${safeName}-${p.date}.jpg`, { type: blob.type || 'image/jpeg' });
+    if(navigator.canShare && navigator.canShare({ files: [file] })){
+      await navigator.share({ files: [file], text: msg });
+      logMessage(owner, 'upsell');
+      saveData();
+      toast('Shared — message also copied if it didn\'t come through');
+      closeSheet();
+    } else {
+      toast('Photo sharing isn\'t supported here — message copied, attach the photo yourself');
+    }
+  }catch(e){
+    if(e && e.name === 'AbortError') return;
+    toast('Could not share that photo — message copied');
+  }
+}
+
 async function sharePhoto(id, photoId){
   const c = data.customers.find(x=>x.id===id);
   const p = (c.photos||[]).find(x=>x.id===photoId);
@@ -676,7 +779,7 @@ function bankDetailsBlock(address){
 // Human-readable labels for the message log shown on a customer/job's screen.
 const MESSAGE_LOG_LABELS = {
   clean: 'Cleaning reminder', textBefore: 'Text before visit', cleanedToday: 'Windows cleaned today', pay: 'Payment reminder',
-  receipt: 'Receipt', quote: 'Quote', repeatQuote: 'Repeat work quote', quoteFollowUp: 'Quote follow-up', quoteCall: 'Follow-up call made', quotePdf: 'Quote sent as PDF', marketing: 'Marketing text'
+  receipt: 'Receipt', upsell: 'Photo offer sent', quote: 'Quote', repeatQuote: 'Repeat work quote', quoteFollowUp: 'Quote follow-up', quoteCall: 'Follow-up call made', quotePdf: 'Quote sent as PDF', marketing: 'Marketing text'
 };
 // Marketing response pipeline — tracked manually, since there's no way for the app
 // to see actual text replies (they land in the phone's own Messages/WhatsApp app).

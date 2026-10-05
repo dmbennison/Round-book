@@ -869,15 +869,17 @@ function renderPhotoViewer(){
   const hasNext = photoViewerIndex < photoViewerList.length - 1;
   const counter = photoViewerList.length > 1
     ? `<div style="text-align:center; color:var(--ink-muted); font-size:0.75rem; margin-bottom:8px;">${photoViewerIndex+1} of ${photoViewerList.length}</div>` : '';
-  const navBtn = (dir, symbol) => `<button onclick="navigatePhotoViewer(${dir})" aria-label="${dir<0?'Previous':'Next'} photo" style="position:absolute; ${dir<0?'left':'right'}:6px; top:50%; transform:translateY(-50%); width:36px; height:36px; border-radius:50%; border:none; background:rgba(0,0,0,0.45); color:#fff; font-size:1.25rem; line-height:1; display:flex; align-items:center; justify-content:center;">${symbol}</button>`;
+  const navBtn = (dir, symbol) => `<button onclick="navigatePhotoViewer(${dir})" aria-label="${dir<0?'Previous':'Next'} photo" class="pv-nav" style="position:absolute; ${dir<0?'left':'right'}:6px; top:50%; transform:translateY(-50%); width:36px; height:36px; border-radius:50%; border:none; background:rgba(0,0,0,0.45); color:#fff; font-size:1.25rem; line-height:1; display:flex; align-items:center; justify-content:center;">${symbol}</button>`;
   openSheet(`
     <div class="sheet-head">
       <h2>Photo</h2>
       <button class="sheet-close" onclick="closeSheet()">✕</button>
     </div>
     ${counter}
-    <div style="position:relative;">
-      <img id="photoViewerImg" src="${src}" style="width:100%; border-radius:12px; margin-bottom:6px; touch-action:pan-y; display:block;">
+    <div style="position:relative; margin-bottom:6px;">
+      <div id="photoZoomBox" style="overflow:hidden; border-radius:12px; touch-action:pan-y; position:relative;">
+        <img id="photoViewerImg" src="${src}" draggable="false" style="width:100%; display:block; transform-origin:0 0; will-change:transform; -webkit-user-drag:none;">
+      </div>
       ${hasPrev ? navBtn(-1,'‹') : ''}
       ${hasNext ? navBtn(1,'›') : ''}
     </div>
@@ -887,7 +889,8 @@ function renderPhotoViewer(){
       <button class="btn btn-clean" onclick="sharePhotoViewerEntry()">📤 Share</button>
       <button class="btn" style="background:var(--red-dim); color:var(--red);" onclick="deletePhotoViewerEntry()">Delete</button>
     </div>
-    <p style="color:var(--ink-muted); font-size:0.7188rem; margin:0 2px; text-align:center;">${photoViewerList.length>1?'Swipe left or right to browse, or ':''}Press and hold the photo to save or share it directly.</p>
+    <button class="btn" style="width:100%; background:var(--blue-dim); color:var(--blue-deep); margin-bottom:10px;" onclick="openPhotoUpsell()">💬 Send with an offer (gutters, conservatory…)</button>
+    <p style="color:var(--ink-muted); font-size:0.7188rem; margin:0 2px; text-align:center;">Pinch or double-tap the photo to zoom, then drag to move around. ${photoViewerList.length>1?'Swipe left or right to browse, or ':''}Press and hold the photo to save or share it directly.</p>
   `, () => { if(photoViewerOnClose) photoViewerOnClose(); });
   attachPhotoViewerSwipe();
 }
@@ -897,26 +900,115 @@ function navigatePhotoViewer(delta){
   photoViewerIndex = next;
   renderPhotoViewer();
 }
+// Touch handling for the photo: pinch with two fingers, double-tap (or double-click)
+// to zoom in/out, drag to move around while zoomed, Ctrl + wheel on a computer. While
+// not zoomed, a clear sideways swipe still moves to the next/previous photo and
+// vertical movement still scrolls the sheet.
 function attachPhotoViewerSwipe(){
+  const box = document.getElementById('photoZoomBox');
   const img = document.getElementById('photoViewerImg');
-  if(!img) return;
-  photoViewerTouchStartX = null; photoViewerTouchStartY = null;
-  img.addEventListener('touchstart', (e) => {
-    if(e.touches.length !== 1) return;
-    photoViewerTouchStartX = e.touches[0].clientX;
-    photoViewerTouchStartY = e.touches[0].clientY;
+  if(!box || !img) return;
+  const MAX = 5;
+  let s = 1, x = 0, y = 0;
+  let mode = null, startX = 0, startY = 0, startT = 0, lastX = 0, lastY = 0, moved = false;
+  let pinch = null, lastTap = 0, lastTapX = 0, lastTapY = 0, mouseDown = false;
+  const navs = () => box.parentElement.querySelectorAll('.pv-nav');
+  const apply = () => {
+    const W = box.clientWidth, H = box.clientHeight;
+    x = Math.min(0, Math.max(W - W*s, x));
+    y = Math.min(0, Math.max(H - H*s, y));
+    img.style.transform = `translate(${x}px, ${y}px) scale(${s})`;
+    box.style.touchAction = s > 1 ? 'none' : 'pan-y';
+    navs().forEach(n => { n.style.display = s > 1 ? 'none' : ''; });
+  };
+  const zoomAt = (px, py, ns) => {
+    ns = Math.max(1, Math.min(MAX, ns));
+    const cx = (px - x) / s, cy = (py - y) / s;
+    s = ns; x = px - cx*s; y = py - cy*s;
+    if(s <= 1.02){ s = 1; x = 0; y = 0; }
+    apply();
+  };
+  const rel = (cx, cy) => { const r = box.getBoundingClientRect(); return {x: cx - r.left, y: cy - r.top}; };
+  const dist = t => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+  const mid = t => rel((t[0].clientX + t[1].clientX)/2, (t[0].clientY + t[1].clientY)/2);
+  const toggleZoom = (p) => { if(s > 1) zoomAt(0, 0, 1); else zoomAt(p.x, p.y, 2.5); };
+
+  box.addEventListener('touchstart', (e) => {
+    if(e.touches.length === 2){
+      const m = mid(e.touches);
+      pinch = { d: dist(e.touches), s, px: (m.x - x) / s, py: (m.y - y) / s };
+      mode = 'pinch';
+    } else if(e.touches.length === 1){
+      const t = e.touches[0];
+      startX = lastX = t.clientX; startY = lastY = t.clientY; startT = Date.now(); moved = false;
+      mode = s > 1 ? 'pan' : 'swipe';
+    }
   }, {passive:true});
-  img.addEventListener('touchend', (e) => {
-    if(photoViewerTouchStartX == null) return;
+  box.addEventListener('touchmove', (e) => {
+    if(mode === 'pinch' && e.touches.length >= 2 && pinch){
+      e.preventDefault();
+      const m = mid(e.touches);
+      s = Math.max(1, Math.min(MAX, pinch.s * dist(e.touches) / pinch.d));
+      x = m.x - pinch.px * s; y = m.y - pinch.py * s;
+      apply();
+    } else if(mode === 'pan' && e.touches.length === 1){
+      e.preventDefault();
+      const t = e.touches[0];
+      x += t.clientX - lastX; y += t.clientY - lastY;
+      lastX = t.clientX; lastY = t.clientY;
+      if(Math.abs(t.clientX - startX) > 8 || Math.abs(t.clientY - startY) > 8) moved = true;
+      apply();
+    } else if(mode === 'swipe' && e.touches.length === 1){
+      const t = e.touches[0];
+      if(Math.abs(t.clientX - startX) > 8 || Math.abs(t.clientY - startY) > 8) moved = true;
+    }
+  }, {passive:false});
+  const finish = (e) => {
+    if(mode === 'pinch'){
+      if(e.touches.length < 2){
+        pinch = null;
+        if(s < 1.05){ s = 1; x = 0; y = 0; apply(); }
+        if(e.touches.length === 1 && s > 1){
+          mode = 'pan'; lastX = e.touches[0].clientX; lastY = e.touches[0].clientY; moved = true;
+        } else mode = null;
+      }
+      return;
+    }
     const t = e.changedTouches[0];
-    const dx = t.clientX - photoViewerTouchStartX;
-    const dy = t.clientY - photoViewerTouchStartY;
-    photoViewerTouchStartX = null; photoViewerTouchStartY = null;
-    // Require a clearly horizontal, decent-sized gesture so vertical scrolling
-    // inside the sheet never gets mistaken for a page-to-page swipe.
-    if(Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
-    navigatePhotoViewer(dx < 0 ? 1 : -1);
-  }, {passive:true});
+    const dx = t.clientX - startX, dy = t.clientY - startY;
+    const wasTap = !moved && Date.now() - startT < 300;
+    if(mode === 'swipe' && s === 1){
+      // Require a clearly horizontal, decent-sized gesture so vertical scrolling
+      // inside the sheet never gets mistaken for a page-to-page swipe.
+      if(Math.abs(dx) >= 40 && Math.abs(dx) >= Math.abs(dy) * 1.5){ mode = null; navigatePhotoViewer(dx < 0 ? 1 : -1); return; }
+    }
+    if(wasTap){
+      const now = Date.now();
+      if(now - lastTap < 300 && Math.abs(t.clientX - lastTapX) < 30 && Math.abs(t.clientY - lastTapY) < 30){
+        lastTap = 0; toggleZoom(rel(t.clientX, t.clientY));
+      } else { lastTap = now; lastTapX = t.clientX; lastTapY = t.clientY; }
+    }
+    mode = null;
+  };
+  box.addEventListener('touchend', finish, {passive:true});
+  box.addEventListener('touchcancel', () => { mode = null; pinch = null; }, {passive:true});
+  // iOS Safari's own page-zoom gesture must not fight this one.
+  ['gesturestart','gesturechange'].forEach(n => box.addEventListener(n, e => e.preventDefault()));
+  // Computer: Ctrl + wheel (also what a trackpad pinch sends), double-click, drag when zoomed.
+  box.addEventListener('wheel', (e) => {
+    if(!e.ctrlKey) return;
+    e.preventDefault();
+    const p = rel(e.clientX, e.clientY);
+    zoomAt(p.x, p.y, s * Math.exp(-e.deltaY * 0.01));
+  }, {passive:false});
+  box.addEventListener('dblclick', (e) => toggleZoom(rel(e.clientX, e.clientY)));
+  box.addEventListener('mousedown', (e) => { if(s > 1){ mouseDown = true; lastX = e.clientX; lastY = e.clientY; e.preventDefault(); } });
+  window.addEventListener('mousemove', (e) => {
+    if(!mouseDown) return;
+    if(!document.body.contains(box)){ mouseDown = false; return; }
+    x += e.clientX - lastX; y += e.clientY - lastY; lastX = e.clientX; lastY = e.clientY; apply();
+  });
+  window.addEventListener('mouseup', () => { mouseDown = false; });
 }
 function sharePhotoViewerEntry(){
   const entry = photoViewerList[photoViewerIndex];
