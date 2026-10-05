@@ -1445,7 +1445,7 @@ function renderRoundsList(main){
         <div class="section-label" style="margin:0; cursor:pointer;" onclick="goToRoundDue('${escapeAttr(rn)}')">${escapeHtml(rn)} <span style="font-weight:600; color:var(--ink-muted); text-transform:none; letter-spacing:0;">(${dueCusts.length})</span></div>
         ${anyPhone ? `<button onclick="openBulkReminders('due','${escapeAttr(rn)}')" style="background:none; border:none; color:var(--blue); font-size:0.75rem; font-weight:800;">✉️ Remind all</button>` : ''}
       </div>`;
-      html += dueCusts.map(custCardHtml).join('');
+      html += dueCusts.map(c=>custCardHtml(c,'due')).join('');
     });
     if(!anyDue){
       html += `<div class="empty">
@@ -1472,7 +1472,7 @@ function renderRoundsList(main){
       }
       Object.keys(byRound).forEach(rn=>{
         html += `<div class="section-label" style="margin:14px 2px 8px;">${escapeHtml(rn)} <span style="font-weight:600; color:var(--ink-muted); text-transform:none; letter-spacing:0;">(${byRound[rn].length})</span></div>`;
-        html += byRound[rn].map(custCardHtml).join('');
+        html += byRound[rn].map(c=>custCardHtml(c)).join('');
       });
       html += listTotalHtml(unsent.length === all.length ? `${all.length} to text` : `${unsent.length} to text · ${all.length - unsent.length} texted`);
     }
@@ -1499,7 +1499,7 @@ function renderRoundsList(main){
         <div class="section-label" style="margin:0;">${escapeHtml(rn)} <span style="font-weight:600; color:var(--ink-muted); text-transform:none; letter-spacing:0;">(owing ${money(roundTotal)})</span></div>
         ${anyPhone ? `<button onclick="openBulkReminders('owed','${escapeAttr(rn)}')" style="background:none; border:none; color:var(--blue); font-size:0.75rem; font-weight:800;">✉️ Remind all</button>` : ''}
       </div>`;
-      html += owedCusts.map(custCardHtml).join('');
+      html += owedCusts.map(c=>custCardHtml(c,'owed')).join('');
     });
     if(!anyOwed){
       html += `<div class="empty">
@@ -1656,6 +1656,8 @@ function renderRoundDetail(main, rn){
       .sort((a,b)=> (daysSinceLastPayment(b)-daysSinceLastPayment(a)) || (custStatus(b).balance-custStatus(a).balance));
   }
   const custs = baseList;
+  // Due and Owed filters show slimmed-down cards (see custCardHtml).
+  const cardMode = (roundFilterMode === 'due' || roundFilterMode === 'owed') ? roundFilterMode : undefined;
   if(!custs.length){
     main.innerHTML = shellHtml + emptyState((roundFilterMode!=='all' || roundDayFilter!=='all') ? 'filter' : 'customers');
     return;
@@ -1670,10 +1672,10 @@ function renderRoundDetail(main, rn){
         shellHtml += `<div class="day-divider">Day ${d}</div>`;
         lastDay = d;
       }
-      shellHtml += custCardHtml(c);
+      shellHtml += custCardHtml(c, cardMode);
     });
   } else {
-    shellHtml += custs.map(custCardHtml).join('');
+    shellHtml += custs.map(c=>custCardHtml(c, cardMode)).join('');
   }
   if(roundFilterMode === 'owed'){
     const owedTotal = custs.reduce((sum,c)=>sum+custStatus(c).balance,0);
@@ -1723,7 +1725,13 @@ function needsPriceReview(c){
   return daysBetween(lastIncrease, target) >= 365;
 }
 
-function custCardHtml(c){
+// mode: 'due' shows only clean-related info (clean status, text-first, day, fronts
+// only, the "cleaned today" text button); 'owed' shows only payment info (what's
+// owed, chase / reminder badges and the Chase button); anything else shows the lot.
+function custCardHtml(c, mode){
+  const showClean = mode !== 'owed';
+  const showPay = mode !== 'due';
+  const showExtras = !mode; // photos, price review, price-low
   const s = custStatus(c);
   const roundCustomers = data.customers.filter(x=>(x.round||'Unassigned')===(c.round||'Unassigned'));
   const showDayBadge = roundDaysUsed(roundCustomers).length > 1;
@@ -1757,19 +1765,19 @@ function custCardHtml(c){
         </div>
       </div>
       <div class="cust-meta">
-        ${s.cleanBadge ? `<span class="badge ${s.cleanBadge.type}"${c.paused&&c.pauseDate?` title="Paused since ${fmtDate(c.pauseDate)}"`:''}>${s.cleanBadge.text}</span>` : `<span class="badge ok">Cleaned ${fmtDate(s.lastClean)}</span>`}
-        ${nextDue ? `<span class="badge paused" title="Next clean due">Next due ${fmtDate(nextDue)}</span>` : ''}
-        ${s.owed ? `<span class="badge owed">Owes ${money(s.balance)}${daysSinceLastPayment(c) ? ` · ${daysSinceLastPayment(c)}d` : ''}</span>` : s.credit ? `<span class="badge ok">Credit ${money(Math.abs(s.balance))}</span>` : `<span class="badge ok">Paid up</span>`}
-        ${(s.owed && (c.paymentReminderCount||0) >= 2) ? `<span class="badge escalate" title="${c.paymentReminderCount} payment reminders sent, still unpaid">⚠ Chase</span>` : ''}
-        ${(s.owed && c.paymentReminderSent) ? `<span class="badge paused">🔔 ${fmtDate(c.paymentReminderSentDate).split(' ').slice(0,2).join(' ')}</span>` : ''}
-        ${(c.photos && c.photos.length) ? `<span class="badge paused">📷 ${c.photos.length}</span>` : ''}
-        ${needsPriceReview(c) ? `<span class="badge due" title="12+ months since last price increase">📈 Review</span>` : ''}
-        ${belowTypeAvg ? `<span class="badge due" title="${money(lowBy)} below the average for ${escapeAttr(c.propertyType||'Not recorded')}">💷 Low by ${money(lowBy)}</span>` : ''}
-        ${c.propertyType ? `<span class="badge paused" title="${escapeAttr(propertySummaryText(c))}">🏠 ${escapeHtml(PROPERTY_TYPE_ABBR[c.propertyType]||c.propertyType)}${c.frontsOnly?' · Fronts':''}</span>` : (c.frontsOnly ? `<span class="badge paused">Fronts only</span>` : '')}
-        ${c.textBeforeVisit ? textFirstBadgeHtml(c) : ''}
-        ${showDayBadge ? `<span class="badge anniversary">Day ${c.visitDay||1}</span>` : ''}
-        ${(s.owed && isMobileNumber(c.phone)) ? `<button onclick="event.stopPropagation(); chaseCustomer('${c.id}')" style="display:inline-flex; align-items:center; gap:4px; background:var(--red-dim); color:var(--red); border:none; border-radius:20px; padding:5px 10px; font-size:0.7188rem; font-weight:800; line-height:1;">✉️ Chase</button>` : ''}
-        ${(isMobileNumber(c.phone) && s.lastClean===todayISO()) ? (
+        ${showClean ? (s.cleanBadge ? `<span class="badge ${s.cleanBadge.type}"${c.paused&&c.pauseDate?` title="Paused since ${fmtDate(c.pauseDate)}"`:''}>${s.cleanBadge.text}</span>` : `<span class="badge ok">Cleaned ${fmtDate(s.lastClean)}</span>`) : ''}
+        ${(showClean && !mode && nextDue) ? `<span class="badge paused" title="Next clean due">Next due ${fmtDate(nextDue)}</span>` : ''}
+        ${showPay ? (s.owed ? `<span class="badge owed">Owes ${money(s.balance)}${daysSinceLastPayment(c) ? ` · ${daysSinceLastPayment(c)}d` : ''}</span>` : s.credit ? `<span class="badge ok">Credit ${money(Math.abs(s.balance))}</span>` : `<span class="badge ok">Paid up</span>`) : ''}
+        ${(showPay && s.owed && (c.paymentReminderCount||0) >= 2) ? `<span class="badge escalate" title="${c.paymentReminderCount} payment reminders sent, still unpaid">⚠ Chase</span>` : ''}
+        ${(showPay && s.owed && c.paymentReminderSent) ? `<span class="badge paused">🔔 ${fmtDate(c.paymentReminderSentDate).split(' ').slice(0,2).join(' ')}</span>` : ''}
+        ${(showExtras && c.photos && c.photos.length) ? `<span class="badge paused">📷 ${c.photos.length}</span>` : ''}
+        ${(showExtras && needsPriceReview(c)) ? `<span class="badge due" title="12+ months since last price increase">📈 Review</span>` : ''}
+        ${(showExtras && belowTypeAvg) ? `<span class="badge due" title="${money(lowBy)} below the average for ${escapeAttr(c.propertyType||'Not recorded')}">💷 Low by ${money(lowBy)}</span>` : ''}
+        ${(showClean && c.frontsOnly) ? `<span class="badge paused">Fronts only</span>` : ''}
+        ${(showClean && c.textBeforeVisit) ? textFirstBadgeHtml(c) : ''}
+        ${(showClean && showDayBadge) ? `<span class="badge anniversary">Day ${c.visitDay||1}</span>` : ''}
+        ${(showPay && s.owed && isMobileNumber(c.phone)) ? `<button onclick="event.stopPropagation(); chaseCustomer('${c.id}')" style="display:inline-flex; align-items:center; gap:4px; background:var(--red-dim); color:var(--red); border:none; border-radius:20px; padding:5px 10px; font-size:0.7188rem; font-weight:800; line-height:1;">✉️ Chase</button>` : ''}
+        ${(showClean && isMobileNumber(c.phone) && s.lastClean===todayISO()) ? (
           c.cleanedTodayTextSentDate === s.lastClean
             ? `<button onclick="event.stopPropagation(); sendTemplate('${c.id}','cleanedToday')" title="Sent — tap to send again" style="display:inline-flex; align-items:center; gap:4px; background:var(--green-dim); color:var(--green); border:none; border-radius:20px; padding:5px 10px; font-size:0.7188rem; font-weight:800; line-height:1;">✓ Text sent</button>`
             : `<button onclick="event.stopPropagation(); sendTemplate('${c.id}','cleanedToday')" style="display:inline-flex; align-items:center; gap:4px; background:var(--green-dim); color:var(--green); border:none; border-radius:20px; padding:5px 10px; font-size:0.7188rem; font-weight:800; line-height:1;">💬 Cleaned today</button>`
