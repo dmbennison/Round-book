@@ -1029,20 +1029,141 @@ function rpBind(){
     if(e.key === 'Escape' && document.getElementById('reportPreview').classList.contains('show')) closeReportPreview();
   });
 }
-function openReportPreview(){
+/* ---------- A4 pagination ----------
+   The report is poured into fixed A4 sheets (794 x 1123 px) rather than one long
+   page. Content is measured in a hidden box the same width as a sheet's text area:
+   blocks that don't fit move to the next sheet, long tables are split between rows
+   (the header row repeats on each sheet), a heading is never left alone at the
+   bottom of a sheet, and any element with the rpt-page-break class starts a new
+   sheet. The same sheets feed the preview and the shared PDF. */
+const RP_PAGE_W = 794, RP_PAGE_H = 1123, RP_PAD_X = 32, RP_PAD_T = 32, RP_PAD_B = 44;
+const RP_CONTENT_W = RP_PAGE_W - RP_PAD_X*2;
+const RP_CONTENT_H = RP_PAGE_H - RP_PAD_T - RP_PAD_B;
+
+async function paginateReport(){
+  const stage = document.createElement('div');
+  stage.style.cssText = `position:absolute; left:-99999px; top:0; width:${RP_CONTENT_W}px; visibility:hidden; pointer-events:none; color:#1C2B36; --bg:#ffffff; --surface:#ffffff; --ink:#1C2B36; --ink-muted:#66798A; --line:#E3E9EC; --card-surface:#ffffff; --card-border:transparent; --card-shadow:none;`;
+  const src = document.createElement('div');
+  src.innerHTML = reportMarkupHtml();
+  const box = document.createElement('div');   // the sheet being filled
+  const probe = document.createElement('div'); // for measuring a block on its own
+  box.style.cssText = probe.style.cssText = `display:flow-root; width:${RP_CONTENT_W}px;`;
+  stage.append(src, box, probe);
+  document.body.appendChild(stage);
+  try{
+    await Promise.all([...src.querySelectorAll('img')].map(img => img.complete ? null :
+      new Promise(res => { img.onload = img.onerror = res; setTimeout(res, 4000); })));
+
+    const pages = [];
+    let live = [], path = []; // wrapper clones on the current sheet / the source wrappers they copy
+    const target = () => live.length ? live[live.length-1] : box;
+    const fits = () => box.offsetHeight <= RP_CONTENT_H;
+    const pageEmpty = () => box.textContent.trim() === '' && !box.querySelector('img');
+    const isHeading = el => el.nodeType === 1 && (el.classList.contains('rpt-round-title') || /^H[1-6]$/.test(el.tagName));
+    const rebuildWrappers = () => {
+      live = [];
+      let parent = box;
+      path.forEach(n => { const w = n.cloneNode(false); parent.appendChild(w); live.push(w); parent = w; });
+    };
+    // Closes the current sheet and starts the next; a heading stranded at the foot
+    // of the closed sheet travels with the content that follows it.
+    function startPage(){
+      let carry = null;
+      const last = target().lastElementChild;
+      if(last && isHeading(last)){
+        target().removeChild(last);
+        if(pageEmpty()){ target().appendChild(last); } else { carry = last; }
+      }
+      pages.push(box.innerHTML);
+      box.innerHTML = '';
+      rebuildWrappers();
+      if(carry) target().appendChild(carry);
+    }
+    function splitTable(table){
+      const rows = [...table.rows].filter(r => r.parentNode.tagName !== 'THEAD');
+      const head = table.tHead;
+      let tb, tbl;
+      const fresh = () => {
+        tbl = table.cloneNode(false);
+        if(head) tbl.appendChild(head.cloneNode(true));
+        tb = document.createElement('tbody');
+        tbl.appendChild(tb);
+        target().appendChild(tbl);
+      };
+      fresh();
+      rows.forEach(r => {
+        tb.appendChild(r);
+        if(fits()) return;
+        tb.removeChild(r);
+        if(tb.children.length){ startPage(); fresh(); tb.appendChild(r); return; }
+        // Not even one row fits under whatever is already on this sheet.
+        target().removeChild(tbl);
+        if(pageEmpty()){ target().appendChild(tbl); tb.appendChild(r); return; }
+        startPage(); fresh(); tb.appendChild(r);
+      });
+    }
+    function place(node){
+      if(node.nodeType === 3){
+        if(!node.textContent.trim()) return;
+        const sp = document.createElement('span'); sp.textContent = node.textContent; node = sp;
+      } else if(node.nodeType !== 1) return;
+      if(node.classList.contains('rpt-page-break')){
+        node.classList.remove('rpt-page-break');
+        if(!pageEmpty()) startPage();
+      }
+      target().appendChild(node);
+      if(fits()) return;
+      target().removeChild(node);
+      probe.appendChild(node);
+      const h = probe.offsetHeight;
+      probe.removeChild(node);
+      if(h <= RP_CONTENT_H){            // fits on a sheet of its own: move it over
+        if(!pageEmpty()) startPage();
+        target().appendChild(node);
+        return;
+      }
+      if(node.tagName === 'TABLE'){ splitTable(node); return; }
+      if(node.children.length){          // taller than a sheet: split it up child by child
+        const w = node.cloneNode(false);
+        target().appendChild(w); live.push(w); path.push(node);
+        [...node.childNodes].forEach(place);
+        live.pop(); path.pop();
+        return;
+      }
+      if(!pageEmpty()) startPage();      // can't be split: give it a sheet to itself
+      target().appendChild(node);
+    }
+    [...src.childNodes].forEach(place);
+    if(box.innerHTML.trim() || !pages.length) pages.push(box.innerHTML);
+    return pages;
+  } finally {
+    document.body.removeChild(stage);
+  }
+}
+function reportSheetHtml(inner, i, n, flat){
+  return `<div class="rp-sheet"${flat ? ' style="box-shadow:none;"' : ''}>${inner}${n > 1 ? `<div class="rp-sheet-foot">Page ${i+1} of ${n}</div>` : ''}</div>`;
+}
+
+let rpToken = 0;
+async function openReportPreview(){
   const { root, paper } = rpEls();
   rpBind();
+  const token = ++rpToken;
   document.getElementById('rpTitle').innerHTML = pendingReportTitle;
-  paper.innerHTML = reportMarkupHtml();
+  paper.innerHTML = '<div class="rp-wait">Preparing preview…</div>';
   root.classList.add('show');
   rpScale = 1; rpAtFit = true;
   rpFit();
-  // Logos and photos can finish loading after the page is measured.
-  paper.querySelectorAll('img').forEach(img => {
-    if(!img.complete) img.addEventListener('load', () => { if(rpAtFit) rpFit(); else rpApply(rpScale, 0, 0); }, {once:true});
-  });
+  let pages;
+  try{ pages = await paginateReport(); }
+  catch(e){ pages = [reportMarkupHtml()]; } // never leave the person without a preview
+  if(token !== rpToken || !root.classList.contains('show')) return; // closed (or replaced) meanwhile
+  paper.innerHTML = pages.map((p, i) => reportSheetHtml(p, i, pages.length)).join('');
+  rpScale = 1; rpAtFit = true;
+  rpFit();
 }
 function closeReportPreview(){
+  rpToken++;
   const { root, paper } = rpEls();
   root.classList.remove('show');
   paper.innerHTML = '';
@@ -1069,40 +1190,30 @@ function sanitizeFilename(str){
   return (clean || 'Document').slice(0,60);
 }
 
-// Renders the pending report's title + body into an offscreen copy of the print
-// layout (same markup printPendingReport uses), rasterizes it, and packs it into
-// an A4 PDF — paginating automatically if the content runs longer than one page.
+// Builds the PDF from the same A4 sheets the preview shows: each sheet is rendered
+// offscreen, rasterized, and placed on its own full A4 page.
 async function generatePendingReportPdfBlob(){
-  const container = document.createElement('div');
-  container.style.cssText = 'position:fixed; left:-9999px; top:0; width:794px; background:#ffffff; padding:32px; color:#1C2B36; --bg:#ffffff; --surface:#ffffff; --ink:#1C2B36; --ink-muted:#66798A; --line:#E3E9EC; --card-surface:#ffffff; --card-border:transparent; --card-shadow:none;';
-  container.innerHTML = reportMarkupHtml();
-  document.body.appendChild(container);
-  try{
-    const imgs = [...container.querySelectorAll('img')];
-    await Promise.all(imgs.map(img => img.complete ? Promise.resolve() : new Promise(res=>{ img.onload = img.onerror = res; })));
-    const canvas = await html2canvas(container, { scale: 2, backgroundColor: '#ffffff', useCORS: true });
-    const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF({ unit: 'pt', format: 'a4' });
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    const margin = 24;
-    const imgWidth = pageWidth - margin*2;
-    const imgHeight = canvas.height * imgWidth / canvas.width;
-    const imgData = canvas.toDataURL('image/png');
-    let heightLeft = imgHeight;
-    let position = margin;
-    pdf.addImage(imgData, 'PNG', margin, position, imgWidth, imgHeight);
-    heightLeft -= (pageHeight - margin*2);
-    while(heightLeft > 0){
-      position = margin - (imgHeight - heightLeft);
-      pdf.addPage();
-      pdf.addImage(imgData, 'PNG', margin, position, imgWidth, imgHeight);
-      heightLeft -= (pageHeight - margin*2);
+  const pages = await paginateReport();
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({ unit: 'pt', format: 'a4' });
+  const pw = pdf.internal.pageSize.getWidth();
+  const ph = pdf.internal.pageSize.getHeight();
+  for(let i = 0; i < pages.length; i++){
+    const holder = document.createElement('div');
+    holder.style.cssText = `position:fixed; left:-9999px; top:0; width:${RP_PAGE_W}px; height:${RP_PAGE_H}px; background:#ffffff;`;
+    holder.innerHTML = reportSheetHtml(pages[i], i, pages.length, true);
+    document.body.appendChild(holder);
+    try{
+      const imgs = [...holder.querySelectorAll('img')];
+      await Promise.all(imgs.map(img => img.complete ? Promise.resolve() : new Promise(res=>{ img.onload = img.onerror = res; })));
+      const canvas = await html2canvas(holder, { scale: 2, backgroundColor: '#ffffff', useCORS: true, width: RP_PAGE_W, height: RP_PAGE_H });
+      if(i > 0) pdf.addPage();
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, pw, ph);
+    } finally {
+      document.body.removeChild(holder);
     }
-    return pdf.output('blob');
-  } finally {
-    document.body.removeChild(container);
   }
+  return pdf.output('blob');
 }
 
 // Shares a PDF Blob via the native share sheet (WhatsApp is one of the apps offered

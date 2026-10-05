@@ -230,7 +230,96 @@ function renderTodayHome(main){
         </div>` : ''}
       </div>
     </div>
+    ${fuelBoxHtml()}
   `;
+  if(fuelBoxOpen) loadFuelWidget();
+}
+
+/* ---------- fuel prices box (Today) ----------
+   A collapsed box under the Today tiles. Nothing is fetched until it's opened: it then
+   asks for the device's location and shows the free CheckFuelPrices.co.uk widget
+   (an embedded page, so no API key and nothing stored here) for the nearest stations.
+   Needs a signal; if location is refused, a postcode can be entered instead. */
+let fuelBoxOpen = false;
+function fuelLs(key, val){
+  try{ if(val === undefined) return localStorage.getItem(key); localStorage.setItem(key, val); }catch(e){}
+  return null;
+}
+function fuelType(){ return fuelLs('roundBookFuelType') === 'E10' ? 'E10' : 'B7'; }
+function fuelBoxHtml(){
+  const chev = '<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
+  return `<details class="cust-section" style="margin-top:12px;"${fuelBoxOpen?' open':''} ontoggle="onFuelBoxToggle(this)">
+    <summary>⛽ Fuel prices ${chev}</summary>
+    <div class="cust-section-body" id="fuelBody"></div>
+  </details>`;
+}
+function onFuelBoxToggle(el){
+  fuelBoxOpen = el.open;
+  if(el.open) loadFuelWidget();
+}
+function setFuelType(t){
+  fuelLs('roundBookFuelType', t === 'E10' ? 'E10' : 'B7');
+  const body = document.getElementById('fuelBody');
+  if(body){ delete body.dataset.state; loadFuelWidget(); }
+}
+function saveFuelPostcode(){
+  const el = document.getElementById('fuelPostcodeInput');
+  const pc = el ? el.value.trim() : '';
+  if(!pc){ toast('Enter a postcode'); return; }
+  fuelLs('roundBookFuelPostcode', pc);
+  const body = document.getElementById('fuelBody');
+  if(body){ delete body.dataset.state; loadFuelWidget(); }
+}
+function clearFuelPostcode(){
+  fuelLs('roundBookFuelPostcode', '');
+  const body = document.getElementById('fuelBody');
+  if(body){ delete body.dataset.state; loadFuelWidget(); }
+}
+function loadFuelWidget(){
+  const body = document.getElementById('fuelBody');
+  if(!body || body.dataset.state) return; // already loading / shown for this render
+  body.dataset.state = 'loading';
+  const type = fuelType();
+  const toggle = `<div class="seg-row" style="margin-bottom:10px;">
+    <button class="seg-btn seg-btn-sm ${type==='B7'?'active':''}" onclick="setFuelType('B7')">Diesel</button>
+    <button class="seg-btn seg-btn-sm ${type==='E10'?'active':''}" onclick="setFuelType('E10')">Petrol</button>
+  </div>`;
+  const note = `<div style="font-size:0.6875rem; color:var(--ink-muted); margin-top:8px; line-height:1.5;">Prices from <a href="https://checkfuelprices.co.uk" target="_blank" rel="noopener" style="color:var(--blue); font-weight:700;">checkfuelprices.co.uk</a> · always check at the pump</div>`;
+  const msg = t => `<p style="color:var(--ink-muted); font-size:0.8125rem; line-height:1.5; margin:4px 2px;">${t}</p>`;
+  if(!navigator.onLine){
+    body.innerHTML = toggle + msg('No signal — fuel prices need an internet connection.');
+    body.dataset.state = 'ready';
+    return;
+  }
+  const stillHere = () => document.getElementById('fuelBody') === body && fuelBoxOpen;
+  const showWidget = (locParam, usingPostcode) => {
+    if(!stillHere()) return;
+    const theme = document.body.classList.contains('dark') ? 'dark' : 'light';
+    const src = `https://checkfuelprices.co.uk/widget/embed?${locParam}&fuel=${type}&radius=5&limit=5&sort=price_low&theme=${theme}&search=false&filters=false`;
+    body.innerHTML = toggle +
+      `<iframe src="${src}" title="Local fuel prices" style="width:100%; height:460px; border:0; border-radius:12px; background:#fff;"></iframe>` +
+      (usingPostcode ? `<div style="font-size:0.75rem; margin-top:8px;"><span style="color:var(--ink-muted);">Using postcode ${escapeHtml(fuelLs('roundBookFuelPostcode')||'')}</span> · <button onclick="clearFuelPostcode()" style="background:none; border:none; padding:0; color:var(--blue); font-size:0.75rem; font-weight:700;">use my location</button></div>` : '') +
+      note;
+    body.dataset.state = 'ready';
+  };
+  const askPostcode = why => {
+    if(!stillHere()) return;
+    body.innerHTML = toggle + msg(why) +
+      `<div style="display:flex; gap:8px; margin-top:8px;">
+        <input type="text" id="fuelPostcodeInput" placeholder="Postcode or town" autocapitalize="characters" style="flex:1; min-width:0; margin:0;">
+        <button class="btn-open" style="width:auto; padding:0 16px; font-weight:800;" onclick="saveFuelPostcode()">Go</button>
+      </div>` + note;
+    body.dataset.state = 'ready';
+  };
+  const saved = (fuelLs('roundBookFuelPostcode') || '').trim();
+  if(saved){ showWidget('postcode=' + encodeURIComponent(saved), true); return; }
+  body.innerHTML = toggle + msg('Finding prices near you…');
+  if(!navigator.geolocation){ askPostcode('This device can\'t share its location — enter a postcode instead.'); return; }
+  navigator.geolocation.getCurrentPosition(
+    pos => showWidget(`coords=${pos.coords.latitude.toFixed(4)},${pos.coords.longitude.toFixed(4)}`, false),
+    () => askPostcode('Couldn\'t get your location — enter a postcode or town instead.'),
+    { enableHighAccuracy:false, timeout:10000, maximumAge:600000 }
+  );
 }
 
 /* ---------- mileage tracking ----------
