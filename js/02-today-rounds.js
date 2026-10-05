@@ -1862,6 +1862,7 @@ function custCardHtml(c, mode){
         ${(showExtras && c.photos && c.photos.length) ? `<span class="badge paused">📷 ${c.photos.length}</span>` : ''}
         ${(showExtras && needsPriceReview(c)) ? `<span class="badge due" title="12+ months since last price increase">📈 Review</span>` : ''}
         ${(showExtras && belowTypeAvg) ? `<span class="badge due" title="${money(lowBy)} below the average for ${escapeAttr(c.propertyType||'Not recorded')}">💷 Low by ${money(lowBy)}</span>` : ''}
+        ${(showClean && couldntCleanActive(c)) ? `<span class="badge escalate" title="Couldn't be cleaned on ${fmtDate(c.couldntCleanDate)}">🚫 Couldn't clean ${fmtDate(c.couldntCleanDate).split(' ').slice(0,2).join(' ')}</span>` : ''}
         ${(showClean && c.frontsOnly) ? `<span class="badge paused">Fronts only</span>` : ''}
         ${(showClean && c.textBeforeVisit) ? textFirstBadgeHtml(c) : ''}
         ${(showClean && showDayBadge) ? `<span class="badge anniversary">Day ${c.visitDay||1}</span>` : ''}

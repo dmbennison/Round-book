@@ -421,7 +421,9 @@ function deferredDateFor(c, days){
   if(c.deferUntil && c.deferUntil > base) base = c.deferUntil;
   const d = new Date(base+'T00:00:00');
   d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0,10);
+  // Local date parts — toISOString() converts to UTC, which in British Summer Time
+  // lands a day early.
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
 }
 function deferLabel(days){
   if(days===1) return '1 day';
@@ -429,10 +431,34 @@ function deferLabel(days){
   if(days===28) return '4 weeks';
   return `${days} days`;
 }
+// "Couldn't clean": nobody home, locked gate, bad weather etc. Skips this clean by
+// deferring a full cycle from today (so they come round again at their next normal
+// clean date) and flags the card until they're next cleaned — the flag is tied to
+// the date, so any clean logged on or after it makes the flag disappear by itself.
+function markCouldntClean(id){
+  const c = data.customers.find(x=>x.id===id);
+  if(!c) return;
+  const prev = { deferUntil: c.deferUntil, couldntCleanDate: c.couldntCleanDate };
+  c.couldntCleanDate = todayISO();
+  c.deferUntil = deferredDateFor({ cleanHistory: [], frequencyWeeks: c.frequencyWeeks, deferUntil: null }, freqDays(c));
+  saveData(); closeSheet(); render();
+  toast(`Couldn't clean ${c.name||c.address||'customer'} — deferred to ${fmtDate(c.deferUntil)}`, 'Undo', () => {
+    c.deferUntil = prev.deferUntil;
+    c.couldntCleanDate = prev.couldntCleanDate;
+    saveData(); render();
+  });
+}
+// True while the "couldn't clean" flag still applies: set, and no clean since.
+function couldntCleanActive(c){
+  if(!c.couldntCleanDate) return false;
+  const last = lastDateOf(c.cleanHistory);
+  return !last || last < c.couldntCleanDate;
+}
 function cancelDefer(id){
   const c = data.customers.find(x=>x.id===id);
   if(!c) return;
   c.deferUntil = null;
+  c.couldntCleanDate = null;
   saveData(); openCustomerDetail(id); render();
   toast('Defer cancelled');
 }
@@ -1125,7 +1151,7 @@ function chaseCustomer(id){
   const c = data.customers.find(x=>x.id===id);
   if(!c || !isMobileNumber(c.phone)){ toast('No mobile number saved for this customer'); return; }
   const s = custStatus(c);
-  const tpl = data.settings.payTemplate;
+  const tpl = payTemplateFor(c.paymentReminderCount); // friendly the first time, firmer after
   const firstName = c.name ? c.name.trim().split(' ')[0] : '';
   const company = data.settings.companyName || '';
   const yourname = data.settings.yourName || '';
@@ -1157,16 +1183,20 @@ function openBulkReminders(kind, roundName){
 
   const tplField = document.getElementById('bulk_msg');
   const tpl = tplField ? tplField.value : (kind==='owed' ? data.settings.payTemplate : data.settings.cleanTemplate);
+  const tplField2 = document.getElementById('bulk_msg2');
+  const tpl2 = tplField2 ? tplField2.value : (data.settings.payFollowUpTemplate || DEFAULT_PAY_FOLLOWUP_TEMPLATE);
 
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">Remind — ${escapeHtml(roundName)}</h2>
       <button class="sheet-close" onclick="closeSheet()">✕</button>
     </div>
-    <label style="margin-top:0;">Message <span style="text-transform:none; font-weight:500; opacity:0.7;">({name}${kind==='owed'?', {amount}, {bankdetails}':''}, {company}, {yourname})</span></label>
+    <label style="margin-top:0;">${kind==='owed' ? 'First reminder' : 'Message'} <span style="text-transform:none; font-weight:500; opacity:0.7;">({name}${kind==='owed'?', {amount}, {bankdetails}':''}, {company}, {yourname})</span></label>
     <textarea id="bulk_msg" rows="4">${escapeHtml(tpl)}</textarea>
+    ${kind==='owed' ? `<label>Follow-up (2nd chase onwards)</label>
+    <textarea id="bulk_msg2" rows="4">${escapeHtml(tpl2)}</textarea>` : ''}
     <p style="color:var(--ink-muted); font-size:0.7812rem; margin:10px 2px 14px; line-height:1.5;">
-      Tap Send for each customer — it opens ${data.settings.messagingApp==='whatsapp'?'WhatsApp':'Messages'} pre-filled and ready to go. Come back here for the next one.
+      Tap Send for each customer — it opens ${data.settings.messagingApp==='whatsapp'?'WhatsApp':'Messages'} pre-filled and ready to go. ${kind==='owed' ? 'Anyone who has already been chased gets the firmer follow-up wording automatically. ' : ''}Come back here for the next one.
     </p>
     ${list.map(c=>{
       const s = custStatus(c);
@@ -1221,8 +1251,10 @@ function openBulkTextBeforeVisit(){
 function sendBulkReminder(id, kind){
   const c = data.customers.find(x=>x.id===id);
   if(!c || !isMobileNumber(c.phone)) return;
-  const msgField = document.getElementById('bulk_msg');
-  const tpl = msgField ? msgField.value : (kind==='owed' ? data.settings.payTemplate : data.settings.cleanTemplate);
+  // Owed reminders: the first chase uses the first box, every later one the follow-up box.
+  const followUp = kind === 'owed' && (c.paymentReminderCount||0) >= 1;
+  const msgField = document.getElementById(followUp ? 'bulk_msg2' : 'bulk_msg');
+  const tpl = msgField ? msgField.value : (kind==='owed' ? payTemplateFor(c.paymentReminderCount) : data.settings.cleanTemplate);
   const firstName = c.name ? c.name.trim().split(' ')[0] : '';
   const company = data.settings.companyName || '';
   const yourname = data.settings.yourName || '';

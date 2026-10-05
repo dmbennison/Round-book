@@ -6,13 +6,14 @@ const STORE_KEY = 'roundBookData_v1';
 // APP_VERSION is a plain decimal number (e.g. 1.01, 1.02 ... 1.99, 2.00) —
 // bump by 0.01 for every change. formatVersion always renders it to exactly
 // two decimal places, so it's never shown as "1.1" or "1.100".
-const APP_VERSION = 2.40;
+const APP_VERSION = 2.41;
 function formatVersion(v){ return Number(v).toFixed(2); }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
 // entry (newest first) with ONE very short plain-English summary, then delete
 // entries so only the latest ten remain.
 const VERSION_HISTORY = [
+  {version: 2.41, changes: ['Payment chase: friendly wording on the first only, firmer on every chase after; new Couldn\'t clean button defers a customer a full cycle and flags the card']},
   {version: 2.40, changes: ['Collapsed Fuel prices box on Today: free local diesel/petrol prices from CheckFuelPrices, loaded only when opened']},
   {version: 2.39, changes: ['Report preview and shared PDFs now laid out as separate A4 sheets with page numbers']},
   {version: 2.38, changes: ['Property type badge removed from customer cards; Due view shows only clean info and Owed view only payment info']},
@@ -22,7 +23,6 @@ const VERSION_HISTORY = [
   {version: 2.34, changes: ['Full-width iPad header; cheapest nearby diesel shown in the Mileage box']},
   {version: 2.33, changes: ['Swiping a clean opens the "windows cleaned" text ready to send']},
   {version: 2.32, changes: ['Photos now sync; text labels on annotated photos; bigger passphrase box']},
-  {version: 2.31, changes: ['Map, route suggestion, directions and reorder follow the list filters']}
 ];
 const DIRECTIONS_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>';
 const CALL_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>';
@@ -232,7 +232,7 @@ async function deliverTextFiles(items, shareTitle){
 
 const DEFAULT_CLEAN_TEMPLATE = "Hi {name}, just a reminder I'll be round to clean your windows soon. Let me know if that's not convenient.\n\nThanks,\n{yourname}\n{company}";
 const DEFAULT_PAY_TEMPLATE = "Hi {name}, a friendly reminder that your window cleaning payment of {amount} is outstanding.\n\n{bankdetails}Thanks,\n{yourname}\n{company}";
-const DEFAULT_PAY_FOLLOWUP_TEMPLATE = "Hi {name}, following up again — your window cleaning payment of {amount} is now {daysoverdue} days overdue. Could you sort this when you get a chance?\n\n{bankdetails}Thanks,\n{yourname}\n{company}";
+const DEFAULT_PAY_FOLLOWUP_TEMPLATE = "Hi {name}, this is a further reminder — your window cleaning payment of {amount} is now {daysoverdue} days overdue and still unpaid. Please arrange payment today.\n\n{bankdetails}Thanks,\n{yourname}\n{company}";
 const DEFAULT_RECEIPT_TEMPLATE = "Hi {name}, thank you for your payment of {amount} received {date}.\n\nThanks,\n{yourname}\n{company}";
 const DEFAULT_QUOTE_TEMPLATE = "Hi {name}, thanks for your enquiry. I'd quote {amount} for the following work: {work}\nLet me know if you'd like to go ahead.\nThanks,\n{yourname}\n{company}";
 const DEFAULT_REPEAT_QUOTE_TEMPLATE = "Hi {name}, hope you're well! I cleaned your windows for you before and wondered if you'd like the same job done again? I'd quote {amount} for the following work: {work}\n\nJust let me know and I'll get you booked back in.\n\nThanks,\n{yourname}\n{company}";
@@ -298,7 +298,9 @@ function migrateData(parsed){
   const OLD_CLEANED_TODAY_TEMPLATES = ["Hi {name}, your windows have been cleaned today!\n\n{bankdetails}Thanks,\n{yourname}\n{company}", "Hi {name}, your windows have been cleaned today! The cost for this clean is {amount}.\n\n{bankdetails}Thanks,\n{yourname}\n{company}"];
   if(!parsed.settings.cleanTemplate || OLD_CLEAN_TEMPLATES.includes(parsed.settings.cleanTemplate)) parsed.settings.cleanTemplate = DEFAULT_CLEAN_TEMPLATE;
   if(!parsed.settings.payTemplate || OLD_PAY_TEMPLATES.includes(parsed.settings.payTemplate)) parsed.settings.payTemplate = DEFAULT_PAY_TEMPLATE;
-  if(!parsed.settings.payFollowUpTemplate) parsed.settings.payFollowUpTemplate = DEFAULT_PAY_FOLLOWUP_TEMPLATE;
+  // Upgrade the earlier, gentler follow-up wording — but only if it was never customised.
+  const OLD_PAY_FOLLOWUP_TEMPLATES = ["Hi {name}, following up again — your window cleaning payment of {amount} is now {daysoverdue} days overdue. Could you sort this when you get a chance?\n\n{bankdetails}Thanks,\n{yourname}\n{company}"];
+  if(!parsed.settings.payFollowUpTemplate || OLD_PAY_FOLLOWUP_TEMPLATES.includes(parsed.settings.payFollowUpTemplate)) parsed.settings.payFollowUpTemplate = DEFAULT_PAY_FOLLOWUP_TEMPLATE;
   if(!parsed.settings.receiptTemplate || OLD_RECEIPT_TEMPLATES.includes(parsed.settings.receiptTemplate)) parsed.settings.receiptTemplate = DEFAULT_RECEIPT_TEMPLATE;
   if(!parsed.settings.quoteTemplate || OLD_QUOTE_TEMPLATES.includes(parsed.settings.quoteTemplate)) parsed.settings.quoteTemplate = DEFAULT_QUOTE_TEMPLATE;
   if(!parsed.settings.repeatQuoteTemplate || OLD_REPEAT_QUOTE_TEMPLATES.includes(parsed.settings.repeatQuoteTemplate)) parsed.settings.repeatQuoteTemplate = DEFAULT_REPEAT_QUOTE_TEMPLATE;
@@ -350,6 +352,7 @@ function migrateData(parsed){
     if(c.paymentReminderSent == null) c.paymentReminderSent = false;
     if(c.paymentReminderSentDate === undefined) c.paymentReminderSentDate = null;
     if(c.deferUntil === undefined) c.deferUntil = null;
+    if(c.couldntCleanDate === undefined) c.couldntCleanDate = null;
     if(c.paymentReminderCount == null) c.paymentReminderCount = 0;
     if(!c.messageLog) c.messageLog = [];
     if(!c.marketingStatus) c.marketingStatus = 'awaiting';

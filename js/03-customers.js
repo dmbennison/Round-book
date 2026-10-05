@@ -509,8 +509,9 @@ function openCustomerDetail(id){
           <button class="btn btn-paid" onclick="openAddPaymentForm('${id}')">+ Add a payment</button>
         </div>
         ${!c.paused ? `
-          ${(s.cleanBadge && s.cleanBadge.type === 'deferred') ? `<div style="font-size:0.75rem; color:var(--ink-muted); margin:0 2px 6px;">⏭ Deferred to ${fmtDate(c.deferUntil)}</div>` : ''}
+          ${(s.cleanBadge && s.cleanBadge.type === 'deferred') ? `<div style="font-size:0.75rem; color:var(--ink-muted); margin:0 2px 6px;">⏭ Deferred to ${fmtDate(c.deferUntil)}${couldntCleanActive(c) ? ` · couldn't clean ${fmtDate(c.couldntCleanDate)}` : ''}</div>` : ''}
           <button class="btn" style="width:100%; background:var(--blue-dim); color:var(--blue-deep); margin-bottom:10px;" onclick="openDeferSheet('customer','${id}')">⏭ Defer</button>
+          <button class="btn" style="width:100%; background:var(--amber-dim); color:var(--amber); margin-bottom:10px;" onclick="markCouldntClean('${id}')">🚫 Couldn't clean — defer to next clean</button>
         ` : ''}
         <button class="btn" style="width:100%; background:var(--green-dim); color:var(--green); margin-bottom:10px;" onclick="openCustomerUpliftSheet('${id}')">📈 Apply price uplift</button>
         <button class="btn" style="width:100%; background:${c.paused?'var(--green-dim)':'var(--line)'}; color:${c.paused?'var(--green)':'var(--ink-muted)'}; margin-bottom:10px;" onclick="${c.paused?`resumeCustomer('${id}')`:`openPauseReasonSheet('${id}')`}">
