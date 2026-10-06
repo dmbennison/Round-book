@@ -6,13 +6,14 @@ const STORE_KEY = 'roundBookData_v1';
 // APP_VERSION is a plain decimal number (e.g. 1.01, 1.02 ... 1.99, 2.00) —
 // bump by 0.01 for every change. formatVersion always renders it to exactly
 // two decimal places, so it's never shown as "1.1" or "1.100".
-const APP_VERSION = 2.46;
+const APP_VERSION = 2.47;
 function formatVersion(v){ return Number(v).toFixed(2); }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
 // entry (newest first) with ONE very short plain-English summary, then delete
 // entries so only the latest ten remain.
 const VERSION_HISTORY = [
+  {version: 2.47, changes: ['iPad: print and help icons inside customer and quote screens no longer show as blank circles; user guide rewritten shorter and simpler']},
   {version: 2.46, changes: ['Fuel prices on Today is now a one-tap link to the live price map (the embedded list showed out-of-date prices)']},
   {version: 2.45, changes: ['Annotations can be moved, selected, deleted and undone; new Before & after photo maker (landscape side by side, or portrait for social media) with labels']},
   {version: 2.44, changes: ['Fuel prices box: nearest stations first (cheapest-first was surfacing out-of-date prices), fresh load every time, link to the live list']},
@@ -22,7 +23,6 @@ const VERSION_HISTORY = [
   {version: 2.40, changes: ['Collapsed Fuel prices box on Today: free local diesel/petrol prices from CheckFuelPrices, loaded only when opened']},
   {version: 2.39, changes: ['Report preview and shared PDFs now laid out as separate A4 sheets with page numbers']},
   {version: 2.38, changes: ['Property type badge removed from customer cards; Due view shows only clean info and Owed view only payment info']},
-  {version: 2.37, changes: ['Round stats in a Statistics dropdown; gallery moved under the info button; reports open in a zoomable preview with Print, Share PDF and Share doc']},
 ];
 const DIRECTIONS_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>';
 const CALL_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>';
