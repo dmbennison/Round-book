@@ -295,10 +295,15 @@ function loadFuelWidget(){
   const showWidget = (locParam, usingPostcode) => {
     if(!stillHere()) return;
     const theme = document.body.classList.contains('dark') ? 'dark' : 'light';
-    const src = `https://checkfuelprices.co.uk/widget/embed?${locParam}&fuel=${type}&radius=5&limit=5&sort=price_low&theme=${theme}&search=false&filters=false`;
+    // Nearest first, not cheapest first: a cheapest-first list rises to the top any station
+    // whose low price is simply old (prices have been climbing). The t= value is ignored by
+    // the widget but makes every open fetch a fresh copy instead of a cached one.
+    const src = `https://checkfuelprices.co.uk/widget/embed?${locParam}&fuel=${type}&radius=5&limit=5&sort=distance&theme=${theme}&search=false&filters=false&t=${Date.now()}`;
+    const liveUrl = usingPostcode ? 'https://checkfuelprices.co.uk/search?postcode=' + encodeURIComponent(fuelLs('roundBookFuelPostcode')||'') : 'https://checkfuelprices.co.uk/fuel-prices-near-me';
     body.innerHTML = toggle +
       `<iframe src="${src}" title="Local fuel prices" style="width:100%; height:460px; border:0; border-radius:12px; background:#fff;"></iframe>` +
       (usingPostcode ? `<div style="font-size:0.75rem; margin-top:8px;"><span style="color:var(--ink-muted);">Using postcode ${escapeHtml(fuelLs('roundBookFuelPostcode')||'')}</span> · <button onclick="clearFuelPostcode()" style="background:none; border:none; padding:0; color:var(--blue); font-size:0.75rem; font-weight:700;">use my location</button></div>` : '') +
+      `<div style="font-size:0.75rem; margin-top:8px;">Nearest stations first · <a href="${liveUrl}" target="_blank" rel="noopener" style="color:var(--blue); font-weight:700;">open the full live list ↗</a></div>` +
       note;
     body.dataset.state = 'ready';
   };
