@@ -274,6 +274,7 @@ initStorage().catch(()=>{}).finally(()=>{
   if(!maybeShowFirstRun()) maybeShowMissingMileagePrompt();
   requestPersistentStorage();
   maybeAutoSafetyCopy();
+  if(typeof liveSyncInit === 'function') liveSyncInit();
 });
 // A home-screen app can stay open for days, so also check each time it comes
 // back to the foreground whether a daily safety copy is due.

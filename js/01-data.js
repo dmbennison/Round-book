@@ -6,13 +6,14 @@ const STORE_KEY = 'roundBookData_v1';
 // APP_VERSION is a plain decimal number (e.g. 1.01, 1.02 ... 1.99, 2.00) —
 // bump by 0.01 for every change. formatVersion always renders it to exactly
 // two decimal places, so it's never shown as "1.1" or "1.100".
-const APP_VERSION = 2.42;
+const APP_VERSION = 2.43;
 function formatVersion(v){ return Number(v).toFixed(2); }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
 // entry (newest first) with ONE very short plain-English summary, then delete
 // entries so only the latest ten remain.
 const VERSION_HISTORY = [
+  {version: 2.43, changes: ['Live sync: devices stay in step automatically through your own free Cloudflare mailbox (encrypted on-device first); sync status shown in the header']},
   {version: 2.42, changes: ['Pinch, double-tap and drag to zoom photos; send a photo with an offer text (gutter clearing, conservatory roof, fascias) from the photo viewer']},
   {version: 2.41, changes: ['Payment chase: friendly wording on the first only, firmer on every chase after; new Couldn\'t clean button defers a customer a full cycle and flags the card']},
   {version: 2.40, changes: ['Collapsed Fuel prices box on Today: free local diesel/petrol prices from CheckFuelPrices, loaded only when opened']},
@@ -22,7 +23,6 @@ const VERSION_HISTORY = [
   {version: 2.36, changes: ['Diesel price feature removed; Jobs box only on Today when a job is due; quotes count now a yellow badge on the Quotes tab']},
   {version: 2.35, changes: ['Diesel line always shows its status, with a details screen when it can\'t get prices']},
   {version: 2.34, changes: ['Full-width iPad header; cheapest nearby diesel shown in the Mileage box']},
-  {version: 2.33, changes: ['Swiping a clean opens the "windows cleaned" text ready to send']},
 ];
 const DIRECTIONS_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>';
 const CALL_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>';

@@ -62,6 +62,7 @@ async function syncMetaSave(meta){
 // Forget what we know about the other device (keeps the passphrase). Used after
 // restoring a backup / safety copy, when this device's data has jumped back in time.
 async function syncForgetBase(){
+  if(typeof liveForgetBase === 'function'){ try{ await liveForgetBase(); }catch(e){} }
   const meta = await syncMetaGet();
   if(!meta.base && !meta.lastPeerFileAt) return;
   await syncMetaSave(Object.assign({}, meta, {base:null, peerDeviceId:null, lastPeerFileAt:0}));
@@ -632,8 +633,9 @@ async function openSyncSheet(){
       <h2 style="flex:1; min-width:0;">Sync with another device</h2>
       <button class="sheet-close" onclick="closeSheet()">✕</button>
     </div>
+    ${liveSyncSectionHtml(meta)}
     <p style="color:var(--ink-muted); font-size:0.8438rem; line-height:1.5; margin:0 2px 14px;">
-      Keep your phone and iPad in step with no internet account. One device makes encrypted files, you AirDrop them across, and the other device merges them in — data and photos. Nothing readable ever leaves your devices. When you receive, choose all the files from the send together.
+      Prefer no cloud at all? Keep your phone and iPad in step with no internet account. One device makes encrypted files, you AirDrop them across, and the other device merges them in — data and photos. Nothing readable ever leaves your devices. When you receive, choose all the files from the send together.
     </p>
     <p style="color:var(--ink-muted); font-size:0.7812rem; font-weight:700; line-height:1.6; margin:0 2px 16px;">
       Last sent from this device: ${syncWhenText(meta.lastExportAt)}<br>
@@ -654,10 +656,10 @@ async function openSyncSheet(){
   `, () => openBackup());
 }
 function syncConfirmForget(){
-  appConfirm('This device will forget the sync passphrase and what it knows about the other device. Your customers and data are not touched. To sync again you\'d set up the pairing again.', {
+  appConfirm('This device will forget the file-sync passphrase and what it knows about the other device (live sync, if you use it, is separate and isn\'t affected). Your customers and data are not touched. To sync again you\'d set up the pairing again.', {
     title:'Forget pairing', confirmLabel:'Forget pairing',
     onConfirm: async () => {
-      try{ await syncMetaPut({}); }catch(e){}
+      try{ const m = await syncMetaGet(); await syncMetaPut({ live: m.live, liveUrl: m.liveUrl }); }catch(e){}
       toast('Pairing forgotten');
       openSyncSheet();
     }
