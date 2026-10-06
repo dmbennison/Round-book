@@ -16,6 +16,9 @@ let annotateStrokes = [];   // finished shapes: {type, color, ...}
 let annotateDrawing = null; // the in-progress shape while a finger/pointer is down
 let annotatePointerId = null;
 let annotateTextPoint = null; // where a Text-tool tap landed, until its label has been typed
+let annotateSelected = null;  // the annotation picked with the Move tool
+let annotateHistory = [];     // undo steps: {kind:'add'|'move'|'delete', ...}
+let annotateMoveDrag = null;  // {s, last, dx, dy} while an annotation is being dragged
 
 function openPhotoAnnotator(){
   const entry = photoViewerList[photoViewerIndex];
@@ -28,6 +31,7 @@ function openPhotoAnnotator(){
   annotateTextPoint = null;
   annotateTool = 'circle';
   annotateColor = ANNOTATE_COLORS[0];
+  annotateSelected = null; annotateHistory = []; annotateMoveDrag = null;
   const img = new Image();
   img.onload = () => { annotateImg = img; renderPhotoAnnotator(); };
   img.onerror = () => toast('Could not load that photo to annotate');
@@ -35,6 +39,7 @@ function openPhotoAnnotator(){
 }
 function cancelPhotoAnnotation(){
   annotateEntry = null; annotateImg = null; annotateStrokes = []; annotateDrawing = null; annotateTextPoint = null;
+  annotateSelected = null; annotateHistory = []; annotateMoveDrag = null;
   renderPhotoViewer(); // back to the plain viewer for the same photo, nothing saved
 }
 function renderPhotoAnnotator(){
@@ -43,7 +48,7 @@ function renderPhotoAnnotator(){
       <h2>Annotate photo</h2>
       <button class="sheet-close" onclick="cancelPhotoAnnotation()">✕</button>
     </div>
-    <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 10px; line-height:1.4;">Circle, point at or draw around anything worth flagging, or choose Text and tap where a label should go. Saved as a new photo — the original is kept as-is.</p>
+    <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 10px; line-height:1.4;">Circle, point at or draw around anything worth flagging, or choose Text and tap where a label should go. Choose Move to drag any annotation into a new position. Saved as a new photo — the original is kept as-is.</p>
     <div style="position:relative; background:#000; border-radius:12px; overflow:hidden; margin-bottom:12px;">
       <canvas id="annotateCanvas" style="width:100%; display:block; touch-action:none;"></canvas>
     </div>
@@ -52,6 +57,10 @@ function renderPhotoAnnotator(){
       <button class="seg-btn ${annotateTool==='arrow'?'active':''}" onclick="setAnnotateTool('arrow')">➚ Arrow</button>
       <button class="seg-btn ${annotateTool==='pen'?'active':''}" onclick="setAnnotateTool('pen')">✏️ Draw</button>
       <button class="seg-btn ${annotateTool==='text'?'active':''}" onclick="setAnnotateTool('text')">Aa Text</button>
+    </div>
+    <div class="seg-row">
+      <button class="seg-btn ${annotateTool==='move'?'active':''}" onclick="setAnnotateTool('move')">✋ Move</button>
+      <button class="seg-btn" id="annDeleteSel" onclick="deleteSelectedAnnotation()">🗑 Delete selected</button>
     </div>
     <div style="display:flex; gap:10px; align-items:center; margin:2px 2px 14px;">
       ${ANNOTATE_COLORS.map(c=>`<button onclick="setAnnotateColor('${c}')" aria-label="Colour" style="width:30px; height:30px; border-radius:50%; background:${c}; border:3px solid ${annotateColor===c?'var(--ink)':'transparent'}; box-shadow:0 0 0 1px rgba(0,0,0,0.15); padding:0;"></button>`).join('')}
@@ -63,20 +72,111 @@ function renderPhotoAnnotator(){
     <button class="btn btn-paid" style="width:100%;" onclick="savePhotoAnnotation()">Save as new photo</button>
   `, () => renderPhotoViewer());
   initAnnotateCanvas();
+  updateAnnotateSelUi();
 }
-function setAnnotateTool(tool){ annotateTool = tool; renderPhotoAnnotator(); }
+function setAnnotateTool(tool){ annotateTool = tool; if(tool !== 'move') annotateSelected = null; renderPhotoAnnotator(); }
 function setAnnotateColor(color){ annotateColor = color; renderPhotoAnnotator(); }
+function updateAnnotateSelUi(){
+  const b = document.getElementById('annDeleteSel');
+  if(!b) return;
+  b.style.opacity = annotateSelected ? '1' : '0.4';
+  b.style.pointerEvents = annotateSelected ? '' : 'none';
+}
 function undoAnnotationStroke(){
-  if(!annotateStrokes.length) return;
-  annotateStrokes.pop();
+  const h = annotateHistory.pop();
+  if(!h) return;
+  if(h.kind === 'add'){
+    const i = annotateStrokes.indexOf(h.s);
+    if(i !== -1) annotateStrokes.splice(i, 1);
+    if(annotateSelected === h.s) annotateSelected = null;
+  } else if(h.kind === 'move'){
+    annotateTranslate(h.s, -h.dx, -h.dy);
+  } else if(h.kind === 'delete'){
+    annotateStrokes.splice(Math.min(h.i, annotateStrokes.length), 0, h.s);
+  }
   redrawAnnotateCanvas();
+  updateAnnotateSelUi();
+}
+function deleteSelectedAnnotation(){
+  if(!annotateSelected) return;
+  const i = annotateStrokes.indexOf(annotateSelected);
+  if(i === -1){ annotateSelected = null; updateAnnotateSelUi(); return; }
+  annotateHistory.push({ kind:'delete', s: annotateSelected, i });
+  annotateStrokes.splice(i, 1);
+  annotateSelected = null;
+  redrawAnnotateCanvas();
+  updateAnnotateSelUi();
 }
 function clearAnnotationStrokes(){
   if(!annotateStrokes.length) return;
   appConfirm('Clear all annotations on this photo?', {title:'Clear annotations', confirmLabel:'Clear', onConfirm: () => {
     annotateStrokes = [];
+    annotateHistory = [];
+    annotateSelected = null;
     redrawAnnotateCanvas();
+    updateAnnotateSelUi();
   }});
+}
+// Moves an annotation by (dx, dy) in photo pixels. Text is kept inside the photo.
+function annotateTranslate(s, dx, dy){
+  if(s.type === 'pen') s.points.forEach(p => { p.x += dx; p.y += dy; });
+  else if(s.type === 'text'){
+    const W = annotateImg ? annotateImg.naturalWidth : Infinity, H = annotateImg ? annotateImg.naturalHeight : Infinity;
+    s.x = Math.max(0, Math.min(W, s.x + dx)); s.y = Math.max(0, Math.min(H, s.y + dy));
+  } else { s.x0 += dx; s.x1 += dx; s.y0 += dy; s.y1 += dy; }
+}
+function annotateDistToSegment(p, a, b){
+  const vx = b.x - a.x, vy = b.y - a.y;
+  const len2 = vx*vx + vy*vy;
+  let t = len2 ? ((p.x - a.x)*vx + (p.y - a.y)*vy) / len2 : 0;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(p.x - (a.x + t*vx), p.y - (a.y + t*vy));
+}
+// The topmost annotation under a point, with a generous touch allowance (null if none).
+function annotateHitTest(pt){
+  const canvas = document.getElementById('annotateCanvas');
+  if(!canvas) return null;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width;
+  const tol = Math.max(24, W * 0.035);
+  for(let i = annotateStrokes.length - 1; i >= 0; i--){
+    const s = annotateStrokes[i];
+    if(s.type === 'circle'){
+      const cx = (s.x0+s.x1)/2, cy = (s.y0+s.y1)/2;
+      const rx = Math.max(Math.abs(s.x1-s.x0)/2, 6) + tol, ry = Math.max(Math.abs(s.y1-s.y0)/2, 6) + tol;
+      const dx = (pt.x-cx)/rx, dy = (pt.y-cy)/ry;
+      if(dx*dx + dy*dy <= 1) return s;
+    } else if(s.type === 'arrow'){
+      if(annotateDistToSegment(pt, {x:s.x0,y:s.y0}, {x:s.x1,y:s.y1}) <= tol) return s;
+    } else if(s.type === 'pen'){
+      for(let k = 1; k < s.points.length; k++){
+        if(annotateDistToSegment(pt, s.points[k-1], s.points[k]) <= tol) return s;
+      }
+      if(s.points.length === 1 && Math.hypot(pt.x-s.points[0].x, pt.y-s.points[0].y) <= tol) return s;
+    } else if(s.type === 'text'){
+      ctx.save();
+      const L = annotateTextLayout(ctx, s, W);
+      ctx.restore();
+      const pad = tol * 0.5;
+      if(pt.x >= L.x0 - pad && pt.x <= L.x0 + L.w + pad && pt.y >= L.y0 - pad && pt.y <= L.y0 + L.h + pad) return s;
+    }
+  }
+  return null;
+}
+// Bounding box of an annotation, used to draw the selection outline.
+function annotateBounds(ctx, s, W){
+  const pad = annotateLineWidth(W) * 1.5;
+  let x0, y0, x1, y1;
+  if(s.type === 'pen'){
+    x0 = Math.min.apply(null, s.points.map(p=>p.x)); x1 = Math.max.apply(null, s.points.map(p=>p.x));
+    y0 = Math.min.apply(null, s.points.map(p=>p.y)); y1 = Math.max.apply(null, s.points.map(p=>p.y));
+  } else if(s.type === 'text'){
+    ctx.save(); const L = annotateTextLayout(ctx, s, W); ctx.restore();
+    x0 = L.x0; y0 = L.y0; x1 = L.x0 + L.w; y1 = L.y0 + L.h;
+  } else {
+    x0 = Math.min(s.x0, s.x1); x1 = Math.max(s.x0, s.x1); y0 = Math.min(s.y0, s.y1); y1 = Math.max(s.y0, s.y1);
+  }
+  return { x: x0 - pad, y: y0 - pad, w: (x1 - x0) + pad*2, h: (y1 - y0) + pad*2 };
 }
 function initAnnotateCanvas(){
   const canvas = document.getElementById('annotateCanvas');
@@ -100,10 +200,35 @@ function askAnnotationText(pt){
     onConfirm: (val) => {
       const text = (val || '').trim().slice(0, 120);
       if(!text) return;
-      annotateStrokes.push({type:'text', color:annotateColor, x:pt.x, y:pt.y, text});
+      const ts = {type:'text', color:annotateColor, x:pt.x, y:pt.y, text};
+      annotateStrokes.push(ts);
+      annotateHistory.push({ kind:'add', s: ts });
       redrawAnnotateCanvas();
     }
   });
+}
+// Works out how a text label wraps and where it sits (used for drawing, hit-testing and the
+// selection outline). Sets the canvas font as a side effect.
+function annotateTextLayout(ctx, s, canvasWidth){
+  const size = annotateFontSize(canvasWidth);
+  ctx.font = `800 ${size}px -apple-system, "SF Pro Text", Helvetica, Arial, sans-serif`;
+  ctx.textBaseline = 'top';
+  const maxW = canvasWidth * 0.8;
+  const lines = [];
+  let line = '';
+  String(s.text).split(/\s+/).forEach(word => {
+    const trial = line ? line + ' ' + word : word;
+    if(line && ctx.measureText(trial).width > maxW){ lines.push(line); line = word; } else line = trial;
+  });
+  if(line) lines.push(line);
+  const lineH = size * 1.2;
+  const w = Math.max.apply(null, lines.map(l => ctx.measureText(l).width));
+  const h = lines.length * lineH;
+  const margin = size * 0.4;
+  const cH = ctx.canvas.height;
+  const x0 = Math.max(margin, Math.min(s.x - w/2, canvasWidth - w - margin));
+  const y0 = Math.max(margin, Math.min(s.y - h/2, cH - h - margin));
+  return { size, lines, lineH, w, h, x0, y0 };
 }
 function drawAnnotateStroke(ctx, s, canvasWidth){
   ctx.save();
@@ -124,31 +249,14 @@ function drawAnnotateStroke(ctx, s, canvasWidth){
   } else if(s.type === 'text'){
     // A label centred on where it was tapped, kept inside the photo, wrapped to
     // fit, with a contrasting outline so it stays readable on any background.
-    const size = annotateFontSize(canvasWidth);
-    ctx.font = `800 ${size}px -apple-system, "SF Pro Text", Helvetica, Arial, sans-serif`;
-    ctx.textBaseline = 'top';
-    const maxW = canvasWidth * 0.8;
-    const lines = [];
-    let line = '';
-    String(s.text).split(/\s+/).forEach(word => {
-      const trial = line ? line + ' ' + word : word;
-      if(line && ctx.measureText(trial).width > maxW){ lines.push(line); line = word; } else line = trial;
-    });
-    if(line) lines.push(line);
-    const lineH = size * 1.2;
-    const w = Math.max.apply(null, lines.map(l => ctx.measureText(l).width));
-    const h = lines.length * lineH;
-    const margin = size * 0.4;
-    const cH = ctx.canvas.height;
-    const x0 = Math.max(margin, Math.min(s.x - w/2, canvasWidth - w - margin));
-    const y0 = Math.max(margin, Math.min(s.y - h/2, cH - h - margin));
-    ctx.lineWidth = Math.max(4, size * 0.28);
+    const L = annotateTextLayout(ctx, s, canvasWidth);
+    ctx.lineWidth = Math.max(4, L.size * 0.28);
     ctx.strokeStyle = s.color === '#ffffff' ? '#000000' : '#ffffff';
     ctx.fillStyle = s.color;
-    lines.forEach((l, i) => {
-      const cx = x0 + (w - ctx.measureText(l).width) / 2; // centre each line within the label
-      ctx.strokeText(l, cx, y0 + i * lineH);
-      ctx.fillText(l, cx, y0 + i * lineH);
+    L.lines.forEach((l, i) => {
+      const cx = L.x0 + (L.w - ctx.measureText(l).width) / 2; // centre each line within the label
+      ctx.strokeText(l, cx, L.y0 + i * L.lineH);
+      ctx.fillText(l, cx, L.y0 + i * L.lineH);
     });
   } else if(s.type === 'arrow'){
     const headLen = ctx.lineWidth * 4.5;
@@ -171,6 +279,17 @@ function redrawAnnotateCanvas(){
   ctx.drawImage(annotateImg, 0, 0, canvas.width, canvas.height);
   const all = annotateDrawing ? [...annotateStrokes, annotateDrawing] : annotateStrokes;
   all.forEach(s => drawAnnotateStroke(ctx, s, canvas.width));
+  if(annotateSelected && annotateStrokes.indexOf(annotateSelected) !== -1){
+    // Selection outline — only ever drawn on screen; it is removed before saving.
+    const b = annotateBounds(ctx, annotateSelected, canvas.width);
+    ctx.save();
+    const lw = Math.max(3, canvas.width * 0.003);
+    ctx.lineWidth = lw * 2; ctx.strokeStyle = '#000000'; ctx.setLineDash([lw*4, lw*3]);
+    ctx.strokeRect(b.x, b.y, b.w, b.h);
+    ctx.lineWidth = lw; ctx.strokeStyle = '#ffffff';
+    ctx.strokeRect(b.x, b.y, b.w, b.h);
+    ctx.restore();
+  }
 }
 function canvasPointFromEvent(canvas, e){
   const rect = canvas.getBoundingClientRect();
@@ -184,6 +303,14 @@ function attachAnnotateCanvasEvents(canvas){
     annotatePointerId = e.pointerId;
     if(canvas.setPointerCapture){ try{ canvas.setPointerCapture(e.pointerId); }catch(err){} }
     const pt = canvasPointFromEvent(canvas, e);
+    if(annotateTool === 'move'){
+      // Pick the annotation under the finger (or deselect), then drag it.
+      annotateSelected = annotateHitTest(pt);
+      annotateMoveDrag = annotateSelected ? { s: annotateSelected, last: pt, dx: 0, dy: 0 } : null;
+      redrawAnnotateCanvas();
+      updateAnnotateSelUi();
+      return;
+    }
     if(annotateTool === 'text'){ annotateTextPoint = pt; return; } // a tap, not a stroke — the label is typed on release
     annotateDrawing = annotateTool === 'pen'
       ? {type:'pen', color:annotateColor, points:[pt]}
@@ -191,7 +318,18 @@ function attachAnnotateCanvasEvents(canvas){
     redrawAnnotateCanvas();
   };
   canvas.onpointermove = (e) => {
-    if(annotatePointerId === null || e.pointerId !== annotatePointerId || !annotateDrawing) return;
+    if(annotatePointerId === null || e.pointerId !== annotatePointerId) return;
+    if(annotateMoveDrag){
+      e.preventDefault();
+      const mp = canvasPointFromEvent(canvas, e);
+      const ddx = mp.x - annotateMoveDrag.last.x, ddy = mp.y - annotateMoveDrag.last.y;
+      annotateTranslate(annotateMoveDrag.s, ddx, ddy);
+      annotateMoveDrag.dx += ddx; annotateMoveDrag.dy += ddy;
+      annotateMoveDrag.last = mp;
+      redrawAnnotateCanvas();
+      return;
+    }
+    if(!annotateDrawing) return;
     e.preventDefault();
     const pt = canvasPointFromEvent(canvas, e);
     if(annotateDrawing.type === 'pen') annotateDrawing.points.push(pt);
@@ -201,6 +339,11 @@ function attachAnnotateCanvasEvents(canvas){
   const finish = (e) => {
     if(annotatePointerId === null || e.pointerId !== annotatePointerId) return;
     annotatePointerId = null;
+    if(annotateMoveDrag){
+      if(annotateMoveDrag.dx || annotateMoveDrag.dy) annotateHistory.push({ kind:'move', s: annotateMoveDrag.s, dx: annotateMoveDrag.dx, dy: annotateMoveDrag.dy });
+      annotateMoveDrag = null;
+      return;
+    }
     if(annotateTextPoint){
       const pt = annotateTextPoint; annotateTextPoint = null;
       askAnnotationText(pt);
@@ -212,7 +355,7 @@ function attachAnnotateCanvasEvents(canvas){
       const meaningful = annotateDrawing.type === 'pen'
         ? annotateDrawing.points.length > 1
         : (Math.abs(annotateDrawing.x1-annotateDrawing.x0) > 4 || Math.abs(annotateDrawing.y1-annotateDrawing.y0) > 4);
-      if(meaningful) annotateStrokes.push(annotateDrawing);
+      if(meaningful){ annotateStrokes.push(annotateDrawing); annotateHistory.push({ kind:'add', s: annotateDrawing }); }
       annotateDrawing = null;
       redrawAnnotateCanvas();
     }
@@ -227,6 +370,7 @@ async function savePhotoAnnotation(){
   const entry = annotateEntry;
   if(!canvas || !entry) return;
   toast('Saving annotated photo…');
+  annotateSelected = null; redrawAnnotateCanvas(); // never bake the selection outline into the saved photo
   canvas.toBlob(async (blob) => {
     if(!blob){ toast('Could not save that annotation — try again'); return; }
     const photoId = uid();
@@ -248,11 +392,244 @@ async function savePhotoAnnotation(){
     if(await saveData()){
       toast('Annotated photo saved');
       annotateEntry = null; annotateImg = null; annotateStrokes = []; annotateDrawing = null;
+      annotateSelected = null; annotateHistory = []; annotateMoveDrag = null;
       const list = entry.kind === 'customer' ? buildCustomerPhotoList(entry.ownerId) : buildJobPhotoList(entry.ownerId);
       const idx = list.findIndex(e=>e.photoId===photoId);
       openPhotoViewerAt(list, idx===-1 ? list.length-1 : idx, photoViewerOnClose);
     }
   }, 'image/jpeg', 0.9);
+}
+
+/* ---------- before & after ----------
+   Combines two of a customer's photos into one image with BEFORE / AFTER labels:
+   Landscape (2400 x 1200, before on the left and after on the right) or Portrait for social
+   media (1080 x 1920 — 9:16 — before on top and after underneath). Opened from the photo
+   viewer. The result is saved as a new photo (originals untouched) and can be shared. */
+const BA_SIZES = { landscape:{ w:2400, h:1200 }, portrait:{ w:1080, h:1920 } };
+let baState = null;       // {list, entry, before, after, layout, fit, lb, la}
+let baImgs = {};          // photoId -> Promise<HTMLImageElement>
+let baDrawToken = 0;
+let baBlob = null;        // the finished JPEG for the current picture, ready to save or share
+
+function baLoad(entry){
+  if(!baImgs[entry.photoId]){
+    baImgs[entry.photoId] = new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error('photo failed to load'));
+      img.src = photoEntrySrc(entry);
+    });
+  }
+  return baImgs[entry.photoId];
+}
+function openBeforeAfter(){
+  const entry = photoViewerList[photoViewerIndex];
+  if(!entry) return;
+  const all = entry.kind === 'customer' ? buildCustomerPhotoList(entry.ownerId) : buildJobPhotoList(entry.ownerId);
+  const list = all.filter(e => photoEntrySrc(e));
+  if(list.length < 2){ toast('Before & after needs two photos — add another photo first'); return; }
+  const cur = Math.max(0, list.findIndex(e => e.photoId === entry.photoId));
+  baImgs = {};
+  baState = {
+    list, entry, before: cur, after: (cur + 1 < list.length ? cur + 1 : cur - 1),
+    layout: 'landscape', fit: 'fill', lb: 'BEFORE', la: 'AFTER'
+  };
+  renderBeforeAfter();
+}
+function baPickerHtml(which){
+  const st = baState;
+  return st.list.map((e, i) => `<div data-ba="${which}" data-i="${i}" onclick="setBaPhoto('${which}', ${i})" style="flex:none; width:74px; cursor:pointer;">
+      <img src="${photoEntrySrc(e)}" style="width:74px; height:74px; object-fit:cover; border-radius:10px; display:block; border:3px solid transparent;">
+      <div style="font-size:0.625rem; color:var(--ink-muted); text-align:center; margin-top:2px;">${fmtDate(e.date).split(' ').slice(0,2).join(' ')}</div>
+    </div>`).join('');
+}
+function renderBeforeAfter(){
+  const st = baState;
+  if(!st){ closeSheet(); return; }
+  openSheet(`
+    <div class="sheet-head">
+      <h2>Before &amp; after</h2>
+      <button class="sheet-close" onclick="closeSheet()">✕</button>
+    </div>
+    <div class="seg-row">
+      <button class="seg-btn seg-btn-sm" data-ba-layout="landscape" onclick="setBaLayout('landscape')">Landscape · side by side</button>
+      <button class="seg-btn seg-btn-sm" data-ba-layout="portrait" onclick="setBaLayout('portrait')">Portrait · for social media</button>
+    </div>
+    <div style="background:#111; border-radius:12px; overflow:hidden; margin-bottom:12px; text-align:center; padding:6px;">
+      <canvas id="baCanvas" style="max-width:100%; max-height:52vh; display:inline-block; vertical-align:top;"></canvas>
+    </div>
+    <label style="margin-top:0;">Before photo</label>
+    <div id="baPickBefore" style="display:flex; gap:8px; overflow-x:auto; padding:2px 0 8px;">${baPickerHtml('before')}</div>
+    <label>After photo</label>
+    <div id="baPickAfter" style="display:flex; gap:8px; overflow-x:auto; padding:2px 0 8px;">${baPickerHtml('after')}</div>
+    <button class="btn" style="width:100%; margin:4px 0 10px; background:var(--blue-dim); color:var(--blue-deep);" onclick="swapBeforeAfter()">⇄ Swap before &amp; after</button>
+    <div class="seg-row">
+      <button class="seg-btn seg-btn-sm" data-ba-fit="fill" onclick="setBaFit('fill')">Crop to fill</button>
+      <button class="seg-btn seg-btn-sm" data-ba-fit="whole" onclick="setBaFit('whole')">Show whole photos</button>
+    </div>
+    <div class="row2" style="margin-bottom:12px;">
+      <div><label style="margin-top:0;">Left / top label</label><input type="text" maxlength="20" value="${escapeAttr(st.lb)}" oninput="setBaLabel('lb', this.value)"></div>
+      <div><label style="margin-top:0;">Right / bottom label</label><input type="text" maxlength="20" value="${escapeAttr(st.la)}" oninput="setBaLabel('la', this.value)"></div>
+    </div>
+    <div class="row2" style="margin-bottom:8px;">
+      <button class="btn btn-paid" onclick="saveBeforeAfter()">Save to photos</button>
+      <button class="btn btn-clean" onclick="shareBeforeAfter()">📤 Share</button>
+    </div>
+    <p style="color:var(--ink-muted); font-size:0.7188rem; margin:6px 2px 0; text-align:center; line-height:1.5;">Saved as a new photo — the originals are kept as they are.</p>
+  `, () => renderPhotoViewer());
+  baRefreshUi();
+  baRedraw();
+}
+// Updates the highlight on whichever options are chosen, without rebuilding the sheet.
+function baRefreshUi(){
+  const st = baState; if(!st) return;
+  document.querySelectorAll('[data-ba-layout]').forEach(b => b.classList.toggle('active', b.dataset.baLayout === st.layout));
+  document.querySelectorAll('[data-ba-fit]').forEach(b => b.classList.toggle('active', b.dataset.baFit === st.fit));
+  document.querySelectorAll('[data-ba]').forEach(el => {
+    const on = st[el.dataset.ba] === Number(el.dataset.i);
+    const img = el.querySelector('img');
+    if(img) img.style.borderColor = on ? (el.dataset.ba === 'before' ? '#374151' : '#16a34a') : 'transparent';
+  });
+}
+function setBaLayout(v){ if(!baState) return; baState.layout = v; baRefreshUi(); baRedraw(); }
+function setBaFit(v){ if(!baState) return; baState.fit = v; baRefreshUi(); baRedraw(); }
+function setBaPhoto(which, i){ if(!baState) return; baState[which] = i; baRefreshUi(); baRedraw(); }
+function swapBeforeAfter(){ if(!baState) return; const t = baState.before; baState.before = baState.after; baState.after = t; baRefreshUi(); baRedraw(); }
+function setBaLabel(key, v){ if(!baState) return; baState[key] = v; baRedraw(); }
+
+function baRoundRect(ctx, x, y, w, h, r){
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y); ctx.arcTo(x + w, y, x + w, y + r, r);
+  ctx.lineTo(x + w, y + h - r); ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+  ctx.lineTo(x + r, y + h); ctx.arcTo(x, y + h, x, y + h - r, r);
+  ctx.lineTo(x, y + r); ctx.arcTo(x, y, x + r, y, r);
+  ctx.closePath();
+}
+function baDrawPanel(ctx, img, r, fit){
+  ctx.save();
+  ctx.beginPath(); ctx.rect(r.x, r.y, r.w, r.h); ctx.clip();
+  const iw = img.naturalWidth, ih = img.naturalHeight;
+  if(fit === 'whole'){
+    ctx.fillStyle = '#111827'; ctx.fillRect(r.x, r.y, r.w, r.h);
+    const k = Math.min(r.w / iw, r.h / ih);
+    const dw = iw * k, dh = ih * k;
+    ctx.drawImage(img, r.x + (r.w - dw) / 2, r.y + (r.h - dh) / 2, dw, dh);
+  } else {
+    const k = Math.max(r.w / iw, r.h / ih); // centre-crop to fill the panel
+    const dw = iw * k, dh = ih * k;
+    ctx.drawImage(img, r.x + (r.w - dw) / 2, r.y + (r.h - dh) / 2, dw, dh);
+  }
+  ctx.restore();
+}
+function baDrawLabel(ctx, text, r, color, layout){
+  text = String(text || '').trim();
+  if(!text) return;
+  const size = layout === 'landscape' ? 76 : 64;
+  const m = Math.round(size * 0.45);
+  ctx.save();
+  ctx.font = `800 ${size}px -apple-system, "SF Pro Display", Helvetica, Arial, sans-serif`;
+  ctx.textBaseline = 'middle';
+  const tw = ctx.measureText(text).width;
+  const padX = size * 0.5, padY = size * 0.32;
+  const w = Math.min(r.w - m * 2, tw + padX * 2), h = size + padY * 2;
+  ctx.shadowColor = 'rgba(0,0,0,0.35)'; ctx.shadowBlur = 14; ctx.shadowOffsetY = 3;
+  ctx.fillStyle = color;
+  baRoundRect(ctx, r.x + m, r.y + m, w, h, h / 2);
+  ctx.fill();
+  ctx.shadowColor = 'transparent';
+  ctx.fillStyle = '#ffffff';
+  ctx.textAlign = 'center';
+  ctx.fillText(text, r.x + m + w / 2, r.y + m + h / 2 + size * 0.04, w - padX);
+  ctx.restore();
+}
+function paintBeforeAfter(canvas, ib, ia, st){
+  const { w, h } = BA_SIZES[st.layout];
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, w, h);
+  const gap = 10;
+  let pb, pa;
+  if(st.layout === 'landscape'){
+    const pw = Math.floor((w - gap) / 2);
+    pb = { x:0, y:0, w:pw, h };
+    pa = { x:pw + gap, y:0, w:pw, h };
+  } else {
+    const ph = Math.floor((h - gap) / 2);
+    pb = { x:0, y:0, w, h:ph };
+    pa = { x:0, y:ph + gap, w, h:ph };
+  }
+  baDrawPanel(ctx, ib, pb, st.fit);
+  baDrawPanel(ctx, ia, pa, st.fit);
+  baDrawLabel(ctx, st.lb, pb, '#374151', st.layout);
+  baDrawLabel(ctx, st.la, pa, '#16a34a', st.layout);
+}
+async function baRedraw(){
+  const canvas = document.getElementById('baCanvas');
+  const st = baState;
+  if(!canvas || !st) return;
+  const token = ++baDrawToken;
+  baBlob = null;
+  let ib, ia;
+  try{ [ib, ia] = await Promise.all([baLoad(st.list[st.before]), baLoad(st.list[st.after])]); }
+  catch(e){ toast('Could not load one of those photos'); return; }
+  if(token !== baDrawToken || !document.getElementById('baCanvas')) return;
+  paintBeforeAfter(canvas, ib, ia, st);
+  // Encode now so Save and Share can act instantly (phones only allow sharing straight after a tap).
+  canvas.toBlob(b => { if(token === baDrawToken) baBlob = b; }, 'image/jpeg', 0.92);
+}
+function baFileName(){
+  const st = baState;
+  const owner = st.entry.kind === 'customer' ? data.customers.find(x=>x.id===st.entry.ownerId) : (data.oneOffJobs||[]).find(x=>x.id===st.entry.ownerId);
+  const base = ((owner && (owner.address || owner.name)) || 'photos').replace(/[^a-z0-9]+/gi, '-').toLowerCase().replace(/^-|-$/g, '');
+  return `before-after-${base}-${st.layout}-${todayISO()}.jpg`;
+}
+async function saveBeforeAfter(){
+  const st = baState;
+  if(!st) return;
+  if(!baBlob){ toast('One moment — still preparing the picture'); return; }
+  const blob = baBlob;
+  const entry = st.entry;
+  const owner = entry.kind === 'customer' ? data.customers.find(x=>x.id===entry.ownerId) : (data.oneOffJobs||[]).find(x=>x.id===entry.ownerId);
+  if(!owner){ toast('Could not find the photo\'s customer or job'); return; }
+  const photoId = uid();
+  owner.photos = owner.photos || [];
+  if(photoStorageAvailable){
+    await idbSavePhoto(photoId, blob);
+    cachePhotoBlob(photoId, blob);
+    owner.photos.push({ id: photoId, date: todayISO() });
+  } else {
+    const dataUrl = await blobToDataURL(blob);
+    owner.photos.push({ id: photoId, dataUrl, date: todayISO() });
+  }
+  if(await saveData()){
+    toast('Before & after saved to photos');
+    baState = null; baImgs = {}; baBlob = null;
+    const list = entry.kind === 'customer' ? buildCustomerPhotoList(entry.ownerId) : buildJobPhotoList(entry.ownerId);
+    const idx = list.findIndex(e => e.photoId === photoId);
+    openPhotoViewerAt(list, idx === -1 ? list.length - 1 : idx, photoViewerOnClose);
+  }
+}
+async function shareBeforeAfter(){
+  const st = baState;
+  if(!st) return;
+  if(!baBlob){ toast('One moment — still preparing the picture'); return; }
+  const file = new File([baBlob], baFileName(), { type: 'image/jpeg' });
+  try{
+    if(navigator.canShare && navigator.canShare({ files: [file] })){
+      await navigator.share({ files: [file] });
+      return;
+    }
+  }catch(e){
+    if(e && e.name === 'AbortError') return;
+  }
+  // No share sheet (e.g. a computer): download it instead.
+  const url = URL.createObjectURL(baBlob);
+  const a = document.createElement('a');
+  a.href = url; a.download = baFileName();
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+  toast('Picture downloaded');
 }
 
 /* ---------- photo + offer text ----------

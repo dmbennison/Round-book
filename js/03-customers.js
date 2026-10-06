@@ -890,6 +890,7 @@ function renderPhotoViewer(){
       <button class="btn" style="background:var(--red-dim); color:var(--red);" onclick="deletePhotoViewerEntry()">Delete</button>
     </div>
     <button class="btn" style="width:100%; background:var(--blue-dim); color:var(--blue-deep); margin-bottom:10px;" onclick="openPhotoUpsell()">💬 Send with an offer (gutters, conservatory…)</button>
+    <button class="btn" style="width:100%; background:var(--blue-dim); color:var(--blue-deep); margin-bottom:10px;" onclick="openBeforeAfter()">↔ Make a before &amp; after photo</button>
     <p style="color:var(--ink-muted); font-size:0.7188rem; margin:0 2px; text-align:center;">Pinch or double-tap the photo to zoom, then drag to move around. ${photoViewerList.length>1?'Swipe left or right to browse, or ':''}Press and hold the photo to save or share it directly.</p>
   `, () => { if(photoViewerOnClose) photoViewerOnClose(); });
   attachPhotoViewerSwipe();
