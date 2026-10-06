@@ -124,6 +124,7 @@
     border-radius:8px; background:#FFD60A; color:#1a1a1a; font-size:0.625rem; font-weight:800; line-height:16px; text-align:center;
   }
   .tab-badge[hidden]{display:none;}
+  #liveSyncChip[hidden]{display:none;}
 
   main{padding:14px 14px 100px;}
 
@@ -765,6 +766,7 @@
     </div>
   </div>
   <div class="sub" id="weatherPill" style="padding-left:46px;"></div>
+  <div class="sub" id="liveSyncChip" hidden style="padding-left:46px; cursor:pointer;"></div>
   <div class="tabs">
     <button class="tab active" data-tab="today" onclick="setTab('today')">Today</button>
     <button class="tab" data-tab="work" onclick="setTab('work')">Work</button>
@@ -817,6 +819,7 @@
 <script src="./js/07-reports-b.js" defer></script>
 <script src="./js/08-backup-import.js" defer></script>
 <script src="./js/08b-sync.js" defer></script>
+<script src="./js/08c-live-sync.js" defer></script>
 <script src="./js/09-boot.js" defer></script>
 </body>
 </html>

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'round-book-v2.42';
+const CACHE_NAME = 'round-book-v2.43';
 const ASSETS = [
   './',
   './manifest.json',
@@ -14,6 +14,7 @@ const ASSETS = [
   './js/07-reports-b.js',
   './js/08-backup-import.js',
   './js/08b-sync.js',
+  './js/08c-live-sync.js',
   './js/09-boot.js',
   'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',
   'https://cdn.jsdelivr.net/npm/docx@8.2.4/build/index.umd.js',
@@ -70,6 +71,9 @@ self.addEventListener('fetch', (event) => {
   // would show the PREVIOUS reading, which can be hours old.
   const host = new URL(event.request.url).hostname;
   if (host === 'api.open-meteo.com') return;
+  // Live sync mailbox traffic must never be served from (or stored in) the cache.
+  const u = new URL(event.request.url);
+  if (host.endsWith('.workers.dev') || (u.origin !== self.location.origin && u.pathname.startsWith('/v1/'))) return;
 
   event.respondWith((async () => {
     const cached = await caches.match(event.request);
