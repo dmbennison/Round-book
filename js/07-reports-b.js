@@ -40,7 +40,7 @@ function printRoundsLastCleaned(){
     </tr>`;
   }).join('');
   const body = `<table class="rpt-table rpt-table-as-tabs"><thead><tr><th>Round</th><th>Dates cleaned (last 5 weeks)</th></tr></thead><tbody>${rows}</tbody></table>
-  <p style="font-size:11px; color:#66798A; margin-top:12px;">Only 4-weekly customers are counted. A date is shown only if 4 or more of a round's 4-weekly houses were cleaned on it, oldest first — single stragglers, one-off recleans and 8 / 12 week customers aren't listed.</p>`;
+`;
   runPrint('Round Cleaning Dates', body, false, false, () => openReports());
 }
 
@@ -97,7 +97,7 @@ function printRoundsLastCleanedCalendar(){
       <thead><tr><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th></tr></thead>
       <tbody>${bodyRows}</tbody>
     </table>
-    <p style="font-size:11px; color:#66798A; margin-top:12px;">Counts 4-weekly customers only. Shows a round on a day only if 4 or more of its 4-weekly houses were cleaned then — single stragglers, one-off recleans and 8 / 12 week customers aren't shown. Greyed-out days fall outside the last 5 weeks.</p>
+
   `;
   runPrint('Round Cleaning Dates — Calendar', body, false, false, () => openReports());
 }
@@ -556,7 +556,7 @@ function printPriceReview(){
   </tr>`).join('');
   const firstTable = flagged.length ? `
     <table class="rpt-table"><thead><tr><th>Customer</th><th>Round</th><th style="text-align:right;">Current price</th><th>Last increase</th><th>Next clean</th></tr></thead><tbody>${rows}</tbody></table>
-    <p style="font-size:11px; color:#66798A; margin-top:12px;">Shows customers where it will have been 12 months or more since their last price increase by their next scheduled clean. Customers with no price history are not included.</p>
+
   ` : '<div class="rpt-empty-note">Nobody is due a price review right now.</div>';
 
   const belowAvgRows = belowAvg.map(({c, roundName, cat, benchmark, gap})=>`<tr>
@@ -570,7 +570,7 @@ function printPriceReview(){
   const secondTable = belowAvg.length ? `
     <div class="rpt-round-title" style="margin-top:22px;">Priced below property type average</div>
     <table class="rpt-table"><thead><tr><th>Customer</th><th>Round</th><th>Property type</th><th style="text-align:right;">Current price</th><th style="text-align:right;">Type average (per house)</th><th style="text-align:right;">Gap</th></tr></thead><tbody>${belowAvgRows}</tbody></table>
-    <p style="font-size:11px; color:#66798A; margin-top:12px;">Customers priced 15%+ below the average price per house for their own property type — their own round's average for that type where there are 4+ of them, otherwise the overall average for that type. Gap is house-weighted (see fronts-only pricing) and sorted biggest first.</p>
+
   ` : '';
 
   const body = firstTable + secondTable;
@@ -636,7 +636,7 @@ function printUpsellOpportunities(){
   const body = `
     <table class="rpt-table"><thead><tr><th>Customer</th><th>Round</th><th>Reason</th><th style="text-align:right;">Suggested uplift</th></tr></thead><tbody>${rows}</tbody></table>
     <div class="rpt-total" style="border-top:2px solid #10344C; padding-top:10px; margin-top:12px; font-size:16px;">Total potential uplift: ${money(totalUplift)}</div>
-    <p style="font-size:11px; color:#66798A; margin-top:12px;">Each customer shows one suggestion only — the first that applies, checked in order: fronts-only long enough that backs are worth offering, a conservatory with no roof clean mentioned, a detached/semi-detached house with no garage door clean, then anyone with no add-ons at all who's been a customer 6+ months. Uplift figures are flat estimates, not quotes — adjust to the job.</p>
+
   `;
   runPrint('Upsell Opportunities', body, false, false, () => openReports());
 }
@@ -682,7 +682,7 @@ function printPropertyTypesReport(){
     <div class="rpt-round-title" style="margin-top:0;">All rounds — total</div>
     ${tableHtml(active)}
     ${roundSections}
-    <p style="font-size:11px; color:#66798A; margin-top:12px;">Paused customers are not included. "Not recorded" covers customers with no property type set yet. Fronts-only properties count as 0.5 of a house.</p>
+
   `;
   runPrint('Property Types Report', body, false, false, () => openReports());
 }
@@ -795,7 +795,7 @@ function printMileageReport(){
 
     <div class="rpt-round-title">Mileage allowance by tax year</div>
     <table class="rpt-table"><thead><tr><th>Tax year</th><th style="text-align:right;">Miles</th><th style="text-align:right;">Allowance</th></tr></thead><tbody>${tyAllowanceRows}</tbody></table>
-    <p style="font-size:11px; color:#66798A; margin-top:8px;">Rates used (change them in Settings → Mileage rates; a tax year's rates apply to all mileage in that year, and each year's mile threshold is worked out separately):${Object.keys(tyTotals).sort((a,b)=>b.localeCompare(a)).map(ty=>`<br>${ty.slice(0,4)}/${String(Number(ty.slice(0,4))+1).slice(2)}: ${mileageRateText(mileageRatesForTaxYear(ty))}`).join('')}</p>
+    <p style="font-size:11px; color:#66798A; margin-top:8px;">Rates used:${Object.keys(tyTotals).sort((a,b)=>b.localeCompare(a)).map(ty=>`<br>${ty.slice(0,4)}/${String(Number(ty.slice(0,4))+1).slice(2)}: ${mileageRateText(mileageRatesForTaxYear(ty))}`).join('')}</p>
 
     <div class="rpt-round-title">Monthly totals</div>
     <table class="rpt-table"><thead><tr><th>Month</th><th style="text-align:right;">Miles</th></tr></thead><tbody>${monthRows}</tbody></table>
@@ -975,7 +975,7 @@ function printSchedule(){
       <thead><tr><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th></tr></thead>
       <tbody>${bodyRows}</tbody>
     </table>
-    <p style="font-size:11px; color:#66798A; margin-top:12px;">Blue chips show any round with a customer due for cleaning that day, based on their last clean date and frequency — rounds split across several visit days show which day is due. Amber chips (🔧) show one-off jobs scheduled that day. Greyed-out days fall outside the next 30 days. Customers not yet cleaned at all aren't included, since there's no date to schedule from.</p>
+
   `;
   runPrint('Monthly Schedule', body, false, false, () => openReports());
 }

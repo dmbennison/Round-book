@@ -1333,6 +1333,23 @@ function propertyTypeAvgSummaryHtml(list){
   </div>`;
 }
 
+// Bank vs cash: how many customers and how much of the round's value each pays, with percentages.
+// Value is the standard price total of active (non-paused) customers, like the round value above.
+function paymentMethodSummaryHtml(list){
+  if(!list || !list.length) return '';
+  const cash = list.filter(isCashCustomer), bank = list.filter(c => !isCashCustomer(c));
+  const val = a => a.reduce((s,c) => s + Number(c.price||0), 0);
+  const n = list.length, v = val(list);
+  const pct = (x, t) => (t > 0 ? Math.round(x / t * 100) : 0) + '%';
+  const cell = (num, lbl) => `<div class="stat"><div class="num">${num}</div><div class="lbl">${lbl}</div></div>`;
+  return `<div class="summary-overall" style="display:grid; grid-template-columns:repeat(2, 1fr); gap:6px; margin-top:8px;">
+    ${cell(`${bank.length} <span style="font-size:0.75rem; font-weight:700; opacity:0.7;">${pct(bank.length, n)}</span>`, '🏦 Bank customers')}
+    ${cell(`${cash.length} <span style="font-size:0.75rem; font-weight:700; opacity:0.7;">${pct(cash.length, n)}</span>`, '💷 Cash customers')}
+    ${cell(`${money(val(bank))} <span style="font-size:0.75rem; font-weight:700; opacity:0.7;">${pct(val(bank), v)}</span>`, '🏦 Bank value')}
+    ${cell(`${money(val(cash))} <span style="font-size:0.75rem; font-weight:700; opacity:0.7;">${pct(val(cash), v)}</span>`, '💷 Cash value')}
+  </div>`;
+}
+
 // Collapsible "Statistics" box (same look as History / Actions in customer
 // details) used on the Work hub and on each round. Remembers whether it was
 // left open so a re-render (e.g. after swiping a customer) doesn't snap it shut.
@@ -1375,7 +1392,8 @@ function renderWorkHub(main){
       <div class="stat"><div class="num">${roundValueOwedHtml(totalValue, totalOwed)}</div><div class="lbl">Round value</div></div>
       <div class="stat"><div class="num">${money(overallAvg)}</div><div class="lbl">Avg / customer</div></div>
     </div>
-    ${propertyTypeAvgSummaryHtml(activeCustomers)}`);
+    ${propertyTypeAvgSummaryHtml(activeCustomers)}
+    ${paymentMethodSummaryHtml(activeCustomers)}`);
   } else {
     html += emptyState('rounds');
   }
@@ -1663,7 +1681,8 @@ function renderRoundDetail(main, rn){
       <div class="stat"><div class="num">${roundValueOwedHtml(roundTotal, roundOwed)}</div><div class="lbl">Round value</div></div>
       <div class="stat"><div class="num">${money(roundAvg)}</div><div class="lbl">Avg / customer</div></div>
     </div>
-    ${propertyTypeAvgSummaryHtml(activeInRound)}`);
+    ${propertyTypeAvgSummaryHtml(activeInRound)}
+    ${paymentMethodSummaryHtml(activeInRound)}`);
   }
 
   shellHtml += roundFilterBarsHtml(daysUsed, spansMultipleDays);

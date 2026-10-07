@@ -393,6 +393,16 @@ function averageDaysToPay(c){
   if(!gaps.length) return null;
   return { days: gaps.reduce((a,b)=>a+b,0) / gaps.length, count: gaps.length };
 }
+// Switches a customer between Bank and Cash straight from the press-and-hold info box.
+function setInfoPayMethod(id, method){
+  const c = data.customers.find(x=>x.id===id);
+  if(!c) return;
+  c.paymentMethod = method === 'cash' ? 'cash' : 'bank';
+  document.querySelectorAll('#ibPayRow .seg-btn').forEach(b => b.classList.toggle('active', b.dataset.pm === c.paymentMethod));
+  saveData();
+  render(); // so the badge on their card changes too
+  toast(c.paymentMethod === 'cash' ? 'Marked as pays by cash' : 'Marked as pays by bank');
+}
 function openCustomerInfoBox(id){
   const c = data.customers.find(x=>x.id===id);
   if(!c) return;
@@ -461,6 +471,10 @@ function openCustomerInfoBox(id){
         ${s.lastPaid ? `<div class="ib-sub">${ago(s.lastPaid)}</div>` : ''}
       </div>
     </div>
+    ${row('Pays by', `<div class="seg-row" id="ibPayRow" style="margin:0; min-width:190px;">
+      <button type="button" class="seg-btn seg-btn-sm ${isCashCustomer(c)?'':'active'}" data-pm="bank" onclick="setInfoPayMethod('${c.id}','bank')">🏦 Bank</button>
+      <button type="button" class="seg-btn seg-btn-sm ${isCashCustomer(c)?'active':''}" data-pm="cash" onclick="setInfoPayMethod('${c.id}','cash')">💷 Cash</button>
+    </div>`)}
     ${row('Total revenue', money(totalRevenue))}
     ${row('Average time to pay', payHtml)}
     ${row('Since last price review', reviewHtml)}

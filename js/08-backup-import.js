@@ -257,7 +257,7 @@ const FOCUSED_HELP = {
   work: {
     title: 'Work',
     body: () => [
-      helpP('Work has two buttons: <b>Rounds</b> and <b>One-off jobs</b>. Tap <b>Statistics</b> to see your customer count, round value, average price per customer and average price by property type.')
+      helpP('Work has two buttons: <b>Rounds</b> and <b>One-off jobs</b>. Tap <b>Statistics</b> to see your customer count, round value, average price per customer, average price by property type, and how many customers pay by bank or cash, what each is worth and the percentages.')
     ]
   },
   rounds: {
@@ -272,7 +272,7 @@ const FOCUSED_HELP = {
         'An <b>Undo</b> button appears for a few seconds afterwards.',
         'After a clean, a “Windows cleaned today” text opens ready to send. You can turn this off in Settings.'
       ]),
-      helpP('<b>Press and hold</b> a card for a quick info box – price, last cleaned, last paid, how long they usually take to pay – handy at the door. The green phone button calls and the blue compass button gives directions.'),
+      helpP('<b>Press and hold</b> a card for a quick info box – price, last cleaned, last paid, how long they usually take to pay – handy at the door. You can switch them between <b>Bank</b> and <b>Cash</b> right there. The green phone button calls and the blue compass button gives directions.'),
       helpP('<b>What the cards show.</b> In the <b>Due</b> view cards show only cleaning information. In the <b>Owed</b> view they show only payment information. Other views show everything. Badges you may see:'),
       helpList([
         '<b>Couldn’t clean</b> – you couldn’t get to them last time.',
