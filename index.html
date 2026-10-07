@@ -342,6 +342,34 @@
 
   .print-area{display:none;}
 
+  /* Schedule editor: a full-screen calendar whose chips can be moved, then committed or rejected */
+  .sched-editor{position:fixed; inset:0; z-index:56; display:none; flex-direction:column; background:var(--bg); color:var(--ink);}
+  .sched-editor.show{display:flex;}
+  .se-bar{flex:none; padding:calc(env(safe-area-inset-top, 0px) + 12px) 14px 8px; border-bottom:1px solid var(--line);}
+  .se-title{font-size:1.125rem; font-weight:800;}
+  .se-count{font-size:0.8125rem; font-weight:700; color:var(--ink-muted); margin-top:2px;}
+  .se-hint{font-size:0.75rem; color:var(--ink-muted); line-height:1.45; margin-top:4px;}
+  .se-scroll{flex:1; min-height:0; overflow:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain;}
+  .se-grid{display:grid; grid-template-columns:repeat(7, minmax(84px, 1fr)); min-width:588px;}
+  .se-dayname{position:sticky; top:0; z-index:2; background:var(--bg); padding:6px 4px; text-align:center; font-size:0.6875rem; font-weight:800; color:var(--ink-muted); border-bottom:1px solid var(--line);}
+  .se-cell{min-height:92px; padding:3px; border-right:1px solid var(--line); border-bottom:1px solid var(--line); box-sizing:border-box;}
+  .se-cell.past{opacity:0.4;}
+  .se-cell.today{background:var(--blue-dim);}
+  .se-cell.drop{background:var(--amber-dim); outline:2px solid var(--amber); outline-offset:-2px;}
+  .se-daynum{font-size:0.6875rem; font-weight:800; color:var(--ink-muted); margin:0 1px 3px;}
+  .se-chip{display:flex; align-items:center; justify-content:space-between; gap:4px; margin-bottom:3px; padding:4px 6px; border-radius:8px; font-size:0.6875rem; font-weight:700; line-height:1.2; cursor:grab; touch-action:none; user-select:none; -webkit-user-select:none; background:var(--blue-dim); color:var(--blue-deep); border:2px solid transparent;}
+  .se-chip.job{background:var(--amber-dim); color:var(--amber);}
+  .se-chip.moved{border-color:var(--amber);}
+  .se-chip.sel{border-color:var(--blue); box-shadow:0 0 0 2px var(--blue);}
+  .se-chip.dragging{opacity:0.35;}
+  .se-chip-label{min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .se-chip-n{flex:none; min-width:16px; padding:0 4px; border-radius:8px; background:rgba(0,0,0,0.12); text-align:center;}
+  .se-ghost{position:fixed; z-index:70; pointer-events:none; padding:6px 10px; border-radius:10px; background:var(--navy, #0B2438); color:#fff; font-size:0.75rem; font-weight:800; box-shadow:0 6px 18px rgba(0,0,0,0.35); max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .se-actions{flex:none; display:flex; gap:10px; padding:10px 14px calc(env(safe-area-inset-bottom, 0px) + 10px); border-top:1px solid var(--line); background:var(--bg);}
+  .se-actions button{flex:1; padding:14px 8px; border:none; border-radius:14px; font-size:0.9375rem; font-weight:800;}
+  .se-reject{background:var(--red-dim); color:var(--red);}
+  .se-commit{background:var(--green); color:#fff;}
+
   /* Report preview: full-screen paper view with Print / Share PDF / Share doc */
   .report-preview{position:fixed; inset:0; z-index:50; display:none; flex-direction:column; background:#4a4f55;}
   .report-preview.show{display:flex;}
@@ -717,7 +745,7 @@
       --card-border:transparent;
       --card-shadow:none;
     }
-    header, #lastActionBanner, #marketingFollowUpBanner, #jobAnniversaryBanner, #importReviewBanner, main, .fab, .overlay, .report-preview, #importFile, #importSpreadsheetFile, #syncFile, .toast{
+    header, #lastActionBanner, #marketingFollowUpBanner, #jobAnniversaryBanner, #importReviewBanner, main, .fab, .overlay, .report-preview, .sched-editor, #importFile, #importSpreadsheetFile, #syncFile, .toast{
       display:none !important;
     }
     body{ padding-top:0 !important; }
@@ -797,6 +825,18 @@
 <input type="file" id="importSpreadsheetFile" accept=".csv,.xlsx,.xls,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
 <div class="toast" id="toast"></div>
 <div class="print-area" id="printArea"></div>
+<div class="sched-editor" id="schedEditor">
+  <div class="se-bar">
+    <div class="se-title">📅 Schedule</div>
+    <div class="se-count" id="seCount">No changes yet</div>
+    <div class="se-hint">Drag a chip to another day, or tap a chip and then tap a day. The number is how many customers are in it. Nothing changes until you Commit.</div>
+  </div>
+  <div class="se-scroll" id="seScroll"><div class="se-grid" id="seGrid"></div></div>
+  <div class="se-actions">
+    <button class="se-reject" onclick="rejectSchedule()">✕ Reject</button>
+    <button class="se-commit" id="seCommit" onclick="commitSchedule()">✓ Commit</button>
+  </div>
+</div>
 <div class="report-preview" id="reportPreview">
   <div class="rp-bar">
     <button class="rp-btn" onclick="closeReportPreview()" aria-label="Close preview">✕</button>
@@ -820,6 +860,7 @@
 <script src="./js/05-jobs-quotes.js" defer></script>
 <script src="./js/06-settings-reports-a.js" defer></script>
 <script src="./js/07-reports-b.js" defer></script>
+<script src="./js/07c-schedule.js" defer></script>
 <script src="./js/08-backup-import.js" defer></script>
 <script src="./js/08b-sync.js" defer></script>
 <script src="./js/08c-live-sync.js" defer></script>

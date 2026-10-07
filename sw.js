@@ -1,4 +1,4 @@
-const CACHE_NAME = 'round-book-v2.49';
+const CACHE_NAME = 'round-book-v2.50';
 const ASSETS = [
   './',
   './manifest.json',
@@ -12,6 +12,7 @@ const ASSETS = [
   './js/05-jobs-quotes.js',
   './js/06-settings-reports-a.js',
   './js/07-reports-b.js',
+  './js/07c-schedule.js',
   './js/08-backup-import.js',
   './js/08b-sync.js',
   './js/08c-live-sync.js',
