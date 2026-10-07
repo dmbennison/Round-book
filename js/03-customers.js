@@ -154,6 +154,11 @@ function openCustomerForm(existing){
     <input type="text" id="f_referredBy" value="${escapeAttr(c.referredBy||'')}" placeholder="e.g. Mrs Patterson, 12 Elm Grove">
     <label>Account number <span style="text-transform:none; font-weight:500; opacity:0.7;">(shown on invoices/receipts)</span></label>
     <input type="text" id="f_accountNumber" value="${escapeAttr(c.accountNumber || (existing ? '' : String(data.settings.nextAccountNumber)))}" placeholder="e.g. 1001">
+    <label>Pays by</label>
+    <div class="seg-row" id="f_payMethodRow">
+      <button type="button" class="seg-btn ${c.paymentMethod==='cash'?'':'active'}" data-pm="bank" onclick="setFormPayMethod('bank')">🏦 Bank</button>
+      <button type="button" class="seg-btn ${c.paymentMethod==='cash'?'active':''}" data-pm="cash" onclick="setFormPayMethod('cash')">💷 Cash</button>
+    </div>
     <label style="display:flex; align-items:center; gap:8px; margin:10px 2px 0; text-transform:none; font-weight:600;">
       <input type="checkbox" id="f_textBefore" ${c.textBeforeVisit?'checked':''} style="width:18px; height:18px; margin:0;">
       Text before I arrive
@@ -169,6 +174,13 @@ function openCustomerForm(existing){
   `, existing ? (() => openCustomerDetail(existing.id)) : null);
   customerFormSnapshot = JSON.stringify(readCustomerFormFields());
   sheetCloseGuard = () => confirmCustomerFormClose(existing ? existing.id : '');
+}
+function getFormPayMethod(){
+  const on = document.querySelector('#f_payMethodRow .seg-btn.active');
+  return on && on.dataset.pm === 'cash' ? 'cash' : 'bank';
+}
+function setFormPayMethod(v){
+  document.querySelectorAll('#f_payMethodRow .seg-btn').forEach(b => b.classList.toggle('active', b.dataset.pm === v));
 }
 // Plain field values, read fresh — used only to detect whether the form's been
 // edited since it opened (see openCustomerForm/confirmCustomerFormClose).
@@ -186,6 +198,7 @@ function readCustomerFormFields(){
     notes: document.getElementById('f_notes').value.trim(),
     referredBy: document.getElementById('f_referredBy').value.trim(),
     textBeforeVisit: document.getElementById('f_textBefore').checked,
+    paymentMethod: getFormPayMethod(),
     marketingOptOut: document.getElementById('f_marketingOptOut').checked,
     accountNumber: document.getElementById('f_accountNumber').value.trim(),
     property: readPropertyPayload('f')
@@ -284,6 +297,7 @@ function finishSavingCustomerForm(id, afterAttempt){
     notes: document.getElementById('f_notes').value.trim(),
     referredBy: document.getElementById('f_referredBy').value.trim(),
     textBeforeVisit: document.getElementById('f_textBefore').checked,
+    paymentMethod: getFormPayMethod(),
     marketingOptOut: document.getElementById('f_marketingOptOut').checked,
     ...readPropertyPayload('f')
   };
@@ -472,6 +486,7 @@ function openCustomerDetail(id){
     ${(c.name && c.address) ? `<div style="color:var(--ink); font-size:0.9375rem; font-weight:700; margin-bottom:2px;">${escapeHtml(c.name)}</div>` : ''}
     <div style="color:var(--ink-muted); font-size:0.8125rem; margin-bottom:10px;">${escapeHtml(c.round||'Unassigned')} · ${money(c.price)} standard · every ${c.frequencyWeeks||4} week${(c.frequencyWeeks||4)===1?'':'s'}${c.accountNumber?` · Acct #${escapeHtml(c.accountNumber)}`:''}${c.paused?` · <span style="color:var(--ink-muted); font-weight:700;">Paused${c.pauseReason?' — '+escapeHtml(c.pauseReason):''}${c.pauseDate?' ('+fmtDate(c.pauseDate)+')':''}</span>`:''}</div>
     ${needsPriceReview(c) ? `<div style="color:var(--amber); font-size:0.75rem; font-weight:700; margin:-6px 2px 10px;">📈 12+ months since last price increase</div>` : ''}
+    <div style="color:var(--ink-muted); font-size:0.75rem; font-weight:700; margin:-6px 2px 10px;">${isCashCustomer(c) ? '💷 Pays by cash' : '🏦 Pays by bank transfer'}</div>
     ${c.textBeforeVisit ? `<div style="color:var(--blue-deep); font-size:0.75rem; font-weight:700; margin:-6px 2px 10px;">📱 Text before you arrive${textFirstSent(c) ? ' · ✓ Texted' : ''}</div>` : ''}
     ${c.referredBy ? `<div style="color:var(--ink-muted); font-size:0.75rem; font-weight:700; margin:-6px 2px 10px;">🤝 Referred by ${escapeHtml(c.referredBy)}</div>` : ''}
     ${c.marketingOptOut ? `<div style="color:var(--red); font-size:0.75rem; font-weight:700; margin:-6px 2px 10px;">🚫 Opted out of marketing texts</div>` : ''}

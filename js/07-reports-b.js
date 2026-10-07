@@ -10,13 +10,15 @@ function printRoundsLastCleaned(){
   }
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - 35);
-  const cutoffISO = cutoff.toISOString().slice(0,10);
+  const cutoffISO = localISO(cutoff);
 
   const rows = roundNames.map(rn=>{
     const custs = rounds[rn];
     const dateCounts = {};
     let latestOverall = null;
-    custs.forEach(c=>{
+    // Only 4-weekly customers set the round's rhythm; 8 / 12 week (and other) customers are left out.
+    const fourWeekly = custs.filter(c => (c.frequencyWeeks || 4) === 4);
+    fourWeekly.forEach(c=>{
       (c.cleanHistory||[]).forEach(e=>{
         if(!e.date) return;
         if(e.date >= cutoffISO) dateCounts[e.date] = (dateCounts[e.date]||0) + 1;
@@ -27,7 +29,9 @@ function printRoundsLastCleaned(){
     // cleaned then — otherwise it's just a one-off reclean or straggler
     // catch-up, not a day the round as a whole was done. Oldest first.
     const sortedDates = Object.keys(dateCounts).filter(d=>dateCounts[d] >= 4).sort();
-    const datesCell = sortedDates.length
+    const datesCell = !fourWeekly.length
+      ? `<span style="color:#66798A;">No 4-weekly customers in this round</span>`
+      : sortedDates.length
       ? sortedDates.map(d=>fmtDate(d)).join(', ')
       : `<span style="color:#66798A;">None in the last 5 weeks${latestOverall ? ' · last cleaned ' + fmtDate(latestOverall) : ' · never cleaned'}</span>`;
     return `<tr>
@@ -36,7 +40,7 @@ function printRoundsLastCleaned(){
     </tr>`;
   }).join('');
   const body = `<table class="rpt-table rpt-table-as-tabs"><thead><tr><th>Round</th><th>Dates cleaned (last 5 weeks)</th></tr></thead><tbody>${rows}</tbody></table>
-  <p style="font-size:11px; color:#66798A; margin-top:12px;">Only shows a date if 4 or more houses in that round were cleaned on it, oldest first — single stragglers or one-off recleans aren't listed.</p>`;
+  <p style="font-size:11px; color:#66798A; margin-top:12px;">Only 4-weekly customers are counted. A date is shown only if 4 or more of a round's 4-weekly houses were cleaned on it, oldest first — single stragglers, one-off recleans and 8 / 12 week customers aren't listed.</p>`;
   runPrint('Round Cleaning Dates', body, false, false, () => openReports());
 }
 
@@ -57,6 +61,7 @@ function printRoundsLastCleanedCalendar(){
 
   const countsByDate = {}; // date -> {round: count of customers cleaned}
   data.customers.forEach(c=>{
+    if((c.frequencyWeeks || 4) !== 4) return; // 4-weekly customers only
     (c.cleanHistory||[]).forEach(e=>{
       if(!e.date) return;
       const rn = c.round || 'Unassigned';
@@ -72,7 +77,7 @@ function printRoundsLastCleanedCalendar(){
     for(let d=0; d<7; d++){
       const cellDate = new Date(gridStart);
       cellDate.setDate(cellDate.getDate() + w*7 + d);
-      const iso = cellDate.toISOString().slice(0,10);
+      const iso = localISO(cellDate);
       const outside = cellDate < rangeStart || cellDate > today;
       const roundsCleaned = countsByDate[iso]
         ? Object.keys(countsByDate[iso]).filter(rn=>countsByDate[iso][rn] >= 4).sort((a,b)=>a.localeCompare(b))
@@ -92,7 +97,7 @@ function printRoundsLastCleanedCalendar(){
       <thead><tr><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th></tr></thead>
       <tbody>${bodyRows}</tbody>
     </table>
-    <p style="font-size:11px; color:#66798A; margin-top:12px;">Shows a round on a day only if 4 or more of its houses were cleaned then — single stragglers or one-off recleans aren't shown. Greyed-out days fall outside the last 5 weeks.</p>
+    <p style="font-size:11px; color:#66798A; margin-top:12px;">Counts 4-weekly customers only. Shows a round on a day only if 4 or more of its 4-weekly houses were cleaned then — single stragglers, one-off recleans and 8 / 12 week customers aren't shown. Greyed-out days fall outside the last 5 weeks.</p>
   `;
   runPrint('Round Cleaning Dates — Calendar', body, false, false, () => openReports());
 }
@@ -950,7 +955,7 @@ function printSchedule(){
     for(let d=0; d<7; d++){
       const cellDate = new Date(gridStart);
       cellDate.setDate(cellDate.getDate() + w*7 + d);
-      const iso = cellDate.toISOString().slice(0,10);
+      const iso = localISO(cellDate);
       const outside = cellDate < today || cellDate > rangeEnd;
       const roundsDue = dueByDate[iso] ? Array.from(dueByDate[iso]).sort((a,b)=>a.localeCompare(b)) : [];
       const jobsDue = jobsByDate[iso] || [];

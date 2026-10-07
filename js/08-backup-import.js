@@ -279,8 +279,10 @@ const FOCUSED_HELP = {
         '<b>Chase</b> – two or more payment reminders have gone unanswered.',
         '<b>Next due</b> – when they’re next due a clean.',
         '<b>Low by £X</b> – their price is well below the average for their property type.',
-        '<b>📈 Review</b> – it’s been 12+ months since their last price rise.'
+        '<b>📈 Review</b> – it’s been 12+ months since their last price rise.',
+        '<b>🏦 Bank / 💷 Cash</b> – how they usually pay.'
       ]),
+      helpP('<b>8 and 12 week customers</b> fall due on the same day as the 4-weekly customers in their round (and visit day), so you’re never making a separate trip. Their date is moved to the nearest round visit, never more than two weeks either way.'),
       helpP('<b>Chasing payments.</b> The Owed view lists the longest-overdue customers first (filter by 0–14, 14–30 or 30+ days). Tap <b>✉️ Chase</b> on a card to text them, or <b>Remind all</b> to go down the list. The first reminder is friendly; every one after that is firmer automatically. You can edit both wordings in Settings → Message templates.'),
       helpP('<b>Text first customers.</b> If someone likes a heads-up, tap their <b>Text first</b> badge to text them – it turns into a green <b>Texted</b> tick so you don’t send twice. <b>Text all</b> skips anyone already texted.'),
       helpP('<b>A round’s ⋯ menu</b> has:'),
@@ -299,7 +301,7 @@ const FOCUSED_HELP = {
       helpP('For anything outside your regular rounds. Swipe <b>right</b> when it’s done and <b>left</b> when it’s paid (Undo appears for a few seconds).'),
       helpList([
         'Type a <b>discount %</b> next to the price – it’s applied to that job’s invoice and receipt.',
-        'If the address matches a customer, the job links to them automatically.',
+        'If the address matches a customer, the job links to them automatically and shows their Cash or Bank badge.',
         'A finished job can be turned into a quote, invoiced, or sent as a PDF.',
         'Payment reminders can be sent once a job is marked done.',
         'The printer icon prints every job with its status and value.'
@@ -313,8 +315,9 @@ const FOCUSED_HELP = {
       helpList([
         '<b>Add a clean / Add a payment</b> – pick the date and amount. Tap any entry in History to edit or remove it, or to send a receipt.',
         '<b>Defer</b> – push their next clean back.',
-        '<b>Couldn’t clean</b> – use when you couldn’t get to them (locked gate, nobody in, weather). They move to their next normal clean date and their card shows a 🚫 badge until they’re next cleaned.',
+        '<b>Couldn’t clean</b> – use when you couldn’t get to them (locked gate, nobody in, weather). They move to the next round visit (four weeks at most) and their card shows a 🚫 badge until they’re next cleaned.',
         '<b>Get a quote for this customer</b> – starts a quote with their details filled in.',
+        '<b>Pays by</b> – Bank or Cash, set when you add or edit a customer. It shows as a small badge on their card. Texts to cash customers leave out your bank details.',
         '<b>Text before I arrive</b> – flags customers who like a heads-up text.',
         '<b>Don’t send marketing texts</b> – leaves them out of every campaign (calls, quotes and reminders are unaffected).',
         'You can also record property type, extras and “fronts only”.'
@@ -364,7 +367,7 @@ const FOCUSED_HELP = {
     title: 'Reports',
     body: () => [
       helpP('Tap the printer icon for a list of reports. Every report, invoice, quote and receipt opens in a preview first, laid out on A4 pages. Scroll it, and pinch (or use − and +) to zoom. The buttons along the bottom are <b>Print</b>, <b>Share PDF</b> and <b>Share doc</b> (an editable Word file).'),
-      helpRow('Round cleaning dates', 'List or calendar of recent cleans'),
+      helpRow('Round cleaning dates', 'List or calendar of recent cleans (4-weekly customers only)'),
       helpRow('Earnings report', 'Totals by week, month and year'),
       helpRow('Daily work done', 'Value completed, day by day'),
       helpRow('Monthly schedule', 'Calendar of rounds and jobs due'),

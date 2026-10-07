@@ -1250,6 +1250,7 @@ async function getOsrmRouteGeometry(points){
 
 /* ---------- rendering ---------- */
 function render(){
+  roundPhaseCache = null;
   updateQuotesBadge();
   renderBackupBanner();
   renderLastActionBanner();
@@ -1742,6 +1743,12 @@ function needsPriceReview(c){
   return daysBetween(lastIncrease, target) >= 365;
 }
 
+// Small "Cash" / "Bank" badge: how this customer usually pays. Shown in every view.
+function payMethodBadgeHtml(c){
+  return isCashCustomer(c)
+    ? `<span class="badge paused" title="Pays by cash">💷 Cash</span>`
+    : `<span class="badge paused" title="Pays by bank transfer">🏦 Bank</span>`;
+}
 // mode: 'due' shows only clean-related info (clean status, text-first, day, fronts
 // only, the "cleaned today" text button); 'owed' shows only payment info (what's
 // owed, chase / reminder badges and the Chase button); anything else shows the lot.
@@ -1787,6 +1794,7 @@ function custCardHtml(c, mode){
         ${showPay ? (s.owed ? `<span class="badge owed">Owes ${money(s.balance)}${daysSinceLastPayment(c) ? ` · ${daysSinceLastPayment(c)}d` : ''}</span>` : s.credit ? `<span class="badge ok">Credit ${money(Math.abs(s.balance))}</span>` : `<span class="badge ok">Paid up</span>`) : ''}
         ${(showPay && s.owed && (c.paymentReminderCount||0) >= 2) ? `<span class="badge escalate" title="${c.paymentReminderCount} payment reminders sent, still unpaid">⚠ Chase</span>` : ''}
         ${(showPay && s.owed && c.paymentReminderSent) ? `<span class="badge paused">🔔 ${fmtDate(c.paymentReminderSentDate).split(' ').slice(0,2).join(' ')}</span>` : ''}
+        ${payMethodBadgeHtml(c)}
         ${(showExtras && c.photos && c.photos.length) ? `<span class="badge paused">📷 ${c.photos.length}</span>` : ''}
         ${(showExtras && needsPriceReview(c)) ? `<span class="badge due" title="12+ months since last price increase">📈 Review</span>` : ''}
         ${(showExtras && belowTypeAvg) ? `<span class="badge due" title="${money(lowBy)} below the average for ${escapeAttr(c.propertyType||'Not recorded')}">💷 Low by ${money(lowBy)}</span>` : ''}

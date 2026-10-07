@@ -920,7 +920,7 @@ function markCouldntClean(id){
   if(!c) return;
   const prev = { deferUntil: c.deferUntil, couldntCleanDate: c.couldntCleanDate };
   c.couldntCleanDate = todayISO();
-  c.deferUntil = deferredDateFor({ cleanHistory: [], frequencyWeeks: c.frequencyWeeks, deferUntil: null }, freqDays(c));
+  c.deferUntil = deferredDateFor({ cleanHistory: [], frequencyWeeks: c.frequencyWeeks, deferUntil: null }, Math.min(freqDays(c), 28)); // next round visit — 28 days at most, even for 8/12-week customers
   saveData(); closeSheet(); render();
   toast(`Couldn't clean ${c.name||c.address||'customer'} — deferred to ${fmtDate(c.deferUntil)}`, 'Undo', () => {
     c.deferUntil = prev.deferUntil;
@@ -1211,7 +1211,8 @@ function applyTemplate(tpl, tokens){
     .replace(/\{yourname\}/g, tokens.yourname || '')
     .replace(/\{work\}/g, tokens.work || 'your window cleaning')
     .replace(/\{daysoverdue\}/g, tokens.daysoverdue != null ? String(tokens.daysoverdue) : '')
-    .replace(/\{bankdetails\}/g, bankDetailsBlock(tokens.address));
+    // Cash customers don't need bank details: the token simply disappears for them.
+    .replace(/\{bankdetails\}/g, tokens.cash ? '' : bankDetailsBlock(tokens.address));
 }
 
 // Normalizes a UK-style phone number into the digits-only, country-code-prefixed
@@ -1495,7 +1496,7 @@ function sendJobPaymentReminder(id){
   const yourname = data.settings.yourName || '';
   const tpl = payTemplateFor(j.paymentReminderCount);
   const daysOverdue = j.date ? Math.max(0, daysBetween(j.date, todayISO())) : 0;
-  const msg = applyTemplate(tpl, {name: firstName, amount: jobDiscountedTotal(j), company, yourname, address: j.address, daysoverdue: daysOverdue});
+  const msg = applyTemplate(tpl, {name: firstName, amount: jobDiscountedTotal(j), company, yourname, address: j.address, cash: isCashJob(j), daysoverdue: daysOverdue});
   const afterSend = () => {
     j.paymentReminderSent = true;
     j.paymentReminderSentDate = todayISO();
@@ -1555,7 +1556,7 @@ function sendQuoteText(id, mode){
 function cleanedTodayMessage(c){
   const st = custStatus(c);
   const firstName = c.name ? c.name.trim().split(' ')[0] : '';
-  return applyTemplate(data.settings.cleanedTodayTemplate, {name: firstName, amount: st.owed ? st.balance : 0, company: data.settings.companyName || '', yourname: data.settings.yourName || '', address: c.address});
+  return applyTemplate(data.settings.cleanedTodayTemplate, {name: firstName, amount: st.owed ? st.balance : 0, company: data.settings.companyName || '', yourname: data.settings.yourName || '', address: c.address, cash: isCashCustomer(c)});
 }
 // Used straight after a swipe-clean: marks the customer as texted for today and logs
 // it, returning the message to open in the messaging app plus an undo for both. Null
@@ -1611,7 +1612,7 @@ function sendTemplate(id, kind, returnTo){
     const s = custStatus(c);
     const amt = s.owed ? s.balance : c.price;
     const tpl = payTemplateFor(c.paymentReminderCount);
-    msg = applyTemplate(tpl, {name: firstName, amount: amt, company, yourname, address: c.address, daysoverdue: daysSinceLastPayment(c)});
+    msg = applyTemplate(tpl, {name: firstName, amount: amt, company, yourname, address: c.address, cash: isCashCustomer(c), daysoverdue: daysSinceLastPayment(c)});
     title = 'Payment reminder';
     afterSend = () => {
       c.paymentReminderSent = true;
@@ -1636,7 +1637,7 @@ function chaseCustomer(id){
   const company = data.settings.companyName || '';
   const yourname = data.settings.yourName || '';
   const amt = s.owed ? s.balance : c.price;
-  const msg = applyTemplate(tpl, {name: firstName, amount: amt, company, yourname, address: c.address, daysoverdue: daysSinceLastPayment(c)});
+  const msg = applyTemplate(tpl, {name: firstName, amount: amt, company, yourname, address: c.address, cash: isCashCustomer(c), daysoverdue: daysSinceLastPayment(c)});
   sendPhoneMessage(c.phone, msg);
   logMessage(c, 'pay');
   c.paymentReminderSent = true;
@@ -1743,7 +1744,7 @@ function sendBulkReminder(id, kind){
     const s = custStatus(c);
     amt = s.owed ? s.balance : c.price;
   }
-  const msg = applyTemplate(tpl, {name: firstName, amount: amt, company, yourname, address: c.address, daysoverdue: kind==='owed' ? daysSinceLastPayment(c) : undefined});
+  const msg = applyTemplate(tpl, {name: firstName, amount: amt, company, yourname, address: c.address, cash: isCashCustomer(c), daysoverdue: kind==='owed' ? daysSinceLastPayment(c) : undefined});
   sendPhoneMessage(c.phone, msg);
   logMessage(c, kind === 'owed' ? 'pay' : kind === 'textBefore' ? 'textBefore' : 'clean');
   if(kind === 'owed'){

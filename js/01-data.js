@@ -6,13 +6,14 @@ const STORE_KEY = 'roundBookData_v1';
 // APP_VERSION is a plain decimal number (e.g. 1.01, 1.02 ... 1.99, 2.00) —
 // bump by 0.01 for every change. formatVersion always renders it to exactly
 // two decimal places, so it's never shown as "1.1" or "1.100".
-const APP_VERSION = 2.47;
+const APP_VERSION = 2.48;
 function formatVersion(v){ return Number(v).toFixed(2); }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
 // entry (newest first) with ONE very short plain-English summary, then delete
 // entries so only the latest ten remain.
 const VERSION_HISTORY = [
+  {version: 2.48, changes: ['8 and 12 week customers now fall due with their round\'s 4-weekly cleans; cleaning dates reports count 4-weekly customers only; customers can be marked Cash or Bank, shown on cards, and cash customers\' texts leave out bank details']},
   {version: 2.47, changes: ['iPad: print and help icons inside customer and quote screens no longer show as blank circles; user guide rewritten shorter and simpler']},
   {version: 2.46, changes: ['Fuel prices on Today is now a one-tap link to the live price map (the embedded list showed out-of-date prices)']},
   {version: 2.45, changes: ['Annotations can be moved, selected, deleted and undone; new Before & after photo maker (landscape side by side, or portrait for social media) with labels']},
@@ -22,7 +23,6 @@ const VERSION_HISTORY = [
   {version: 2.41, changes: ['Payment chase: friendly wording on the first only, firmer on every chase after; new Couldn\'t clean button defers a customer a full cycle and flags the card']},
   {version: 2.40, changes: ['Collapsed Fuel prices box on Today: free local diesel/petrol prices from CheckFuelPrices, loaded only when opened']},
   {version: 2.39, changes: ['Report preview and shared PDFs now laid out as separate A4 sheets with page numbers']},
-  {version: 2.38, changes: ['Property type badge removed from customer cards; Due view shows only clean info and Owed view only payment info']},
 ];
 const DIRECTIONS_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>';
 const CALL_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>';
@@ -337,6 +337,7 @@ function migrateData(parsed){
     if(c.pauseReason == null) c.pauseReason = '';
     if(c.pauseDate == null) c.pauseDate = '';
     if(c.textBeforeVisit == null) c.textBeforeVisit = false;
+    if(c.paymentMethod !== 'cash' && c.paymentMethod !== 'bank') c.paymentMethod = 'bank'; // how they usually pay
     if(c.frequencyWeeks == null){
       c.frequencyWeeks = c.frequencyDays ? Math.max(1, Math.round(c.frequencyDays/7)) : 4;
     }
@@ -401,6 +402,7 @@ async function loadData(){
 // The 3 call sites that DO need to know whether the save actually succeeded
 // (logo/photo uploads, which only navigate onward on success) `await` it instead.
 async function saveData(){
+  roundPhaseCache = null; // due-date alignment (see roundPhases) depends on the data
   try{
     await idbSaveAppData(data);
     // Once IndexedDB genuinely holds the current data, drop any stale localStorage
@@ -660,7 +662,10 @@ let data = migrateData({ customers: [] }); // safe placeholder until initStorage
 
 /* ---------- helpers ---------- */
 function uid(){ return 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
-function todayISO(){ const d=new Date(); return d.toISOString().slice(0,10); }
+// A date as YYYY-MM-DD from its LOCAL parts. (toISOString() converts to UTC, which in British
+// Summer Time lands a day early for local-midnight dates.)
+function localISO(d){ return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+function todayISO(){ return localISO(new Date()); }
 function fmtDate(iso){
   if(!iso) return '—';
   const d = new Date(iso+'T00:00:00');
@@ -721,7 +726,65 @@ function runToastAction(){
 }
 
 function freqDays(c){ return (c.frequencyWeeks || 4) * 7; }
+function isCashCustomer(c){ return !!c && c.paymentMethod === 'cash'; }
+// A one-off job takes its payment method from the customer it's linked to (if any).
+function isCashJob(j){
+  if(!j || !j.customerId) return false;
+  return isCashCustomer((data.customers||[]).find(x=>x.id === j.customerId));
+}
+
+/* ---------- aligning 8 / 12 week customers with their round's 4-weekly cycle ----------
+   Customers on a longer cycle that is a multiple of four weeks (8, 12, 16...) are due on the same
+   dates as the 4-weekly customers in their round (and visit day) rather than drifting a few days
+   either side. The round's rhythm is the most common "next due" day-in-a-28-day-cycle among its
+   4-weekly customers; a longer-cycle customer's natural due date (last clean + their interval) is
+   moved to the nearest date on that rhythm — never more than 14 days either way. Customers on any
+   other frequency, and rounds with no 4-weekly customers, are untouched. */
+function isoToDays(iso){ const p = iso.split('-').map(Number); return Math.round(Date.UTC(p[0], p[1]-1, p[2]) / 86400000); }
+function daysToISO(n){
+  const d = new Date(n * 86400000);
+  return d.getUTCFullYear() + '-' + String(d.getUTCMonth()+1).padStart(2,'0') + '-' + String(d.getUTCDate()).padStart(2,'0');
+}
+function roundGroupKey(c){ return (c.round || 'Unassigned') + '|' + (c.visitDay || 1); }
+let roundPhaseCache = null; // cleared on every save and every render
+function roundPhases(){
+  if(roundPhaseCache) return roundPhaseCache;
+  const groups = {};
+  (data.customers || []).forEach(c => {
+    if(c.paused || (c.frequencyWeeks || 4) !== 4) return;
+    const last = lastDateOf(c.cleanHistory);
+    if(!last) return;
+    const ph = ((isoToDays(last) + 28) % 28 + 28) % 28;
+    const k = roundGroupKey(c);
+    const g = groups[k] = groups[k] || {};
+    const e = g[ph] = g[ph] || { count: 0, latest: '' };
+    e.count++;
+    if(last > e.latest) e.latest = last;
+  });
+  const out = {};
+  Object.keys(groups).forEach(k => {
+    let best = null;
+    Object.keys(groups[k]).forEach(ph => {
+      const e = groups[k][ph];
+      if(!best || e.count > best.e.count || (e.count === best.e.count && e.latest > best.e.latest)) best = { ph: Number(ph), e };
+    });
+    if(best) out[k] = best.ph;
+  });
+  roundPhaseCache = out;
+  return out;
+}
 function nextDueISO(c){
+  const natural = naturalNextDueISO(c);
+  if(!natural) return null;
+  const f = c.frequencyWeeks || 4;
+  if(f <= 4 || f % 4 !== 0) return natural;
+  const ph = roundPhases()[roundGroupKey(c)];
+  if(ph == null) return natural;
+  const n = isoToDays(natural);
+  const delta = (((ph - n) % 28) + 28) % 28; // days forward from the natural date to the next cycle date
+  return daysToISO(delta <= 14 ? n + delta : n + delta - 28);
+}
+function naturalNextDueISO(c){
   const lastClean = lastDateOf(c.cleanHistory);
   if(!lastClean) return null;
   const d = new Date(lastClean+'T00:00:00');
@@ -765,9 +828,9 @@ function custStatus(c){
     // deferred date, without touching cleanHistory or the normal cycle after that.
     cleanBadge = {type:'deferred', text: `Deferred to ${fmtDate(c.deferUntil)}`};
   } else if(lastClean){
-    const due = daysBetween(lastClean, todayISO());
-    if(due >= freq){
-      const daysPast = due - freq;
+    // The aligned due date (see roundPhases), which for most customers is simply last clean + frequency.
+    const daysPast = daysBetween(nextDueISO(c), todayISO());
+    if(daysPast >= 0){
       cleanBadge = {type:'due', text: daysPast===0 ? 'Due today' : `Due +${daysPast}`};
     }
   } else {
