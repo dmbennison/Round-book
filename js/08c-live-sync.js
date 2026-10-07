@@ -40,8 +40,8 @@ function liveRun(fn){
   return run;
 }
 function liveUiBusy(){
-  const ov = document.getElementById('overlay'), rp = document.getElementById('reportPreview');
-  return !!((ov && ov.classList.contains('show')) || (rp && rp.classList.contains('show')));
+  const ov = document.getElementById('overlay'), rp = document.getElementById('reportPreview'), sc = document.getElementById('schedEditor');
+  return !!((ov && ov.classList.contains('show')) || (rp && rp.classList.contains('show')) || (sc && sc.classList.contains('show')));
 }
 async function liveHashState(state){
   const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(syncStable(state)));

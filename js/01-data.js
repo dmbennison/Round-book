@@ -6,13 +6,14 @@ const STORE_KEY = 'roundBookData_v1';
 // APP_VERSION is a plain decimal number (e.g. 1.01, 1.02 ... 1.99, 2.00) —
 // bump by 0.01 for every change. formatVersion always renders it to exactly
 // two decimal places, so it's never shown as "1.1" or "1.100".
-const APP_VERSION = 2.49;
+const APP_VERSION = 2.50;
 function formatVersion(v){ return Number(v).toFixed(2); }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
 // entry (newest first) with ONE very short plain-English summary, then delete
 // entries so only the latest ten remain.
 const VERSION_HISTORY = [
+  {version: 2.50, changes: ['New Schedule button in Work: a calendar where rounds and jobs can be dragged to other days, then committed (due dates change) or rejected (nothing changes)']},
   {version: 2.49, changes: ['Cash / Bank toggle in the press-and-hold customer info box; Statistics now show cash vs bank customers, value and percentages; explanatory notes removed from the bottom of reports']},
   {version: 2.48, changes: ['8 and 12 week customers now fall due with their round\'s 4-weekly cleans; cleaning dates reports count 4-weekly customers only; customers can be marked Cash or Bank, shown on cards, and cash customers\' texts leave out bank details']},
   {version: 2.47, changes: ['iPad: print and help icons inside customer and quote screens no longer show as blank circles; user guide rewritten shorter and simpler']},
@@ -22,7 +23,6 @@ const VERSION_HISTORY = [
   {version: 2.43, changes: ['Live sync: devices stay in step automatically through your own free Cloudflare mailbox (encrypted on-device first); sync status shown in the header']},
   {version: 2.42, changes: ['Pinch, double-tap and drag to zoom photos; send a photo with an offer text (gutter clearing, conservatory roof, fascias) from the photo viewer']},
   {version: 2.41, changes: ['Payment chase: friendly wording on the first only, firmer on every chase after; new Couldn\'t clean button defers a customer a full cycle and flags the card']},
-  {version: 2.40, changes: ['Collapsed Fuel prices box on Today: free local diesel/petrol prices from CheckFuelPrices, loaded only when opened']},
 ];
 const DIRECTIONS_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>';
 const CALL_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>';
@@ -359,6 +359,7 @@ function migrateData(parsed){
     if(c.paymentReminderSent == null) c.paymentReminderSent = false;
     if(c.paymentReminderSentDate === undefined) c.paymentReminderSentDate = null;
     if(c.deferUntil === undefined) c.deferUntil = null;
+    if(c.dueOverride === undefined) c.dueOverride = null;
     if(c.couldntCleanDate === undefined) c.couldntCleanDate = null;
     if(c.paymentReminderCount == null) c.paymentReminderCount = 0;
     if(!c.messageLog) c.messageLog = [];
@@ -754,7 +755,9 @@ function roundPhases(){
     if(c.paused || (c.frequencyWeeks || 4) !== 4) return;
     const last = lastDateOf(c.cleanHistory);
     if(!last) return;
-    const ph = ((isoToDays(last) + 28) % 28 + 28) % 28;
+    // A 4-weekly customer moved in the Schedule editor sets the rhythm from their moved date.
+    const od = dueOverrideISO(c);
+    const ph = (((od ? isoToDays(od) : isoToDays(last) + 28)) % 28 + 28) % 28;
     const k = roundGroupKey(c);
     const g = groups[k] = groups[k] || {};
     const e = g[ph] = g[ph] || { count: 0, latest: '' };
@@ -773,7 +776,19 @@ function roundPhases(){
   roundPhaseCache = out;
   return out;
 }
+/* A date set by hand in the Schedule editor. It is only honoured while the customer's latest
+   clean is the same one it was set against, so as soon as they're cleaned again it lapses by
+   itself and the normal last-clean + frequency rule takes over (nothing to clear). */
+function dueOverrideISO(c){
+  const o = c && c.dueOverride;
+  if(!o || !o.date) return null;
+  return ((lastDateOf(c.cleanHistory) || '') === (o.base || '')) ? o.date : null;
+}
+// The date a customer is due: a hand-set date if there is one, otherwise the calculated date.
 function nextDueISO(c){
+  return dueOverrideISO(c) || computedDueISO(c);
+}
+function computedDueISO(c){
   const natural = naturalNextDueISO(c);
   if(!natural) return null;
   const f = c.frequencyWeeks || 4;

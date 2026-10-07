@@ -257,7 +257,19 @@ const FOCUSED_HELP = {
   work: {
     title: 'Work',
     body: () => [
-      helpP('Work has two buttons: <b>Rounds</b> and <b>One-off jobs</b>. Tap <b>Statistics</b> to see your customer count, round value, average price per customer, average price by property type, and how many customers pay by bank or cash, what each is worth and the percentages.')
+      helpP('Work has three buttons: <b>Rounds</b>, <b>One-off jobs</b> and <b>Schedule</b>. Tap <b>Statistics</b> to see your customer count, round value, average price per customer, average price by property type, and how many customers pay by bank or cash, what each is worth and the percentages.')
+    ]
+  },
+  schedule: {
+    title: 'Schedule',
+    body: () => [
+      helpP('<b>Work → Schedule</b> opens a calendar of the next nine weeks. Each blue chip is a round (and visit day) on the day it’s due, with the number of customers in it; amber 🔧 chips are one-off jobs. Anyone overdue shows on today.'),
+      helpList([
+        '<b>Move a chip</b> by dragging it to another day, or tap the chip and then tap the day. Moved chips get an amber outline and the top of the screen shows how many have moved. You can’t move something to a day that’s already past.',
+        '<b>✓ Commit</b> – everyone in a moved chip is now due on the new day (it replaces any deferral), and moved jobs change date. Your Due lists, the Monthly schedule report and the “Next due” badges all follow.',
+        '<b>✕ Reject</b> – throws away every move; nothing changes.',
+        'A date set this way only lasts until that customer is next cleaned, then their normal cycle carries on from the new clean. Moving a chip back to its usual day simply removes the change.'
+      ])
     ]
   },
   rounds: {
@@ -428,7 +440,7 @@ const FOCUSED_HELP = {
     ]
   }
 };
-const FOCUSED_HELP_ORDER = ['today','work','rounds','jobs','customer','photos','quotes','marketing','reports','backup','sync','settings','reminders'];
+const FOCUSED_HELP_ORDER = ['today','work','schedule','rounds','jobs','customer','photos','quotes','marketing','reports','backup','sync','settings','reminders'];
 
 function openFocusedHelp(topic, explicitReturnTo){
   const h = FOCUSED_HELP[topic];

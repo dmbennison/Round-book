@@ -1384,6 +1384,10 @@ function renderWorkHub(main){
       <div class="num" style="font-size:1.375rem;">🧰</div>
       <div class="lbl" style="font-size:0.875rem; margin-top:8px; color:var(--ink);">One-off jobs${openJobsCount ? ` (${openJobsCount})` : ''}</div>
     </button>
+    <button class="today-tile" style="text-align:center; cursor:pointer; grid-column:1 / -1;" onclick="openScheduleEditor()">
+      <div class="num" style="font-size:1.375rem;">📅</div>
+      <div class="lbl" style="font-size:0.875rem; margin-top:8px; color:var(--ink);">Schedule</div>
+    </button>
   </div>`;
 
   if(data.customers.length){
