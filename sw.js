@@ -1,4 +1,4 @@
-const CACHE_NAME = 'round-book-v2.54';
+const CACHE_NAME = 'round-book-v2.55';
 const ASSETS = [
   './',
   './manifest.json',
@@ -68,10 +68,7 @@ self.addEventListener('activate', (event) => {
 // and updates the cache in the background when a connection is available.
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
-  // Live weather must always come from the network: serving it cache-first
-  // would show the PREVIOUS reading, which can be hours old.
   const host = new URL(event.request.url).hostname;
-  if (host === 'api.open-meteo.com') return;
   // Live sync mailbox traffic must never be served from (or stored in) the cache.
   const u = new URL(event.request.url);
   if (host.endsWith('.workers.dev') || (u.origin !== self.location.origin && u.pathname.startsWith('/v1/'))) return;

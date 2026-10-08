@@ -103,7 +103,6 @@
   .brand-text{min-width:0;}
   .brand h1{font-size:1.1875rem; font-weight:800; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
   .brand .sub{font-size:0.6875rem; color:#A9C4D8; font-weight:600; letter-spacing:.04em; text-transform:uppercase; margin-top:1px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
-  #weatherPill{text-transform:none; margin-top:8px; white-space:normal;}
   .icon-btn{
     width:34px;height:34px;border-radius:9px;border:none; flex-shrink:0;
     background:rgba(255,255,255,0.12); color:#fff; display:flex;align-items:center;justify-content:center;
@@ -350,7 +349,7 @@
   .se-count{font-size:0.8125rem; font-weight:700; color:var(--ink-muted); margin-top:2px;}
   .se-hint{font-size:0.75rem; color:var(--ink-muted); line-height:1.45; margin-top:4px;}
   .se-scroll{flex:1; min-height:0; overflow:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; touch-action:pan-x pan-y;}
-  .se-grid{--z:1.4; display:grid; grid-template-columns:repeat(7, minmax(calc(84px * var(--z)), 1fr)); min-width:calc(588px * var(--z));}
+  .se-grid{--z:1.4; display:grid; grid-template-columns:repeat(7, minmax(calc(112px * var(--z)), 1fr)); min-width:calc(784px * var(--z));}
   .se-dayname{position:sticky; top:0; z-index:2; background:var(--bg); padding:6px 4px; text-align:center; font-size:max(0.5625rem, calc(0.6875rem * var(--z,1.4))); font-weight:800; color:var(--ink-muted); border-bottom:1px solid var(--line);}
   .se-cell{position:relative; min-height:calc(92px * var(--z)); padding:calc(3px * var(--z)); border-right:1px solid var(--line); border-bottom:1px solid var(--line); box-sizing:border-box;}
   .se-cell.past{opacity:0.4;}
@@ -861,7 +860,6 @@
       </button>
     </div>
   </div>
-  <div class="sub" id="weatherPill" style="padding-left:46px;"></div>
   <div class="sub" id="liveSyncChip" hidden style="padding-left:46px; cursor:pointer;"></div>
   <div class="tabs">
     <button class="tab active" data-tab="today" onclick="setTab('today')">Today</button>
