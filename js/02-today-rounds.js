@@ -230,24 +230,7 @@ function renderTodayHome(main){
         </div>` : ''}
       </div>
     </div>
-    ${fuelMapTileHtml()}
   `;
-}
-
-/* ---------- fuel prices tile (Today) ----------
-   One tap to the live fuel price map on CheckFuelPrices.co.uk. (An embedded list was tried
-   first but showed out-of-date prices; the site's own map is current.) The map has its own
-   "Locate" button for finding stations near you. */
-function fuelMapTileHtml(){
-  return `<a href="https://checkfuelprices.co.uk/map" target="_blank" rel="noopener"
-    style="display:flex; align-items:center; gap:12px; margin-top:12px; padding:14px 16px; text-decoration:none; color:inherit; background:var(--card-surface); border:1px solid var(--card-border); border-radius:14px; box-shadow:var(--card-shadow);">
-    <span style="font-size:1.5rem; line-height:1;">⛽</span>
-    <span style="flex:1; min-width:0;">
-      <span style="display:block; font-weight:800;">Fuel prices map</span>
-      <span style="display:block; font-size:0.75rem; color:var(--ink-muted); margin-top:2px;">Live prices — tap Locate on the map for stations near you</span>
-    </span>
-    <span style="font-weight:800; color:var(--ink-muted);">↗</span>
-  </a>`;
 }
 
 /* ---------- mileage tracking ----------

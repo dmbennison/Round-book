@@ -11,6 +11,7 @@
 
 const SE_WEEKS = 9;           // weeks shown when the editor opens, starting with the Monday of this week
 const SE_MORE_WEEKS = 4;      // weeks added by the "+ more weeks" button
+const SE_HOLD_MS = 350;       // touchscreens: how long to press and hold a tile before it lifts
 const SE_MAX_WEEKS = 52;      // furthest the calendar can be extended
 const SE_ZOOM_KEY = 'roundBookScheduleZoom';
 const SE_ZOOM_MIN = 0.45, SE_ZOOM_MAX = 2.6, SE_ZOOM_DEFAULT = 1.4;
@@ -286,46 +287,70 @@ function seEndDrag(){
   const d = se && se.drag;
   if(!d) return;
   if(d.timer) clearInterval(d.timer);
+  if(d.hold) clearTimeout(d.hold);
   if(d.ghost && d.ghost.parentNode) d.ghost.parentNode.removeChild(d.ghost);
   document.querySelectorAll('.se-cell.drop').forEach(c => c.classList.remove('drop'));
   document.querySelectorAll('.se-chip.dragging').forEach(c => c.classList.remove('dragging'));
   se.drag = null;
 }
+function seActivateDrag(d){
+  if(d.active || d.dead) return;
+  d.active = true;
+  // Dragging a chip that's part of a multi-selection carries the whole selection.
+  d.ids = (se.multi && se.sel.includes(d.id)) ? se.sel.slice() : [d.id];
+  const ch = se.chipIndex[d.id];
+  const ghost = document.createElement('div');
+  ghost.className = 'se-ghost';
+  ghost.textContent = d.ids.length > 1 ? `${d.ids.length} chips` : (ch ? ch.label : '');
+  ghost.style.left = (d.x + 12) + 'px';
+  ghost.style.top = (d.y - 18) + 'px';
+  document.body.appendChild(ghost);
+  d.ghost = ghost;
+  const { grid, scroll } = seEls();
+  d.ids.forEach(id => {
+    const src = grid.querySelector(`.se-chip[data-id="${CSS.escape(id)}"]`);
+    if(src) src.classList.add('dragging');
+  });
+  // Scroll the calendar when the chip is held near its edge.
+  d.timer = setInterval(() => {
+    const r = scroll.getBoundingClientRect();
+    if(d.y < r.top + 56) scroll.scrollTop -= 14; else if(d.y > r.bottom - 56) scroll.scrollTop += 14;
+    if(d.x < r.left + 40) scroll.scrollLeft -= 14; else if(d.x > r.right - 40) scroll.scrollLeft += 14;
+    seUpdateDropTarget(d.x, d.y);
+  }, 40);
+  seUpdateDropTarget(d.x, d.y);
+}
 function seBind(){
   if(seBound) return;
   seBound = true;
   const { grid, scroll, modal } = seEls();
+  // On a touchscreen a tile is picked up by pressing and holding it for a moment (it lifts and
+  // buzzes); a quick swipe starting on a tile just scrolls the calendar. A mouse drags straight away.
   grid.addEventListener('pointerdown', (e) => {
     const chip = e.target.closest('.se-chip');
     if(!chip || !se || se.drag) return; // a second finger (pinch) must not replace the first
-    se.drag = { id: chip.dataset.id, sx: e.clientX, sy: e.clientY, x: e.clientX, y: e.clientY, pid: e.pointerId, active: false, ghost: null, timer: null };
+    const d = { id: chip.dataset.id, sx: e.clientX, sy: e.clientY, x: e.clientX, y: e.clientY, pid: e.pointerId,
+                touch: e.pointerType === 'touch', active: false, dead: false, ghost: null, timer: null, hold: null };
+    se.drag = d;
     try{ chip.setPointerCapture(e.pointerId); }catch(err){}
+    if(d.touch){
+      d.hold = setTimeout(() => {
+        d.hold = null;
+        if(se && se.drag === d && !d.dead){ if(navigator.vibrate) navigator.vibrate(20); seActivateDrag(d); }
+      }, SE_HOLD_MS);
+    }
   });
   grid.addEventListener('pointermove', (e) => {
     const d = se && se.drag;
-    if(!d || e.pointerId !== d.pid) return;
+    if(!d || d.dead || e.pointerId !== d.pid) return;
     d.x = e.clientX; d.y = e.clientY;
     if(!d.active && Math.hypot(d.x - d.sx, d.y - d.sy) > 8){
-      d.active = true;
-      // Dragging a chip that's part of a multi-selection carries the whole selection.
-      d.ids = (se.multi && se.sel.includes(d.id)) ? se.sel.slice() : [d.id];
-      const ch = se.chipIndex[d.id];
-      const ghost = document.createElement('div');
-      ghost.className = 'se-ghost';
-      ghost.textContent = d.ids.length > 1 ? `${d.ids.length} chips` : (ch ? ch.label : '');
-      document.body.appendChild(ghost);
-      d.ghost = ghost;
-      d.ids.forEach(id => {
-        const src = grid.querySelector(`.se-chip[data-id="${CSS.escape(id)}"]`);
-        if(src) src.classList.add('dragging');
-      });
-      // Scroll the calendar when the chip is held near its edge.
-      d.timer = setInterval(() => {
-        const r = scroll.getBoundingClientRect();
-        if(d.y < r.top + 56) scroll.scrollTop -= 14; else if(d.y > r.bottom - 56) scroll.scrollTop += 14;
-        if(d.x < r.left + 40) scroll.scrollLeft -= 14; else if(d.x > r.right - 40) scroll.scrollLeft += 14;
-        seUpdateDropTarget(d.x, d.y);
-      }, 40);
+      if(d.touch){ // moved before the hold finished: the person is scrolling, not dragging
+        d.dead = true;
+        if(d.hold){ clearTimeout(d.hold); d.hold = null; }
+        return;
+      }
+      seActivateDrag(d);
     }
     if(d.active){
       e.preventDefault();
@@ -334,10 +359,14 @@ function seBind(){
       seUpdateDropTarget(d.x, d.y);
     }
   });
+  // Once a tile has been picked up, the finger must move it rather than scroll the page.
+  grid.addEventListener('touchmove', (e) => { if(se && se.drag && se.drag.active && e.cancelable) e.preventDefault(); }, {passive:false});
+  grid.addEventListener('contextmenu', (e) => { if(e.target.closest('.se-chip')) e.preventDefault(); });
   grid.addEventListener('pointerup', (e) => {
     const d = se && se.drag;
     if(!d || e.pointerId !== d.pid) return;
     se.ignoreClickUntil = Date.now() + 350; // the click that follows a chip touch must not also hit the day underneath
+    if(d.dead){ seEndDrag(); return; } // it was a scroll
     if(d.active){
       const cell = seCellAt(e.clientX, e.clientY);
       const ids = d.ids || [d.id];
@@ -351,7 +380,11 @@ function seBind(){
       seTapChip(id);
     }
   });
-  grid.addEventListener('pointercancel', () => { seEndDrag(); renderScheduleEditor(); });
+  grid.addEventListener('pointercancel', () => {
+    const wasActive = se && se.drag && se.drag.active;
+    seEndDrag();
+    if(wasActive) renderScheduleEditor(); // a cancelled scroll must not redraw the calendar under the finger
+  });
   // Tap a day while chips are selected to move them there; with nothing selected it selects the day
   // (used by Push back and Add job).
   grid.addEventListener('click', (e) => {

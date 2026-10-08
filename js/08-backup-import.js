@@ -247,8 +247,7 @@ const FOCUSED_HELP = {
         '<b>Text before visit</b> – customers you haven’t texted yet who like a heads-up.',
         '<b>Mileage</b> – tap to log your start reading in the morning, tap again for your end reading in the evening.',
         '<b>Jobs</b> – only appears on days when a one-off job is booked.',
-        '<b>Customers owing</b> – how much is outstanding, split into 0–14, 14–30 and 30+ days.',
-        '<b>Fuel prices map</b> – opens a live map of nearby fuel prices. Tap <b>Locate</b> on the map.'
+        '<b>Customers owing</b> – how much is outstanding, split into 0–14, 14–30 and 30+ days.'
       ]),
       helpP('Tap any tile to open its full list. A yellow number on the <b>Quotes</b> tab means quotes need following up. The Getting started card helps with first-time setup; dismiss it with the ✕, or restart setup any time from the ⓘ button.'),
       helpP('On an iPad held sideways, the list stays on the left and whatever you open appears on the right.')
@@ -265,7 +264,7 @@ const FOCUSED_HELP = {
     body: () => [
       helpP('<b>Work → Schedule</b> opens a calendar of the next nine weeks (tap <b>＋ Show 4 more weeks</b> at the bottom to look further ahead, up to a year). Each blue tile is a round (and visit day) on the day it’s due, with the number of customers in it; amber 🔧 tiles are one-off jobs. Anyone overdue shows on today in a red tile with a ⚠. Nothing is saved until you Commit.'),
       helpList([
-        '<b>Move a chip</b> by dragging it to another day, or tap the chip and then tap the day. Moved chips get an amber outline and the top of the screen counts what has moved. You can’t move something to a day that’s already past or marked off.',
+        '<b>Move a chip</b> by pressing and holding it for a moment until it lifts (your phone gives a little buzz), then dragging it to another day – or tap the chip and then tap the day. Swiping across the calendar just scrolls, even if your finger starts on a chip, so tiles don’t move by accident (with a mouse you can simply drag). Moved chips get an amber outline and the top of the screen counts what has moved. You can’t move something to a day that’s already past or marked off.',
         '<b>On each day</b> you’ll see how many customers and jobs are booked and what they’re worth. A coloured stripe along the top of a day means it’s much busier than your typical day: amber is busy, red is very busy.',
         '<b>📍 Today</b> jumps back to today. <b>🔍− / 🔍＋</b> make the days smaller or bigger – or just pinch the calendar with two fingers. It remembers your zoom. Zoom out to see the whole week at once, zoom in to read the round names clearly. <b>↶ Undo</b> takes back your last change, one at a time.',
         '<b>☔ Push back</b> – for a rained-off day. Choose the day, whether to push just that day or that day and every day after it, and by how many working days. Sundays and days off are skipped, and the box tells you what will move before you confirm. Tapping a day (or a chip) first fills the date in for you.',
