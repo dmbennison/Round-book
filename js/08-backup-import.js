@@ -421,10 +421,11 @@ const FOCUSED_HELP = {
         'On the second device tap <b>Join live sync</b> and enter the same passphrase.',
         'A small line under the date shows when it last synced. Open the app to catch up – it can’t sync while closed. Changes made offline go across when you’re back online.',
         '<b>Turn off</b> stops it on that device; <b>Delete the cloud copy</b> also clears the mailbox.',
+        '<b>If both devices changed the same detail</b> (say a customer’s price, or a date), live sync pauses and shows both versions – <b>This device</b> and <b>Other device</b> – and you tap the one to keep. Use <b>Keep this device for all</b> / <b>Keep other device for all</b> if there are several. Your answer goes across too, so the other device doesn’t ask again. <b>Decide later</b> leaves things as they are and asks again after about 15 minutes, or tap the sync line under the date to be asked straight away. Different changes to different details still merge on their own.',
         'If you restore a backup, live sync stops and asks what to do, so the restore can’t undo work on your other device.'
       ]),
       helpP('<b>Sync by file</b> (no internet account). On one device tap <b>Send to other device</b>, choose a passphrase, and AirDrop the file across. On the other tap <b>Receive from other device</b>, pick the file and enter the same passphrase. You’ll see a summary first, and a safety copy is made. Do this in whichever direction you last made changes.'),
-      helpP('Either way, a change made on one device and a different change on the other are both kept. If both changed the same detail, one version is kept and you’re told.')
+      helpP('Either way, a change made on one device and a different change on the other are both kept. If both changed the same detail, live sync asks you which to keep; file sync keeps one version automatically and tells you.')
     ]
   },
   settings: {

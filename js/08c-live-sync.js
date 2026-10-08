@@ -138,6 +138,94 @@ async function liveDeriveRoom(passphrase){
   return { roomId: liveHex(u.slice(0,16)), token: liveHex(u.slice(16,48)) };
 }
 
+
+/* ---------- clashes: ask, don't guess ----------
+   When the same detail was changed on both devices, the person chooses which version to keep.
+   Each choice is remembered as a "resolution" and sent with the next update, so the other device
+   applies the same answer instead of asking again (and if both were asked at once, the later
+   answer wins on both). */
+const LIVE_CLASH_SNOOZE_MS = 15*60*1000;
+const LIVE_RES_KEEP_MS = 14*24*3600*1000;
+const LIVE_CLASH_TEXT = 'Sync paused — a clash needs your choice. Tap here to decide.';
+let liveClashSnoozeUntil = 0, liveClashWaiting = false, liveClashState = null;
+function liveClashKey(c){
+  return [c.coll, c.key == null ? '' : c.key, c.path.join('›')].join('|') + '#' + [syncStable(c.local), syncStable(c.remote)].sort().join(' ⇄ ');
+}
+// Writes a chosen value into the merged copy. Returns true if it changed anything.
+function liveApplyValue(merged, r){
+  const find = (arr, f) => (arr || []).find(f);
+  let t = null;
+  if(r.coll === 'customers') t = find(merged.customers, x => x.id === r.key);
+  else if(r.coll === 'oneOffJobs') t = find(merged.oneOffJobs, x => x.id === r.key);
+  else if(r.coll === 'quotes') t = find(merged.quotes, x => x.id === r.key);
+  else if(r.coll === 'mileageLog') t = find(merged.mileageLog, x => x.date === r.key);
+  else if(r.coll === 'campaigns') t = find((merged.settings || {}).marketingCampaigns, x => x.id === r.key);
+  else if(r.coll === 'settings') t = merged.settings;
+  if(!t || !r.path || !r.path.length) return false;
+  let o = t;
+  for(let i = 0; i < r.path.length - 1; i++){ if(!syncIsObj(o[r.path[i]])) return false; o = o[r.path[i]]; }
+  const last = r.path[r.path.length - 1];
+  if(syncEq(o[last], r.value)) return false;
+  o[last] = syncClone(r.value);
+  return true;
+}
+function liveFieldName(path){
+  const k = String(path[path.length - 1] || 'Detail');
+  const w = k.replace(/([A-Z])/g, ' $1').trim().toLowerCase();
+  return w.charAt(0).toUpperCase() + w.slice(1);
+}
+function liveFmtVal(v){
+  if(v === true) return 'Yes';
+  if(v === false) return 'No';
+  if(v === null || v === undefined || v === '') return '(blank)';
+  const s = typeof v === 'object' ? JSON.stringify(v) : String(v);
+  return s.length > 90 ? s.slice(0, 87) + '…' : s;
+}
+// Shows the choice sheet. Resolves with an array of 'local' / 'remote' (one per clash),
+// or null if the person chooses to decide later.
+function livePromptClashes(list){
+  return new Promise(resolve => {
+    let done = false;
+    const finish = (v) => { if(done) return; done = true; liveClashState = null; resolve(v); };
+    liveClashState = { list, picks: list.map(() => null), finish };
+    const n = list.length;
+    openSheet(`
+      <div class="sheet-head"><h2>Choose which to keep</h2><button class="sheet-close" onclick="liveClashLater()">✕</button></div>
+      <p style="font-size:0.8438rem; line-height:1.55; margin:0 2px 12px; color:var(--ink);">${n === 1 ? 'One detail was' : n + ' details were'} changed differently on this device and your other device. Choose the version to keep${n === 1 ? '' : ' for each'}. Everything else has merged normally.</p>
+      ${n > 1 ? `<div style="display:flex; gap:8px; margin-bottom:12px;"><button class="lc-all" onclick="liveClashAll('local')">Keep this device for all</button><button class="lc-all" onclick="liveClashAll('remote')">Keep other device for all</button></div>` : ''}
+      ${list.map((c, i) => `
+        <div class="lc-card">
+          <div class="lc-title">${escapeHtml(c.label || 'Item')}</div>
+          <div class="lc-field">${escapeHtml(liveFieldName(c.path))}</div>
+          <button class="lc-opt" data-i="${i}" data-side="local" onclick="liveClashPick(${i}, 'local')"><span class="lc-who">This device</span><span class="lc-val">${escapeHtml(liveFmtVal(c.local))}</span></button>
+          <button class="lc-opt" data-i="${i}" data-side="remote" onclick="liveClashPick(${i}, 'remote')"><span class="lc-who">Other device</span><span class="lc-val">${escapeHtml(liveFmtVal(c.remote))}</span></button>
+        </div>`).join('')}
+      <div style="display:flex; gap:10px; margin-top:14px;">
+        <button class="lc-later" onclick="liveClashLater()">Decide later</button>
+        <button class="lc-apply" id="lcApply" onclick="liveClashApply()" disabled>Apply</button>
+      </div>
+    `, () => finish(null));
+  });
+}
+function liveClashRefresh(){
+  const st = liveClashState; if(!st) return;
+  document.querySelectorAll('.lc-opt').forEach(b => b.classList.toggle('on', st.picks[Number(b.dataset.i)] === b.dataset.side));
+  const ok = st.picks.every(Boolean), btn = document.getElementById('lcApply');
+  if(btn) btn.disabled = !ok;
+}
+function liveClashPick(i, side){ if(!liveClashState) return; liveClashState.picks[i] = side; liveClashRefresh(); }
+function liveClashAll(side){ if(!liveClashState) return; liveClashState.picks = liveClashState.picks.map(() => side); liveClashRefresh(); }
+function liveClashApply(){
+  const st = liveClashState; if(!st || !st.picks.every(Boolean)) return;
+  st.finish(st.picks.slice());
+  closeSheet();
+}
+function liveClashLater(){
+  const st = liveClashState;
+  if(st) st.finish(null);
+  closeSheet();
+}
+
 /* ---------- pulling in the other device's changes ---------- */
 function liveHeadPeer(devs){
   const me = syncDeviceId();
@@ -243,6 +331,47 @@ async function liveMergeIn(live, payload, headAt, opts){
   const ctx = { preferRemote: payload.deviceId > syncDeviceId() };
   const res = syncMergeStates(live.base, local, remote, ctx);
   const m = res.merged;
+  const now = Date.now(), me = syncDeviceId();
+
+  // Answers already given — on this device, or sent over by the other one.
+  let myRes = (live.resolutions || []).filter(r => r && now - r.at < LIVE_RES_KEEP_MS);
+  const applied = (live.appliedRes || []).slice();
+  (payload.resolved || []).forEach(r => {
+    if(!r || !r.k || !(now - r.at < LIVE_RES_KEEP_MS)) return;
+    const own = myRes.find(x => x.k === r.k);
+    if(own && (own.at > r.at || (own.at === r.at && String(own.by) >= String(r.by)))) return; // ours is newer
+    const tag = r.k + '@' + r.at;
+    if(applied.includes(tag)) return;
+    liveApplyValue(m, r);
+    applied.push(tag);
+    myRes = myRes.filter(x => x.k !== r.k).concat([r]);
+  });
+  // Anything that clashed and hasn't been answered is put to the person.
+  const unresolved = [];
+  res.clashes.forEach(c => {
+    const r = myRes.find(x => x.k === liveClashKey(c));
+    if(r) liveApplyValue(m, r); else unresolved.push(c);
+  });
+  let chosen = 0;
+  if(unresolved.length){
+    if(!opts.force && now < liveClashSnoozeUntil){ liveClashWaiting = true; liveSetStatus('attention', LIVE_CLASH_TEXT); return 'deferred'; }
+    const picks = await livePromptClashes(unresolved);
+    if(!picks){
+      liveClashSnoozeUntil = Date.now() + LIVE_CLASH_SNOOZE_MS;
+      liveClashWaiting = true;
+      liveSetStatus('attention', LIVE_CLASH_TEXT);
+      return 'deferred';
+    }
+    const at = Date.now();
+    unresolved.forEach((c, i) => {
+      const rec = { k: liveClashKey(c), coll: c.coll, key: c.key, path: c.path, value: syncClone(picks[i] === 'remote' ? c.remote : c.local), at, by: me };
+      liveApplyValue(m, rec);
+      myRes = myRes.filter(x => x.k !== rec.k).concat([rec]);
+      chosen++;
+    });
+  }
+  liveClashWaiting = false; liveClashSnoozeUntil = 0;
+
   const same = syncEq(m.customers, local.customers) && syncEq(m.oneOffJobs, local.oneOffJobs) &&
                syncEq(m.quotes, local.quotes) && syncEq(m.settings, local.settings) && syncEq(m.mileageLog, local.mileageLog);
   let summary = '';
@@ -256,18 +385,24 @@ async function liveMergeIn(live, payload, headAt, opts){
       data = migrateData(nd);
       await saveData();
     } finally { liveApplying = false; }
-    const parts = syncSummaryText(res);
+    const parts = syncSummaryText(Object.assign({}, res, { clashes: [] }));
+    if(chosen) parts.push(`${chosen} clash${chosen === 1 ? '' : 'es'} resolved as you chose`);
     summary = parts.join(' · ');
-    toast('Synced from your other device' + (parts.length ? ': ' + parts[0] : '') + (res.clashes.length ? ` (${res.clashes.length} clash${res.clashes.length===1?'':'es'} sorted automatically)` : ''));
+    toast('Synced from your other device' + (parts.length ? ': ' + parts[0] : '') + (parts.length > 1 ? ' (+' + (parts.length - 1) + ' more)' : ''));
     render();
+  } else if(chosen){
+    summary = `${chosen} clash${chosen === 1 ? '' : 'es'} resolved as you chose`;
+    toast(`Clash resolved — your choice will be sent to your other device`);
   }
   // If the merged result is exactly what the other device already has, there is nothing to send back.
   let lastPushHash = live.lastPushHash;
   try{
     const mine = await liveHashState(syncBuildState(data));
     if(mine === await liveHashState(remote)) lastPushHash = mine;
+    else if(chosen) lastPushHash = null; // send our answers across even if our own data didn't change
   }catch(e){}
-  await liveUpdate(Object.assign({ base: remote, lastPushHash, lastSummary: summary || live.lastSummary || '' }, markers));
+  await liveUpdate(Object.assign({ base: remote, lastPushHash, lastSummary: summary || live.lastSummary || '',
+    resolutions: myRes.slice(-200), appliedRes: applied.slice(-300) }, markers));
   return same ? 'nochange' : 'merged';
 }
 
@@ -363,7 +498,8 @@ async function livePushInner(opts){
       liveSetStatus('error', 'Live sync paused for 30 minutes because the devices kept updating each other. It will retry automatically.');
       return { ok:false };
     }
-    const payload = { v:1, appVersion: APP_VERSION, createdAt: now, deviceId: syncDeviceId(), setId: now.toString(36), kind:'state', state };
+    const payload = { v:1, appVersion: APP_VERSION, createdAt: now, deviceId: syncDeviceId(), setId: now.toString(36), kind:'state', state,
+      resolved: (live.resolutions || []).filter(r => r && now - r.at < LIVE_RES_KEEP_MS) };
     const text = await syncEncrypt(payload, key, live.salt);
     let res;
     try{ res = await liveApi(live, 'PUT', '/state/' + syncDeviceId(), text); }catch(e){ liveSetStatus('offline'); return { ok:false }; }
@@ -441,7 +577,10 @@ function liveWire(){
   });
   window.addEventListener('online', () => { if(liveActive) liveSyncNow(); });
   const chip = document.getElementById('liveSyncChip');
-  if(chip) chip.addEventListener('click', () => openSyncSheet());
+  if(chip) chip.addEventListener('click', () => {
+    if(liveClashWaiting){ liveClashSnoozeUntil = 0; liveSyncNow({ force:true }); } // a clash is waiting for a choice
+    else openSyncSheet();
+  });
 }
 async function liveSyncInit(){
   let live = null;

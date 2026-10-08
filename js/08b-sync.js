@@ -7,7 +7,8 @@
    other one (the "base"). On the next receive it compares base / this device / the incoming file:
      - only one side changed something  -> take that change
      - both changed different things    -> keep both
-     - both changed the SAME field      -> a clash: the app picks one (the same one on both devices)
+     - both changed the SAME field      -> a clash: file sync picks one automatically (the same one
+                                           on both devices); live sync asks the person (see 08c-live-sync.js)
      - lists inside a customer (cleans, payments, messages...) are merged entry by entry, so
        a clean marked on the phone and a note typed on the iPad both survive.
    A safety copy is always taken first, and the person sees a summary and confirms before
@@ -206,7 +207,7 @@ function syncMerge3(base, local, remote, ctx, path){
   const blank = v => v === undefined || v === null || v === '';
   if(blank(local)) return remote;
   if(blank(remote)) return local;
-  ctx.clashes.push({label: ctx.label, field: path.join(' › ')});
+  ctx.clashes.push({label: ctx.label, field: path.join(' › '), coll: ctx.coll, key: ctx.itemKey == null ? null : ctx.itemKey, path: path.slice(), local: syncClone(local), remote: syncClone(remote)});
   return ctx.preferRemote ? remote : local;
 }
 function syncNewBucket(){ return {added:0, updated:0, removed:0, kept:0, restored:0}; }
@@ -220,6 +221,7 @@ function syncMergeCollection(baseArr, localArr, remoteArr, keyOf, labelOf, ctx, 
     const b = B.get(k), l = L.get(k), r = R.get(k);
     if(l && r){
       ctx.label = labelOf(l) || labelOf(r);
+      ctx.itemKey = k;
       const merged = syncMerge3(b || {}, l, r, ctx, []);
       if(!syncEq(merged, l)) bucket.updated++;
       out.push(syncClone(merged));
@@ -260,16 +262,21 @@ function syncMergeStates(base, local, remote, ctx){
   const stats = {customers:syncNewBucket(), oneOffJobs:syncNewBucket(), quotes:syncNewBucket(), mileageLog:syncNewBucket(), settingsChanged:false};
   const byId = x => x.id;
   const nameOf = x => x.name || x.address || x.date || '';
+  ctx.coll = 'customers';
   const customers = syncMergeCollection(base.customers, local.customers, remote.customers, byId, nameOf, ctx, stats.customers);
+  ctx.coll = 'oneOffJobs';
   const jobs = syncMergeCollection(base.oneOffJobs, local.oneOffJobs, remote.oneOffJobs, byId, nameOf, ctx, stats.oneOffJobs);
+  ctx.coll = 'quotes';
   const quotes = syncMergeCollection(base.quotes, local.quotes, remote.quotes, byId, nameOf, ctx, stats.quotes);
+  ctx.coll = 'mileageLog';
   const mileage = syncMergeCollection(base.mileageLog, local.mileageLog, remote.mileageLog, x => x.date, x => x.date, ctx, stats.mileageLog);
   // Settings: the campaign list is merged entry by entry, everything else field by field.
   const split = s => { const o = Object.assign({}, s || {}); const camps = o.marketingCampaigns; delete o.marketingCampaigns; return {o, camps: camps || []}; };
   const sb = split(base.settings), sl = split(local.settings), sr = split(remote.settings);
-  ctx.label = 'Settings';
+  ctx.label = 'Settings'; ctx.coll = 'settings'; ctx.itemKey = null;
   const settings = syncClone(syncMerge3(sb.o, sl.o, sr.o, ctx, [])) || {};
   const campBucket = syncNewBucket();
+  ctx.coll = 'campaigns';
   settings.marketingCampaigns = syncMergeCollection(sb.camps, sl.camps, sr.camps, x => x.id, x => x.name || x.id, ctx, campBucket);
   stats.settingsChanged = !syncEq(settings, local.settings || {});
   syncFixAccountNumbers(customers, base.customers, settings, ctx);
