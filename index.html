@@ -352,11 +352,11 @@
   .se-scroll{flex:1; min-height:0; overflow:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain;}
   .se-grid{display:grid; grid-template-columns:repeat(7, minmax(84px, 1fr)); min-width:588px;}
   .se-dayname{position:sticky; top:0; z-index:2; background:var(--bg); padding:6px 4px; text-align:center; font-size:0.6875rem; font-weight:800; color:var(--ink-muted); border-bottom:1px solid var(--line);}
-  .se-cell{min-height:92px; padding:3px; border-right:1px solid var(--line); border-bottom:1px solid var(--line); box-sizing:border-box;}
+  .se-cell{position:relative; min-height:92px; padding:3px; border-right:1px solid var(--line); border-bottom:1px solid var(--line); box-sizing:border-box;}
   .se-cell.past{opacity:0.4;}
   .se-cell.today{background:var(--blue-dim);}
   .se-cell.drop{background:var(--amber-dim); outline:2px solid var(--amber); outline-offset:-2px;}
-  .se-daynum{font-size:0.6875rem; font-weight:800; color:var(--ink-muted); margin:0 1px 3px;}
+  .se-daynum{font-size:0.6875rem; font-weight:800; color:var(--ink-muted);}
   .se-chip{display:flex; align-items:center; justify-content:space-between; gap:4px; margin-bottom:3px; padding:4px 6px; border-radius:8px; font-size:0.6875rem; font-weight:700; line-height:1.2; cursor:grab; touch-action:none; user-select:none; -webkit-user-select:none; background:var(--blue-dim); color:var(--blue-deep); border:2px solid transparent;}
   .se-chip.job{background:var(--amber-dim); color:var(--amber);}
   .se-chip.moved{border-color:var(--amber);}
@@ -365,6 +365,61 @@
   .se-chip-label{min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
   .se-chip-n{flex:none; min-width:16px; padding:0 4px; border-radius:8px; background:rgba(0,0,0,0.12); text-align:center;}
   .se-ghost{position:fixed; z-index:70; pointer-events:none; padding:6px 10px; border-radius:10px; background:var(--navy, #0B2438); color:#fff; font-size:0.75rem; font-weight:800; box-shadow:0 6px 18px rgba(0,0,0,0.35); max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .se-chip.overdue{background:var(--red-dim); color:var(--red);}
+  .se-chip.new{border-style:dashed; border-color:var(--green);}
+  .se-chip.moved.new{border-color:var(--green);}
+  .se-cell.off{background:repeating-linear-gradient(135deg, transparent 0 6px, var(--line) 6px 7px);}
+  .se-cell.selday{outline:2px solid var(--blue); outline-offset:-2px;}
+  .se-cell.load-hi{box-shadow:inset 0 3px 0 var(--amber);}
+  .se-cell.load-vhi{box-shadow:inset 0 3px 0 var(--red);}
+  .se-cellhead{display:flex; align-items:center; justify-content:space-between; gap:2px; margin:0 1px 2px;}
+  .se-wx{font-size:0.5625rem; font-weight:700; color:var(--ink-muted); white-space:nowrap;}
+  .se-wx.wet{color:var(--blue-deep); background:var(--blue-dim); box-shadow:inset 0 0 0 1px var(--blue); border-radius:6px; padding:0 3px;}
+  .se-meta{display:flex; flex-wrap:wrap; gap:0 6px; margin:0 1px 3px; font-size:0.5625rem; font-weight:700; color:var(--ink-muted);}
+  .se-spread.warn{color:var(--amber);}
+  .se-off{margin:0 1px 3px; font-size:0.5625rem; font-weight:800; color:var(--ink-muted);}
+  .se-tools{flex:none; display:flex; gap:6px; padding:6px 10px; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; border-bottom:1px solid var(--line);}
+  .se-tools::-webkit-scrollbar{display:none;}
+  .se-tool{flex:none; padding:7px 11px; border:1px solid var(--line); border-radius:10px; background:var(--surface); color:var(--ink); font-size:0.75rem; font-weight:800; white-space:nowrap;}
+  .se-tool.active{background:var(--blue); border-color:var(--blue); color:#fff;}
+  .se-tool:disabled{opacity:0.4;}
+  .se-more{display:block; width:calc(100% - 20px); margin:12px 10px 16px; padding:11px; border:1px dashed var(--line); border-radius:12px; background:transparent; color:var(--ink-muted); font-size:0.8125rem; font-weight:800;}
+  .se-modal{position:absolute; inset:0; z-index:5; display:none; align-items:flex-end; justify-content:center; background:rgba(11,36,56,0.45);}
+  .se-modal.show{display:flex;}
+  .se-modal-card{width:100%; max-width:520px; max-height:88%; overflow-y:auto; box-sizing:border-box; padding:16px 16px calc(env(safe-area-inset-bottom, 0px) + 16px); border-radius:20px 20px 0 0; background:var(--bg); color:var(--ink);}
+  .se-modal-card h3{margin:0 0 8px; font-size:1.0625rem; font-weight:800;}
+  .se-modal-card label{display:block; margin:12px 2px 5px; font-size:0.75rem; font-weight:800; color:var(--ink-muted);}
+  .se-modal-card input[type="text"], .se-modal-card input[type="number"], .se-modal-card input[type="date"], .se-modal-card select{width:100%; box-sizing:border-box; padding:11px 12px; border:1px solid var(--line); border-radius:10px; background:var(--surface); color:var(--ink); font-size:1rem;}
+  .se-note{margin:0 2px 6px; font-size:0.8125rem; line-height:1.5; color:var(--ink-muted);}
+  .se-opt{font-weight:500; opacity:0.75;}
+  .se-radios{display:flex; flex-direction:column; gap:2px;}
+  .se-modal-card label.se-radio{display:flex; align-items:center; gap:8px; margin:3px 2px; font-size:0.875rem; font-weight:600; color:var(--ink);}
+  .se-preview{margin:12px 2px 0; padding:10px 12px; border-radius:10px; background:var(--blue-dim); color:var(--blue-deep); font-size:0.8125rem; font-weight:700; line-height:1.45;}
+  .se-btn-row{display:flex; gap:10px; margin-top:16px;}
+  .se-btn{flex:1; padding:13px 8px; border:none; border-radius:12px; background:var(--surface); color:var(--ink); border:1px solid var(--line); font-size:0.9375rem; font-weight:800;}
+  .se-btn.primary{background:var(--blue); border-color:var(--blue); color:#fff;}
+  .se-btn.go{background:var(--green); border-color:var(--green); color:#fff;}
+  .se-btn.danger{background:var(--red); border-color:var(--red); color:#fff;}
+  .se-quick{display:flex; gap:14px; margin:0 2px 4px;}
+  .se-link{border:none; background:none; padding:4px 0; color:var(--blue); font-size:0.8125rem; font-weight:800;}
+  .se-list{max-height:40vh; overflow-y:auto; border:1px solid var(--line); border-radius:10px; background:var(--surface);}
+  .se-modal-card label.se-row{display:flex; align-items:center; gap:10px; margin:0; padding:10px 12px; border-bottom:1px solid var(--line); font-size:0.875rem; font-weight:600; color:var(--ink);}
+  .se-modal-card label.se-row:last-child{border-bottom:none;}
+  .se-row input{flex:none; width:20px; height:20px;}
+  .se-row-name{flex:1; min-width:0;}
+  .se-row-price{flex:none; color:var(--ink-muted); font-weight:700;}
+  .se-days{display:flex; gap:5px;}
+  .se-day{flex:1; padding:10px 0; border:1px solid var(--line); border-radius:10px; background:var(--surface); color:var(--ink); font-size:0.8125rem; font-weight:800;}
+  .se-day.off{background:var(--red-dim); border-color:var(--red); color:var(--red);}
+  .se-range{display:flex; gap:10px;}
+  .se-range > div{flex:1; min-width:0;}
+  .se-range .se-opt{display:block; margin:0 2px 4px; font-size:0.6875rem; font-weight:800; color:var(--ink-muted);}
+  .se-chips-off{display:flex; flex-wrap:wrap; gap:6px;}
+  .se-offchip{display:inline-flex; align-items:center; gap:6px; padding:6px 6px 6px 10px; border-radius:16px; background:var(--red-dim); color:var(--red); font-size:0.8125rem; font-weight:800;}
+  .se-offchip button{border:none; background:rgba(0,0,0,0.12); color:inherit; width:22px; height:22px; border-radius:11px; font-size:0.6875rem; font-weight:800;}
+  .se-review{margin:6px 0 0; padding-left:18px; font-size:0.875rem; line-height:1.5;}
+  .se-review li{margin-bottom:9px;}
+  .se-from{color:var(--ink-muted);}
   .se-actions{flex:none; display:flex; gap:10px; padding:10px 14px calc(env(safe-area-inset-bottom, 0px) + 10px); border-top:1px solid var(--line); background:var(--bg);}
   .se-actions button{flex:1; padding:14px 8px; border:none; border-radius:14px; font-size:0.9375rem; font-weight:800;}
   .se-reject{background:var(--red-dim); color:var(--red);}
@@ -829,13 +884,23 @@
   <div class="se-bar">
     <div class="se-title">📅 Schedule</div>
     <div class="se-count" id="seCount">No changes yet</div>
-    <div class="se-hint">Drag a chip to another day, or tap a chip and then tap a day. The number is how many customers are in it. Nothing changes until you Commit.</div>
+    <div class="se-hint">Drag a chip to another day, or tap a chip and then tap a day. The number is how many customers are in it. Tap an empty day to select it. Nothing changes until you Commit.</div>
   </div>
-  <div class="se-scroll" id="seScroll"><div class="se-grid" id="seGrid"></div></div>
+  <div class="se-tools" id="seTools">
+    <button class="se-tool" onclick="seScrollToToday()">📍 Today</button>
+    <button class="se-tool" id="seUndo" onclick="seUndo()">↶ Undo</button>
+    <button class="se-tool" onclick="sePushBackOpen()">☔ Push back</button>
+    <button class="se-tool" id="seMultiBtn" onclick="seToggleMulti()">☑ Multi</button>
+    <button class="se-tool" id="seSplitBtn" onclick="seSplitOpen()">👥 Split</button>
+    <button class="se-tool" onclick="seAddJobOpen()">＋ Job</button>
+    <button class="se-tool" onclick="seDaysOffOpen()">🚫 Days off</button>
+  </div>
+  <div class="se-scroll" id="seScroll"><div class="se-grid" id="seGrid"></div><button class="se-more" id="seMore" onclick="seShowMoreWeeks()">＋ Show 4 more weeks</button></div>
   <div class="se-actions">
-    <button class="se-reject" onclick="rejectSchedule()">✕ Reject</button>
-    <button class="se-commit" id="seCommit" onclick="commitSchedule()">✓ Commit</button>
+    <button class="se-reject" onclick="seRequestReject()">✕ Reject</button>
+    <button class="se-commit" id="seCommit" onclick="seReviewOpen()">✓ Commit</button>
   </div>
+  <div class="se-modal" id="seModal"><div class="se-modal-card" id="seModalCard"></div></div>
 </div>
 <div class="report-preview" id="reportPreview">
   <div class="rp-bar">
