@@ -263,11 +263,18 @@ const FOCUSED_HELP = {
   schedule: {
     title: 'Schedule',
     body: () => [
-      helpP('<b>Work → Schedule</b> opens a calendar of the next nine weeks. Each blue chip is a round (and visit day) on the day it’s due, with the number of customers in it; amber 🔧 chips are one-off jobs. Anyone overdue shows on today.'),
+      helpP('<b>Work → Schedule</b> opens a calendar of the next nine weeks (tap <b>＋ Show 4 more weeks</b> at the bottom to look further ahead, up to a year). Each blue chip is a round (and visit day) on the day it’s due, with the number of customers in it; amber 🔧 chips are one-off jobs. Anyone overdue shows on today in a red chip with a ⚠. Nothing is saved until you Commit.'),
       helpList([
-        '<b>Move a chip</b> by dragging it to another day, or tap the chip and then tap the day. Moved chips get an amber outline and the top of the screen shows how many have moved. You can’t move something to a day that’s already past.',
-        '<b>✓ Commit</b> – everyone in a moved chip is now due on the new day (it replaces any deferral), and moved jobs change date. Your Due lists, the Monthly schedule report and the “Next due” badges all follow.',
-        '<b>✕ Reject</b> – throws away every move; nothing changes.',
+        '<b>Move a chip</b> by dragging it to another day, or tap the chip and then tap the day. Moved chips get an amber outline and the top of the screen counts what has moved. You can’t move something to a day that’s already past or marked off.',
+        '<b>On each day</b> you’ll see the forecast (🌧️ and the chance of rain, highlighted when it’s 60% or more – shown for about the next two weeks), how many customers and jobs are booked and what they’re worth, and ↔ how far apart the furthest two customers are (amber over 8 km – only customers with a pinned address count). A coloured stripe along the top of a day means it’s much busier than your typical day: amber is busy, red is very busy.',
+        '<b>📍 Today</b> jumps back to today. <b>↶ Undo</b> takes back your last change, one at a time.',
+        '<b>☔ Push back</b> – for a rained-off day. Choose the day, whether to push just that day or that day and every day after it, and by how many working days. Sundays and days off are skipped, and the box tells you what will move before you confirm. Tapping a day (or a chip) first fills the date in for you.',
+        '<b>☑ Multi</b> – turn on, tap several chips, then tap a day (or drag one of them) to move them all together. Turn it off again to go back to one at a time.',
+        '<b>👥 Split</b> – tap a round chip first, then Split. It lists the customers in that chip; tick the ones to move and pick the day. The rest stay where they were.',
+        '<b>＋ Job</b> – adds a one-off job straight onto a day (select the day first, or choose the date in the box). You can fill it from an existing customer. It’s added to One-off jobs when you Commit.',
+        '<b>🚫 Days off</b> – choose your regular days off (Sundays by default) and mark holidays or other days off, one day or a range. Days off are greyed out, refuse moves and are skipped by Push back. If anything is already booked on a day you mark off you’re asked whether to move it to the next working day.',
+        '<b>✓ Commit</b> – shows a review of every change first (for example “Windows A: 6 customers, Tue 14 Oct → Thu 16 Oct”). Confirm it and everyone in a moved chip is due on the new day (it replaces any deferral), moved jobs change date, new jobs are added and days off are saved. Your Due lists, the Monthly schedule report and the “Next due” badges all follow.',
+        '<b>✕ Reject</b> – throws away every change (it asks first if you’ve changed anything); nothing changes. Pressing Escape on a keyboard does the same.',
         'A date set this way only lasts until that customer is next cleaned, then their normal cycle carries on from the new clean. Moving a chip back to its usual day simply removes the change.'
       ])
     ]
