@@ -357,7 +357,7 @@
   .se-cell.drop{background:var(--amber-dim); outline:2px solid var(--amber); outline-offset:-2px;}
   .se-daynum{font-size:max(0.5625rem, calc(0.8125rem * var(--z,1.4))); font-weight:800; color:var(--ink-muted);}
   .se-cell.today .se-daynum{color:var(--blue-deep);}
-  .se-chip{display:flex; align-items:flex-start; justify-content:space-between; gap:calc(4px * var(--z)); margin-bottom:calc(4px * var(--z)); padding:calc(6px * var(--z)) calc(7px * var(--z)); border-radius:calc(9px * var(--z)); font-size:max(0.5rem, calc(0.6875rem * var(--z,1.4))); font-weight:800; line-height:1.2; cursor:grab; touch-action:none; user-select:none; -webkit-user-select:none; background:var(--blue); color:#fff; border:2px solid transparent; box-shadow:0 1px 3px rgba(0,0,0,0.25); min-height:calc(34px * var(--z));}
+  .se-chip{display:flex; align-items:flex-start; justify-content:space-between; gap:calc(4px * var(--z)); margin-bottom:calc(4px * var(--z)); padding:calc(6px * var(--z)) calc(7px * var(--z)); border-radius:calc(9px * var(--z)); font-size:max(0.5rem, calc(0.6875rem * var(--z,1.4))); font-weight:800; line-height:1.2; cursor:grab; touch-action:pan-x pan-y; -webkit-touch-callout:none; user-select:none; -webkit-user-select:none; background:var(--blue); color:#fff; border:2px solid transparent; box-shadow:0 1px 3px rgba(0,0,0,0.25); min-height:calc(34px * var(--z));}
   .se-chip.job{background:var(--amber); color:#fff;}
   .se-chip.moved{border-color:#fff; box-shadow:0 0 0 2px var(--amber), 0 1px 3px rgba(0,0,0,0.25);}
   .se-chip.sel{box-shadow:0 0 0 3px var(--navy, #10344C), 0 0 0 5px #fff;}
@@ -892,7 +892,7 @@
   <div class="se-bar">
     <div class="se-title">📅 Schedule</div>
     <div class="se-count" id="seCount">No changes yet</div>
-    <div class="se-hint">Drag a chip to another day, or tap a chip and then tap a day. The number is how many customers are in it. Tap an empty day to select it. Pinch or use 🔍 to zoom. Nothing changes until you Commit.</div>
+    <div class="se-hint">Press and hold a chip until it lifts, then drag it to another day (or tap a chip and then tap a day). The number is how many customers are in it. Tap an empty day to select it. Pinch or use 🔍 to zoom. Nothing changes until you Commit.</div>
   </div>
   <div class="se-tools" id="seTools">
     <button class="se-tool" onclick="seScrollToToday()">📍 Today</button>
