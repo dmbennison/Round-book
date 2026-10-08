@@ -14,6 +14,8 @@ const SE_MORE_WEEKS = 4;      // weeks added by the "+ more weeks" button
 const SE_MAX_WEEKS = 52;      // furthest the calendar can be extended
 const SE_SPREAD_WARN_KM = 8;  // a day whose customers are further apart than this gets an amber travel warning
 const SE_FORECAST_KEY = 'roundBookForecastCache';
+const SE_ZOOM_KEY = 'roundBookScheduleZoom';
+const SE_ZOOM_MIN = 0.6, SE_ZOOM_MAX = 2.6, SE_ZOOM_DEFAULT = 1.4;
 let se = null;      // editor state while open (see openScheduleEditor)
 let seBound = false;
 
@@ -81,7 +83,9 @@ function openScheduleEditor(){
   const offWeekdays = Array.isArray(st.scheduleOffWeekdays) ? st.scheduleOffWeekdays.slice() : [0];
   const blocked = (Array.isArray(st.blockedDays) ? st.blockedDays : []).filter(d => d >= todayStr).sort();
 
-  se = { items, cust, sel:[], multi:false, selDay:null, startISO, capISO, todayStr, weeks:SE_WEEKS,
+  let zoom = SE_ZOOM_DEFAULT;
+  try{ const z = parseFloat(localStorage.getItem(SE_ZOOM_KEY)); if(z >= SE_ZOOM_MIN && z <= SE_ZOOM_MAX) zoom = z; }catch(e){}
+  se = { zoom, items, cust, sel:[], multi:false, selDay:null, startISO, capISO, todayStr, weeks:SE_WEEKS,
          offWeekdays, blocked, origOff:offWeekdays.slice(), origBlocked:blocked.slice(),
          history:[], drag:null, weather:{}, chipIndex:{}, ignoreClickUntil:0, pendingRender:false, offPending:null };
   const { root, scroll } = seEls();
@@ -153,6 +157,7 @@ function renderScheduleEditor(){
   if(!se) return;
   se.pendingRender = false;
   const { grid, count, commit, undo, multi, split, more } = seEls();
+  grid.style.setProperty('--z', se.zoom);
   const chips = seBuildChips();
   se.sel = se.sel.filter(id => se.chipIndex[id]);
   const stats = seDayStats(chips);
@@ -270,6 +275,21 @@ function seScrollToToday(){
   if(!cell) return;
   scroll.scrollTop += cell.getBoundingClientRect().top - scroll.getBoundingClientRect().top - 34;
 }
+/* ---------- zoom (buttons, or pinch the calendar) ---------- */
+function seSetZoom(z, noSave){
+  if(!se) return;
+  z = Math.max(SE_ZOOM_MIN, Math.min(SE_ZOOM_MAX, z));
+  const { scroll, grid } = seEls();
+  const ratio = z / se.zoom;
+  // keep whatever is in the middle of the screen in the middle
+  const cx = scroll.scrollLeft + scroll.clientWidth / 2, cy = scroll.scrollTop + scroll.clientHeight / 2;
+  se.zoom = z;
+  grid.style.setProperty('--z', z);
+  scroll.scrollLeft = cx * ratio - scroll.clientWidth / 2;
+  scroll.scrollTop = cy * ratio - scroll.clientHeight / 2;
+  if(!noSave){ try{ localStorage.setItem(SE_ZOOM_KEY, String(z)); }catch(e){} }
+}
+function seZoomBy(f){ if(se) seSetZoom(se.zoom * f); }
 function seShowMoreWeeks(){
   if(!se) return;
   se.weeks = Math.min(SE_MAX_WEEKS, se.weeks + SE_MORE_WEEKS);
@@ -302,7 +322,7 @@ function seBind(){
   const { grid, scroll, modal } = seEls();
   grid.addEventListener('pointerdown', (e) => {
     const chip = e.target.closest('.se-chip');
-    if(!chip || !se) return;
+    if(!chip || !se || se.drag) return; // a second finger (pinch) must not replace the first
     se.drag = { id: chip.dataset.id, sx: e.clientX, sy: e.clientY, x: e.clientX, y: e.clientY, pid: e.pointerId, active: false, ghost: null, timer: null };
     try{ chip.setPointerCapture(e.pointerId); }catch(err){}
   });
@@ -369,6 +389,26 @@ function seBind(){
     se.selDay = (se.selDay === iso) ? null : iso;
     renderScheduleEditor();
   });
+  // Pinch with two fingers to zoom.
+  let pinch = null;
+  const dist = t => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+  scroll.addEventListener('touchstart', (e) => {
+    if(!se || e.touches.length !== 2) return;
+    if(se.drag) seEndDrag();
+    pinch = { d: dist(e.touches), z: se.zoom };
+  }, {passive:true});
+  scroll.addEventListener('touchmove', (e) => {
+    if(!se || !pinch || e.touches.length !== 2) return;
+    e.preventDefault();
+    seSetZoom(pinch.z * dist(e.touches) / pinch.d, true);
+  }, {passive:false});
+  const pinchEnd = (e) => {
+    if(!pinch || (e.touches && e.touches.length >= 2)) return;
+    pinch = null;
+    if(se) try{ localStorage.setItem(SE_ZOOM_KEY, String(se.zoom)); }catch(err){}
+  };
+  scroll.addEventListener('touchend', pinchEnd, {passive:true});
+  scroll.addEventListener('touchcancel', pinchEnd, {passive:true});
   // Tapping the dimmed area behind a dialog closes it.
   modal.addEventListener('click', (e) => { if(e.target === modal) seCloseModal(); });
   document.addEventListener('keydown', (e) => {
