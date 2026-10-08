@@ -349,35 +349,36 @@
   .se-title{font-size:1.125rem; font-weight:800;}
   .se-count{font-size:0.8125rem; font-weight:700; color:var(--ink-muted); margin-top:2px;}
   .se-hint{font-size:0.75rem; color:var(--ink-muted); line-height:1.45; margin-top:4px;}
-  .se-scroll{flex:1; min-height:0; overflow:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain;}
-  .se-grid{display:grid; grid-template-columns:repeat(7, minmax(84px, 1fr)); min-width:588px;}
-  .se-dayname{position:sticky; top:0; z-index:2; background:var(--bg); padding:6px 4px; text-align:center; font-size:0.6875rem; font-weight:800; color:var(--ink-muted); border-bottom:1px solid var(--line);}
-  .se-cell{position:relative; min-height:92px; padding:3px; border-right:1px solid var(--line); border-bottom:1px solid var(--line); box-sizing:border-box;}
+  .se-scroll{flex:1; min-height:0; overflow:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; touch-action:pan-x pan-y;}
+  .se-grid{--z:1.4; display:grid; grid-template-columns:repeat(7, minmax(calc(84px * var(--z)), 1fr)); min-width:calc(588px * var(--z));}
+  .se-dayname{position:sticky; top:0; z-index:2; background:var(--bg); padding:6px 4px; text-align:center; font-size:max(0.5625rem, calc(0.6875rem * var(--z,1.4))); font-weight:800; color:var(--ink-muted); border-bottom:1px solid var(--line);}
+  .se-cell{position:relative; min-height:calc(92px * var(--z)); padding:calc(3px * var(--z)); border-right:1px solid var(--line); border-bottom:1px solid var(--line); box-sizing:border-box;}
   .se-cell.past{opacity:0.4;}
   .se-cell.today{background:var(--blue-dim);}
   .se-cell.drop{background:var(--amber-dim); outline:2px solid var(--amber); outline-offset:-2px;}
-  .se-daynum{font-size:0.6875rem; font-weight:800; color:var(--ink-muted);}
-  .se-chip{display:flex; align-items:center; justify-content:space-between; gap:4px; margin-bottom:3px; padding:4px 6px; border-radius:8px; font-size:0.6875rem; font-weight:700; line-height:1.2; cursor:grab; touch-action:none; user-select:none; -webkit-user-select:none; background:var(--blue-dim); color:var(--blue-deep); border:2px solid transparent;}
-  .se-chip.job{background:var(--amber-dim); color:var(--amber);}
-  .se-chip.moved{border-color:var(--amber);}
-  .se-chip.sel{border-color:var(--blue); box-shadow:0 0 0 2px var(--blue);}
+  .se-daynum{font-size:max(0.5625rem, calc(0.8125rem * var(--z,1.4))); font-weight:800; color:var(--ink-muted);}
+  .se-cell.today .se-daynum{color:var(--blue-deep);}
+  .se-chip{display:flex; align-items:flex-start; justify-content:space-between; gap:calc(4px * var(--z)); margin-bottom:calc(4px * var(--z)); padding:calc(6px * var(--z)) calc(7px * var(--z)); border-radius:calc(9px * var(--z)); font-size:max(0.5rem, calc(0.6875rem * var(--z,1.4))); font-weight:800; line-height:1.2; cursor:grab; touch-action:none; user-select:none; -webkit-user-select:none; background:var(--blue); color:#fff; border:2px solid transparent; box-shadow:0 1px 3px rgba(0,0,0,0.25); min-height:calc(34px * var(--z));}
+  .se-chip.job{background:var(--amber); color:#fff;}
+  .se-chip.moved{border-color:#fff; box-shadow:0 0 0 2px var(--amber), 0 1px 3px rgba(0,0,0,0.25);}
+  .se-chip.sel{box-shadow:0 0 0 3px var(--navy, #10344C), 0 0 0 5px #fff;}
   .se-chip.dragging{opacity:0.35;}
-  .se-chip-label{min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
-  .se-chip-n{flex:none; min-width:16px; padding:0 4px; border-radius:8px; background:rgba(0,0,0,0.12); text-align:center;}
+  .se-chip-label{min-width:0; flex:1; overflow:hidden; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow-wrap:anywhere; word-break:break-word;}
+  .se-chip-n{flex:none; min-width:calc(18px * var(--z)); padding:0 calc(5px * var(--z)); border-radius:calc(9px * var(--z)); background:rgba(255,255,255,0.28); text-align:center; font-weight:800;}
   .se-ghost{position:fixed; z-index:70; pointer-events:none; padding:6px 10px; border-radius:10px; background:var(--navy, #0B2438); color:#fff; font-size:0.75rem; font-weight:800; box-shadow:0 6px 18px rgba(0,0,0,0.35); max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
-  .se-chip.overdue{background:var(--red-dim); color:var(--red);}
-  .se-chip.new{border-style:dashed; border-color:var(--green);}
-  .se-chip.moved.new{border-color:var(--green);}
+  .se-chip.overdue{background:var(--red); color:#fff;}
+  .se-chip.new{border:2px dashed #fff;}
+  .se-chip.moved.new{box-shadow:0 0 0 2px var(--green), 0 1px 3px rgba(0,0,0,0.25);}
   .se-cell.off{background:repeating-linear-gradient(135deg, transparent 0 6px, var(--line) 6px 7px);}
   .se-cell.selday{outline:2px solid var(--blue); outline-offset:-2px;}
   .se-cell.load-hi{box-shadow:inset 0 3px 0 var(--amber);}
   .se-cell.load-vhi{box-shadow:inset 0 3px 0 var(--red);}
   .se-cellhead{display:flex; align-items:center; justify-content:space-between; gap:2px; margin:0 1px 2px;}
-  .se-wx{font-size:0.5625rem; font-weight:700; color:var(--ink-muted); white-space:nowrap;}
+  .se-wx{font-size:max(0.5rem, calc(0.5625rem * var(--z,1.4))); font-weight:700; color:var(--ink-muted); white-space:nowrap;}
   .se-wx.wet{color:var(--blue-deep); background:var(--blue-dim); box-shadow:inset 0 0 0 1px var(--blue); border-radius:6px; padding:0 3px;}
-  .se-meta{display:flex; flex-wrap:wrap; gap:0 6px; margin:0 1px 3px; font-size:0.5625rem; font-weight:700; color:var(--ink-muted);}
+  .se-meta{display:flex; flex-wrap:wrap; gap:0 6px; margin:0 1px 3px; font-size:max(0.5rem, calc(0.5625rem * var(--z,1.4))); font-weight:700; color:var(--ink-muted);}
   .se-spread.warn{color:var(--amber);}
-  .se-off{margin:0 1px 3px; font-size:0.5625rem; font-weight:800; color:var(--ink-muted);}
+  .se-off{margin:0 1px 3px; font-size:max(0.5rem, calc(0.5625rem * var(--z,1.4))); font-weight:800; color:var(--ink-muted);}
   .se-tools{flex:none; display:flex; gap:6px; padding:6px 10px; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; border-bottom:1px solid var(--line);}
   .se-tools::-webkit-scrollbar{display:none;}
   .se-tool{flex:none; padding:7px 11px; border:1px solid var(--line); border-radius:10px; background:var(--surface); color:var(--ink); font-size:0.75rem; font-weight:800; white-space:nowrap;}
@@ -884,10 +885,12 @@
   <div class="se-bar">
     <div class="se-title">📅 Schedule</div>
     <div class="se-count" id="seCount">No changes yet</div>
-    <div class="se-hint">Drag a chip to another day, or tap a chip and then tap a day. The number is how many customers are in it. Tap an empty day to select it. Nothing changes until you Commit.</div>
+    <div class="se-hint">Drag a chip to another day, or tap a chip and then tap a day. The number is how many customers are in it. Tap an empty day to select it. Pinch or use 🔍 to zoom. Nothing changes until you Commit.</div>
   </div>
   <div class="se-tools" id="seTools">
     <button class="se-tool" onclick="seScrollToToday()">📍 Today</button>
+    <button class="se-tool" onclick="seZoomBy(1/1.25)" aria-label="Zoom out">🔍−</button>
+    <button class="se-tool" onclick="seZoomBy(1.25)" aria-label="Zoom in">🔍＋</button>
     <button class="se-tool" id="seUndo" onclick="seUndo()">↶ Undo</button>
     <button class="se-tool" onclick="sePushBackOpen()">☔ Push back</button>
     <button class="se-tool" id="seMultiBtn" onclick="seToggleMulti()">☑ Multi</button>
