@@ -4,16 +4,14 @@
    tapping a day. Nothing is saved until Commit; Reject throws every change away.
    Committing gives each customer in a moved chip a hand-set due date (see dueOverrideISO in
    01-data.js) and changes a moved job's date.
-   Extras: ☔ push-back (rain-off), 👥 move part of a round, ☑ multi-select, ↶ undo, a forecast and
-   a load / travel-spread summary on every day, 🚫 days off, ＋ jobs added straight onto a day, a
+   Extras: ☔ push-back (rain-off), 👥 move part of a round, ☑ multi-select, ↶ undo, a load summary
+   (customers and value) on every day, 🚫 days off, ＋ jobs added straight onto a day, a
    review step before committing, and a "+4 weeks" button to look further ahead.
    Part of Round Book's split JS bundle; loaded in numeric order from index.html. */
 
 const SE_WEEKS = 9;           // weeks shown when the editor opens, starting with the Monday of this week
 const SE_MORE_WEEKS = 4;      // weeks added by the "+ more weeks" button
 const SE_MAX_WEEKS = 52;      // furthest the calendar can be extended
-const SE_SPREAD_WARN_KM = 8;  // a day whose customers are further apart than this gets an amber travel warning
-const SE_FORECAST_KEY = 'roundBookForecastCache';
 const SE_ZOOM_KEY = 'roundBookScheduleZoom';
 const SE_ZOOM_MIN = 0.6, SE_ZOOM_MAX = 2.6, SE_ZOOM_DEFAULT = 1.4;
 let se = null;      // editor state while open (see openScheduleEditor)
@@ -57,7 +55,7 @@ function openScheduleEditor(){
   // One item per customer / job. Chips are built from these (see seBuildChips), which is what lets a
   // round be split, merged and undone. Anyone overdue is shown on today (flagged), and a deferred
   // customer on the day their deferral ends.
-  const items = [], cust = {};
+  const items = [];
   data.customers.forEach(c => {
     if(c.paused) return;
     let due = nextDueISO(c);
@@ -69,7 +67,6 @@ function openScheduleEditor(){
     const rn = c.round || 'Unassigned';
     const label = multi.has(rn) ? `${rn} (Day ${c.visitDay || 1})` : rn;
     items.push({ kind:'c', key:c.id, label, dispDate:disp, date:disp, overdue, due, price:Number(c.price || 0) });
-    if(c.lat != null && c.lng != null) cust[c.id] = { lat:c.lat, lng:c.lng };
   });
   (data.oneOffJobs || []).forEach(j => {
     if(j.done || !j.date) return;
@@ -85,16 +82,15 @@ function openScheduleEditor(){
 
   let zoom = SE_ZOOM_DEFAULT;
   try{ const z = parseFloat(localStorage.getItem(SE_ZOOM_KEY)); if(z >= SE_ZOOM_MIN && z <= SE_ZOOM_MAX) zoom = z; }catch(e){}
-  se = { zoom, items, cust, sel:[], multi:false, selDay:null, startISO, capISO, todayStr, weeks:SE_WEEKS,
+  se = { zoom, items, sel:[], multi:false, selDay:null, startISO, capISO, todayStr, weeks:SE_WEEKS,
          offWeekdays, blocked, origOff:offWeekdays.slice(), origBlocked:blocked.slice(),
-         history:[], drag:null, weather:{}, chipIndex:{}, ignoreClickUntil:0, pendingRender:false, offPending:null };
+         history:[], drag:null, chipIndex:{}, ignoreClickUntil:0, pendingRender:false, offPending:null };
   const { root, scroll } = seEls();
   seBind();
   seCloseModal();
   root.classList.add('show');
   renderScheduleEditor();
   scroll.scrollTop = 0; scroll.scrollLeft = 0;
-  seLoadForecast();
 }
 
 /* ---------- chips, day totals, change summary ---------- */
@@ -123,18 +119,11 @@ function seBuildChips(){
 function seDayStats(chips){
   const st = {};
   chips.forEach(ch => {
-    const s = st[ch.date] = st[ch.date] || { cust:0, jobs:0, value:0, pts:[], spread:0 };
+    const s = st[ch.date] = st[ch.date] || { cust:0, jobs:0, value:0 };
     ch.items.forEach(it => {
-      if(it.kind === 'c'){ s.cust++; const p = se.cust[it.key]; if(p) s.pts.push(p); } else s.jobs++;
+      if(it.kind === 'c') s.cust++; else s.jobs++;
       s.value += it.price || 0;
     });
-  });
-  Object.keys(st).forEach(d => {
-    const p = st[d].pts; let m = 0;
-    for(let i = 0; i < p.length; i++) for(let j = i + 1; j < p.length; j++){
-      const k = haversineKm(p[i].lat, p[i].lng, p[j].lat, p[j].lng); if(k > m) m = k;
-    }
-    st[d].spread = m;
   });
   return st;
 }
@@ -151,8 +140,6 @@ function seChangeSummary(){
 }
 
 /* ---------- rendering ---------- */
-function seSafeRender(){ if(se && se.drag){ se.pendingRender = true; return; } renderScheduleEditor(); }
-
 function renderScheduleEditor(){
   if(!se) return;
   se.pendingRender = false;
@@ -186,22 +173,10 @@ function renderScheduleEditor(){
       const l = loadOf(s);
       if(l >= median * 1.75) cls = ' load-vhi'; else if(l >= median * 1.35) cls = ' load-hi';
     }
-    const wx = se.weather[iso];
-    let wxHtml = '';
-    if(wx && !past){
-      const icon = WEATHER_CODES[wx.c] || '🌡️';
-      const rain = wx.r != null ? wx.r : null;
-      wxHtml = `<span class="se-wx${rain != null && rain >= 60 ? ' wet' : ''}" title="${wx.t != null ? wx.t + '°C max' : ''}${rain != null ? ' · ' + rain + '% chance of rain' : ''}">${icon}${rain != null && rain >= 20 ? ' ' + rain + '%' : ''}</span>`;
-    }
-    let meta = '';
-    if(s && !past){
-      const n = s.cust + s.jobs;
-      meta = `<span>${n}${s.value > 0 ? ' · ' + money(s.value) : ''}</span>`;
-      if(s.spread >= 1) meta += `<span class="se-spread${s.spread > SE_SPREAD_WARN_KM ? ' warn' : ''}" title="Furthest two customers on this day are about ${Math.round(s.spread)} km apart">↔${Math.round(s.spread)}km</span>`;
-    }
+    const meta = (s && !past) ? `${s.cust + s.jobs}${s.value > 0 ? ' · ' + money(s.value) : ''}` : '';
     html += `<div class="se-cell${past ? ' past' : ''}${iso === se.todayStr ? ' today' : ''}${off ? ' off' : ''}${se.selDay === iso ? ' selday' : ''}${cls}" data-date="${iso}">
-      <div class="se-cellhead"><div class="se-daynum">${monthLabel}${dayNum}</div>${wxHtml}</div>
-      ${off ? '<div class="se-off">🚫 Off</div>' : ''}${meta ? `<div class="se-meta">${meta}</div>` : ''}
+      <div class="se-cellhead"><div class="se-daynum">${monthLabel}${dayNum}</div></div>
+      ${off ? '<div class="se-off">🚫 Off</div>' : ''}${meta ? `<div class="se-meta"><span>${meta}</span></div>` : ''}
       ${here.map(ch => {
         const n = ch.kind === 'round' ? ch.items.length : '';
         const tip = ch.label + (ch.moved ? ' — moved from ' + fmtDate(ch.dispDate) : '') + (ch.isNew ? ' — new job' : '') + (ch.overdue ? ' — overdue since ' + fmtDate(ch.minDue) : '');
@@ -668,33 +643,6 @@ function seReviewOpen(){
     <ul class="se-review">${lines.join('')}</ul>
     <div class="se-btn-row"><button class="se-btn" onclick="seCloseModal()">Back to editing</button><button class="se-btn go" onclick="commitSchedule()">✓ Commit</button></div>
   `);
-}
-
-/* --- weather forecast (Open-Meteo, same service as the header weather) --- */
-function seLoadForecast(){
-  let cache = null;
-  try{ cache = JSON.parse(localStorage.getItem(SE_FORECAST_KEY) || 'null'); }catch(e){}
-  const apply = (days) => { if(se){ se.weather = days || {}; seSafeRender(); } };
-  const age = cache && cache.time ? Date.now() - cache.time : Infinity;
-  if(cache && cache.days && age < 12 * 3600 * 1000) apply(cache.days);
-  if(age < 90 * 60 * 1000) return; // fresh enough
-  const fetchFor = async (lat, lng) => {
-    try{
-      const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&daily=weathercode,precipitation_probability_max,temperature_2m_max&forecast_days=16&timezone=auto`);
-      if(!res.ok) throw new Error('bad response');
-      const json = await res.json(), dd = json && json.daily;
-      if(!dd || !dd.time) throw new Error('no forecast');
-      const days = {};
-      dd.time.forEach((iso, i) => {
-        days[iso] = { c: dd.weathercode[i], r: dd.precipitation_probability_max ? dd.precipitation_probability_max[i] : null, t: dd.temperature_2m_max ? Math.round(dd.temperature_2m_max[i]) : null };
-      });
-      try{ localStorage.setItem(SE_FORECAST_KEY, JSON.stringify({ time: Date.now(), lat, lng, days })); }catch(e){}
-      apply(days);
-    }catch(e){ /* offline or blocked — leave whatever is showing */ }
-  };
-  const fallback = () => { if(cache && cache.lat != null) fetchFor(cache.lat, cache.lng); };
-  if(!navigator.geolocation){ fallback(); return; }
-  navigator.geolocation.getCurrentPosition(p => fetchFor(p.coords.latitude, p.coords.longitude), fallback, { enableHighAccuracy:false, timeout:8000, maximumAge:1800000 });
 }
 
 /* ---------- commit / reject ---------- */
