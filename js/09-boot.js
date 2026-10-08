@@ -181,8 +181,8 @@ function onSwipeCancel(){
 
 /* ---------- fixed header ---------- */
 // The header is position:fixed so it never scrolls away; the page content is pushed
-// down by exactly its height (--header-h). The height changes when the weather line
-// appears or wraps, text size changes or the device rotates, so keep it measured.
+// down by exactly its height (--header-h). The height changes when
+// text size changes or the device rotates, so keep it measured.
 (function(){
   const header = document.querySelector('header');
   if(!header) return;
@@ -194,72 +194,8 @@ function onSwipeCancel(){
 })();
 document.getElementById('dateNow').textContent = new Date().toLocaleDateString('en-GB',{weekday:'long', day:'numeric', month:'long'});
 
-/* ---------- weather ---------- */
-const WEATHER_CODES = {
-  0:'☀️', 1:'🌤️', 2:'⛅', 3:'☁️',
-  45:'🌫️', 48:'🌫️',
-  51:'🌦️', 53:'🌦️', 55:'🌦️', 56:'🌦️', 57:'🌦️',
-  61:'🌧️', 63:'🌧️', 65:'🌧️', 66:'🌧️', 67:'🌧️',
-  71:'🌨️', 73:'🌨️', 75:'🌨️', 77:'🌨️',
-  80:'🌦️', 81:'🌧️', 82:'🌧️',
-  85:'🌨️', 86:'🌨️',
-  95:'⛈️', 96:'⛈️', 99:'⛈️'
-};
-function loadWeather(){
-  const el = document.getElementById('weatherPill');
-  if(!el) return;
-  const cacheRaw = localStorage.getItem('roundBookWeatherCache');
-  let cache = null;
-  try{ cache = cacheRaw ? JSON.parse(cacheRaw) : null; }catch(e){}
-  if(cache && cache.text){ el.textContent = cache.text; }
-
-  const cacheAgeMs = cache ? (Date.now() - cache.time) : Infinity;
-  if(cacheAgeMs < 30*60*1000) return; // refresh at most every 30 minutes
-  if(!navigator.geolocation) return;
-
-  navigator.geolocation.getCurrentPosition(async (pos)=>{
-    try{
-      const { latitude, longitude } = pos.coords;
-      const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true&hourly=precipitation_probability&forecast_days=1&timezone=auto&windspeed_unit=mph`);
-      if(!res.ok) throw new Error('bad response');
-      const json = await res.json();
-      const cw = json && json.current_weather;
-      if(!cw) throw new Error('no weather');
-      const icon = WEATHER_CODES[cw.weathercode] || '🌡️';
-      const temp = Math.round(cw.temperature);
-      let rainChance = null;
-      if(json.hourly && json.hourly.time && json.hourly.precipitation_probability){
-        // Match the hourly slot to the current time, rather than using the day's peak —
-        // that's the figure that actually matches what the weather app shows right now.
-        const nowISO = cw.time; // e.g. "2026-08-17T14:00"
-        let idx = json.hourly.time.indexOf(nowISO);
-        if(idx === -1){
-          // fall back to the closest hour if the exact timestamp isn't listed
-          const nowMs = new Date(nowISO).getTime();
-          let bestDiff = Infinity;
-          json.hourly.time.forEach((t, i)=>{
-            const diff = Math.abs(new Date(t).getTime() - nowMs);
-            if(diff < bestDiff){ bestDiff = diff; idx = i; }
-          });
-        }
-        if(idx !== -1) rainChance = json.hourly.precipitation_probability[idx];
-      }
-      const rainPart = (rainChance != null) ? ` · 🌧️ ${rainChance}%` : '';
-      const windPart = (cw.windspeed != null) ? ` · 💨 ${Math.round(cw.windspeed)}mph` : '';
-      const now = new Date();
-      const hhmm = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-      const text = `${hhmm} · ${icon} ${temp}°C${rainPart}${windPart}`;
-      const el2 = document.getElementById('weatherPill');
-      if(el2) el2.textContent = text;
-      localStorage.setItem('roundBookWeatherCache', JSON.stringify({ text, time: Date.now() }));
-    }catch(e){ /* offline or blocked — leave any cached reading showing */ }
-  }, ()=>{ /* permission denied — fail silently, no clutter */ }, { enableHighAccuracy:false, timeout:10000, maximumAge:600000 });
-}
-loadWeather();
-// loadWeather() itself only actually re-fetches once its cache is 30+ minutes
-// old, so calling it on a 30-minute timer (rather than only once on load) is
-// what makes it keep itself current through a long open session.
-setInterval(loadWeather, 30*60*1000);
+// The weather readout was removed in 2.55 — tidy away the leftover cached readings.
+try{ localStorage.removeItem('roundBookWeatherCache'); localStorage.removeItem('roundBookForecastCache'); }catch(e){}
 
 /* seed a couple of example customers on very first run so the app isn't blank —
    handled inside initStorage() below, once data has actually finished loading */

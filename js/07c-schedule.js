@@ -13,7 +13,7 @@ const SE_WEEKS = 9;           // weeks shown when the editor opens, starting wit
 const SE_MORE_WEEKS = 4;      // weeks added by the "+ more weeks" button
 const SE_MAX_WEEKS = 52;      // furthest the calendar can be extended
 const SE_ZOOM_KEY = 'roundBookScheduleZoom';
-const SE_ZOOM_MIN = 0.6, SE_ZOOM_MAX = 2.6, SE_ZOOM_DEFAULT = 1.4;
+const SE_ZOOM_MIN = 0.45, SE_ZOOM_MAX = 2.6, SE_ZOOM_DEFAULT = 1.4;
 let se = null;      // editor state while open (see openScheduleEditor)
 let seBound = false;
 
