@@ -160,6 +160,16 @@ function openMoreMenu(){
     </button>
   `);
 }
+/* Shown in About: whether Round Book is running as the installed app or in a browser tab, plus the screen sizes —
+   handy when the bottom tabs don't seem to reach the bottom of the screen. */
+function screenModeNoteHtml(){
+  const inBrowser = document.documentElement.classList.contains('in-browser');
+  const sab = (() => { try{ const d = document.createElement('div'); d.style.cssText = 'position:fixed; visibility:hidden; padding-bottom:env(safe-area-inset-bottom);'; document.body.appendChild(d); const v = parseFloat(getComputedStyle(d).paddingBottom) || 0; d.remove(); return Math.round(v); }catch(e){ return 0; } })();
+  const tip = inBrowser && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+    ? '<br>You’re using Round Book in a browser tab, so the browser’s own toolbar takes up room at the bottom of the screen and the tabs can’t sit lower than it. For the full screen, tap <b>Share → Add to Home Screen</b> and open Round Book from that icon.'
+    : '';
+  return `<p style="color:var(--ink-muted); font-size:0.75rem; line-height:1.6; margin:0 2px 12px;">Display: <b style="color:var(--ink);">${inBrowser ? 'browser tab' : 'installed app'}</b> · window ${window.innerWidth}×${window.innerHeight} of screen ${screen.width}×${screen.height} · bottom safe area ${sab}px${tip}</p>`;
+}
 function openInfo(){
   openSheet(`
     <div class="sheet-head">
@@ -189,6 +199,7 @@ function openInfo(){
       <span style="flex:1;">Share Round Book</span>
       <span style="opacity:0.6;">›</span>
     </button>
+    ${screenModeNoteHtml()}
     <p style="color:var(--ink-muted); font-size:0.8125rem; line-height:1.6; margin:0 2px 6px;">
       Created by <b style="color:var(--ink);">D M Bennison using Claude</b>.
     </p>
@@ -500,7 +511,7 @@ function openHelp(returnTo){
 
     ${helpH('Getting around')}
     ${helpList([
-      'The top bar and the four tabs along the bottom stay fixed on every screen – only the part between them scrolls. The tabs are <b>Today</b>, <b>Work</b> (Rounds and One-off jobs), <b>Quotes</b> and <b>Marketing</b>. Each remembers where you were; tap the tab you’re on to go back to the top.',
+      'The top bar and the four tabs along the bottom stay fixed on every screen – only the part between them scrolls. Round Book works best installed as an app (in Safari: Share → Add to Home Screen) – in an ordinary browser tab the browser’s own toolbar takes up room at the bottom, so swipe the page once and it tucks away. The tabs are <b>Today</b>, <b>Work</b> (Rounds and One-off jobs), <b>Quotes</b> and <b>Marketing</b>. Each remembers where you were; tap the tab you’re on to go back to the top.',
       'The blue <b>+</b> button adds whatever suits the screen you’re on – a customer, job, quote or campaign.',
       'Top bar: <b>Search</b> (finds customers, jobs, quotes and rounds), <b>⋯</b> (opens <b>Reports</b>, <b>Backup</b> and <b>About</b> – which holds the photo gallery and this guide) and <b>Settings</b>.',
       'A <b>?</b> next to a screen’s title opens help for just that screen.'
