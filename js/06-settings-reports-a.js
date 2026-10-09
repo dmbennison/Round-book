@@ -2,13 +2,33 @@
    Part of Round Book's split JS bundle; loaded in numeric order from index.html. */
 
 /* ---------- settings / dark mode / colour scheme ---------- */
+/* Each colour scheme has its own personality, not just a different header: its own accent, a "glow" colour
+   for the soft light behind the glass, and a full set of page / card / text colours for light AND dark mode.
+   The light-mode surfaces deliberately differ in temperature — cool (Ocean), neutral (Slate), warm cream (Rust),
+   green-tinted parchment (Forest), lilac-white (Plum), rosy-white (Ruby) — so the schemes feel like different
+   apps rather than one app with a different header.
+     navy = header / tab bar / dark chrome      blue = the accent (buttons, highlights, active states)
+     blueDark = optional brighter accent used in dark mode where the normal one would be too dim
+     glow = third colour in the background light   light/dark: bg (page), surface (cards), ink (text), muted, line */
 const THEMES = {
-  ocean:  {name:'Ocean',  navy:'#164559', blue:'#3FA9D6'},
-  slate:  {name:'Slate',  navy:'#3A424C', blue:'#A6B4C2'},
-  rust:   {name:'Rust',   navy:'#5A2A1C', blue:'#E0723A'},
-  plum:   {name:'Plum',   navy:'#4A1F52', blue:'#C15FC0'},
-  forest: {name:'Forest', navy:'#1E4A2E', blue:'#4FAE64'},
-  ruby:   {name:'Ruby',    navy:'#661018', blue:'#FF3B4A'}
+  ocean: { name:'Ocean',  navy:'#164559', blue:'#3FA9D6', glow:'#2E9E5B',   // cool navy, crisp blue
+    light:{ bg:'#F0F5F8', surface:'#FFFFFF', ink:'#1C2B36', muted:'#66798A', line:'#E3E9EC' },
+    dark: { bg:'#0E1923', surface:'#16212C', ink:'#EAF1F6', muted:'#8CA0B3', line:'#28394A' } },
+  slate: { name:'Slate',  navy:'#33373C', blue:'#C47A3A', glow:'#9AA3AD',   // true charcoal, copper accent
+    light:{ bg:'#F1F0EE', surface:'#FCFBFA', ink:'#24272B', muted:'#6B6E73', line:'#DFDDD9' },
+    dark: { bg:'#121314', surface:'#1D1F21', ink:'#ECEAE6', muted:'#9A9791', line:'#303234' } },
+  rust:  { name:'Rust',   navy:'#4F2A1D', blue:'#D2531C', glow:'#E0A33C',   // earthy terracotta, cream surfaces
+    light:{ bg:'#F6EBDC', surface:'#FFF8EE', ink:'#33201A', muted:'#86675A', line:'#E7D5BF' },
+    dark: { bg:'#1B130F', surface:'#281C16', ink:'#F3E9DD', muted:'#B09886', line:'#3E2B21' } },
+  forest:{ name:'Forest', navy:'#1B3F2B', blue:'#668A25', glow:'#C9B458',   // deep green, mossy accent, parchment
+    light:{ bg:'#F0EEDD', surface:'#FBFAEE', ink:'#1F2D22', muted:'#667760', line:'#DCDAC2' },
+    dark: { bg:'#0E1812', surface:'#16241B', ink:'#E7EFE2', muted:'#8FA58F', line:'#243A2B' } },
+  plum:  { name:'Plum',   navy:'#3F1A47', blue:'#C2278F', blueDark:'#E05AB8', glow:'#7E5BD6',   // rich aubergine, magenta, lilac-white
+    light:{ bg:'#F4EEF4', surface:'#FFFBFE', ink:'#2D1B33', muted:'#7B6882', line:'#E4D8E5' },
+    dark: { bg:'#160E1A', surface:'#221529', ink:'#F1E8F4', muted:'#A48DAD', line:'#38263F' } },
+  ruby:  { name:'Ruby',   navy:'#5A0F1B', blue:'#D81E3F', blueDark:'#F2506B', glow:'#E8923A',   // deep wine, crimson, rosy-white
+    light:{ bg:'#F7EDEA', surface:'#FFF9F6', ink:'#321A1C', muted:'#86656A', line:'#EBD8D3' },
+    dark: { bg:'#1A0E10', surface:'#271518', ink:'#F5E8E8', muted:'#AD8D90', line:'#3E2327' } }
 };
 let themeName = localStorage.getItem('roundBookTheme') || 'ocean';
 
@@ -59,39 +79,46 @@ function setTextSize(v){
   applyTextSize();
   openSettings();
 }
+function rgbTriplet(hex){ return hexToRgb(hex).join(','); }
 function applyTheme(){
   const t = THEMES[themeName] || THEMES.ocean;
+  const p = darkMode ? t.dark : t.light; // this scheme's page / card / text colours for the current mode
+  const acc = (darkMode && t.blueDark) ? t.blueDark : t.blue; // the accent actually used in this mode
   // Set on the body element itself (not html/:root) so these inline values take
   // precedence over the static light/dark-mode CSS blocks, which declare --blue-dim,
   // --bg etc. directly on body/body.dark and would otherwise win over anything
   // inherited from an ancestor regardless of dark mode state.
   const root = document.body.style;
   root.setProperty('--navy', t.navy);
-  root.setProperty('--blue', t.blue);
+  root.setProperty('--blue', acc);
+  root.setProperty('--orb-glow', t.glow);
   // A darker shade of the scheme's navy, used for toasts and other high-emphasis chrome.
   root.setProperty('--navy-dark', mixHex(t.navy, '#000000', 0.28));
   // A deepened version of the accent colour, used as readable text on the pale "dim" chips/buttons below.
-  root.setProperty('--blue-deep', mixHex(t.blue, '#000000', 0.32));
-  // The pale tinted background used for chips, quick-action buttons, and banners — mixed
-  // toward white in light mode and toward the dark surface colour in dark mode, so every
-  // scheme gets its own badge colour instead of everything defaulting to ocean-blue.
-  root.setProperty('--blue-dim', darkMode ? mixHex(t.blue, '#0E1620', 0.82) : mixHex(t.blue, '#FFFFFF', 0.86));
-  // A much paler tint than --blue-dim, used only for the subtle gradient fill on
-  // cards (round-card, cust-card) — kept pale so the card's own border/shadow
-  // still reads as its main definition rather than the fill colour.
-  root.setProperty('--card-tint', darkMode ? mixHex(t.blue, '#16212C', 0.92) : mixHex(t.blue, '#FFFFFF', 0.94));
-  // A soft tint of the main screen background, so the page itself carries a hint of the
-  // chosen scheme rather than staying neutral grey — card surfaces (--surface) stay
-  // untinted so content still stands out clearly on top.
-  root.setProperty('--bg', darkMode ? mixHex(t.blue, '#0E1620', 0.90) : mixHex(t.blue, '#F5F7F8', 0.92));
-  // Card surfaces (cust-card, round-card, backup-btn, cust-section) derive from
-  // the theme too, mixed toward the card's own dark-mode base rather than the
-  // plain --surface colour, so schemes stay visibly distinct from each other in
-  // dark mode instead of converging on the same neutral dark card.
-  // Liquid Glass: cards are translucent, tinted by the chosen scheme, with a
-  // bright specular top edge. (Fill fades from surface to tint, top to bottom.)
-  root.setProperty('--card-surface', darkMode ? hexToRgba(mixHex(t.blue, '#16212C', 0.80), 0.55) : 'rgba(255,255,255,0.66)');
-  root.setProperty('--card-tint', darkMode ? hexToRgba(t.blue, 0.10) : hexToRgba(t.blue, 0.07));
+  root.setProperty('--blue-deep', mixHex(acc, '#000000', 0.32));
+  // The scheme's own page, card and text colours (this is what makes some schemes warm and some cool).
+  root.setProperty('--bg', p.bg);
+  root.setProperty('--surface', p.surface);
+  root.setProperty('--ink', p.ink);
+  root.setProperty('--ink-muted', p.muted);
+  root.setProperty('--line', p.line);
+  root.setProperty('--emphasis', darkMode ? p.ink : 'var(--navy)');
+  // The pale tinted background used for chips, quick-action buttons, and banners — the accent mixed into
+  // this scheme's own surface colour, so the tint carries the scheme's temperature too.
+  root.setProperty('--blue-dim', mixHex(acc, p.surface, darkMode ? 0.82 : 0.86));
+  // Liquid Glass: panels are translucent, tinted by the scheme's own surface colour, with a bright specular
+  // top edge. These RGB triplets feed the --glass-fill / --sheet-fill rules in the stylesheet.
+  root.setProperty('--glass-base', darkMode ? rgbTriplet(mixHex(p.surface, '#FFFFFF', 0.10)) : rgbTriplet(p.surface));
+  root.setProperty('--glass-strong-base', darkMode ? rgbTriplet(mixHex(p.surface, '#000000', 0.15)) : rgbTriplet(p.surface));
+  root.setProperty('--sheet-base', darkMode ? rgbTriplet(mixHex(p.surface, '#000000', 0.10)) : rgbTriplet(p.bg));
+  root.setProperty('--field-edge', darkMode ? 'rgba(255,255,255,0.14)' : hexToRgba(p.muted, 0.30));
+  root.setProperty('--glass-shadow', darkMode
+    ? '0 12px 32px rgba(0,0,0,0.42), 0 2px 6px rgba(0,0,0,0.30)'
+    : `0 10px 30px ${hexToRgba(t.navy, 0.16)}, 0 2px 6px ${hexToRgba(t.navy, 0.08)}`);
+  // Cards (cust-card, round-card, backup-btn, cust-section): a translucent fill of the scheme's surface colour
+  // (nudged toward the accent in dark mode so schemes stay distinct), a faint accent wash, and a soft shadow.
+  root.setProperty('--card-surface', darkMode ? hexToRgba(mixHex(p.surface, acc, 0.12), 0.58) : hexToRgba(p.surface, 0.66));
+  root.setProperty('--card-tint', darkMode ? hexToRgba(acc, 0.10) : hexToRgba(acc, 0.07));
   root.setProperty('--card-border', darkMode ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.85)');
   root.setProperty('--card-shadow', darkMode
     ? `inset 0 1px 0 rgba(255,255,255,0.22), inset 0 0 0 1px rgba(255,255,255,0.05), 0 10px 28px ${hexToRgba(mixHex(t.navy, '#000000', 0.6), 0.50)}`
@@ -131,9 +158,10 @@ function openSettings(){
       ${Object.keys(THEMES).map(key=>{
         const t = THEMES[key];
         const active = themeName===key;
-        return `<button onclick="setTheme('${key}')" style="display:flex; flex-direction:column; align-items:center; gap:6px; padding:10px 4px; border-radius:12px; border:2px solid ${active?t.blue:'var(--line)'}; background:var(--surface);">
-          <span style="width:26px; height:26px; border-radius:50%; background:${t.navy}; box-shadow: inset 0 0 0 4px ${t.blue};"></span>
-          <span style="font-size:0.7188rem; font-weight:700; color:var(--ink);">${t.name}</span>
+        const pal = darkMode ? t.dark : t.light;
+        return `<button onclick="setTheme('${key}')" style="display:flex; flex-direction:column; align-items:center; gap:7px; padding:10px 4px; border-radius:12px; border:2px solid ${active?t.blue:'var(--line)'}; background:${pal.bg};">
+          <span style="display:flex; width:48px; height:26px; border-radius:13px; overflow:hidden; box-shadow:0 0 0 1px rgba(0,0,0,0.14);"><span style="flex:1; background:${t.navy};"></span><span style="flex:1; background:${t.blue};"></span><span style="flex:1; background:${pal.surface};"></span></span>
+          <span style="font-size:0.7188rem; font-weight:700; color:${pal.ink};">${t.name}</span>
         </button>`;
       }).join('')}
     </div>

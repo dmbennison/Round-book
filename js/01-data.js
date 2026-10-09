@@ -6,13 +6,14 @@ const STORE_KEY = 'roundBookData_v1';
 // APP_VERSION is a plain decimal number (e.g. 1.01, 1.02 ... 1.99, 2.00) —
 // bump by 0.01 for every change. formatVersion always renders it to exactly
 // two decimal places, so it's never shown as "1.1" or "1.100".
-const APP_VERSION = 2.63;
+const APP_VERSION = 2.64;
 function formatVersion(v){ return Number(v).toFixed(2); }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
 // entry (newest first) with ONE very short plain-English summary, then delete
 // entries so only the latest ten remain.
 const VERSION_HISTORY = [
+  {version: 2.64, changes: ['Colour schemes redesigned so each has its own personality: Slate is charcoal with a copper accent, Rust is terracotta on cream, Forest is green with a mossy accent on parchment, Plum is aubergine with magenta, Ruby is wine with crimson — with warm or cool backgrounds in light and dark mode. Ocean is unchanged']},
   {version: 2.63, changes: ['In a browser tab the page scrolls normally again so the browser toolbar can tuck away and the tabs reach the bottom; About now shows whether you are in a browser tab or the installed app']},
   {version: 2.62, changes: ['The bottom tabs now sit right at the bottom edge of the screen instead of floating above the home-bar space']},
   {version: 2.61, changes: ['The top bar and bottom tabs now stay fixed on every screen (only the middle scrolls); the three top buttons moved to the very top, with the date and sync note running underneath them']},
@@ -22,7 +23,6 @@ const VERSION_HISTORY = [
   {version: 2.57, changes: ['Schedule: an Undo button appears for about 15 seconds after you commit', 'Fixed dates coming out a day early during British Summer Time in the last-tax-year accounting export, weekly mileage totals, tax-year end dates, the 30-day payments list and marketing follow-up dates']},
   {version: 2.56, changes: ['Fuel prices link removed from Today; Schedule tiles now need a press-and-hold to move, so scrolling no longer shifts them by accident']},
   {version: 2.55, changes: ['Weather removed from the top of the app, and the Schedule days are wider']},
-  {version: 2.54, changes: ['Schedule: weather and distance removed from the top of each day']},
 ];
 const DIRECTIONS_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>';
 const CALL_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>';
