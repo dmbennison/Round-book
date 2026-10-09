@@ -6,13 +6,14 @@ const STORE_KEY = 'roundBookData_v1';
 // APP_VERSION is a plain decimal number (e.g. 1.01, 1.02 ... 1.99, 2.00) —
 // bump by 0.01 for every change. formatVersion always renders it to exactly
 // two decimal places, so it's never shown as "1.1" or "1.100".
-const APP_VERSION = 2.61;
+const APP_VERSION = 2.62;
 function formatVersion(v){ return Number(v).toFixed(2); }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
 // entry (newest first) with ONE very short plain-English summary, then delete
 // entries so only the latest ten remain.
 const VERSION_HISTORY = [
+  {version: 2.62, changes: ['The bottom tabs now sit right at the bottom edge of the screen instead of floating above the home-bar space']},
   {version: 2.61, changes: ['The top bar and bottom tabs now stay fixed on every screen (only the middle scrolls); the three top buttons moved to the very top, with the date and sync note running underneath them']},
   {version: 2.60, changes: ['New top bar: Reports, Backup and About are now under a ⋯ button, the sync note sits on the same line as the date, and the four tabs are anchored to the bottom of the screen']},
   {version: 2.59, changes: ['Fixed reordering a round that runs over several days — customers snapped back to where they were; the Reorder list is now grouped by day and moves work within each day']},
@@ -22,7 +23,6 @@ const VERSION_HISTORY = [
   {version: 2.55, changes: ['Weather removed from the top of the app, and the Schedule days are wider']},
   {version: 2.54, changes: ['Schedule: weather and distance removed from the top of each day']},
   {version: 2.53, changes: ['Live sync: if the same detail was changed on both devices you now choose which version to keep, instead of the app picking one']},
-  {version: 2.52, changes: ['Schedule: bigger days that open larger, pinch or 🔍 buttons to zoom, and round labels now show as solid tiles']},
 ];
 const DIRECTIONS_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>';
 const CALL_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>';
