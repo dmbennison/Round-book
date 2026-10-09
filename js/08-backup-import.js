@@ -309,7 +309,7 @@ const FOCUSED_HELP = {
         '<b>Start round</b> – directions to every stop.',
         '<b>Print</b>, <b>Defer</b> (push everyone back a day, a week, four weeks or to a date) and <b>Apply price uplift</b> (a % or £ increase for the whole round).'
       ]),
-      helpP('<b>Reorder</b> sets your visiting order: drag the ⠿ handle or use the arrows. <b>Suggest a route order</b> shows a shorter route and only applies it if you tap <b>Use this order</b>. Reorder, the map and directions follow whichever filter (Day, All, Due, Owed) you have on.'),
+      helpP('<b>Reorder</b> sets your visiting order: drag the ⠿ handle or use the arrows. If a round runs over several days, the list is grouped Day 1, Day 2… and each customer moves within their own day – use the Day button on a row to move someone to a different day. <b>Suggest a route order</b> shows a shorter route and only applies it if you tap <b>Use this order</b>. Reorder, the map and directions follow whichever filter (Day, All, Due, Owed) you have on.'),
       helpP('Customers imported from a spreadsheet have no price history. Open the customer → Price history → <b>Set last price review date</b> to fix the “Review” reminder.')
     ]
   },

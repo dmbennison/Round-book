@@ -6,13 +6,14 @@ const STORE_KEY = 'roundBookData_v1';
 // APP_VERSION is a plain decimal number (e.g. 1.01, 1.02 ... 1.99, 2.00) —
 // bump by 0.01 for every change. formatVersion always renders it to exactly
 // two decimal places, so it's never shown as "1.1" or "1.100".
-const APP_VERSION = 2.58;
+const APP_VERSION = 2.59;
 function formatVersion(v){ return Number(v).toFixed(2); }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
 // entry (newest first) with ONE very short plain-English summary, then delete
 // entries so only the latest ten remain.
 const VERSION_HISTORY = [
+  {version: 2.59, changes: ['Fixed reordering a round that runs over several days — customers snapped back to where they were; the Reorder list is now grouped by day and moves work within each day']},
   {version: 2.58, changes: ['Little icon buttons (help, print, close, round actions, Reorder, Show map, header icons) no longer have a box behind them', 'Today: paused customers owing for more than 120 days no longer show in the Customers owing tile (they still appear in the full Owed list)']},
   {version: 2.57, changes: ['Schedule: an Undo button appears for about 15 seconds after you commit', 'Fixed dates coming out a day early during British Summer Time in the last-tax-year accounting export, weekly mileage totals, tax-year end dates, the 30-day payments list and marketing follow-up dates']},
   {version: 2.56, changes: ['Fuel prices link removed from Today; Schedule tiles now need a press-and-hold to move, so scrolling no longer shifts them by accident']},
@@ -22,7 +23,6 @@ const VERSION_HISTORY = [
   {version: 2.52, changes: ['Schedule: bigger days that open larger, pinch or 🔍 buttons to zoom, and round labels now show as solid tiles']},
   {version: 2.51, changes: ['Schedule: Push back for rained-off days, move part of a round, multi-select, undo, weather and load on each day, days off, add jobs onto a day, review before committing, view more weeks']},
   {version: 2.50, changes: ['New Schedule button in Work: a calendar where rounds and jobs can be dragged to other days, then committed (due dates change) or rejected (nothing changes)']},
-  {version: 2.49, changes: ['Cash / Bank toggle in the press-and-hold customer info box; Statistics now show cash vs bank customers, value and percentages; explanatory notes removed from the bottom of reports']},
 ];
 const DIRECTIONS_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>';
 const CALL_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>';

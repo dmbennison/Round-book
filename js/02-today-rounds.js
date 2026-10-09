@@ -505,6 +505,15 @@ function roundScopeList(rn){
   else if(roundFilterMode === 'owed') list = list.filter(c=>custStatus(c).owed && matchesOwedAgeFilter(c));
   return list;
 }
+// The order the Reorder screen shows: when a round runs over several visit days and more than one day
+// is on screen, the rows are grouped by day (Day 1, then Day 2…) — each day has its own route, so moving
+// a customer only ever means moving them within their own day. (Interleaved by order number, a move
+// past someone from another day changed nothing, so it looked like it "snapped back".)
+function roundReorderList(rn){
+  const list = roundScopeList(rn);
+  if(roundDaysUsed(list).length <= 1) return list;
+  return list.map((c,i)=>({c,i})).sort((a,b)=>((a.c.visitDay||1)-(b.c.visitDay||1)) || (a.i-b.i)).map(x=>x.c);
+}
 // e.g. "Due · Day 2" — empty when nothing is filtered.
 function roundScopeLabel(rn){
   const parts = [];
@@ -615,10 +624,11 @@ function setRoundsView(v){ roundsViewMode = v; render(); }
 function toggleReorder(){ reorderMode = !reorderMode; render(); }
 function moveInRound(id, direction){
   const rn = currentRound;
-  const shown = roundScopeList(rn); // only what the Reorder screen is showing
+  const shown = roundReorderList(rn); // exactly what the Reorder screen is showing
   const idx = shown.findIndex(c=>c.id===id);
   const swapIdx = direction==='up' ? idx-1 : idx+1;
   if(idx<0 || swapIdx<0 || swapIdx>=shown.length) return;
+  if((shown[idx].visitDay||1) !== (shown[swapIdx].visitDay||1)){ toast('That’s the edge of the day — use the Day button to move someone to another day'); return; }
   const ordered = shown.slice();
   const tmp = ordered[idx]; ordered[idx] = ordered[swapIdx]; ordered[swapIdx] = tmp;
   reorderRoundSubset(rn, ordered);
@@ -671,6 +681,7 @@ function onDragReorderMove(e){
   let closest = placeholder, closestDist = Infinity;
   list.querySelectorAll('.reorder-row').forEach(sib=>{
     if(sib === row) return;
+    if(sib.dataset.day !== row.dataset.day) return; // a customer can only be placed among their own day's stops
     const r = sib.getBoundingClientRect();
     const mid = r.top + r.height/2;
     const dist = Math.abs(mid - rowMidY);
@@ -1639,22 +1650,33 @@ function renderRoundDetail(main, rn){
     }
     if(!allInRound.length){ main.innerHTML = shellHtml + emptyState('customers'); return; }
     if(!scope.length){ main.innerHTML = shellHtml + emptyState('filter'); return; }
-    shellHtml += `<div id="reorderList">` + scope.map((c,i)=>`
-      <div class="cust-card reorder-row" data-id="${c.id}" style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+    const rscope = roundReorderList(rn);
+    const grouped = roundDaysUsed(rscope).length > 1;
+    let lastDay = null, dayIdx = 0;
+    shellHtml += `<div id="reorderList">` + rscope.map((c,i)=>{
+      const day = c.visitDay || 1;
+      let head = '';
+      if(grouped && day !== lastDay){ head = `<div class="section-label" style="margin:14px 2px 8px;">Day ${day}</div>`; lastDay = day; dayIdx = 0; }
+      dayIdx++;
+      const first = i === 0 || (grouped && (rscope[i-1].visitDay||1) !== day);
+      const last = i === rscope.length-1 || (grouped && (rscope[i+1].visitDay||1) !== day);
+      return head + `
+      <div class="cust-card reorder-row" data-id="${c.id}" data-day="${day}" style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
         <button type="button" onpointerdown="startDragReorder(event,'${c.id}')" style="background:none; border:none; padding:6px; margin:-6px; color:var(--ink-muted); cursor:grab; touch-action:none; flex-shrink:0;" aria-label="Drag to reorder">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>
         </button>
         <div style="flex:1; min-width:0;">
-          <div class="cust-addr" style="font-size:0.9375rem; font-weight:800;">${i+1}. ${escapeHtml(c.address||'No address')}</div>
+          <div class="cust-addr" style="font-size:0.9375rem; font-weight:800;">${dayIdx}. ${escapeHtml(c.address||'No address')}</div>
           ${c.name?`<div class="cust-name" style="font-size:0.8125rem; color:var(--ink-muted); margin-top:2px;">${escapeHtml(c.name)}</div>`:''}
         </div>
         <button class="btn-open" style="width:auto; padding:6px 10px; font-size:0.75rem; font-weight:800; background:var(--blue-dim); color:var(--blue-deep); flex-shrink:0;" onclick="cycleVisitDay('${c.id}')">Day ${c.visitDay||1}</button>
         <div style="display:flex; flex-direction:column; gap:6px;">
-          <button class="btn-open icon-plain" style="width:34px; height:28px; padding:0; opacity:${i===0?'0.3':'1'};" onclick="moveInRound('${c.id}','up')">▲</button>
-          <button class="btn-open icon-plain" style="width:34px; height:28px; padding:0; opacity:${i===scope.length-1?'0.3':'1'};" onclick="moveInRound('${c.id}','down')">▼</button>
+          <button class="btn-open icon-plain" style="width:34px; height:28px; padding:0; opacity:${first?'0.3':'1'};" onclick="moveInRound('${c.id}','up')">▲</button>
+          <button class="btn-open icon-plain" style="width:34px; height:28px; padding:0; opacity:${last?'0.3':'1'};" onclick="moveInRound('${c.id}','down')">▼</button>
         </div>
       </div>
-    `).join('') + `</div>`;
+    `;
+    }).join('') + `</div>`;
     main.innerHTML = shellHtml;
     return;
   }
