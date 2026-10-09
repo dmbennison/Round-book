@@ -191,6 +191,16 @@ function onSwipeCancel(){
   window.addEventListener('resize', sync);
   window.addEventListener('orientationchange', sync);
   if(window.ResizeObserver) new ResizeObserver(sync).observe(header);
+  // The tab bar is fixed to the bottom; keep its measured height too, so the page, the + button and
+  // pop-up messages sit just above it.
+  const bar = document.getElementById('tabBar');
+  if(bar){
+    const syncBar = () => document.documentElement.style.setProperty('--tabbar-h', bar.offsetHeight + 'px');
+    syncBar();
+    window.addEventListener('resize', syncBar);
+    window.addEventListener('orientationchange', syncBar);
+    if(window.ResizeObserver) new ResizeObserver(syncBar).observe(bar);
+  }
 })();
 document.getElementById('dateNow').textContent = new Date().toLocaleDateString('en-GB',{weekday:'long', day:'numeric', month:'long'});
 

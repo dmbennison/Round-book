@@ -85,11 +85,11 @@ function liveChipText(){
   switch(s.state){
     case 'off': return '';
     case 'syncing': return '⟳ Syncing…';
-    case 'offline': return '☁️ Offline — will sync when back';
-    case 'error': return '⚠ Sync problem — tap for details';
-    case 'locked': return '🔒 Tap to unlock live sync';
-    case 'attention': return '⚠ Sync needs your attention';
-    case 'waiting': return '☁️ Live sync on — waiting for other device';
+    case 'offline': return '☁️ Offline';
+    case 'error': return '⚠ Sync problem';
+    case 'locked': return '🔒 Unlock sync';
+    case 'attention': return '⚠ Needs attention';
+    case 'waiting': return '☁️ Live sync on';
     default: return s.okAt ? `☁️ Synced ${liveAgo(s.okAt)}` : '☁️ Live sync on';
   }
 }
@@ -146,7 +146,7 @@ async function liveDeriveRoom(passphrase){
    answer wins on both). */
 const LIVE_CLASH_SNOOZE_MS = 15*60*1000;
 const LIVE_RES_KEEP_MS = 14*24*3600*1000;
-const LIVE_CLASH_TEXT = 'Sync paused — a clash needs your choice. Tap here to decide.';
+const LIVE_CLASH_TEXT = '⚠ Clash — tap to choose';
 let liveClashSnoozeUntil = 0, liveClashWaiting = false, liveClashState = null;
 function liveClashKey(c){
   return [c.coll, c.key == null ? '' : c.key, c.path.join('›')].join('|') + '#' + [syncStable(c.local), syncStable(c.remote)].sort().join(' ⇄ ');

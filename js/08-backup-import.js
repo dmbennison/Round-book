@@ -138,6 +138,28 @@ async function shareRoundBook(){
   }
 }
 
+/* ---------- the "…" menu in the top bar ---------- */
+function openMoreMenu(){
+  const ico = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+  openSheet(`
+    <div class="sheet-head">
+      <h2>More</h2>
+      <button class="sheet-close" onclick="closeSheet()">✕</button>
+    </div>
+    <button class="backup-btn" onclick="openReports()">
+      ${ico('<path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/>')}
+      <div><div class="t1">Reports</div><div class="t2">Print or save schedules, customer lists, mileage and more</div></div>
+    </button>
+    <button class="backup-btn" onclick="openBackup()">
+      ${ico('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/>')}
+      <div><div class="t1">Backup</div><div class="t2">Save a copy of your data, restore, and sync between devices</div></div>
+    </button>
+    <button class="backup-btn" onclick="openInfo()">
+      ${ico('<circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>')}
+      <div><div class="t1">About</div><div class="t2">User guide, version history and getting started</div></div>
+    </button>
+  `);
+}
 function openInfo(){
   openSheet(`
     <div class="sheet-head">
@@ -399,7 +421,7 @@ const FOCUSED_HELP = {
   backup: {
     title: 'Backup and restore',
     body: () => [
-      helpP('Your data lives on this device only, so back it up regularly from the <b>Backup</b> icon. A pop-up reminds you if a change hasn’t been backed up for 24 hours.'),
+      helpP('Your data lives on this device only, so back it up regularly from the <b>⋯</b> menu (top right) → <b>Backup</b>. A pop-up reminds you if a change hasn’t been backed up for 24 hours.'),
       helpList([
         '<b>Export backup</b> – save a full backup file. Keep a copy somewhere safe such as iCloud Drive; the app can’t do that by itself.',
         '<b>Restore</b> – bring everything back from a backup file.',
@@ -418,9 +440,9 @@ const FOCUSED_HELP = {
       helpList([
         'On the first device tap <b>Set up live sync</b> and choose a passphrase.',
         'On the second device tap <b>Join live sync</b> and enter the same passphrase.',
-        'A small line under the date shows when it last synced. Open the app to catch up – it can’t sync while closed. Changes made offline go across when you’re back online.',
+        'A small line next to the date at the top shows when it last synced. Open the app to catch up – it can’t sync while closed. Changes made offline go across when you’re back online.',
         '<b>Turn off</b> stops it on that device; <b>Delete the cloud copy</b> also clears the mailbox.',
-        '<b>If both devices changed the same detail</b> (say a customer’s price, or a date), live sync pauses and shows both versions – <b>This device</b> and <b>Other device</b> – and you tap the one to keep. Use <b>Keep this device for all</b> / <b>Keep other device for all</b> if there are several. Your answer goes across too, so the other device doesn’t ask again. <b>Decide later</b> leaves things as they are and asks again after about 15 minutes, or tap the sync line under the date to be asked straight away. Different changes to different details still merge on their own.',
+        '<b>If both devices changed the same detail</b> (say a customer’s price, or a date), live sync pauses and shows both versions – <b>This device</b> and <b>Other device</b> – and you tap the one to keep. Use <b>Keep this device for all</b> / <b>Keep other device for all</b> if there are several. Your answer goes across too, so the other device doesn’t ask again. <b>Decide later</b> leaves things as they are and asks again after about 15 minutes, or tap the sync note next to the date to be asked straight away. Different changes to different details still merge on their own.',
         'If you restore a backup, live sync stops and asks what to do, so the restore can’t undo work on your other device.'
       ]),
       helpP('<b>Sync by file</b> (no internet account). On one device tap <b>Send to other device</b>, choose a passphrase, and AirDrop the file across. On the other tap <b>Receive from other device</b>, pick the file and enter the same passphrase. You’ll see a summary first, and a safety copy is made. Do this in whichever direction you last made changes.'),
@@ -478,9 +500,9 @@ function openHelp(returnTo){
 
     ${helpH('Getting around')}
     ${helpList([
-      'Four tabs along the top: <b>Today</b>, <b>Work</b> (Rounds and One-off jobs), <b>Quotes</b> and <b>Marketing</b>. Each remembers where you were; tap the tab you’re on to go back to the top.',
+      'Four tabs along the bottom of the screen: <b>Today</b>, <b>Work</b> (Rounds and One-off jobs), <b>Quotes</b> and <b>Marketing</b>. Each remembers where you were; tap the tab you’re on to go back to the top.',
       'The blue <b>+</b> button adds whatever suits the screen you’re on – a customer, job, quote or campaign.',
-      'Header icons: <b>Search</b> (finds customers, jobs, quotes and rounds), <b>ⓘ</b> (photo gallery and this guide), <b>Reports</b>, <b>Backup</b> and <b>Settings</b>.',
+      'Top bar: <b>Search</b> (finds customers, jobs, quotes and rounds), <b>⋯</b> (opens <b>Reports</b>, <b>Backup</b> and <b>About</b> – which holds the photo gallery and this guide) and <b>Settings</b>.',
       'A <b>?</b> next to a screen’s title opens help for just that screen.'
     ])}
 
