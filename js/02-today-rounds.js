@@ -608,9 +608,9 @@ function setTab(tab){
     }
   } else {
     if(currentTab === 'rounds' || currentTab === 'jobs'){
-      lastWorkView = { screen: currentTab, round: currentRound, roundsViewMode, roundDayFilter, roundFilterMode, scrollY: window.scrollY };
+      lastWorkView = { screen: currentTab, round: currentRound, roundsViewMode, roundDayFilter, roundFilterMode, scrollY: pageScrollY() };
     } else if(switching){
-      tabScroll[fromKey] = window.scrollY;
+      tabScroll[fromKey] = pageScrollY();
     }
     if(switching) restoreY = tabScroll[toKey] || 0;
     currentTab = tab; currentRound = null; reorderMode = false; roundFilterMode = 'all'; roundDayFilter = 'all';
@@ -618,8 +618,13 @@ function setTab(tab){
   const activeTabKey = (currentTab === 'rounds' || currentTab === 'jobs') ? 'work' : currentTab;
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===activeTabKey));
   render();
-  window.scrollTo(0, restoreY);
+  pageScrollTo(restoreY);
 }
+// The page itself never scrolls (the header and tab bar stay fixed); everything between them scrolls inside
+// #appScroll. These stand in for window.scrollY / scrollTo / scrollBy.
+function pageScrollY(){ const el = document.getElementById('appScroll'); return el ? el.scrollTop : window.scrollY; }
+function pageScrollTo(y){ const el = document.getElementById('appScroll'); if(el) el.scrollTop = y; else window.scrollTo(0, y); }
+function pageScrollBy(dy){ const el = document.getElementById('appScroll'); if(el) el.scrollTop += dy; else window.scrollBy(0, dy); }
 function setRoundsView(v){ roundsViewMode = v; render(); }
 function toggleReorder(){ reorderMode = !reorderMode; render(); }
 function moveInRound(id, direction){
@@ -674,8 +679,8 @@ function onDragReorderMove(e){
   // Nudge the page when dragging near the top/bottom of the viewport, so a
   // long round doesn't strand a row off-screen mid-drag.
   const margin = 60;
-  if(e.clientY < margin) window.scrollBy(0, -12);
-  else if(e.clientY > window.innerHeight - margin) window.scrollBy(0, 12);
+  if(e.clientY < margin) pageScrollBy(-12);
+  else if(e.clientY > window.innerHeight - margin) pageScrollBy(12);
 
   const rowMidY = newTop + height/2;
   let closest = placeholder, closestDist = Infinity;
@@ -1550,7 +1555,7 @@ function renderRoundsList(main){
   main.innerHTML = html;
 }
 
-function openRound(rn){ currentRound = rn; reorderMode = false; roundFilterMode = 'all'; roundDayFilter = 'all'; render(); window.scrollTo(0, 0); }
+function openRound(rn){ currentRound = rn; reorderMode = false; roundFilterMode = 'all'; roundDayFilter = 'all'; render(); pageScrollTo(0); }
 // Same as openRound, but opens straight into that round's Due filter — used
 // by the round-name headers on the Rounds > Due overview list.
 // Jumps straight to a round's Due list — called both from inside the Rounds
@@ -1565,7 +1570,7 @@ function goToRoundDue(rn){
   roundDayFilter = 'all';
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab==='work'));
   render();
-  window.scrollTo(0, 0);
+  pageScrollTo(0);
 }
 // Tapping a round chip on the Today hero both jumps straight to that round's
 // Due list (goToRoundDue) and remembers the choice so the Today tab itself
@@ -1576,7 +1581,7 @@ function selectTodayRound(rn){
   todaySelectedRoundDate = todayISO();
   goToRoundDue(rn);
 }
-function backToRounds(){ currentRound = null; reorderMode = false; roundFilterMode = 'all'; roundDayFilter = 'all'; render(); window.scrollTo(0, 0); }
+function backToRounds(){ currentRound = null; reorderMode = false; roundFilterMode = 'all'; roundDayFilter = 'all'; render(); pageScrollTo(0); }
 function setRoundFilterMode(v){ roundFilterMode = v; render(); }
 
 function openRoundActionsMenu(rn){

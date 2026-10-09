@@ -500,7 +500,7 @@ function openHelp(returnTo){
 
     ${helpH('Getting around')}
     ${helpList([
-      'Four tabs along the bottom of the screen: <b>Today</b>, <b>Work</b> (Rounds and One-off jobs), <b>Quotes</b> and <b>Marketing</b>. Each remembers where you were; tap the tab you’re on to go back to the top.',
+      'The top bar and the four tabs along the bottom stay fixed on every screen – only the part between them scrolls. The tabs are <b>Today</b>, <b>Work</b> (Rounds and One-off jobs), <b>Quotes</b> and <b>Marketing</b>. Each remembers where you were; tap the tab you’re on to go back to the top.',
       'The blue <b>+</b> button adds whatever suits the screen you’re on – a customer, job, quote or campaign.',
       'Top bar: <b>Search</b> (finds customers, jobs, quotes and rounds), <b>⋯</b> (opens <b>Reports</b>, <b>Backup</b> and <b>About</b> – which holds the photo gallery and this guide) and <b>Settings</b>.',
       'A <b>?</b> next to a screen’s title opens help for just that screen.'
