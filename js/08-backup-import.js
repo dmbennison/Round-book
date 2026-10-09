@@ -213,7 +213,7 @@ let helpReturnCallback = null;
 // Same "?" help icon as helpIconBtn, but sized/styled for a main tab screen's own
 // header row (next to that screen's print icon) rather than a sheet's header.
 function mainScreenHelpBtn(topic, returnTo){
-  return `<button class="btn-open" style="width:38px; height:38px; padding:0;" onclick="openFocusedHelp('${topic}', ${returnTo})" aria-label="Help">
+  return `<button class="btn-open icon-plain" style="width:38px; height:38px; padding:0;" onclick="openFocusedHelp('${topic}', ${returnTo})" aria-label="Help">
     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
   </button>`;
 }
@@ -247,7 +247,7 @@ const FOCUSED_HELP = {
         '<b>Text before visit</b> – customers you haven’t texted yet who like a heads-up.',
         '<b>Mileage</b> – tap to log your start reading in the morning, tap again for your end reading in the evening.',
         '<b>Jobs</b> – only appears on days when a one-off job is booked.',
-        '<b>Customers owing</b> – how much is outstanding, split into 0–14, 14–30 and 30+ days.'
+        '<b>Customers owing</b> – how much is outstanding, split into 0–14, 14–30 and 30+ days. A paused customer whose balance is more than 120 days old is left out of this tile so it doesn’t keep showing as red, but they’re still in the full Owed list (tap the tile, or Rounds → Owed).'
       ]),
       helpP('Tap any tile to open its full list. A yellow number on the <b>Quotes</b> tab means quotes need following up. The Getting started card helps with first-time setup; dismiss it with the ✕, or restart setup any time from the ⓘ button.'),
       helpP('On an iPad held sideways, the list stays on the left and whatever you open appears on the right.')

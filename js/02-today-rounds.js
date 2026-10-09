@@ -144,7 +144,8 @@ function renderTodayHome(main){
   const textBefore = textBeforeDueList();
   const textBeforeOverdue = textBeforeOverdueCount();
   const todaysJobs = (data.oneOffJobs||[]).filter(j=>!j.done && j.date===today);
-  const owedCustomers = data.customers.filter(c=>custStatus(c).owed);
+  // Paused customers owing for more than 120 days are left off this tile (they stay in the full Owed list).
+  const owedCustomers = data.customers.filter(c=>custStatus(c).owed && !hideFromTodayOwing(c));
   // Bucketed by how long the balance has been outstanding — see
   // daysSinceLastPayment for what "days" means when there's no per-invoice
   // tracking, just a running balance.
@@ -1397,7 +1398,7 @@ function renderRoundsList(main){
     </button>
     <div style="display:flex; align-items:center; gap:8px;">
       ${mainScreenHelpBtn('rounds', "()=>setTab('rounds')")}
-      <button class="btn-open" style="width:38px; height:38px; padding:0;" onclick="openRoundReports()" aria-label="Print reports">
+      <button class="btn-open icon-plain" style="width:38px; height:38px; padding:0;" onclick="openRoundReports()" aria-label="Print reports">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
       </button>
     </div>
@@ -1611,15 +1612,15 @@ function renderRoundDetail(main, rn){
       <button class="btn-open" style="width:auto; padding:8px 14px; display:inline-flex; gap:6px; align-items:center;" onclick="backToRounds()">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 6l-6 6 6 6"/></svg> All rounds
       </button>
-      <button class="btn-open" style="width:auto; padding:8px 14px; font-size:0.7812rem; font-weight:800;" onclick="toggleReorder()">${reorderMode?'Done':'↕ Reorder route'}</button>
+      <button class="btn-open icon-plain" style="width:auto; padding:8px 14px; font-size:0.7812rem; font-weight:800;" onclick="toggleReorder()">${reorderMode?'Done':'↕ Reorder route'}</button>
     </div>
     <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:12px;">
       <h2 style="font-size:1.25rem;">${escapeHtml(rn)}</h2>
-      <button class="btn-open" style="width:38px; height:38px; padding:0; flex-shrink:0;" onclick="openRoundActionsMenu('${escapeAttr(rn)}')" aria-label="Round actions">
+      <button class="btn-open icon-plain" style="width:38px; height:38px; padding:0; flex-shrink:0;" onclick="openRoundActionsMenu('${escapeAttr(rn)}')" aria-label="Round actions">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
       </button>
     </div>
-    <button class="btn-open" style="width:100%; margin-bottom:12px; font-weight:800; display:flex; align-items:center; justify-content:center; gap:7px;" onclick="showRoundMap('${escapeAttr(rn)}')">
+    <button class="btn-open icon-plain" style="width:100%; margin-bottom:12px; font-weight:800; display:flex; align-items:center; justify-content:center; gap:7px;" onclick="showRoundMap('${escapeAttr(rn)}')">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
       Show map
     </button>
@@ -1628,7 +1629,7 @@ function renderRoundDetail(main, rn){
   if(reorderMode){
     shellHtml += `<p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 6px;">Drag the ⠿ handle to set the order you actually visit these customers in (or use the arrows). Use the filters below to reorder just the Due, Owed or a single day's customers.</p>`;
     shellHtml += `<p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 14px;">If this round takes more than one day, tap the day badge to say which day each customer is visited on (up to 5).</p>`;
-    shellHtml += `<button class="btn-open" style="width:100%; margin-bottom:14px; font-weight:800; display:flex; align-items:center; justify-content:center; gap:7px;" onclick="suggestRouteOrder('${escapeAttr(rn)}')">
+    shellHtml += `<button class="btn-open icon-plain" style="width:100%; margin-bottom:14px; font-weight:800; display:flex; align-items:center; justify-content:center; gap:7px;" onclick="suggestRouteOrder('${escapeAttr(rn)}')">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h8a4 4 0 0 0 4-4V7a4 4 0 0 0-4-4H8"/></svg>
       Suggest a route order
     </button>`;
@@ -1649,8 +1650,8 @@ function renderRoundDetail(main, rn){
         </div>
         <button class="btn-open" style="width:auto; padding:6px 10px; font-size:0.75rem; font-weight:800; background:var(--blue-dim); color:var(--blue-deep); flex-shrink:0;" onclick="cycleVisitDay('${c.id}')">Day ${c.visitDay||1}</button>
         <div style="display:flex; flex-direction:column; gap:6px;">
-          <button class="btn-open" style="width:34px; height:28px; padding:0; opacity:${i===0?'0.3':'1'};" onclick="moveInRound('${c.id}','up')">▲</button>
-          <button class="btn-open" style="width:34px; height:28px; padding:0; opacity:${i===scope.length-1?'0.3':'1'};" onclick="moveInRound('${c.id}','down')">▼</button>
+          <button class="btn-open icon-plain" style="width:34px; height:28px; padding:0; opacity:${i===0?'0.3':'1'};" onclick="moveInRound('${c.id}','up')">▲</button>
+          <button class="btn-open icon-plain" style="width:34px; height:28px; padding:0; opacity:${i===scope.length-1?'0.3':'1'};" onclick="moveInRound('${c.id}','down')">▼</button>
         </div>
       </div>
     `).join('') + `</div>`;

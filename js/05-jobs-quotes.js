@@ -11,7 +11,7 @@ function renderJobs(main){
     </button>
     <div style="display:flex; align-items:center; gap:8px;">
       ${mainScreenHelpBtn('jobs', "()=>setTab('jobs')")}
-      <button class="btn-open" style="width:38px; height:38px; padding:0;" onclick="printAllJobs()" aria-label="Print report">
+      <button class="btn-open icon-plain" style="width:38px; height:38px; padding:0;" onclick="printAllJobs()" aria-label="Print report">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
       </button>
     </div>
@@ -379,7 +379,7 @@ function renderQuotes(main){
   let html = '';
   html += `<div style="display:flex; align-items:center; justify-content:flex-end; gap:8px; margin-bottom:8px;">
     ${mainScreenHelpBtn('quotes', "()=>setTab('quotes')")}
-    <button class="btn-open" style="width:38px; height:38px; padding:0;" onclick="printQuotes()" aria-label="Print report">
+    <button class="btn-open icon-plain" style="width:38px; height:38px; padding:0;" onclick="printQuotes()" aria-label="Print report">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
     </button>
   </div>`;
