@@ -701,7 +701,7 @@ function mondayOfWeek(dateStr){
   const d = new Date(dateStr+'T00:00:00');
   const dayIdx = (d.getDay()+6)%7; // 0 = Monday
   d.setDate(d.getDate()-dayIdx);
-  return d.toISOString().slice(0,10);
+  return localISO(d);
 }
 // HMRC's standard mileage allowance: 45p/mile for the first 10,000 business
 // miles in a tax year, 25p/mile after that. The 10,000-mile threshold resets
@@ -756,7 +756,7 @@ function printMileageReport(){
   }
   const today = todayISO();
   const tyStart = taxYearStart(today);
-  const tyEnd = (()=>{ const d = new Date(tyStart+'T00:00:00'); d.setFullYear(d.getFullYear()+1); d.setDate(d.getDate()-1); return d.toISOString().slice(0,10); })();
+  const tyEnd = (()=>{ const d = new Date(tyStart+'T00:00:00'); d.setFullYear(d.getFullYear()+1); d.setDate(d.getDate()-1); return localISO(d); })();
   const tyMiles = entries.filter(e=>e.date >= tyStart).reduce((s,e)=>s+e.miles,0);
 
   // Every tax year that has any logged mileage, oldest first for the table —
@@ -766,7 +766,7 @@ function printMileageReport(){
   const tyAllowanceRows = Object.keys(tyTotals).sort((a,b)=>b.localeCompare(a)).map(ty=>{
     const miles = tyTotals[ty];
     const end = new Date(ty+'T00:00:00'); end.setFullYear(end.getFullYear()+1); end.setDate(end.getDate()-1);
-    const label = `6 Apr ${ty.slice(0,4)} – ${fmtDate(end.toISOString().slice(0,10))}`;
+    const label = `6 Apr ${ty.slice(0,4)} – ${fmtDate(localISO(end))}`;
     return `<tr><td>${label}</td><td style="text-align:right;">${miles.toFixed(1)}</td><td style="text-align:right;">${money(mileageAllowanceForMiles(miles, ty))}</td></tr>`;
   }).join('');
 
@@ -781,7 +781,7 @@ function printMileageReport(){
   entries.forEach(e=>{ const wk = mondayOfWeek(e.date); weekTotals[wk] = (weekTotals[wk]||0) + e.miles; });
   const weekRows = Object.keys(weekTotals).sort((a,b)=>b.localeCompare(a)).map(wk=>{
     const end = new Date(wk+'T00:00:00'); end.setDate(end.getDate()+6);
-    return `<tr><td>${fmtDate(wk)} – ${fmtDate(end.toISOString().slice(0,10))}</td><td style="text-align:right;">${weekTotals[wk].toFixed(1)}</td></tr>`;
+    return `<tr><td>${fmtDate(wk)} – ${fmtDate(localISO(end))}</td><td style="text-align:right;">${weekTotals[wk].toFixed(1)}</td></tr>`;
   }).join('');
 
   const dailyRows = entries.slice().reverse().map(e=>`<tr><td>${fmtDate(e.date)}</td><td>${escapeHtml(roundWorkedText(e.date))}</td><td style="text-align:right;">${e.miles.toFixed(1)}</td></tr>`).join('');
@@ -889,7 +889,7 @@ function printDailyWork(){
   for(let i=29; i>=0; i--){
     const d = new Date(today);
     d.setDate(d.getDate() - i);
-    const iso = d.toISOString().slice(0,10);
+    const iso = localISO(d);
     const info = dailyTotals[iso] || { total: 0, count: 0 };
     grandTotal += info.total;
     grandCount += info.count;

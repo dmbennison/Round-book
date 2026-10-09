@@ -592,10 +592,10 @@ function setMarketingAction(id, action){
   // has no target date, since a quote already tracks its own follow-up.
   if(action === 'call'){
     const d = new Date(); d.setDate(d.getDate() + 2);
-    c.marketingFollowUpDate = d.toISOString().slice(0,10);
+    c.marketingFollowUpDate = localISO(d);
   } else if(action === 'text_again'){
     const d = new Date(); d.setDate(d.getDate() + 3);
-    c.marketingFollowUpDate = d.toISOString().slice(0,10);
+    c.marketingFollowUpDate = localISO(d);
   } else {
     c.marketingFollowUpDate = '';
   }

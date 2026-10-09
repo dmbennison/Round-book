@@ -706,9 +706,11 @@ function commitSchedule(){
   const sum = seChangeSummary();
   if(!sum.total){ toast('Nothing has been changed yet'); return; }
   let customers = 0, jobs = 0, added = 0;
+  const snap = { cust:[], jobs:[], addedJobs:[], settings:null }; // how things were, so the commit can be undone
   se.items.forEach(it => {
     if(it.isNew){
       it.job.date = it.date;
+      snap.addedJobs.push(it.job.id);
       (data.oneOffJobs = data.oneOffJobs || []).push(it.job);
       added++;
       return;
@@ -716,11 +718,12 @@ function commitSchedule(){
     if(it.date === it.dispDate) return;
     if(it.kind === 'j'){
       const j = (data.oneOffJobs || []).find(x => x.id === it.key);
-      if(j){ j.date = it.date; jobs++; }
+      if(j){ snap.jobs.push({ id:j.id, date:j.date }); j.date = it.date; jobs++; }
       return;
     }
     const c = data.customers.find(x => x.id === it.key);
     if(!c) return;
+    snap.cust.push({ id:c.id, had:('dueOverride' in c), dueOverride: c.dueOverride == null ? c.dueOverride : JSON.parse(JSON.stringify(c.dueOverride)), deferUntil: c.deferUntil });
     // Back onto the day the normal rules would give? Then no hand-set date is needed.
     if(it.date === computedDueISO(c)) c.dueOverride = null;
     else c.dueOverride = { date: it.date, base: lastDateOf(c.cleanHistory) || '' };
@@ -728,6 +731,10 @@ function commitSchedule(){
     customers++;
   });
   data.settings = data.settings || {};
+  if(sum.offAdded.length || sum.offRemoved.length || sum.wdChanged){
+    snap.settings = { blockedDays: JSON.parse(JSON.stringify(data.settings.blockedDays === undefined ? null : data.settings.blockedDays)), hadBlocked: data.settings.blockedDays !== undefined,
+                      off: JSON.parse(JSON.stringify(data.settings.scheduleOffWeekdays === undefined ? null : data.settings.scheduleOffWeekdays)), hadOff: data.settings.scheduleOffWeekdays !== undefined };
+  }
   if(sum.offAdded.length || sum.offRemoved.length) data.settings.blockedDays = se.blocked.slice();
   if(sum.wdChanged) data.settings.scheduleOffWeekdays = se.offWeekdays.slice();
   closeScheduleEditor();
@@ -738,5 +745,24 @@ function commitSchedule(){
   if(jobs) bits.push(sePlural(jobs, 'job'));
   let msg = bits.length ? `Schedule updated — ${bits.join(' and ')} moved` : 'Schedule updated';
   if(added) msg += `${bits.length ? ', ' : ' — '}${sePlural(added, 'job')} added`;
-  toast(msg);
+  toast(msg, 'Undo', () => seUndoCommit(snap), 15000); // a long-ish window, in case it was done by accident
+}
+// Puts back exactly what the last Commit changed.
+function seUndoCommit(snap){
+  snap.cust.forEach(o => {
+    const c = data.customers.find(x => x.id === o.id);
+    if(!c) return;
+    if(o.had) c.dueOverride = o.dueOverride; else delete c.dueOverride;
+    c.deferUntil = o.deferUntil;
+  });
+  snap.jobs.forEach(o => { const j = (data.oneOffJobs || []).find(x => x.id === o.id); if(j) j.date = o.date; });
+  if(snap.addedJobs.length) data.oneOffJobs = (data.oneOffJobs || []).filter(j => !snap.addedJobs.includes(j.id));
+  if(snap.settings){
+    data.settings = data.settings || {};
+    if(snap.settings.hadBlocked) data.settings.blockedDays = snap.settings.blockedDays; else delete data.settings.blockedDays;
+    if(snap.settings.hadOff) data.settings.scheduleOffWeekdays = snap.settings.off; else delete data.settings.scheduleOffWeekdays;
+  }
+  saveData();
+  render();
+  toast('Schedule change undone');
 }

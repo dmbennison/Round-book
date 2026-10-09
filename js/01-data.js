@@ -6,13 +6,14 @@ const STORE_KEY = 'roundBookData_v1';
 // APP_VERSION is a plain decimal number (e.g. 1.01, 1.02 ... 1.99, 2.00) —
 // bump by 0.01 for every change. formatVersion always renders it to exactly
 // two decimal places, so it's never shown as "1.1" or "1.100".
-const APP_VERSION = 2.56;
+const APP_VERSION = 2.57;
 function formatVersion(v){ return Number(v).toFixed(2); }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
 // entry (newest first) with ONE very short plain-English summary, then delete
 // entries so only the latest ten remain.
 const VERSION_HISTORY = [
+  {version: 2.57, changes: ['Schedule: an Undo button appears for about 15 seconds after you commit', 'Fixed dates coming out a day early during British Summer Time in the last-tax-year accounting export, weekly mileage totals, tax-year end dates, the 30-day payments list and marketing follow-up dates']},
   {version: 2.56, changes: ['Fuel prices link removed from Today; Schedule tiles now need a press-and-hold to move, so scrolling no longer shifts them by accident']},
   {version: 2.55, changes: ['Weather removed from the top of the app, and the Schedule days are wider']},
   {version: 2.54, changes: ['Schedule: weather and distance removed from the top of each day']},
@@ -22,7 +23,6 @@ const VERSION_HISTORY = [
   {version: 2.50, changes: ['New Schedule button in Work: a calendar where rounds and jobs can be dragged to other days, then committed (due dates change) or rejected (nothing changes)']},
   {version: 2.49, changes: ['Cash / Bank toggle in the press-and-hold customer info box; Statistics now show cash vs bank customers, value and percentages; explanatory notes removed from the bottom of reports']},
   {version: 2.48, changes: ['8 and 12 week customers now fall due with their round\'s 4-weekly cleans; cleaning dates reports count 4-weekly customers only; customers can be marked Cash or Bank, shown on cards, and cash customers\' texts leave out bank details']},
-  {version: 2.47, changes: ['iPad: print and help icons inside customer and quote screens no longer show as blank circles; user guide rewritten shorter and simpler']},
 ];
 const DIRECTIONS_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>';
 const CALL_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>';
@@ -176,7 +176,7 @@ async function exportAccountingCSV(){
     fromISO = tyStart; toISO = today;
   } else if(range === 'lasty'){
     const lastYEnd = new Date(tyStart+'T00:00:00'); lastYEnd.setDate(lastYEnd.getDate()-1);
-    toISO = lastYEnd.toISOString().slice(0,10);
+    toISO = localISO(lastYEnd);
     fromISO = taxYearStart(toISO);
   } else if(range === 'custom'){
     fromISO = document.getElementById('acct_from').value || null;
@@ -703,14 +703,14 @@ function jobDiscountedTotal(j){
   return Math.round((price * (1 - pct/100)) * 100) / 100;
 }
 let pendingToastAction = null;
-function toast(msg, actionLabel, actionFn){
+function toast(msg, actionLabel, actionFn, ms){
   const t=document.getElementById('toast');
   clearTimeout(toast._t);
   pendingToastAction = actionFn || null;
   if(actionLabel && actionFn){
     t.innerHTML = `${escapeHtml(msg)}<button class="toast-undo-btn" onclick="runToastAction()">${escapeHtml(actionLabel)}</button>`;
     t.classList.add('show');
-    toast._t = setTimeout(()=>{ t.classList.remove('show'); pendingToastAction=null; }, 5000);
+    toast._t = setTimeout(()=>{ t.classList.remove('show'); pendingToastAction=null; }, ms || 5000);
   } else {
     t.textContent = msg;
     t.classList.add('show');
