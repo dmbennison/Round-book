@@ -16,6 +16,15 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js" defer></script>
 <title>Round Book</title>
+<script>
+/* Installed Home Screen app = "standalone". Anything else is an ordinary browser tab, where the browser's own
+   toolbar takes space at the bottom of the screen; the layout below adapts (see html.in-browser). */
+(function(){
+  var standalone = (window.navigator.standalone === true) ||
+    (window.matchMedia && (matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: fullscreen)').matches));
+  if(!standalone) document.documentElement.classList.add('in-browser');
+})();
+</script>
 <style>
   :root{
     --navy:#10344C;
@@ -132,6 +141,12 @@
   /* The page never scrolls: the header and the bottom tab bar stay put on every screen, and only this
      area between them scrolls. Their heights are measured in 09-boot.js. */
   #appScroll{position:fixed; top:var(--header-h, 100px); bottom:var(--tabbar-h, 64px); left:0; right:0; overflow-x:hidden; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior-y:contain;}
+  /* In an ordinary browser tab the page scrolls normally instead (swiping lets the browser tuck its toolbar
+     away, which is what lets the tab bar reach the true bottom). The header and tab bar are still fixed.
+     The page is always a touch taller than the screen so there is always something to swipe. */
+  html.in-browser, html.in-browser body{height:auto; overflow:visible; overscroll-behavior:auto;}
+  html.in-browser body{padding-top:var(--header-h, 100px); padding-bottom:calc(var(--tabbar-h, 64px) + 8px); min-height:100vh;}
+  html.in-browser #appScroll{position:static; overflow:visible; overscroll-behavior:auto;}
   main{padding:14px 14px 100px;}
 
   .section-label{
@@ -826,7 +841,7 @@
     header, .tabs, #lastActionBanner, #marketingFollowUpBanner, #jobAnniversaryBanner, #importReviewBanner, main, .fab, .overlay, .report-preview, .sched-editor, #importFile, #importSpreadsheetFile, #syncFile, .toast{
       display:none !important;
     }
-    body{ padding-top:0 !important; }
+    body{ padding-top:0 !important; padding-bottom:0 !important; }
     .print-area{
       display:block !important;
       position:static;
