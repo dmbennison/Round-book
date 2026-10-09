@@ -63,15 +63,14 @@
     --card-shadow:inset 0 1px 0 rgba(255,255,255,0.06), 0 2px 8px rgba(9,28,36,0.45), 0 1px 2px rgba(9,28,36,0.35);
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color: transparent;}
-  html,body{height:100%;}
+  html,body{height:100%; overflow:hidden; overscroll-behavior:none;}
   html{font-size:18px;}
   body{
     margin:0;
     background:var(--bg);
     color:var(--ink);
     font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    padding-top:var(--header-h, 170px); /* room for the fixed header; real height is measured in 09-boot.js */
-    padding-bottom:calc(var(--tabbar-h, 64px) + 8px); /* room for the bottom tab bar; real height is measured in 09-boot.js */
+    padding:0;
     -webkit-user-select:none;
     user-select:none;
   }
@@ -87,15 +86,17 @@
   header{
     background:var(--navy);
     color:#fff;
-    padding:calc(env(safe-area-inset-top) + 10px) 16px 10px;
+    padding:calc(env(safe-area-inset-top) + 5px) 14px 8px;
     position:fixed; top:0; left:0; right:0; z-index:20;
   }
-  .header-row{display:flex; align-items:center; justify-content:space-between; gap:10px;}
-  .brand{display:flex; align-items:center; gap:10px; min-width:0; flex:1 1 auto;}
-  .sub-line{display:flex; align-items:baseline; gap:8px; min-width:0; margin-top:1px;}
-  .sub-line .sub, .brand .sub-line .sub{margin-top:0;}
+  /* Row 1: logo, title and the three buttons (pinned to the top). Row 2: the date and sync note, which run
+     across the full width, underneath the buttons. */
+  .header-row{display:grid; grid-template-columns:auto minmax(0,1fr) auto; column-gap:10px; row-gap:0; align-items:center;}
+  .sub-line{grid-column:2 / -1; grid-row:2; display:flex; align-items:baseline; gap:8px; min-width:0; margin-top:-3px;}
   .sub-line #dateNow{flex:0 0 auto;}
   .sub-line #liveSyncChip{flex:0 1 auto; min-width:0; cursor:pointer;}
+  .hdr-btns{grid-column:3; grid-row:1; align-self:start; display:flex; gap:5px;}
+  .header-row h1{grid-column:2; grid-row:1;}
   .brand-mark{
     width:36px;height:36px;border-radius:9px;
     background:linear-gradient(160deg, var(--blue), var(--blue-deep));
@@ -104,9 +105,9 @@
     flex-shrink:0;
   }
   .brand-mark svg{width:26px;height:26px;}
-  .brand-text{min-width:0;}
-  .brand h1{font-size:1.1875rem; font-weight:800; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
-  .brand .sub{font-size:0.6875rem; color:#A9C4D8; font-weight:600; letter-spacing:.04em; text-transform:uppercase; margin-top:1px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .brand-mark{grid-column:1; grid-row:1 / span 2; align-self:center;}
+  .header-row h1{font-size:1.1875rem; font-weight:800; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .sub-line .sub{font-size:0.6875rem; color:#A9C4D8; font-weight:600; letter-spacing:.04em; text-transform:uppercase; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
   .icon-btn{
     width:34px;height:34px;border-radius:9px;border:none; flex-shrink:0;
     background:rgba(255,255,255,0.12); color:#fff; display:flex;align-items:center;justify-content:center;
@@ -128,6 +129,9 @@
   .tab-badge[hidden]{display:none;}
   #liveSyncChip[hidden]{display:none;}
 
+  /* The page never scrolls: the header and the bottom tab bar stay put on every screen, and only this
+     area between them scrolls. Their heights are measured in 09-boot.js. */
+  #appScroll{position:fixed; top:var(--header-h, 100px); bottom:var(--tabbar-h, 64px); left:0; right:0; overflow-x:hidden; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior-y:contain;}
   main{padding:14px 14px 100px;}
 
   .section-label{
@@ -754,8 +758,8 @@
        column width as you change tab or open something); the right-hand pane starts
        just below it instead of running up behind it. */
     header{ border-radius:0 0 26px 26px; }
-    #marketingFollowUpBanner, #jobAnniversaryBanner, #importReviewBanner{ width:var(--list-w); box-sizing:border-box; }
-    main{ width:var(--list-w); box-sizing:border-box; min-height:calc(100vh - 120px); }
+    #appScroll{ width:var(--list-w); right:auto; }
+    main{ box-sizing:border-box; min-height:100%; }
     .fab{ right:auto; left:calc(var(--list-w) - 74px); }
 
     /* The overlay becomes the always-present right-hand pane */
@@ -817,6 +821,8 @@
       --card-border:transparent;
       --card-shadow:none;
     }
+    html, body{ overflow:visible !important; height:auto !important; }
+    #appScroll{ position:static !important; }
     header, .tabs, #lastActionBanner, #marketingFollowUpBanner, #jobAnniversaryBanner, #importReviewBanner, main, .fab, .overlay, .report-preview, .sched-editor, #importFile, #importSpreadsheetFile, #syncFile, .toast{
       display:none !important;
     }
@@ -845,16 +851,11 @@
 
 <header>
   <div class="header-row">
-    <div class="brand">
-      <div class="brand-mark">
-        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h20v13H2z"/><path d="M2 9.5h20M12 3v13"/><path d="M15.5 20l4-4M20.5 20l2-2"/></svg>
-      </div>
-      <div class="brand-text">
-        <h1>Round Book</h1>
-        <div class="sub-line"><div class="sub" id="dateNow"></div><div class="sub" id="liveSyncChip" hidden></div></div>
-      </div>
+    <div class="brand-mark">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h20v13H2z"/><path d="M2 9.5h20M12 3v13"/><path d="M15.5 20l4-4M20.5 20l2-2"/></svg>
     </div>
-    <div style="display:flex; gap:5px;">
+    <h1>Round Book</h1>
+    <div class="hdr-btns">
       <button class="icon-btn" onclick="openUniversalSearch()" aria-label="Search">
         <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
       </button>
@@ -865,6 +866,7 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       </button>
     </div>
+    <div class="sub-line"><div class="sub" id="dateNow"></div><div class="sub" id="liveSyncChip" hidden></div></div>
   </div>
 </header>
 
@@ -875,11 +877,13 @@
     <button class="tab" data-tab="marketing" onclick="setTab('marketing')">Marketing</button>
 </nav>
 
+<div id="appScroll">
 <div id="lastActionBanner"></div>
 <div id="marketingFollowUpBanner"></div>
 <div id="jobAnniversaryBanner"></div>
 <div id="importReviewBanner"></div>
 <main id="main"></main>
+</div>
 
 <button class="fab" onclick="handleFabClick()" aria-label="Add">
   <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
