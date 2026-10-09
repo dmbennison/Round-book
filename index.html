@@ -549,13 +549,30 @@
     --orb-a:30%; --orb-b:20%; --orb-c:14%;
   }
 
+  /* The glass colours are built from per-scheme RGB triplets (set in applyTheme), so each colour scheme's
+     panels pick up its own warm or cool surface colour. Declared on body so they can see those inline values. */
+  body{
+    --glass-base:255,255,255; --glass-strong-base:255,255,255; --sheet-base:245,247,248;
+    --glass-fill:rgba(var(--glass-base),0.58);
+    --glass-fill-strong:rgba(var(--glass-strong-base),0.80);
+    --field-fill:rgba(var(--glass-base),0.62);
+    --sheet-fill:rgba(var(--sheet-base),0.74);
+  }
+  body.dark{
+    --glass-base:44,60,78; --glass-strong-base:30,42,56; --sheet-base:20,30,42;
+    --glass-fill:rgba(var(--glass-base),0.44);
+    --glass-fill-strong:rgba(var(--glass-strong-base),0.72);
+    --field-fill:rgba(255,255,255,0.07);
+    --sheet-fill:rgba(var(--sheet-base),0.72);
+  }
+
   /* Something colourful behind the glass for it to refract. */
   body::before{
     content:""; position:fixed; inset:0; z-index:-1; pointer-events:none;
     background:
       radial-gradient(60% 42% at 12% 2%, color-mix(in srgb, var(--blue) var(--orb-a), transparent), transparent 72%),
       radial-gradient(55% 40% at 100% 34%, color-mix(in srgb, var(--blue) var(--orb-b), transparent), transparent 72%),
-      radial-gradient(70% 50% at 22% 100%, color-mix(in srgb, var(--green) var(--orb-c), transparent), transparent 72%);
+      radial-gradient(70% 50% at 22% 100%, color-mix(in srgb, var(--orb-glow, var(--green)) var(--orb-c), transparent), transparent 72%);
   }
 
   /* Header: a floating pane of tinted glass with rounded lower corners */
@@ -741,12 +758,12 @@
   /* Fallbacks: browsers without backdrop blur, or people who've asked iOS to
      reduce transparency, get solid, fully legible surfaces instead. */
   @supports not ((-webkit-backdrop-filter:blur(1px)) or (backdrop-filter:blur(1px))){
-    :root{--glass-fill:rgba(255,255,255,0.92); --sheet-fill:#F5F7F8;}
-    body.dark{--glass-fill:rgba(32,46,60,0.94); --sheet-fill:#16212C;}
+    body{--glass-fill:rgba(var(--glass-base),0.92); --sheet-fill:rgb(var(--sheet-base));}
+    body.dark{--glass-fill:rgba(var(--glass-strong-base),0.94); --sheet-fill:rgb(var(--sheet-base));}
   }
   @media (prefers-reduced-transparency: reduce){
-    :root{--glass-fill:rgba(255,255,255,0.96); --sheet-fill:#F5F7F8;}
-    body.dark{--glass-fill:rgba(32,46,60,0.96); --sheet-fill:#16212C;}
+    body{--glass-fill:rgba(var(--glass-base),0.96); --sheet-fill:rgb(var(--sheet-base));}
+    body.dark{--glass-fill:rgba(var(--glass-strong-base),0.96); --sheet-fill:rgb(var(--sheet-base));}
     .today-tile, .stat, .sheet, header, .fab, .toast{-webkit-backdrop-filter:none; backdrop-filter:none;}
   }
   @media (prefers-reduced-motion: reduce){
