@@ -878,6 +878,15 @@
      behind them — just the icon, with a soft flash when pressed. */
   .icon-btn, .sheet-close, .icon-plain{background:transparent !important; box-shadow:none !important; border-color:transparent !important; -webkit-backdrop-filter:none !important; backdrop-filter:none !important;}
   .icon-btn:active, .sheet-close:active, .icon-plain:active{background:rgba(128,140,155,0.22) !important;}
+  /* Scrolling inside a pop-up never carries on to the page behind it */
+  .overlay, .sheet, #schedEditor, .rp-scroll{overscroll-behavior:contain;}
+  /* Your location on the round map */
+  .you-pin{background:none; border:none;}
+  .you-dot{position:relative; width:18px; height:18px; border-radius:50%; background:#1A73E8; border:3px solid #fff; box-shadow:0 1px 5px rgba(0,0,0,0.45); box-sizing:border-box;}
+  .you-dot::after{content:""; position:absolute; inset:-9px; border-radius:50%; background:rgba(26,115,232,0.30); animation:youPulse 2s ease-out infinite;}
+  @keyframes youPulse{0%{transform:scale(0.5); opacity:0.9;} 100%{transform:scale(1.5); opacity:0;}}
+  .you-key{display:inline-block; width:10px; height:10px; border-radius:50%; background:#1A73E8; border:2px solid #fff; box-shadow:0 0 0 1px rgba(0,0,0,0.25); margin-right:5px; vertical-align:-1px; box-sizing:border-box;}
+  .locate-btn{width:34px; height:34px; border:none; border-radius:8px; background:#fff; color:#1A73E8; font-size:1.25rem; line-height:34px; padding:0; box-shadow:0 1px 5px rgba(0,0,0,0.4);}
 </style>
 </head>
 <body>
