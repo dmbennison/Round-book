@@ -620,13 +620,11 @@ function setTab(tab){
   render();
   pageScrollTo(restoreY);
 }
-// In the installed app the page itself never scrolls (the header and tab bar stay fixed); everything between
-// them scrolls inside #appScroll. In an ordinary browser tab the page scrolls as normal (html.in-browser).
-// These stand in for window.scrollY / scrollTo / scrollBy and work in either mode.
-function pageScroller(){ return document.documentElement.classList.contains('in-browser') ? null : document.getElementById('appScroll'); }
-function pageScrollY(){ const el = pageScroller(); return el ? el.scrollTop : window.scrollY; }
-function pageScrollTo(y){ const el = pageScroller(); if(el) el.scrollTop = y; else window.scrollTo(0, y); }
-function pageScrollBy(dy){ const el = pageScroller(); if(el) el.scrollTop += dy; else window.scrollBy(0, dy); }
+// The page itself scrolls (the header and tab bar are fixed), so these are simply the window scroll —
+// kept as named helpers so the scrolling area can be changed in one place.
+function pageScrollY(){ return window.scrollY; }
+function pageScrollTo(y){ window.scrollTo(0, y); }
+function pageScrollBy(dy){ window.scrollBy(0, dy); }
 function setRoundsView(v){ roundsViewMode = v; render(); }
 function toggleReorder(){ reorderMode = !reorderMode; render(); }
 function moveInRound(id, direction){
