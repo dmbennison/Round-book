@@ -20,12 +20,14 @@ function openSheet(html, onClose){
   sheetOnClose = onClose || null;
   sheetCloseGuard = null; // each new sheet starts unguarded; set one after opening if needed
   document.getElementById('sheet').innerHTML = `<div class="sheet-handle"></div>` + html;
+  pageScrollLock('sheet', true);
   document.getElementById('overlay').classList.add('show');
 }
 function closeSheet(){
   if(sheetCloseGuard && !sheetCloseGuard()) return;
   sheetCloseGuard = null;
   document.getElementById('overlay').classList.remove('show');
+  pageScrollLock('sheet', false);
   if(sheetOnClose){
     const cb = sheetOnClose;
     sheetOnClose = null;

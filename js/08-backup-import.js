@@ -321,6 +321,7 @@ const FOCUSED_HELP = {
         '<b>All the way right</b> – cleaned and paid.',
         '<b>Left</b> – paid.',
         'An <b>Undo</b> button appears for a few seconds afterwards.',
+        'After you swipe a customer cleaned (or cleaned and paid), the list scrolls on by itself so the <b>next customer</b> is at the top, ready for you to carry on down the round.',
         'After a clean, a “Windows cleaned today” text opens ready to send. You can turn this off in Settings.'
       ]),
       helpP('<b>Press and hold</b> a card for a quick info box – price, last cleaned, last paid, how long they usually take to pay – handy at the door. You can switch them between <b>Bank</b> and <b>Cash</b> right there. The green phone button calls and the blue compass button gives directions.'),
@@ -338,7 +339,7 @@ const FOCUSED_HELP = {
       helpP('<b>Text first customers.</b> If someone likes a heads-up, tap their <b>Text first</b> badge to text them – it turns into a green <b>Texted</b> tick so you don’t send twice. <b>Text all</b> skips anyone already texted.'),
       helpP('<b>A round’s ⋯ menu</b> has:'),
       helpList([
-        '<b>Show map</b> – numbered stops. Drag a pin to correct an address; it then stays where you put it.',
+        '<b>Show map</b> – numbered stops, with a pulsing blue dot for <b>where you are now</b> (allow location access when asked). The <b>◎</b> button in the corner of the map centres on you. Drag a pin to correct an address; it then stays where you put it.',
         '<b>Start round</b> – directions to every stop.',
         '<b>Print</b>, <b>Defer</b> (push everyone back a day, a week, four weeks or to a date) and <b>Apply price uplift</b> (a % or £ increase for the whole round).'
       ]),
@@ -464,7 +465,7 @@ const FOCUSED_HELP = {
     title: 'Settings',
     body: () => [
       helpList([
-        '<b>Appearance</b> – text size, light, dark or automatic, and colour scheme. There are seven, each with its own character: <b>Ocean</b> (cool coastal navy and clear blue), <b>Slate</b> (charcoal with a copper accent), <b>Rust</b> (earthy terracotta on sand), <b>Forest</b> (deep pine with a settled moss accent on parchment), <b>Plum</b> (aubergine with magenta on lilac-white), <b>Ruby</b> (oxblood with a bordeaux accent on rosy-cream) and <b>High contrast</b> (pure black and white with hard borders and a cobalt or yellow accent – made for bright sunlight and gloved use). The backgrounds are warm or cool to match, in both light and dark mode, and coloured text is chosen to stay easy to read.',
+        '<b>Appearance</b> – text size, light, dark or automatic, and colour scheme. There are six, each with its own character: <b>Ocean</b> (cool coastal navy and clear blue), <b>Slate</b> (charcoal with a copper accent), <b>Rust</b> (earthy terracotta on sand), <b>Forest</b> (deep pine with a settled moss accent on parchment), <b>Plum</b> (aubergine with magenta on lilac-white) and <b>High contrast</b> (pure black and white with hard borders and a cobalt or yellow accent – made for bright sunlight and gloved use). The backgrounds are warm or cool to match, in both light and dark mode, and coloured text is chosen to stay easy to read.',
         '<b>Messaging app</b> – Messages or WhatsApp.',
         '<b>Swipe to text</b> – switches the “Windows cleaned today” text after a clean on or off.',
         '<b>Business details</b> – your name, company and bank details, used in invoices and texts.',

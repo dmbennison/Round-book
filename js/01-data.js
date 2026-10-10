@@ -6,13 +6,14 @@ const STORE_KEY = 'roundBookData_v1';
 // APP_VERSION is a plain decimal number (e.g. 1.01, 1.02 ... 1.99, 2.00) —
 // bump by 0.01 for every change. formatVersion always renders it to exactly
 // two decimal places, so it's never shown as "1.1" or "1.100".
-const APP_VERSION = 2.66;
+const APP_VERSION = 2.67;
 function formatVersion(v){ return Number(v).toFixed(2); }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
 // entry (newest first) with ONE very short plain-English summary, then delete
 // entries so only the latest ten remain.
 const VERSION_HISTORY = [
+  {version: 2.67, changes: ['The page behind a pop-up no longer scrolls, so lists are where you left them when it closes', 'After swiping a customer cleaned the list moves on to the next customer', 'Round maps show a "you are here" pin and a locate button', 'Ruby colour scheme removed']},
   {version: 2.66, changes: ['Colour schemes redesigned again: Slate, Rust, Forest, Plum and Ruby each have a stronger identity, Ruby is now a bordeaux wine instead of warning red, Forest a deeper moss, and a new High contrast scheme for outdoor use. Accent text now passes accessibility contrast in light and dark mode']},
   {version: 2.65, changes: ['Fixed the gap under the bottom tabs on iPhone and iPad: pages can now always scroll a little, which stops the screen shrinking on short pages']},
   {version: 2.64, changes: ['Colour schemes redesigned so each has its own personality: Slate is charcoal with a copper accent, Rust is terracotta on cream, Forest is green with a mossy accent on parchment, Plum is aubergine with magenta, Ruby is wine with crimson — with warm or cool backgrounds in light and dark mode. Ocean is unchanged']},
@@ -22,7 +23,6 @@ const VERSION_HISTORY = [
   {version: 2.60, changes: ['New top bar: Reports, Backup and About are now under a ⋯ button, the sync note sits on the same line as the date, and the four tabs are anchored to the bottom of the screen']},
   {version: 2.59, changes: ['Fixed reordering a round that runs over several days — customers snapped back to where they were; the Reorder list is now grouped by day and moves work within each day']},
   {version: 2.58, changes: ['Little icon buttons (help, print, close, round actions, Reorder, Show map, header icons) no longer have a box behind them', 'Today: paused customers owing for more than 120 days no longer show in the Customers owing tile (they still appear in the full Owed list)']},
-  {version: 2.57, changes: ['Schedule: an Undo button appears for about 15 seconds after you commit', 'Fixed dates coming out a day early during British Summer Time in the last-tax-year accounting export, weekly mileage totals, tax-year end dates, the 30-day payments list and marketing follow-up dates']},
 ];
 const DIRECTIONS_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>';
 const CALL_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>';
@@ -703,6 +703,22 @@ function jobDiscountedTotal(j){
   return Math.round((price * (1 - pct/100)) * 100) / 100;
 }
 let pendingToastAction = null;
+/* ---------- keep the page still behind pop-ups ----------
+   Swiping inside a pop-up (customer details, a map, the Schedule…) could scroll the list underneath, so it was in
+   the wrong place when the pop-up closed. While anything is open the page is held exactly where it was; the
+   pop-up's own scrolling is untouched. Each pop-up registers/unregisters under its own name. */
+const pageLockSources = {};
+let pageLockY = null;
+function pageScrollLock(source, on){
+  if(on){ if(pageLockY === null) pageLockY = window.scrollY; pageLockSources[source] = true; }
+  else {
+    delete pageLockSources[source];
+    if(!Object.keys(pageLockSources).length) pageLockY = null;
+  }
+}
+window.addEventListener('scroll', () => {
+  if(pageLockY !== null && window.scrollY !== pageLockY) window.scrollTo(0, pageLockY);
+}, {passive:true});
 function toast(msg, actionLabel, actionFn, ms){
   const t=document.getElementById('toast');
   clearTimeout(toast._t);

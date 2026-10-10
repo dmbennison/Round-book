@@ -18,6 +18,11 @@ if(window.matchMedia){
     if(themeMode === 'auto') applyDarkMode();
   });
 }
+// Swiping on the dimmed area behind a pop-up shouldn't scroll the page underneath.
+(function(){
+  const ov = document.getElementById('overlay');
+  if(ov) ov.addEventListener('touchmove', (e) => { if(e.target === ov && e.cancelable) e.preventDefault(); }, {passive:false});
+})();
 /* ---------- swipe actions ---------- */
 let swipeState = null;
 function initSwipeHandlers(){

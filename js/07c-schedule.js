@@ -89,6 +89,7 @@ function openScheduleEditor(){
   const { root, scroll } = seEls();
   seBind();
   seCloseModal();
+  pageScrollLock('schedule', true);
   root.classList.add('show');
   renderScheduleEditor();
   scroll.scrollTop = 0; scroll.scrollLeft = 0;
@@ -683,6 +684,7 @@ function closeScheduleEditor(){
   seEndDrag();
   seCloseModal();
   seEls().root.classList.remove('show');
+  pageScrollLock('schedule', false);
   se = null;
 }
 // Reject button / Escape: asks first if anything has been changed.

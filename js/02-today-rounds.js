@@ -623,8 +623,8 @@ function setTab(tab){
 // The page itself scrolls (the header and tab bar are fixed), so these are simply the window scroll —
 // kept as named helpers so the scrolling area can be changed in one place.
 function pageScrollY(){ return window.scrollY; }
-function pageScrollTo(y){ window.scrollTo(0, y); }
-function pageScrollBy(dy){ window.scrollBy(0, dy); }
+function pageScrollTo(y){ if(pageLockY !== null) pageLockY = y; window.scrollTo(0, y); }
+function pageScrollBy(dy){ if(pageLockY !== null) pageLockY += dy; window.scrollBy(0, dy); }
 function setRoundsView(v){ roundsViewMode = v; render(); }
 function toggleReorder(){ reorderMode = !reorderMode; render(); }
 function moveInRound(id, direction){
@@ -1102,6 +1102,7 @@ function applySuggestedRouteOrder(){
    that customer's location so future map/route requests leave it alone. */
 let roundMapLeafletInstance = null;
 let roundMapRouteLine = null;
+let roundMapWatchId = null; // live location watch for the "you are here" pin
 async function showRoundMap(rn){
   // Maps exactly what the round list is showing (Day and All/Due/Owed filters), minus
   // paused customers. With nothing filtered that's the whole round.
@@ -1141,6 +1142,8 @@ async function showRoundMap(rn){
   renderRoundMapSheet(rn, withAddress, fallbackCoords);
 }
 function destroyRoundMap(){
+  if(roundMapWatchId !== null && navigator.geolocation){ navigator.geolocation.clearWatch(roundMapWatchId); }
+  roundMapWatchId = null;
   if(roundMapLeafletInstance){ roundMapLeafletInstance.remove(); roundMapLeafletInstance = null; }
   roundMapRouteLine = null;
 }
@@ -1154,6 +1157,7 @@ function renderRoundMapSheet(rn, customers, fallbackCoords){
     ${approxCount ? `<p style="color:var(--amber); font-size:0.75rem; margin:0 2px 10px; line-height:1.4; font-weight:700;">📍 ${approxCount} address${approxCount===1?'':'es'} couldn't be found automatically — shown as a grey dashed pin near the others. Drag ${approxCount===1?'it':'them'} to the right spot to fix.</p>` : ''}
     <div id="roundMapEl" style="height:min(65vh, 520px); border-radius:14px; overflow:hidden; background:var(--surface); border:1px solid var(--box-border); margin-bottom:12px;"></div>
     <div style="display:flex; flex-wrap:wrap; gap:6px 14px; margin:0 2px 8px; font-size:0.75rem; font-weight:700; color:var(--ink-muted);">
+      <span><span class="you-key"></span>You are here</span>
       <span><span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:${PIN_COLOUR_UNMOVED}; margin-right:5px;"></span>Not moved by you</span>
       <span><span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:${PIN_COLOUR_MOVED}; margin-right:5px;"></span>Moved &amp; locked</span>
       ${approxCount ? `<span><span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:${PIN_COLOUR_APPROX}; margin-right:5px;"></span>Approximate</span>` : ''}
@@ -1215,6 +1219,40 @@ function initRoundMapLeaflet(customers, fallbackCoords){
   const latlngs = customers.map(c=>{ const p = pointOf(c); return [p.lat, p.lng]; });
   if(latlngs.length > 1) map.fitBounds(L.latLngBounds(latlngs), {padding:[30,30]});
   else map.setView(latlngs[0], 15);
+
+  showYouAreHere(map);
+}
+// A blue pulsing dot (with an accuracy ring) for where you are right now; it follows you while the map is open.
+// The ◎ button in the corner of the map centres on it. Blue so it can't be mistaken for a customer pin.
+function showYouAreHere(map){
+  if(!navigator.geolocation) return;
+  let dot = null, ring = null, last = null, told = false;
+  const Locate = L.Control.extend({
+    options:{ position:'topleft' },
+    onAdd(){
+      const b = L.DomUtil.create('button', 'locate-btn');
+      b.type = 'button'; b.title = 'Show my location'; b.setAttribute('aria-label', 'Show my location'); b.textContent = '◎';
+      L.DomEvent.disableClickPropagation(b);
+      b.addEventListener('click', () => {
+        if(last) map.setView(last, Math.max(map.getZoom(), 16));
+        else toast('Still finding your location…');
+      });
+      return b;
+    }
+  });
+  new Locate().addTo(map);
+  roundMapWatchId = navigator.geolocation.watchPosition(pos => {
+    if(roundMapLeafletInstance !== map) return;
+    last = [pos.coords.latitude, pos.coords.longitude];
+    if(!dot){
+      ring = L.circle(last, { radius: pos.coords.accuracy || 30, color:'#1A73E8', weight:1, fillColor:'#1A73E8', fillOpacity:0.12, interactive:false }).addTo(map);
+      dot = L.marker(last, { icon: L.divIcon({ className:'you-pin', html:'<div class="you-dot"></div>', iconSize:[18,18], iconAnchor:[9,9] }), zIndexOffset:1000, keyboard:false }).addTo(map).bindPopup('<b>You are here</b>');
+    } else {
+      dot.setLatLng(last); ring.setLatLng(last); ring.setRadius(pos.coords.accuracy || 30);
+    }
+  }, err => {
+    if(!told && err && err.code === 1){ told = true; toast('Allow location access to see where you are on the map'); }
+  }, { enableHighAccuracy:true, maximumAge:15000, timeout:20000 });
 }
 function redrawRoundMapRoute(customers, fallbackCoords, map){
   if(roundMapRouteLine){ roundMapRouteLine.remove(); roundMapRouteLine = null; }
@@ -1850,6 +1888,20 @@ function custCardHtml(c, mode){
 // fromSwipe: true when this came from swiping a card. A swipe-clean then jumps straight
 // to the messaging app with the "windows cleaned today" text ready to send (see
 // prepareCleanedTodayText) — one tap in Messages instead of opening a preview first.
+// After a customer is swiped cleaned, the list moves on: remember who is next, then scroll them to the top.
+function nextCustomerIdInList(id){
+  const cards = Array.from(document.querySelectorAll('#main .cust-card[data-kind="customer"]'));
+  const i = cards.findIndex(c => c.dataset.id === id);
+  return (i >= 0 && i < cards.length - 1) ? cards[i + 1].dataset.id : null;
+}
+function scrollToCustomerCard(id){
+  if(!id) return;
+  const el = document.querySelector(`#main .cust-card[data-kind="customer"][data-id="${CSS.escape(id)}"]`);
+  if(!el) return;
+  const header = document.querySelector('header');
+  const top = el.getBoundingClientRect().top + window.scrollY - (header ? header.offsetHeight : 0) - 14;
+  window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+}
 function quickClean(id, fromSwipe){
   const c = data.customers.find(x=>x.id===id);
   const prevDeferUntil = c.deferUntil;
@@ -1857,7 +1909,9 @@ function quickClean(id, fromSwipe){
   c.cleanHistory.push({date: todayISO(), amount: c.price||0});
   c.deferUntil = null;
   const text = fromSwipe ? prepareCleanedTodayText(c) : null;
+  const nextId = fromSwipe ? nextCustomerIdInList(id) : null;
   saveData(); render();
+  if(nextId) scrollToCustomerCard(nextId);
   toast(`Marked ${c.name||c.address||'customer'} as cleaned today`, 'Undo', () => {
     c.cleanHistory.pop();
     c.deferUntil = prevDeferUntil;
@@ -1894,7 +1948,9 @@ function quickCleanAndPaid(id, fromSwipe){
   c.paymentReminderSentDate = null;
   c.paymentReminderCount = 0;
   const text = fromSwipe ? prepareCleanedTodayText(c) : null;
+  const nextId = fromSwipe ? nextCustomerIdInList(id) : null;
   saveData(); render();
+  if(nextId) scrollToCustomerCard(nextId);
   toast(`Marked ${c.name||c.address||'customer'} as cleaned and paid today`, 'Undo', () => {
     c.cleanHistory.pop();
     c.paymentHistory.pop();

@@ -5,7 +5,7 @@
 /* Each colour scheme has its own personality, not just a different header: its own accent, a "glow" colour
    for the soft light behind the glass, and a full set of page / card / text colours for light AND dark mode.
    The light-mode surfaces deliberately differ in temperature — cool blue-white (Ocean), neutral stone (Slate),
-   warm sand (Rust), green-gold parchment (Forest), lilac-white (Plum), rosy-cream (Ruby), pure white (High contrast).
+   warm sand (Rust), green-gold parchment (Forest), lilac-white (Plum), pure white (High contrast).
      navy     = header / tab bar / dark chrome (white text sits on it)
      blue     = the accent: fills (buttons, tiles) AND text/icons that carry meaning, so in LIGHT mode it is
                 dark enough to pass WCAG AA (4.5:1) against both the page and the card colour
@@ -40,11 +40,6 @@ const THEMES = {
   plum: { name:'Plum', navy:'#3F1A47', blue:'#B01F82', blueDark:'#E86CC2', glow:'#7E5BD6',
     light:{ bg:'#EFE6F1', surface:'#FFFBFE', ink:'#2D1B33', muted:'#705C77', line:'#E0D1E2' },
     dark: { bg:'#150D19', surface:'#211528', ink:'#F1E8F4', muted:'#A891B1', line:'#38263F' } },
-  // RUBY — dark and sophisticated: oxblood/bordeaux header, rosy-cream pages, a deep bordeaux accent, rose-gold glow.
-  // Deliberately NOT a warning red: the accent is a wine so buttons don't look like errors. Dark mode uses a soft rosé for text.
-  ruby: { name:'Ruby', navy:'#4A0D1A', blue:'#9A1F3C', blueDark:'#EC7A92', glow:'#E3A18A',
-    light:{ bg:'#F3E4E1', surface:'#FFF8F5', ink:'#321A1C', muted:'#785A5F', line:'#E6D0CC' },
-    dark: { bg:'#190D0F', surface:'#261418', ink:'#F5E8E8', muted:'#B39397', line:'#3E2327' } },
   // HIGH CONTRAST — for outdoor and gloved use: pure black and white, hard borders, solid (non-glass) cards, no glow.
   // Light: black on white with a cobalt accent. Dark: white on black with a signal-yellow accent. See `flat` handling in applyTheme.
   contrast: { name:'High contrast', navy:'#000000', blue:'#0033CC', blueDark:'#FFD60A', glow:'#FFFFFF',
@@ -52,6 +47,7 @@ const THEMES = {
     dark: { bg:'#000000', surface:'#0C0C0C', ink:'#FFFFFF', muted:'#D2D2D2', line:'#8C8C8C' } }
 };
 let themeName = localStorage.getItem('roundBookTheme') || 'ocean';
+if(!THEMES[themeName]) themeName = 'ocean'; // a scheme that no longer exists (e.g. the removed Ruby) falls back to Ocean
 
 // Small colour-mixing helpers so every tinted surface in the app (not just
 // the header) can be derived from the two colours a scheme actually defines.
@@ -1226,6 +1222,7 @@ async function openReportPreview(){
   const token = ++rpToken;
   document.getElementById('rpTitle').innerHTML = pendingReportTitle;
   paper.innerHTML = '<div class="rp-wait">Preparing preview…</div>';
+  pageScrollLock('report', true);
   root.classList.add('show');
   rpScale = 1; rpAtFit = true;
   rpFit();
@@ -1240,6 +1237,7 @@ async function openReportPreview(){
 function closeReportPreview(){
   rpToken++;
   const { root, paper } = rpEls();
+  pageScrollLock('report', false);
   root.classList.remove('show');
   paper.innerHTML = '';
   const back = pendingReportReturnTo;
