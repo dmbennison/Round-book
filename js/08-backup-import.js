@@ -464,7 +464,7 @@ const FOCUSED_HELP = {
     title: 'Settings',
     body: () => [
       helpList([
-        '<b>Appearance</b> – text size, light, dark or automatic, and colour scheme. There are six, each with its own character: <b>Ocean</b> (cool navy and blue), <b>Slate</b> (charcoal with a copper accent), <b>Rust</b> (earthy terracotta on cream), <b>Forest</b> (deep green with a mossy accent on parchment), <b>Plum</b> (aubergine with magenta on lilac-white) and <b>Ruby</b> (deep wine with crimson on rosy-white). The backgrounds are warm or cool to match, in both light and dark mode.',
+        '<b>Appearance</b> – text size, light, dark or automatic, and colour scheme. There are seven, each with its own character: <b>Ocean</b> (cool coastal navy and clear blue), <b>Slate</b> (charcoal with a copper accent), <b>Rust</b> (earthy terracotta on sand), <b>Forest</b> (deep pine with a settled moss accent on parchment), <b>Plum</b> (aubergine with magenta on lilac-white), <b>Ruby</b> (oxblood with a bordeaux accent on rosy-cream) and <b>High contrast</b> (pure black and white with hard borders and a cobalt or yellow accent – made for bright sunlight and gloved use). The backgrounds are warm or cool to match, in both light and dark mode, and coloured text is chosen to stay easy to read.',
         '<b>Messaging app</b> – Messages or WhatsApp.',
         '<b>Swipe to text</b> – switches the “Windows cleaned today” text after a clean on or off.',
         '<b>Business details</b> – your name, company and bank details, used in invoices and texts.',

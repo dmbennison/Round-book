@@ -4,31 +4,52 @@
 /* ---------- settings / dark mode / colour scheme ---------- */
 /* Each colour scheme has its own personality, not just a different header: its own accent, a "glow" colour
    for the soft light behind the glass, and a full set of page / card / text colours for light AND dark mode.
-   The light-mode surfaces deliberately differ in temperature — cool (Ocean), neutral (Slate), warm cream (Rust),
-   green-tinted parchment (Forest), lilac-white (Plum), rosy-white (Ruby) — so the schemes feel like different
-   apps rather than one app with a different header.
-     navy = header / tab bar / dark chrome      blue = the accent (buttons, highlights, active states)
-     blueDark = optional brighter accent used in dark mode where the normal one would be too dim
-     glow = third colour in the background light   light/dark: bg (page), surface (cards), ink (text), muted, line */
+   The light-mode surfaces deliberately differ in temperature — cool blue-white (Ocean), neutral stone (Slate),
+   warm sand (Rust), green-gold parchment (Forest), lilac-white (Plum), rosy-cream (Ruby), pure white (High contrast).
+     navy     = header / tab bar / dark chrome (white text sits on it)
+     blue     = the accent: fills (buttons, tiles) AND text/icons that carry meaning, so in LIGHT mode it is
+                dark enough to pass WCAG AA (4.5:1) against both the page and the card colour
+     blueDark = the accent in DARK mode, lightened so it passes AA against the dark page and cards
+     glow     = third colour in the soft background light
+     light/dark: bg (page), surface (cards), ink (text), muted (secondary text, AA), line (borders)
+   Every pairing was checked with a contrast calculator: ink >= 7:1, muted and accent >= 4.5:1, white on
+   navy >= 7:1. If you change a value, re-check it (e.g. webaim.org/resources/contrastchecker). */
 const THEMES = {
-  ocean: { name:'Ocean',  navy:'#164559', blue:'#3FA9D6', glow:'#2E9E5B',   // cool navy, crisp blue
-    light:{ bg:'#F0F5F8', surface:'#FFFFFF', ink:'#1C2B36', muted:'#66798A', line:'#E3E9EC' },
-    dark: { bg:'#0E1923', surface:'#16212C', ink:'#EAF1F6', muted:'#8CA0B3', line:'#28394A' } },
-  slate: { name:'Slate',  navy:'#33373C', blue:'#C47A3A', glow:'#9AA3AD',   // true charcoal, copper accent
-    light:{ bg:'#F1F0EE', surface:'#FCFBFA', ink:'#24272B', muted:'#6B6E73', line:'#DFDDD9' },
-    dark: { bg:'#121314', surface:'#1D1F21', ink:'#ECEAE6', muted:'#9A9791', line:'#303234' } },
-  rust:  { name:'Rust',   navy:'#4F2A1D', blue:'#D2531C', glow:'#E0A33C',   // earthy terracotta, cream surfaces
-    light:{ bg:'#F6EBDC', surface:'#FFF8EE', ink:'#33201A', muted:'#86675A', line:'#E7D5BF' },
-    dark: { bg:'#1B130F', surface:'#281C16', ink:'#F3E9DD', muted:'#B09886', line:'#3E2B21' } },
-  forest:{ name:'Forest', navy:'#1B3F2B', blue:'#668A25', glow:'#C9B458',   // deep green, mossy accent, parchment
-    light:{ bg:'#F0EEDD', surface:'#FBFAEE', ink:'#1F2D22', muted:'#667760', line:'#DCDAC2' },
-    dark: { bg:'#0E1812', surface:'#16241B', ink:'#E7EFE2', muted:'#8FA58F', line:'#243A2B' } },
-  plum:  { name:'Plum',   navy:'#3F1A47', blue:'#C2278F', blueDark:'#E05AB8', glow:'#7E5BD6',   // rich aubergine, magenta, lilac-white
-    light:{ bg:'#F4EEF4', surface:'#FFFBFE', ink:'#2D1B33', muted:'#7B6882', line:'#E4D8E5' },
-    dark: { bg:'#160E1A', surface:'#221529', ink:'#F1E8F4', muted:'#A48DAD', line:'#38263F' } },
-  ruby:  { name:'Ruby',   navy:'#5A0F1B', blue:'#D81E3F', blueDark:'#F2506B', glow:'#E8923A',   // deep wine, crimson, rosy-white
-    light:{ bg:'#F7EDEA', surface:'#FFF9F6', ink:'#321A1C', muted:'#86656A', line:'#EBD8D3' },
-    dark: { bg:'#1A0E10', surface:'#271518', ink:'#F5E8E8', muted:'#AD8D90', line:'#3E2327' } }
+  // OCEAN — cool coastal navy with a crisp, clear-water blue accent; pale blue-white pages and clean white cards.
+  // Accent is a touch deeper than the old sky blue so it passes AA as text; the bright sky blue lives on in dark mode.
+  ocean: { name:'Ocean', navy:'#164559', blue:'#187096', blueDark:'#5CC0EA', glow:'#2E9E5B',
+    light:{ bg:'#EAF3F8', surface:'#FFFFFF', ink:'#14283A', muted:'#556B7C', line:'#D3E2EB' },
+    dark: { bg:'#0C1A25', surface:'#14232F', ink:'#EAF1F6', muted:'#93A8B9', line:'#27394A' } },
+  // SLATE — professional and neutral: true charcoal header, stone-grey pages, and one warm copper accent for contrast.
+  // Almost no hue except the copper, so it reads as a tool, not a theme.
+  slate: { name:'Slate', navy:'#2B2F34', blue:'#99531D', blueDark:'#E3995A', glow:'#8E9AA6',
+    light:{ bg:'#ECECEA', surface:'#FAFAF8', ink:'#212427', muted:'#62656A', line:'#D6D6D2' },
+    dark: { bg:'#101112', surface:'#1B1D1F', ink:'#ECEAE6', muted:'#A09D97', line:'#303234' } },
+  // RUST — earthy and warm: brown-terracotta header, sand and cream pages, burnt-orange accent, amber glow.
+  // The warmest scheme; light mode should feel like paper and clay.
+  rust: { name:'Rust', navy:'#5A2E1C', blue:'#A93E0D', blueDark:'#F08A55', glow:'#E0A33C',
+    light:{ bg:'#F3E4D0', surface:'#FFF6E8', ink:'#33201A', muted:'#795B4E', line:'#E3CDB3' },
+    dark: { bg:'#1A110D', surface:'#271B15', ink:'#F3E9DD', muted:'#B49C8A', line:'#412D23' } },
+  // FOREST — settled and natural: deep pine header, parchment pages with a green-gold tint, a deep moss accent.
+  // Moss is deliberately dark and grey-leaning (not lime) so it looks established, not unripe.
+  forest: { name:'Forest', navy:'#14402C', blue:'#486D1F', blueDark:'#A6C65F', glow:'#B9C65A',
+    light:{ bg:'#E8EBD2', surface:'#F9FAEC', ink:'#1C2B20', muted:'#576852', line:'#D3D8B8' },
+    dark: { bg:'#0C160F', surface:'#15231A', ink:'#E7EFE2', muted:'#94AA94', line:'#263D2D' } },
+  // PLUM — rich and a little luxurious: aubergine header, lilac-white pages, a vivid magenta accent, violet glow.
+  // Barely changed from before; accent nudged slightly deeper to pass AA as text.
+  plum: { name:'Plum', navy:'#3F1A47', blue:'#B01F82', blueDark:'#E86CC2', glow:'#7E5BD6',
+    light:{ bg:'#EFE6F1', surface:'#FFFBFE', ink:'#2D1B33', muted:'#705C77', line:'#E0D1E2' },
+    dark: { bg:'#150D19', surface:'#211528', ink:'#F1E8F4', muted:'#A891B1', line:'#38263F' } },
+  // RUBY — dark and sophisticated: oxblood/bordeaux header, rosy-cream pages, a deep bordeaux accent, rose-gold glow.
+  // Deliberately NOT a warning red: the accent is a wine so buttons don't look like errors. Dark mode uses a soft rosé for text.
+  ruby: { name:'Ruby', navy:'#4A0D1A', blue:'#9A1F3C', blueDark:'#EC7A92', glow:'#E3A18A',
+    light:{ bg:'#F3E4E1', surface:'#FFF8F5', ink:'#321A1C', muted:'#785A5F', line:'#E6D0CC' },
+    dark: { bg:'#190D0F', surface:'#261418', ink:'#F5E8E8', muted:'#B39397', line:'#3E2327' } },
+  // HIGH CONTRAST — for outdoor and gloved use: pure black and white, hard borders, solid (non-glass) cards, no glow.
+  // Light: black on white with a cobalt accent. Dark: white on black with a signal-yellow accent. See `flat` handling in applyTheme.
+  contrast: { name:'High contrast', navy:'#000000', blue:'#0033CC', blueDark:'#FFD60A', glow:'#FFFFFF',
+    light:{ bg:'#FFFFFF', surface:'#FFFFFF', ink:'#000000', muted:'#3A3A3A', line:'#6B6B6B' },
+    dark: { bg:'#000000', surface:'#0C0C0C', ink:'#FFFFFF', muted:'#D2D2D2', line:'#8C8C8C' } }
 };
 let themeName = localStorage.getItem('roundBookTheme') || 'ocean';
 
@@ -80,10 +101,23 @@ function setTextSize(v){
   openSettings();
 }
 function rgbTriplet(hex){ return hexToRgb(hex).join(','); }
+// WCAG relative luminance / contrast, so text on an accent-coloured fill can be black or white as needed.
+function relLum(hex){
+  const f = c => { c /= 255; return c <= 0.03928 ? c/12.92 : Math.pow((c+0.055)/1.055, 2.4); };
+  const [r,g,b] = hexToRgb(hex);
+  return 0.2126*f(r) + 0.7152*f(g) + 0.0722*f(b);
+}
+function contrastRatio(a, b){
+  const la = relLum(a), lb = relLum(b);
+  return (Math.max(la,lb)+0.05) / (Math.min(la,lb)+0.05);
+}
 function applyTheme(){
   const t = THEMES[themeName] || THEMES.ocean;
   const p = darkMode ? t.dark : t.light; // this scheme's page / card / text colours for the current mode
   const acc = (darkMode && t.blueDark) ? t.blueDark : t.blue; // the accent actually used in this mode
+  // A scheme whose borders are strongly visible against its page (High contrast) is drawn "flat": opaque
+  // cards, hard borders, no glass blur, no background glow.
+  const flat = contrastRatio(p.line, p.bg) >= 3;
   // Set on the body element itself (not html/:root) so these inline values take
   // precedence over the static light/dark-mode CSS blocks, which declare --blue-dim,
   // --bg etc. directly on body/body.dark and would otherwise win over anything
@@ -94,8 +128,10 @@ function applyTheme(){
   root.setProperty('--orb-glow', t.glow);
   // A darker shade of the scheme's navy, used for toasts and other high-emphasis chrome.
   root.setProperty('--navy-dark', mixHex(t.navy, '#000000', 0.28));
-  // A deepened version of the accent colour, used as readable text on the pale "dim" chips/buttons below.
-  root.setProperty('--blue-deep', mixHex(acc, '#000000', 0.32));
+  // Accent used as text on the pale "dim" chips below: deepened in light mode, lightened in dark mode (AA both ways).
+  root.setProperty('--blue-deep', darkMode ? mixHex(acc, '#FFFFFF', 0.35) : mixHex(acc, '#000000', 0.32));
+  // Text on top of an accent-coloured fill (buttons, the + bubble, active chips): black or white, whichever reads better.
+  root.setProperty('--on-accent', contrastRatio('#000000', acc) > contrastRatio('#FFFFFF', acc) ? '#000000' : '#FFFFFF');
   // The scheme's own page, card and text colours (this is what makes some schemes warm and some cool).
   root.setProperty('--bg', p.bg);
   root.setProperty('--surface', p.surface);
@@ -111,18 +147,25 @@ function applyTheme(){
   root.setProperty('--glass-base', darkMode ? rgbTriplet(mixHex(p.surface, '#FFFFFF', 0.10)) : rgbTriplet(p.surface));
   root.setProperty('--glass-strong-base', darkMode ? rgbTriplet(mixHex(p.surface, '#000000', 0.15)) : rgbTriplet(p.surface));
   root.setProperty('--sheet-base', darkMode ? rgbTriplet(mixHex(p.surface, '#000000', 0.10)) : rgbTriplet(p.bg));
-  root.setProperty('--field-edge', darkMode ? 'rgba(255,255,255,0.14)' : hexToRgba(p.muted, 0.30));
+  root.setProperty('--field-edge', flat ? p.line : (darkMode ? 'rgba(255,255,255,0.14)' : hexToRgba(p.muted, 0.30)));
   root.setProperty('--glass-shadow', darkMode
     ? '0 12px 32px rgba(0,0,0,0.42), 0 2px 6px rgba(0,0,0,0.30)'
     : `0 10px 30px ${hexToRgba(t.navy, 0.16)}, 0 2px 6px ${hexToRgba(t.navy, 0.08)}`);
   // Cards (cust-card, round-card, backup-btn, cust-section): a translucent fill of the scheme's surface colour
   // (nudged toward the accent in dark mode so schemes stay distinct), a faint accent wash, and a soft shadow.
-  root.setProperty('--card-surface', darkMode ? hexToRgba(mixHex(p.surface, acc, 0.12), 0.58) : hexToRgba(p.surface, 0.66));
-  root.setProperty('--card-tint', darkMode ? hexToRgba(acc, 0.10) : hexToRgba(acc, 0.07));
-  root.setProperty('--card-border', darkMode ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.85)');
-  root.setProperty('--card-shadow', darkMode
+  root.setProperty('--card-surface', flat ? p.surface : (darkMode ? hexToRgba(mixHex(p.surface, acc, 0.12), 0.58) : hexToRgba(p.surface, 0.66)));
+  root.setProperty('--card-tint', flat ? 'transparent' : (darkMode ? hexToRgba(acc, 0.10) : hexToRgba(acc, 0.07)));
+  root.setProperty('--card-border', flat ? p.line : (darkMode ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.85)'));
+  root.setProperty('--card-shadow', flat ? 'none' : (darkMode
     ? `inset 0 1px 0 rgba(255,255,255,0.22), inset 0 0 0 1px rgba(255,255,255,0.05), 0 10px 28px ${hexToRgba(mixHex(t.navy, '#000000', 0.6), 0.50)}`
-    : `inset 0 1px 0 rgba(255,255,255,0.95), inset 0 -1px 0 rgba(255,255,255,0.35), 0 8px 24px ${hexToRgba(t.navy, 0.12)}, 0 1px 3px rgba(0,0,0,0.06)`);
+    : `inset 0 1px 0 rgba(255,255,255,0.95), inset 0 -1px 0 rgba(255,255,255,0.35), 0 8px 24px ${hexToRgba(t.navy, 0.12)}, 0 1px 3px rgba(0,0,0,0.06)`));
+  // Flat scheme: solid fills (the stylesheet's fallbacks are glass), no blur, no background glow.
+  const flatVars = {
+    '--glass-fill': `rgb(${rgbTriplet(p.surface)})`, '--glass-fill-strong': `rgb(${rgbTriplet(p.surface)})`,
+    '--sheet-fill': `rgb(${rgbTriplet(p.surface)})`, '--field-fill': `rgb(${rgbTriplet(p.bg)})`,
+    '--glass-blur': 'none', '--orb-a': '0%', '--orb-b': '0%', '--orb-c': '0%'
+  };
+  Object.keys(flatVars).forEach(k => { if(flat) root.setProperty(k, flatVars[k]); else root.removeProperty(k); });
   const meta = document.querySelector('meta[name="theme-color"]');
   if(meta) meta.setAttribute('content', t.navy);
 }
@@ -154,7 +197,7 @@ function openSettings(){
       <span id="textSizeLabel" style="font-size:0.75rem; font-weight:800; color:var(--ink); min-width:34px; text-align:right; flex-shrink:0;">${textSize}px</span>
     </div>
     <div class="section-label">Colour scheme</div>
-    <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:16px;">
+    <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:16px;">
       ${Object.keys(THEMES).map(key=>{
         const t = THEMES[key];
         const active = themeName===key;
