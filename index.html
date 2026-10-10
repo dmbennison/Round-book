@@ -72,14 +72,20 @@
     --card-shadow:inset 0 1px 0 rgba(255,255,255,0.06), 0 2px 8px rgba(9,28,36,0.45), 0 1px 2px rgba(9,28,36,0.35);
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color: transparent;}
-  html,body{height:100%; overflow:hidden; overscroll-behavior:none;}
+  /* The page itself scrolls and the header and tab bar are fixed. The page is deliberately always a couple of
+     pixels taller than the screen: iPhones and iPads shrink the app's window by the status-bar height whenever
+     a page can't scroll, which left a gap beneath the tab bar on short screens (Today, Quotes, Marketing)
+     but not on long ones (Rounds, Jobs). */
+  html,body{height:auto; overflow:visible;}
   html{font-size:18px;}
   body{
     margin:0;
     background:var(--bg);
     color:var(--ink);
     font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    padding:0;
+    padding-top:var(--header-h, 100px); /* room for the fixed header; real height is measured in 09-boot.js */
+    padding-bottom:calc(var(--tabbar-h, 64px) + 8px); /* room for the fixed tab bar */
+    min-height:calc(100vh + 2px);
     -webkit-user-select:none;
     user-select:none;
   }
@@ -140,13 +146,8 @@
 
   /* The page never scrolls: the header and the bottom tab bar stay put on every screen, and only this
      area between them scrolls. Their heights are measured in 09-boot.js. */
-  #appScroll{position:fixed; top:var(--header-h, 100px); bottom:var(--tabbar-h, 64px); left:0; right:0; overflow-x:hidden; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior-y:contain;}
-  /* In an ordinary browser tab the page scrolls normally instead (swiping lets the browser tuck its toolbar
-     away, which is what lets the tab bar reach the true bottom). The header and tab bar are still fixed.
-     The page is always a touch taller than the screen so there is always something to swipe. */
-  html.in-browser, html.in-browser body{height:auto; overflow:visible; overscroll-behavior:auto;}
-  html.in-browser body{padding-top:var(--header-h, 100px); padding-bottom:calc(var(--tabbar-h, 64px) + 8px); min-height:100vh;}
-  html.in-browser #appScroll{position:static; overflow:visible; overscroll-behavior:auto;}
+  #appScroll{position:static;}
+  @media (hover:hover) and (pointer:fine){ body{min-height:100vh;} } /* desktop: no need for the extra pixels */
   main{padding:14px 14px 100px;}
 
   .section-label{
@@ -790,7 +791,7 @@
        column width as you change tab or open something); the right-hand pane starts
        just below it instead of running up behind it. */
     header{ border-radius:0 0 26px 26px; }
-    #appScroll{ width:var(--list-w); right:auto; }
+    #appScroll{ width:var(--list-w); }
     main{ box-sizing:border-box; min-height:100%; }
     .fab{ right:auto; left:calc(var(--list-w) - 74px); }
 
@@ -858,7 +859,7 @@
     header, .tabs, #lastActionBanner, #marketingFollowUpBanner, #jobAnniversaryBanner, #importReviewBanner, main, .fab, .overlay, .report-preview, .sched-editor, #importFile, #importSpreadsheetFile, #syncFile, .toast{
       display:none !important;
     }
-    body{ padding-top:0 !important; padding-bottom:0 !important; }
+    body{ padding-top:0 !important; padding-bottom:0 !important; min-height:0 !important; }
     .print-area{
       display:block !important;
       position:static;
