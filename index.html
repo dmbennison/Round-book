@@ -277,15 +277,17 @@
     align-items:flex-end;
   }
   .overlay.show{display:flex;}
-  /* Search opens at the TOP so the on-screen keyboard can never cover it (phones/portrait only;
-     the landscape split view below keeps its right-hand pane). */
-  .overlay.search-top{align-items:flex-start;}
-  .overlay.search-top .sheet{
-    margin:calc(env(safe-area-inset-top, 0px) + 8px) auto 0;
-    max-height:min(calc(100% - env(safe-area-inset-top, 0px) - 16px), 50vh);
+  /* Any pop-up with somewhere to type (see openSheet) opens at the TOP so the on-screen keyboard can
+     never cover it. While the keyboard is up the overlay is sized to the visible area only (see
+     fitTopSheetToViewport), so the sheet scrolls inside the space above the keyboard. Phones/portrait
+     only; the landscape split view below keeps its right-hand pane. */
+  .overlay.top-sheet{align-items:flex-start;}
+  .overlay.top-sheet .sheet{
+    margin:calc(env(safe-area-inset-top, 0px) + 8px) auto 8px;
+    max-height:calc(100% - env(safe-area-inset-top, 0px) - 16px);
     animation:slidedown .22s ease-out;
   }
-  .overlay.search-top .sheet-handle{display:none;}
+  .overlay.top-sheet .sheet-handle{display:none;}
   @keyframes slidedown{from{transform:translateY(-20px); opacity:0.4;} to{transform:translateY(0); opacity:1;}}
   .sheet{
     background:var(--bg); width:100%; max-height:92vh; overflow-y:auto; overflow-x:hidden;
@@ -825,8 +827,8 @@
       box-shadow:none;
     }
     .sheet-handle{ display:none; }
-    .overlay.search-top{ align-items:stretch; }
-    .overlay.search-top .sheet{ margin:0; max-height:none; animation:none; }
+    .overlay.top-sheet{ align-items:stretch; }
+    .overlay.top-sheet .sheet{ margin:0; max-height:none; animation:none; }
 
     /* Today, nothing open: use the full width as a dashboard instead of a
        phone-width column with an empty pane beside it. */
