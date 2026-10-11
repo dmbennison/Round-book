@@ -10,6 +10,9 @@
    Part of Round Book's split JS bundle; loaded in numeric order from index.html. */
 
 const SE_WEEKS = 9;           // weeks shown when the editor opens, starting with the Monday of this week
+const SE_WEEKS_TALL = 13;     // ...or this many on a big landscape screen (see seStartWeeks)
+const SE_TALL_PX = 800;       // how tall (px) the window must be to count as big
+const SE_HINT_WIDE = 'Drag a chip to another day (on a touchscreen, press and hold it first), or click a chip and then a day. With a chip selected, ← → move it a working day and ↑ ↓ move it a week. The number is how many customers are in it. Click an empty day to select it. Ctrl/Cmd + scroll or 🔍 to zoom. Ctrl/Cmd + Z undoes and Enter reviews your changes. Nothing changes until you Commit.';
 const SE_MORE_WEEKS = 4;      // weeks added by the "+ more weeks" button
 const SE_HOLD_MS = 350;       // touchscreens: how long to press and hold a tile before it lifts
 const SE_MAX_WEEKS = 52;      // furthest the calendar can be extended
@@ -24,7 +27,8 @@ function seEls(){
            commit: document.getElementById('seCommit'), modal: document.getElementById('seModal'),
            card: document.getElementById('seModalCard'), undo: document.getElementById('seUndo'),
            multi: document.getElementById('seMultiBtn'), split: document.getElementById('seSplitBtn'),
-           more: document.getElementById('seMore') };
+           more: document.getElementById('seMore'), weeksBtn: document.getElementById('seWeeksBtn'),
+           hint: document.getElementById('seHint') };
 }
 
 /* ---------- small date helpers (isoToDays / daysToISO live in 01-data.js) ---------- */
@@ -39,6 +43,14 @@ function seNextWorking(iso, n){
   while(left > 0 && guard++ < 500){ d = seAddDays(d, 1); if(!seIsOff(d)) left--; }
   return d;
 }
+// The n-th working day before iso (skipping days off). Can land before today — callers check.
+function sePrevWorking(iso, n){
+  let d = iso, left = n, guard = 0;
+  while(left > 0 && guard++ < 500){ d = seAddDays(d, -1); if(!seIsOff(d)) left--; }
+  return d;
+}
+// A big desktop / iPad window has room for more weeks, so opens with more. Phones (even tall ones) keep SE_WEEKS.
+function seStartWeeks(){ return (isWideSplitView() && window.innerHeight > SE_TALL_PX) ? SE_WEEKS_TALL : SE_WEEKS; }
 function sePlural(n, w){ return n + ' ' + w + (n === 1 ? '' : 's'); }
 
 function openScheduleEditor(){
@@ -83,10 +95,15 @@ function openScheduleEditor(){
 
   let zoom = SE_ZOOM_DEFAULT;
   try{ const z = parseFloat(localStorage.getItem(SE_ZOOM_KEY)); if(z >= SE_ZOOM_MIN && z <= SE_ZOOM_MAX) zoom = z; }catch(e){}
-  se = { zoom, items, sel:[], multi:false, selDay:null, startISO, capISO, todayStr, weeks:SE_WEEKS,
+  se = { zoom, items, sel:[], multi:false, selDay:null, startISO, capISO, todayStr, weeks:seStartWeeks(),
          offWeekdays, blocked, origOff:offWeekdays.slice(), origBlocked:blocked.slice(),
          history:[], drag:null, chipIndex:{}, ignoreClickUntil:0, pendingRender:false, offPending:null };
-  const { root, scroll } = seEls();
+  const { root, scroll, hint } = seEls();
+  // The tip is written for a touchscreen in index.html; a wide screen gets mouse and keyboard wording instead.
+  if(hint){
+    if(!hint.dataset.touch) hint.dataset.touch = hint.textContent;
+    hint.textContent = isWideSplitView() ? SE_HINT_WIDE : hint.dataset.touch;
+  }
   seBind();
   seCloseModal();
   pageScrollLock('schedule', true);
@@ -145,7 +162,7 @@ function seChangeSummary(){
 function renderScheduleEditor(){
   if(!se) return;
   se.pendingRender = false;
-  const { grid, count, commit, undo, multi, split, more } = seEls();
+  const { grid, count, commit, undo, multi, split, more, weeksBtn } = seEls();
   grid.style.setProperty('--z', se.zoom);
   const chips = seBuildChips();
   se.sel = se.sel.filter(id => se.chipIndex[id]);
@@ -205,6 +222,7 @@ function renderScheduleEditor(){
   const one = se.sel.length === 1 && se.chipIndex[se.sel[0]];
   split.disabled = !(one && one.kind === 'round');
   more.style.display = se.weeks >= SE_MAX_WEEKS ? 'none' : '';
+  if(weeksBtn) weeksBtn.style.display = se.weeks >= SE_MAX_WEEKS ? 'none' : ''; // the wide-screen rail's version of the same button
 }
 
 /* ---------- history (undo) ---------- */
@@ -253,17 +271,18 @@ function seScrollToToday(){
   scroll.scrollTop += cell.getBoundingClientRect().top - scroll.getBoundingClientRect().top - 34;
 }
 /* ---------- zoom (buttons, or pinch the calendar) ---------- */
-function seSetZoom(z, noSave){
+function seSetZoom(z, noSave, fx, fy){
   if(!se) return;
   z = Math.max(SE_ZOOM_MIN, Math.min(SE_ZOOM_MAX, z));
   const { scroll, grid } = seEls();
   const ratio = z / se.zoom;
-  // keep whatever is in the middle of the screen in the middle
-  const cx = scroll.scrollLeft + scroll.clientWidth / 2, cy = scroll.scrollTop + scroll.clientHeight / 2;
+  // keep whatever is in the middle of the screen in the middle (or, for the mouse wheel, under the pointer)
+  if(fx == null){ fx = scroll.clientWidth / 2; fy = scroll.clientHeight / 2; }
+  const cx = scroll.scrollLeft + fx, cy = scroll.scrollTop + fy;
   se.zoom = z;
   grid.style.setProperty('--z', z);
-  scroll.scrollLeft = cx * ratio - scroll.clientWidth / 2;
-  scroll.scrollTop = cy * ratio - scroll.clientHeight / 2;
+  scroll.scrollLeft = cx * ratio - fx;
+  scroll.scrollTop = cy * ratio - fy;
   if(!noSave){ try{ localStorage.setItem(SE_ZOOM_KEY, String(z)); }catch(e){} }
 }
 function seZoomBy(f){ if(se) seSetZoom(se.zoom * f); }
@@ -320,6 +339,28 @@ function seActivateDrag(d){
     seUpdateDropTarget(d.x, d.y);
   }, 40);
   seUpdateDropTarget(d.x, d.y);
+}
+// Arrow keys: ← → move the selected chip to the previous / next working day; ↑ ↓ to the same weekday a week
+// earlier / later (or the nearest working day if that one is off). A move redraws the calendar and clears the
+// selection, so the chip is picked up again afterwards and the keys can be pressed again.
+function seKeyMove(ch, step){
+  const dir = step < 0 ? -1 : 1;
+  let to;
+  if(Math.abs(step) === 1){
+    to = dir > 0 ? seNextWorking(ch.date, 1) : sePrevWorking(ch.date, 1);
+  } else {
+    to = seAddDays(ch.date, step);
+    if(seIsOff(to)) to = dir > 0 ? seNextWorking(to, 1) : sePrevWorking(to, 1);
+  }
+  if(to < se.todayStr){ toast('Choose today or a later day'); return; }
+  const first = ch.items[0];
+  seMoveChips([ch.id], to);
+  const moved = Object.values(se.chipIndex).find(c => c.items.indexOf(first) >= 0);
+  if(!moved) return;
+  se.sel = [moved.id];
+  renderScheduleEditor();
+  const el = seEls().grid.querySelector(`.se-chip[data-id="${CSS.escape(moved.id)}"]`);
+  if(el && el.scrollIntoView) el.scrollIntoView({block:'nearest', inline:'nearest'});
 }
 function seBind(){
   if(seBound) return;
@@ -418,11 +459,43 @@ function seBind(){
   };
   scroll.addEventListener('touchend', pinchEnd, {passive:true});
   scroll.addEventListener('touchcancel', pinchEnd, {passive:true});
+  // Computer: Ctrl/Cmd + wheel (also what a trackpad pinch sends) zooms toward the pointer; a plain wheel
+  // scrolls as normal. One notch of a mouse wheel is capped so it doesn't leap across the whole zoom range.
+  let wheelSave = null;
+  scroll.addEventListener('wheel', (e) => {
+    if(!se || !(e.ctrlKey || e.metaKey)) return;
+    e.preventDefault();
+    const r = scroll.getBoundingClientRect();
+    const dy = Math.max(-50, Math.min(50, e.deltaY));
+    seSetZoom(se.zoom * Math.exp(-dy * 0.01), true, e.clientX - r.left, e.clientY - r.top);
+    clearTimeout(wheelSave);
+    wheelSave = setTimeout(() => { if(se) try{ localStorage.setItem(SE_ZOOM_KEY, String(se.zoom)); }catch(err){} }, 300);
+  }, {passive:false});
   // Tapping the dimmed area behind a dialog closes it.
   modal.addEventListener('click', (e) => { if(e.target === modal) seCloseModal(); });
   document.addEventListener('keydown', (e) => {
-    if(e.key !== 'Escape' || !se || !seEls().root.classList.contains('show')) return;
-    if(seModalOpen()) seCloseModal(); else seRequestReject();
+    if(!se || !seEls().root.classList.contains('show')) return;
+    if(e.key === 'Escape'){
+      if(seModalOpen()) seCloseModal(); else seRequestReject();
+      return;
+    }
+    // Everything below is for the calendar itself: not while a dialog is up, someone is typing in a field,
+    // or a key is being held down (which would flood Undo with moves).
+    if(seModalOpen() || e.repeat) return;
+    const t = e.target, tag = t && t.tagName;
+    if(tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (t && t.isContentEditable)) return;
+    const mod = e.ctrlKey || e.metaKey;
+    if(mod && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'z'){ e.preventDefault(); seUndo(); return; }
+    if(e.key === 'Enter' && !mod && !e.shiftKey && !e.altKey){
+      if(tag === 'BUTTON') return; // Enter on a focused button already presses it
+      e.preventDefault(); seReviewOpen(); return;
+    }
+    const step = { ArrowLeft:-1, ArrowRight:1, ArrowUp:-7, ArrowDown:7 }[e.key];
+    if(!step || mod || e.shiftKey || e.altKey || se.sel.length !== 1) return;
+    const ch = se.chipIndex[se.sel[0]];
+    if(!ch) return;
+    e.preventDefault();
+    seKeyMove(ch, step);
   });
 }
 

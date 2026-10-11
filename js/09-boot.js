@@ -7,6 +7,24 @@ function escapeHtml(str){
 }
 function escapeAttr(str){ return escapeHtml(str); }
 
+/* ---------- keyboard shortcuts ---------- */
+// Ctrl/Cmd + K, or / on its own, opens Search — for anyone with a keyboard (iPad, desktop). Left alone while
+// typing in a field, while a full-screen editor / preview / dialog is up, and while a form is open (Search would
+// replace it and lose what was typed).
+document.addEventListener('keydown', (e) => {
+  const isK = (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'k';
+  const isSlash = e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey;
+  if((!isK && !isSlash) || e.repeat || e.defaultPrevented) return;
+  const t = e.target, tag = t && t.tagName;
+  if(tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (t && t.isContentEditable)) return;
+  const shown = (id) => { const el = document.getElementById(id); return !!el && el.classList.contains('show'); };
+  if(shown('schedEditor') || shown('reportPreview') || document.getElementById('appConfirmPrompt') || document.getElementById('backupPopup')) return;
+  const sheet = document.getElementById('sheet');
+  if(shown('overlay') && sheet && sheet.querySelector(SHEET_TEXT_ENTRY)) return;
+  e.preventDefault();
+  openUniversalSearch();
+});
+
 /* ---------- init ---------- */
 applyDarkMode();
 applyTheme();

@@ -897,6 +897,10 @@ function openRoundReports(){
   `);
 }
 
+// Idea, not done: on the wide split view this could be two columns — this list on the left, a live preview of the
+// picked report on the right. Skipped because every report goes through runPrint() into the one full-screen
+// preview, which is tied to fixed element ids and the pendingReport* / rp* globals; embedding it would mean making
+// those container-aware first.
 function openReports(){
   openSheet(`
     <div class="sheet-head">
@@ -1215,10 +1219,26 @@ function reportSheetHtml(inner, i, n, flat){
   return `<div class="rp-sheet"${flat ? ' style="box-shadow:none;"' : ''}>${inner}${n > 1 ? `<div class="rp-sheet-foot">Page ${i+1} of ${n}</div>` : ''}</div>`;
 }
 
+// Browsers that can't hand a file to a share sheet (most desktop browsers) just download it, so the buttons
+// say what they'll do. PDF and Word are checked separately because browsers accept different file types.
+// Called once each time the preview opens; each label is the plain text after the button's icon.
+function rpLabelShareButtons(){
+  const canShareFile = (name, type) => {
+    try{ return !!(navigator.canShare && navigator.canShare({files:[new File(['x'], name, {type})]})); }
+    catch(e){ return false; }
+  };
+  const label = (id, can, shareText, saveText) => {
+    const b = document.getElementById(id), n = b && b.lastChild;
+    if(n && n.nodeType === 3) n.nodeValue = can ? shareText : saveText;
+  };
+  label('rpBtnPdf', canShareFile('report.pdf', 'application/pdf'), 'Share PDF', 'Save PDF');
+  label('rpBtnDoc', canShareFile('report.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'), 'Share doc', 'Save doc');
+}
 let rpToken = 0;
 async function openReportPreview(){
   const { root, paper } = rpEls();
   rpBind();
+  rpLabelShareButtons();
   const token = ++rpToken;
   document.getElementById('rpTitle').innerHTML = pendingReportTitle;
   paper.innerHTML = '<div class="rp-wait">Preparing preview…</div>';

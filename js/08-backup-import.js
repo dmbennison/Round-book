@@ -307,6 +307,7 @@ const FOCUSED_HELP = {
         '<b>🚫 Days off</b> – choose your regular days off (Sundays by default) and mark holidays or other days off, one day or a range. Days off are greyed out, refuse moves and are skipped by Push back. If anything is already booked on a day you mark off you’re asked whether to move it to the next working day.',
         '<b>✓ Commit</b> – shows a review of every change first (for example “Windows A: 6 customers, Tue 14 Oct → Thu 16 Oct”). Confirm it and everyone in a moved chip is due on the new day (it replaces any deferral), moved jobs change date, new jobs are added and days off are saved. Your Due lists, the Monthly schedule report and the next due dates in the press-and-hold info box all follow. A message appears with an <b>Undo</b> button for about 15 seconds – tap it if you committed by accident and everything goes back exactly as it was.',
         '<b>✕ Reject</b> – throws away every change (it asks first if you’ve changed anything); nothing changes. Pressing Escape on a keyboard does the same.',
+        '<b>On an iPad or computer held sideways</b> the editor fits between the top bar and the tabs, with the tools in a column down the left, and opens on thirteen weeks if the window is tall enough. <b>＋ Weeks</b> in that column shows four more. With a mouse, just drag a chip. With one chip selected, <b>← →</b> move it to the previous or next working day and <b>↑ ↓</b> move it a week (days off are skipped). <b>Ctrl/Cmd + Z</b> undoes, <b>Enter</b> reviews your changes and <b>Escape</b> rejects. Hold <b>Ctrl/Cmd</b> and scroll to zoom; scrolling on its own just scrolls.',
         'A date set this way only lasts until that customer is next cleaned, then their normal cycle carries on from the new clean. Moving a chip back to its usual day simply removes the change.'
       ])
     ]
@@ -416,7 +417,7 @@ const FOCUSED_HELP = {
   reports: {
     title: 'Reports',
     body: () => [
-      helpP('Tap the printer icon for a list of reports. Every report, invoice, quote and receipt opens in a preview first, laid out on A4 pages. Scroll it, and pinch (or use − and +) to zoom. The buttons along the bottom are <b>Print</b>, <b>Share PDF</b> and <b>Share doc</b> (an editable Word file).'),
+      helpP('Tap the printer icon for a list of reports. Every report, invoice, quote and receipt opens in a preview first, laid out on A4 pages. Scroll it, and pinch (or use − and +) to zoom. The buttons along the bottom are <b>Print</b>, <b>Share PDF</b> and <b>Share doc</b> (an editable Word file). Where a device can’t share files (most computers) they read <b>Save PDF</b> and <b>Save doc</b> and download the file instead.'),
       helpRow('Round cleaning dates', 'List or calendar of recent cleans (4-weekly customers only)'),
       helpRow('Earnings report', 'Totals by week, month and year'),
       helpRow('Daily work done', 'Value completed, day by day'),
@@ -514,6 +515,7 @@ function openHelp(returnTo){
       'The blue <b>+</b> button adds whatever suits the screen you’re on – a customer, job, quote or campaign.',
       'Top bar: <b>Search</b> (finds customers, jobs, quotes and rounds – it opens at the top of the screen so the keyboard never covers it), <b>⋯</b> (opens <b>Reports</b>, <b>Backup</b> and <b>About</b> – which holds the photo gallery and this guide) and <b>Settings</b>.',
       'Any pop-up where you type (adding a customer, notes, search and so on) opens at the top of the screen so the keyboard never covers it.',
+      'With a keyboard (iPad or computer) press <b>Ctrl/Cmd + K</b>, or <b>/</b>, to open Search – as long as you’re not typing in a box. On a wide screen held upright the cards sit in a centred column.',
       'A <b>?</b> next to a screen’s title opens help for just that screen.'
     ])}
 
