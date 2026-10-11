@@ -21,13 +21,53 @@ function openSheet(html, onClose){
   sheetCloseGuard = null; // each new sheet starts unguarded; set one after opening if needed
   document.getElementById('sheet').innerHTML = `<div class="sheet-handle"></div>` + html;
   pageScrollLock('sheet', true);
-  document.getElementById('overlay').classList.remove('search-top'); // only the Search sheet sits at the top
+  // Anything with somewhere to type opens at the top of the screen, clear of the keyboard.
+  document.getElementById('overlay').classList.toggle('top-sheet', !!document.querySelector('#sheet ' + SHEET_TEXT_ENTRY.split(',').join(', #sheet ')));
   document.getElementById('overlay').classList.add('show');
+  fitTopSheetToViewport();
 }
+// Fields that bring up the keyboard (or, for dates and times, a picker at the bottom of the screen).
+const SHEET_TEXT_ENTRY = 'input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=range]):not([type=button]):not([type=submit]):not([type=hidden]):not([type=color]),textarea';
+function isWideSplitView(){
+  return !!(window.matchMedia && window.matchMedia('screen and (orientation: landscape) and (min-width: 960px) and (min-height: 600px)').matches);
+}
+// While a top-anchored sheet is open, make the overlay exactly the visible area (the screen minus the
+// keyboard), so the sheet sits at the top and never runs underneath it.
+function fitTopSheetToViewport(){
+  const ov = document.getElementById('overlay');
+  if(!ov) return;
+  const vv = window.visualViewport;
+  if(!vv || !ov.classList.contains('top-sheet') || !ov.classList.contains('show') || isWideSplitView()){
+    ov.style.top = ''; ov.style.height = ''; ov.style.bottom = '';
+    return;
+  }
+  ov.style.top = vv.offsetTop + 'px';
+  ov.style.height = vv.height + 'px';
+  ov.style.bottom = 'auto';
+}
+if(window.visualViewport){
+  window.visualViewport.addEventListener('resize', () => {
+    fitTopSheetToViewport();
+    // Keep the field being typed in on screen once the keyboard has shrunk the space.
+    setTimeout(() => {
+      const a = document.activeElement;
+      if(a && a.closest && a.closest('#sheet') && a.scrollIntoView) a.scrollIntoView({block:'nearest'});
+    }, 50);
+  });
+  window.visualViewport.addEventListener('scroll', fitTopSheetToViewport);
+}
+window.addEventListener('resize', fitTopSheetToViewport);
+// A field added to an open sheet after it opened (e.g. tapping "Add a note") still moves the sheet up.
+document.addEventListener('focusin', (e) => {
+  const t = e.target, ov = document.getElementById('overlay');
+  if(!ov || !ov.classList.contains('show') || ov.classList.contains('top-sheet')) return;
+  if(t && t.matches && t.matches(SHEET_TEXT_ENTRY) && t.closest('#sheet')){ ov.classList.add('top-sheet'); fitTopSheetToViewport(); }
+});
 function closeSheet(){
   if(sheetCloseGuard && !sheetCloseGuard()) return;
   sheetCloseGuard = null;
-  document.getElementById('overlay').classList.remove('show', 'search-top');
+  document.getElementById('overlay').classList.remove('show', 'top-sheet');
+  fitTopSheetToViewport();
   pageScrollLock('sheet', false);
   if(sheetOnClose){
     const cb = sheetOnClose;
@@ -403,7 +443,7 @@ function setInfoPayMethod(id, method){
   c.paymentMethod = method === 'cash' ? 'cash' : 'bank';
   document.querySelectorAll('#ibPayRow .seg-btn').forEach(b => b.classList.toggle('active', b.dataset.pm === c.paymentMethod));
   saveData();
-  render(); // so the badge on their card changes too
+  render();
   toast(c.paymentMethod === 'cash' ? 'Marked as pays by cash' : 'Marked as pays by bank');
 }
 function openCustomerInfoBox(id){
@@ -436,6 +476,23 @@ function openCustomerInfoBox(id){
     const d = Math.round(pay.days);
     payHtml = `${d===0 ? 'Same day' : d===1 ? '1 day' : d+' days'}<div class="ib-sub">across ${pay.count} paid clean${pay.count===1?'':'s'}</div>`;
   }
+  // Next due: same rules the card used to follow — paused and deferred customers say so, a customer
+  // who has never been cleaned is due now, everyone else gets their aligned due date.
+  let nextVal = '<span style="color:var(--ink-muted);">—</span>', nextSub = '';
+  if(c.paused){
+    nextVal = '<span style="color:var(--ink-muted);">Paused</span>';
+  } else if(c.deferUntil && c.deferUntil > today){
+    nextVal = fmtDate(c.deferUntil); nextSub = 'deferred to then';
+  } else if(s.lastClean){
+    const nd = nextDueISO(c);
+    if(nd){
+      const dd = daysBetween(today, nd);
+      nextVal = dd < 0 ? `<span style="color:var(--red);">${fmtDate(nd)}</span>` : fmtDate(nd);
+      nextSub = dd===0 ? 'today' : dd===1 ? 'tomorrow' : dd>1 ? `in ${dd} days` : `${-dd} day${-dd===1?'':'s'} overdue`;
+    }
+  } else {
+    nextVal = 'Due now'; nextSub = 'never cleaned';
+  }
   const row = (label, valueHtml)=>`<div class="ib-row"><div class="ib-label">${label}</div><div class="ib-value">${valueHtml}</div></div>`;
   const quickLine = [
     escapeHtml(c.propertyType || 'Not recorded') + (c.frontsOnly ? ' (fronts only)' : ''),
@@ -450,7 +507,7 @@ function openCustomerInfoBox(id){
       .ib-label{font-size:0.8125rem; font-weight:700; color:var(--ink-muted); padding-top:2px;}
       .ib-value{font-size:1.0625rem; font-weight:800; color:var(--ink); text-align:right;}
       .ib-sub{font-size:0.7188rem; font-weight:600; color:var(--ink-muted); margin-top:1px;}
-      .ib-half{flex:1; min-width:0; padding:8px 10px; background:var(--card-tint); border-radius:10px;}
+      .ib-half{flex:1; min-width:0; padding:8px 8px; background:var(--card-tint); border-radius:10px;}
       .ib-half-label{font-size:0.7188rem; font-weight:700; color:var(--ink-muted);}
       .ib-half-value{font-size:0.9375rem; font-weight:800; color:var(--ink); margin-top:2px;}
     </style>
@@ -467,6 +524,11 @@ function openCustomerInfoBox(id){
         <div class="ib-half-label">Last cleaned</div>
         <div class="ib-half-value">${s.lastClean ? fmtDate(s.lastClean) : '<span style="color:var(--ink-muted);">Never</span>'}</div>
         ${s.lastClean ? `<div class="ib-sub">${ago(s.lastClean)}</div>` : ''}
+      </div>
+      <div class="ib-half">
+        <div class="ib-half-label">Next due</div>
+        <div class="ib-half-value">${nextVal}</div>
+        ${nextSub ? `<div class="ib-sub">${nextSub}</div>` : ''}
       </div>
       <div class="ib-half">
         <div class="ib-half-label">Last paid</div>

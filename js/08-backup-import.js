@@ -305,7 +305,7 @@ const FOCUSED_HELP = {
         '<b>👥 Split</b> – tap a round chip first, then Split. It lists the customers in that chip; tick the ones to move and pick the day. The rest stay where they were.',
         '<b>＋ Job</b> – adds a one-off job straight onto a day (select the day first, or choose the date in the box). You can fill it from an existing customer. It’s added to One-off jobs when you Commit.',
         '<b>🚫 Days off</b> – choose your regular days off (Sundays by default) and mark holidays or other days off, one day or a range. Days off are greyed out, refuse moves and are skipped by Push back. If anything is already booked on a day you mark off you’re asked whether to move it to the next working day.',
-        '<b>✓ Commit</b> – shows a review of every change first (for example “Windows A: 6 customers, Tue 14 Oct → Thu 16 Oct”). Confirm it and everyone in a moved chip is due on the new day (it replaces any deferral), moved jobs change date, new jobs are added and days off are saved. Your Due lists, the Monthly schedule report and the “Next due” badges all follow. A message appears with an <b>Undo</b> button for about 15 seconds – tap it if you committed by accident and everything goes back exactly as it was.',
+        '<b>✓ Commit</b> – shows a review of every change first (for example “Windows A: 6 customers, Tue 14 Oct → Thu 16 Oct”). Confirm it and everyone in a moved chip is due on the new day (it replaces any deferral), moved jobs change date, new jobs are added and days off are saved. Your Due lists, the Monthly schedule report and the next due dates in the press-and-hold info box all follow. A message appears with an <b>Undo</b> button for about 15 seconds – tap it if you committed by accident and everything goes back exactly as it was.',
         '<b>✕ Reject</b> – throws away every change (it asks first if you’ve changed anything); nothing changes. Pressing Escape on a keyboard does the same.',
         'A date set this way only lasts until that customer is next cleaned, then their normal cycle carries on from the new clean. Moving a chip back to its usual day simply removes the change.'
       ])
@@ -324,15 +324,13 @@ const FOCUSED_HELP = {
         'After you swipe a customer cleaned (or cleaned and paid), the list scrolls on by itself so the <b>next customer</b> is at the top, ready for you to carry on down the round.',
         'After a clean, a “Windows cleaned today” text opens ready to send. You can turn this off in Settings.'
       ]),
-      helpP('<b>Press and hold</b> a card for a quick info box – price, last cleaned, last paid, how long they usually take to pay – handy at the door. You can switch them between <b>Bank</b> and <b>Cash</b> right there. The green phone button calls and the blue compass button gives directions.'),
+      helpP('<b>Press and hold</b> a card for a quick info box – price, <b>last cleaned</b>, <b>next due</b>, <b>last paid</b>, whether they pay by <b>Bank</b> or <b>Cash</b>, and how long they usually take to pay – handy at the door. You can switch them between Bank and Cash right there. To keep the cards uncluttered, those details aren’t shown on the card itself. The green phone button calls and the blue compass button gives directions.'),
       helpP('<b>What the cards show.</b> In the <b>Due</b> view cards show only cleaning information. In the <b>Owed</b> view they show only payment information. Other views show everything. Badges you may see:'),
       helpList([
         '<b>Couldn’t clean</b> – you couldn’t get to them last time.',
         '<b>Chase</b> – two or more payment reminders have gone unanswered.',
-        '<b>Next due</b> – when they’re next due a clean.',
         '<b>Low by £X</b> – their price is well below the average for their property type.',
-        '<b>📈 Review</b> – it’s been 12+ months since their last price rise.',
-        '<b>🏦 Bank / 💷 Cash</b> – how they usually pay.'
+        '<b>📈 Review</b> – it’s been 12+ months since their last price rise.'
       ]),
       helpP('<b>8 and 12 week customers</b> fall due on the same day as the 4-weekly customers in their round (and visit day), so you’re never making a separate trip. Their date is moved to the nearest round visit, never more than two weeks either way.'),
       helpP('<b>Chasing payments.</b> The Owed view lists the longest-overdue customers first (filter by 0–14, 14–30 or 30+ days). Tap <b>✉️ Chase</b> on a card to text them, or <b>Remind all</b> to go down the list. The first reminder is friendly; every one after that is firmer automatically. You can edit both wordings in Settings → Message templates.'),
@@ -369,7 +367,7 @@ const FOCUSED_HELP = {
         '<b>Defer</b> – push their next clean back.',
         '<b>Couldn’t clean</b> – use when you couldn’t get to them (locked gate, nobody in, weather). They move to the next round visit (four weeks at most) and their card shows a 🚫 badge until they’re next cleaned.',
         '<b>Get a quote for this customer</b> – starts a quote with their details filled in.',
-        '<b>Pays by</b> – Bank or Cash, set when you add or edit a customer. It shows as a small badge on their card. Texts to cash customers leave out your bank details.',
+        '<b>Pays by</b> – Bank or Cash, set when you add or edit a customer. Press and hold their card to see it (and switch it). Texts to cash customers leave out your bank details.',
         '<b>Text before I arrive</b> – flags customers who like a heads-up text.',
         '<b>Don’t send marketing texts</b> – leaves them out of every campaign (calls, quotes and reminders are unaffected).',
         'You can also record property type, extras and “fronts only”.'
@@ -515,6 +513,7 @@ function openHelp(returnTo){
       'The top bar and the four tabs along the bottom stay fixed on every screen while the page scrolls between them. Round Book works best installed as an app (in Safari: Share → Add to Home Screen) – in an ordinary browser tab the browser’s own toolbar takes up room at the bottom, so swipe the page once and it tucks away. The tabs are <b>Today</b>, <b>Work</b> (Rounds and One-off jobs), <b>Quotes</b> and <b>Marketing</b>; they’re kept large and set in from the edges so they clear the curved corners of the screen. Each remembers where you were; tap the tab you’re on to go back to the top.',
       'The blue <b>+</b> button adds whatever suits the screen you’re on – a customer, job, quote or campaign.',
       'Top bar: <b>Search</b> (finds customers, jobs, quotes and rounds – it opens at the top of the screen so the keyboard never covers it), <b>⋯</b> (opens <b>Reports</b>, <b>Backup</b> and <b>About</b> – which holds the photo gallery and this guide) and <b>Settings</b>.',
+      'Any pop-up where you type (adding a customer, notes, search and so on) opens at the top of the screen so the keyboard never covers it.',
       'A <b>?</b> next to a screen’s title opens help for just that screen.'
     ])}
 

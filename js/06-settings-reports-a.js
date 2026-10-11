@@ -694,7 +694,6 @@ function openUniversalSearch(){
     <input type="text" id="search_input" placeholder="Customers, jobs, quotes, rounds..." oninput="renderUniversalSearchResults()" style="margin-top:0; margin-bottom:14px;">
     <div id="search_results"></div>
   `, () => render());
-  document.getElementById('overlay').classList.add('search-top'); // anchor to the top, clear of the keyboard
   renderUniversalSearchResults();
   setTimeout(() => { const el = document.getElementById('search_input'); if(el) el.focus(); }, 60);
 }

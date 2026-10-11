@@ -1815,7 +1815,8 @@ function needsPriceReview(c){
   return daysBetween(lastIncrease, target) >= 365;
 }
 
-// Small "Cash" / "Bank" badge: how this customer usually pays. Shown in every view.
+// Small "Cash" / "Bank" badge: how this customer usually pays. Shown on one-off job cards linked to a
+// customer; customer cards no longer show it (it lives in the press-and-hold info box instead).
 function payMethodBadgeHtml(c){
   return isCashCustomer(c)
     ? `<span class="badge paused" title="Pays by cash">💷 Cash</span>`
@@ -1839,10 +1840,6 @@ function custCardHtml(c, mode){
   // How far under the benchmark they are, for their own house count (a fronts-only
   // customer counts as half a house, matching how the benchmark is worked out).
   const lowBy = belowTypeAvg ? Math.max(0, Math.round((typeBenchmark * houseWeight(c) - Number(c.price||0)) * 100) / 100) : 0;
-  // Next due date: shown for active customers with a clean history. Skipped when
-  // paused, when deferred (the "Deferred to" badge already says it) and when
-  // never cleaned (the "Never cleaned" badge covers that).
-  const nextDue = (!c.paused && s.lastClean && !(s.cleanBadge && s.cleanBadge.type === 'deferred')) ? nextDueISO(c) : null;
   return `<div class="swipe-wrap">
     <div class="swipe-bg swipe-bg-left">✓ Cleaned</div>
     <div class="swipe-bg swipe-bg-right">💷 Paid</div>
@@ -1861,12 +1858,10 @@ function custCardHtml(c, mode){
         </div>
       </div>
       <div class="cust-meta">
-        ${showClean ? (s.cleanBadge ? `<span class="badge ${s.cleanBadge.type}"${c.paused&&c.pauseDate?` title="Paused since ${fmtDate(c.pauseDate)}"`:''}>${s.cleanBadge.text}</span>` : `<span class="badge ok">Cleaned ${fmtDate(s.lastClean)}</span>`) : ''}
-        ${(showClean && !mode && nextDue) ? `<span class="badge paused" title="Next clean due">Next due ${fmtDate(nextDue)}</span>` : ''}
+        ${showClean ? (s.cleanBadge ? `<span class="badge ${s.cleanBadge.type}"${c.paused&&c.pauseDate?` title="Paused since ${fmtDate(c.pauseDate)}"`:''}>${s.cleanBadge.text}</span>` : '') : ''}
         ${showPay ? (s.owed ? `<span class="badge owed">Owes ${money(s.balance)}${daysSinceLastPayment(c) ? ` · ${daysSinceLastPayment(c)}d` : ''}</span>` : s.credit ? `<span class="badge ok">Credit ${money(Math.abs(s.balance))}</span>` : `<span class="badge ok">Paid up</span>`) : ''}
         ${(showPay && s.owed && (c.paymentReminderCount||0) >= 2) ? `<span class="badge escalate" title="${c.paymentReminderCount} payment reminders sent, still unpaid">⚠ Chase</span>` : ''}
         ${(showPay && s.owed && c.paymentReminderSent) ? `<span class="badge paused">🔔 ${fmtDate(c.paymentReminderSentDate).split(' ').slice(0,2).join(' ')}</span>` : ''}
-        ${payMethodBadgeHtml(c)}
         ${(showExtras && c.photos && c.photos.length) ? `<span class="badge paused">📷 ${c.photos.length}</span>` : ''}
         ${(showExtras && needsPriceReview(c)) ? `<span class="badge due" title="12+ months since last price increase">📈 Review</span>` : ''}
         ${(showExtras && belowTypeAvg) ? `<span class="badge due" title="${money(lowBy)} below the average for ${escapeAttr(c.propertyType||'Not recorded')}">💷 Low by ${money(lowBy)}</span>` : ''}
