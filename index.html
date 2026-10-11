@@ -415,6 +415,7 @@
   .se-tool{flex:none; padding:7px 11px; border:1px solid var(--line); border-radius:10px; background:var(--surface); color:var(--ink); font-size:0.75rem; font-weight:800; white-space:nowrap;}
   .se-tool.active{background:var(--blue); border-color:var(--blue); color:var(--on-accent, #fff);}
   .se-tool:disabled{opacity:0.4;}
+  .se-tool.se-tool-weeks{display:none;} /* only shown in the wide-screen tool rail (see the landscape block below) */
   .se-more{display:block; width:calc(100% - 20px); margin:12px 10px 16px; padding:11px; border:1px dashed var(--line); border-radius:12px; background:transparent; color:var(--ink-muted); font-size:0.8125rem; font-weight:800;}
   .se-modal{position:absolute; inset:0; z-index:5; display:none; align-items:flex-end; justify-content:center; background:rgba(11,36,56,0.45);}
   .se-modal.show{display:flex;}
@@ -784,6 +785,14 @@
     .btn:active, .fab:active, .icon-btn:active, .today-tile:active, .today-hero:active, .seg-btn:active{transform:none;}
   }
 
+  /* Wide but not split (an iPad or desktop window held upright, or a narrower desktop window): the phone layout
+     would stretch edge to edge, so keep the content a readable column in the middle. Both dimensions have to be
+     tablet-sized, so a phone — even on its side — never matches. The landscape split view below resets this. */
+  @media screen and (min-width: 768px) and (min-height: 600px){
+    main{ max-width:720px; margin-left:auto; margin-right:auto; }
+    .fab{ right:max(18px, calc((100% - 720px) / 2 + 18px)); }
+  }
+
   /* =====================================================================
      Landscape split view (iPad / large screens held sideways).
      Full-width header and tabs across the top; below it, on the left, the current list (rounds, jobs, quotes,
@@ -804,7 +813,7 @@
        just below it instead of running up behind it. */
     header{ border-radius:0 0 26px 26px; }
     #appScroll{ width:var(--list-w); }
-    main{ box-sizing:border-box; min-height:100%; }
+    main{ box-sizing:border-box; min-height:100%; max-width:none; margin-left:0; margin-right:0; }
     .fab{ right:auto; left:calc(var(--list-w) - 74px); }
 
     /* The overlay becomes the always-present right-hand pane */
@@ -855,6 +864,25 @@
     body[data-tab="today"]:has(#overlay.show) .today-tile{ padding:10px 12px; }
     body[data-tab="today"]:has(#overlay.show) .today-tile .num{ font-size:1.3rem; }
     body[data-tab="today"]:has(#overlay.show) .today-grid{ gap:8px; }
+
+    /* Schedule editor as a workspace: instead of covering the whole screen it sits between the header and the
+       tab bar. The tools stack in a rail down the left (so the calendar gets the full height) and the title,
+       calendar and Commit / Reject bar fill the column beside it. Phones and portrait keep the full-screen
+       editor with the toolbar across the top. */
+    .sched-editor{ top:var(--header-h, 170px); bottom:var(--tabbar-h, 64px); }
+    .sched-editor.show{ display:grid; grid-template-columns:88px minmax(0, 1fr); grid-template-rows:auto minmax(0, 1fr) auto; }
+    .se-tools{ grid-column:1; grid-row:1 / -1; flex-direction:column; gap:6px; padding:10px 8px; overflow-x:hidden; overflow-y:auto; border-bottom:none; border-right:1px solid var(--line); }
+    .se-tool{ width:100%; padding:10px 4px; white-space:normal; text-align:center; line-height:1.25; }
+    .se-tool.se-tool-weeks{ display:block; }
+    .se-bar{ grid-column:2; grid-row:1; padding-top:12px; }
+    .se-scroll{ grid-column:2; grid-row:2; }
+    .se-actions{ grid-column:2; grid-row:3; padding-bottom:10px; }
+    .se-more{ display:none; } /* replaced by ＋ Weeks in the rail */
+    .se-chip{ scroll-margin-top:40px; } /* keeps a chip moved with the arrow keys clear of the sticky day names */
+    .se-modal{ align-items:center; }
+    .se-modal-card{ border-radius:20px; padding-bottom:16px; }
+    /* The header and tab bar stay visible around the workspace but can't be used until you Commit or Reject, as on a phone. */
+    body:has(#schedEditor.show) header, body:has(#schedEditor.show) .tabs{ pointer-events:none; }
   }
 
   @media print{
@@ -958,7 +986,7 @@
   <div class="se-bar">
     <div class="se-title">📅 Schedule</div>
     <div class="se-count" id="seCount">No changes yet</div>
-    <div class="se-hint">Press and hold a chip until it lifts, then drag it to another day (or tap a chip and then tap a day). The number is how many customers are in it. Tap an empty day to select it. Pinch or use 🔍 to zoom. Nothing changes until you Commit.</div>
+    <div class="se-hint" id="seHint">Press and hold a chip until it lifts, then drag it to another day (or tap a chip and then tap a day). The number is how many customers are in it. Tap an empty day to select it. Pinch or use 🔍 to zoom. Nothing changes until you Commit.</div>
   </div>
   <div class="se-tools" id="seTools">
     <button class="se-tool" onclick="seScrollToToday()">📍 Today</button>
@@ -970,6 +998,7 @@
     <button class="se-tool" id="seSplitBtn" onclick="seSplitOpen()">👥 Split</button>
     <button class="se-tool" onclick="seAddJobOpen()">＋ Job</button>
     <button class="se-tool" onclick="seDaysOffOpen()">🚫 Days off</button>
+    <button class="se-tool se-tool-weeks" id="seWeeksBtn" onclick="seShowMoreWeeks()">＋ Weeks</button>
   </div>
   <div class="se-scroll" id="seScroll"><div class="se-grid" id="seGrid"></div><button class="se-more" id="seMore" onclick="seShowMoreWeeks()">＋ Show 4 more weeks</button></div>
   <div class="se-actions">
