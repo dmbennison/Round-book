@@ -21,12 +21,13 @@ function openSheet(html, onClose){
   sheetCloseGuard = null; // each new sheet starts unguarded; set one after opening if needed
   document.getElementById('sheet').innerHTML = `<div class="sheet-handle"></div>` + html;
   pageScrollLock('sheet', true);
+  document.getElementById('overlay').classList.remove('search-top'); // only the Search sheet sits at the top
   document.getElementById('overlay').classList.add('show');
 }
 function closeSheet(){
   if(sheetCloseGuard && !sheetCloseGuard()) return;
   sheetCloseGuard = null;
-  document.getElementById('overlay').classList.remove('show');
+  document.getElementById('overlay').classList.remove('show', 'search-top');
   pageScrollLock('sheet', false);
   if(sheetOnClose){
     const cb = sheetOnClose;
