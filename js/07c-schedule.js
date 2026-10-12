@@ -12,7 +12,6 @@
 const SE_WEEKS = 9;           // weeks shown when the editor opens, starting with the Monday of this week
 const SE_WEEKS_TALL = 13;     // ...or this many on a big landscape screen (see seStartWeeks)
 const SE_TALL_PX = 800;       // how tall (px) the window must be to count as big
-const SE_HINT_WIDE = 'Drag a chip to another day (on a touchscreen, press and hold it first), or click a chip and then a day. With a chip selected, ← → move it a working day and ↑ ↓ move it a week. The number is how many customers are in it. Click an empty day to select it. Ctrl/Cmd + scroll or 🔍 to zoom. Ctrl/Cmd + Z undoes and Enter reviews your changes. Nothing changes until you Commit.';
 const SE_MORE_WEEKS = 4;      // weeks added by the "+ more weeks" button
 const SE_HOLD_MS = 350;       // touchscreens: how long to press and hold a tile before it lifts
 const SE_MAX_WEEKS = 52;      // furthest the calendar can be extended
@@ -27,8 +26,7 @@ function seEls(){
            commit: document.getElementById('seCommit'), modal: document.getElementById('seModal'),
            card: document.getElementById('seModalCard'), undo: document.getElementById('seUndo'),
            multi: document.getElementById('seMultiBtn'), split: document.getElementById('seSplitBtn'),
-           more: document.getElementById('seMore'), weeksBtn: document.getElementById('seWeeksBtn'),
-           hint: document.getElementById('seHint') };
+           more: document.getElementById('seMore'), weeksBtn: document.getElementById('seWeeksBtn') };
 }
 
 /* ---------- small date helpers (isoToDays / daysToISO live in 01-data.js) ---------- */
@@ -98,12 +96,7 @@ function openScheduleEditor(){
   se = { zoom, items, sel:[], multi:false, selDay:null, startISO, capISO, todayStr, weeks:seStartWeeks(),
          offWeekdays, blocked, origOff:offWeekdays.slice(), origBlocked:blocked.slice(),
          history:[], drag:null, chipIndex:{}, ignoreClickUntil:0, pendingRender:false, offPending:null };
-  const { root, scroll, hint } = seEls();
-  // The tip is written for a touchscreen in index.html; a wide screen gets mouse and keyboard wording instead.
-  if(hint){
-    if(!hint.dataset.touch) hint.dataset.touch = hint.textContent;
-    hint.textContent = isWideSplitView() ? SE_HINT_WIDE : hint.dataset.touch;
-  }
+  const { root, scroll } = seEls();
   seBind();
   seCloseModal();
   pageScrollLock('schedule', true);
@@ -502,6 +495,15 @@ function seBind(){
 /* ---------- dialogs ---------- */
 function seModal(html){ const { modal, card } = seEls(); card.innerHTML = html; card.scrollTop = 0; modal.classList.add('show'); }
 function seCloseModal(){ const { modal, card } = seEls(); if(modal) modal.classList.remove('show'); if(card) card.innerHTML = ''; }
+// The ? in the corner: the Schedule help, shown in the editor's own dialog (the normal help pop-up would open
+// underneath the full-screen editor and be hidden).
+function seHelpOpen(){
+  seModal(`
+    <h3>Schedule help</h3>
+    ${FOCUSED_HELP.schedule.body().join('')}
+    <div class="se-btn-row"><button class="se-btn primary" onclick="seCloseModal()">Done</button></div>
+  `);
+}
 function seModalOpen(){ const { modal } = seEls(); return !!modal && modal.classList.contains('show'); }
 
 /* --- ☔ Push back --- */

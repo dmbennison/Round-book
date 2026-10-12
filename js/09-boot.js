@@ -170,6 +170,34 @@ if(window.matchMedia){
   const ov = document.getElementById('overlay');
   if(ov) ov.addEventListener('touchmove', (e) => { if(e.target === ov && e.cancelable) e.preventDefault(); }, {passive:false});
 })();
+/* ---------- haptics ----------
+   A short tick for gestures. Android (anything with navigator.vibrate) buzzes. iPhone Safari has no vibrate(), but
+   switching a hidden <input type="checkbox" switch> gives the system's light tick (iOS 17.4+); it only fires from a
+   touch or click, so a tick as a finger crosses a swipe threshold is best effort, while the one on release is
+   reliable. A list of numbers is a pattern: buzz, pause, buzz... */
+let hapticSwitch = null;
+function haptic(pattern){
+  const p = Array.isArray(pattern) ? pattern : [pattern || 12];
+  try{
+    if(navigator.vibrate){ navigator.vibrate(p); return; }
+    if(!hapticSwitch){
+      const label = document.createElement('label');
+      label.setAttribute('aria-hidden', 'true');
+      label.style.cssText = 'position:fixed; left:-9999px; top:0; width:1px; height:1px; opacity:0; pointer-events:none;';
+      const input = document.createElement('input');
+      input.type = 'checkbox'; input.setAttribute('switch', ''); input.tabIndex = -1;
+      label.appendChild(input);
+      document.body.appendChild(label);
+      hapticSwitch = label;
+    }
+    // one tick per buzz in the pattern, the first straight away
+    let t = 0;
+    p.forEach((ms, i) => {
+      if(i % 2 === 0){ if(t === 0) hapticSwitch.click(); else setTimeout(() => { try{ hapticSwitch.click(); }catch(e){} }, t); }
+      t += ms;
+    });
+  }catch(e){}
+}
 /* ---------- swipe actions ---------- */
 let swipeState = null;
 function initSwipeHandlers(){
@@ -234,6 +262,7 @@ function onSwipeStart(e){
   const bgRight = wrap && wrap.querySelector('.swipe-bg-right');
   swipeState = {
     card, startX: touch.clientX, startY: touch.clientY, currentX: 0, decided:false, horizontal:false,
+    level: 0, // 0 = not far enough yet, 1 = an action will fire on release, 2 = the "clean and paid" action (customer cards)
     bgLeft, bgRight,
     // Remembered so onSwipeEnd/onSwipeCancel can restore the label exactly as it
     // was — job ("✓ Done") and quote ("✓ Accept") cards must never get stuck
@@ -266,6 +295,9 @@ function onSwipeMove(e){
   const maxDragRight = isCustomer ? SWIPE_FULL_X : 96;
   const clamped = Math.max(-96, Math.min(maxDragRight, dx));
   swipeState.currentX = clamped;
+  // A tick as the swipe becomes "armed" (and a lighter one if it's pulled back out), stronger for clean + paid.
+  const level = (isCustomer && clamped >= SWIPE_FULL_THRESHOLD) ? 2 : (clamped >= SWIPE_HALF_THRESHOLD || clamped <= -SWIPE_HALF_THRESHOLD) ? 1 : 0;
+  if(level !== swipeState.level){ haptic(level === 2 ? 24 : level === 1 ? 14 : 8); swipeState.level = level; }
   swipeState.card.style.transition = 'none';
   swipeState.card.style.transform = `translateX(${clamped}px)`;
 
@@ -309,11 +341,13 @@ function onSwipeEnd(){
     const id = card.dataset.id;
     const kind = card.dataset.kind || 'customer';
     if(currentX >= SWIPE_HALF_THRESHOLD){
+      haptic([18, 50, 18]); // the action has happened
       if(kind === 'job') toggleJobDone(id);
       else if(kind === 'quote') markQuoteAccepted(id);
       else if(kind === 'customer' && currentX >= SWIPE_FULL_THRESHOLD) quickCleanAndPaid(id, true);
       else quickClean(id, true);
-    } else if(currentX <= -64){
+    } else if(currentX <= -SWIPE_HALF_THRESHOLD){
+      haptic([18, 50, 18]);
       if(kind === 'job') toggleJobPaid(id);
       else if(kind === 'quote') markQuoteDeclined(id);
       else quickPaid(id);

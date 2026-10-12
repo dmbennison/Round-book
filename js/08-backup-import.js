@@ -270,81 +270,60 @@ function helpList(items){
 
 // Single source of truth for help content — the full User Guide is these sections one after
 // another, and the "?" icon dotted around the app opens just the one relevant section plus a
-// link through to the full guide, so the two never drift out of sync with each other.
+// link through to the full guide, so the two never drift out of sync with each other. Kept to
+// what's needed to use each screen; the Schedule section is also what the ? in the schedule editor shows.
 const FOCUSED_HELP = {
   today: {
     title: 'Today',
     body: () => [
-      helpP('Today is your home screen. The big card at the top shows how many customers are due today, what they’re worth, and how much you’ve cleaned and been paid so far. If more than one round has customers due, tap a round’s chip to see just that round.'),
+      helpP('Today is your home screen. The big card shows who’s due today and how much you’ve cleaned and been paid so far. If more than one round is due, tap a round’s chip to see just that round. Tap any tile to open its full list.'),
       helpList([
-        '<b>Text before visit</b> – customers you haven’t texted yet who like a heads-up.',
+        '<b>Text before visit</b> – customers who like a heads-up text.',
         '<b>Mileage</b> – tap to log your start reading in the morning, tap again for your end reading in the evening.',
-        '<b>Jobs</b> – only appears on days when a one-off job is booked.',
-        '<b>Customers owing</b> – how much is outstanding, split into 0–14, 14–30 and 30+ days. A paused customer whose balance is more than 120 days old is left out of this tile so it doesn’t keep showing as red, but they’re still in the full Owed list (tap the tile, or Rounds → Owed).'
+        '<b>Jobs</b> – appears on days when a one-off job is booked.',
+        '<b>Customers owing</b> – how much is outstanding, and for how long.'
       ]),
-      helpP('Tap any tile to open its full list. A yellow number on the <b>Quotes</b> tab means quotes need following up. The Getting started card helps with first-time setup; dismiss it with the ✕, or restart setup any time from the ⓘ button.'),
-      helpP('On an iPad held sideways, the list stays on the left and whatever you open appears on the right.')
+      helpP('A yellow number on the <b>Quotes</b> tab means quotes need following up.')
     ]
   },
   work: {
     title: 'Work',
     body: () => [
-      helpP('Work has three buttons: <b>Rounds</b>, <b>One-off jobs</b> and <b>Schedule</b>. Tap <b>Statistics</b> to see your customer count, round value, average price per customer, average price by property type, and how many customers pay by bank or cash, what each is worth and the percentages.')
+      helpP('Work has three buttons: <b>Rounds</b>, <b>One-off jobs</b> and <b>Schedule</b>. <b>Statistics</b> shows your customer count and round value.')
     ]
   },
   schedule: {
     title: 'Schedule',
     body: () => [
-      helpP('<b>Work → Schedule</b> opens a calendar of the next nine weeks (tap <b>＋ Show 4 more weeks</b> at the bottom to look further ahead, up to a year). Each blue tile is a round (and visit day) on the day it’s due, with the number of customers in it; amber 🔧 tiles are one-off jobs. Anyone overdue shows on today in a red tile with a ⚠. Nothing is saved until you Commit.'),
+      helpP('<b>Work → Schedule</b> is a calendar of the coming weeks. Each blue tile is a round on the day it’s due, with the number of customers in it; amber 🔧 tiles are one-off jobs, and anyone overdue shows on today in red. <b>Nothing changes until you tap Commit.</b>'),
       helpList([
-        '<b>Move a chip</b> by pressing and holding it for a moment until it lifts (your phone gives a little buzz), then dragging it to another day – or tap the chip and then tap the day. Swiping across the calendar just scrolls, even if your finger starts on a chip, so tiles don’t move by accident (with a mouse you can simply drag). Moved chips get an amber outline and the top of the screen counts what has moved. You can’t move something to a day that’s already past or marked off.',
-        '<b>On each day</b> you’ll see how many customers and jobs are booked and what they’re worth. A coloured stripe along the top of a day means it’s much busier than your typical day: amber is busy, red is very busy.',
-        '<b>📍 Today</b> jumps back to today. <b>🔍− / 🔍＋</b> make the days smaller or bigger – or just pinch the calendar with two fingers. It remembers your zoom. Zoom out to see the whole week at once, zoom in to read the round names clearly. <b>↶ Undo</b> takes back your last change, one at a time.',
-        '<b>☔ Push back</b> – for a rained-off day. Choose the day, whether to push just that day or that day and every day after it, and by how many working days. Sundays and days off are skipped, and the box tells you what will move before you confirm. Tapping a day (or a chip) first fills the date in for you.',
-        '<b>☑ Multi</b> – turn on, tap several chips, then tap a day (or drag one of them) to move them all together. Turn it off again to go back to one at a time.',
-        '<b>👥 Split</b> – tap a round chip first, then Split. It lists the customers in that chip; tick the ones to move and pick the day. The rest stay where they were.',
-        '<b>＋ Job</b> – adds a one-off job straight onto a day (select the day first, or choose the date in the box). You can fill it from an existing customer. It’s added to One-off jobs when you Commit.',
-        '<b>🚫 Days off</b> – choose your regular days off (Sundays by default) and mark holidays or other days off, one day or a range. Days off are greyed out, refuse moves and are skipped by Push back. If anything is already booked on a day you mark off you’re asked whether to move it to the next working day.',
-        '<b>✓ Commit</b> – shows a review of every change first (for example “Windows A: 6 customers, Tue 14 Oct → Thu 16 Oct”). Confirm it and everyone in a moved chip is due on the new day (it replaces any deferral), moved jobs change date, new jobs are added and days off are saved. Your Due lists, the Monthly schedule report and the next due dates in the press-and-hold info box all follow. A message appears with an <b>Undo</b> button for about 15 seconds – tap it if you committed by accident and everything goes back exactly as it was.',
-        '<b>✕ Reject</b> – throws away every change (it asks first if you’ve changed anything); nothing changes. Pressing Escape on a keyboard does the same.',
-        '<b>On an iPad or computer held sideways</b> the editor fits between the top bar and the tabs, with the tools in a column down the left, and opens on thirteen weeks if the window is tall enough. <b>＋ Weeks</b> in that column shows four more. With a mouse, just drag a chip. With one chip selected, <b>← →</b> move it to the previous or next working day and <b>↑ ↓</b> move it a week (days off are skipped). <b>Ctrl/Cmd + Z</b> undoes, <b>Enter</b> reviews your changes and <b>Escape</b> rejects. Hold <b>Ctrl/Cmd</b> and scroll to zoom; scrolling on its own just scrolls.',
-        'A date set this way only lasts until that customer is next cleaned, then their normal cycle carries on from the new clean. Moving a chip back to its usual day simply removes the change.'
+        '<b>Move a tile</b> – press and hold it until it lifts, then drag it to another day. Or tap the tile, then tap the day. (With a mouse, just drag.) Swiping across the calendar only scrolls. You can’t move work to a day that’s past or marked off.',
+        '<b>📍 Today</b> jumps to today. <b>🔍−</b> and <b>🔍＋</b> (or pinching) zoom the calendar. <b>↶ Undo</b> takes back your last change.',
+        '<b>☔ Push back</b> – for a rained-off day: choose the day and how many working days to push it, for just that day or every day after it.',
+        '<b>☑ Multi</b> – tap several tiles, then a day, to move them together. <b>👥 Split</b> – tap a round’s tile first, then choose which customers to move.',
+        '<b>＋ Job</b> adds a one-off job to a day (tap the day first). <b>🚫 Days off</b> sets your regular days off and any holidays.',
+        '<b>✓ Commit</b> shows what will change first; confirm and the new dates apply (an Undo button appears for about 15 seconds). <b>✕ Reject</b> throws away every change.',
+        'A moved date lasts until that customer’s next clean, then their normal cycle carries on.',
+        '<b>On an iPad or computer:</b> with a tile selected, <b>← →</b> move it a working day and <b>↑ ↓</b> move it a week. Ctrl/Cmd + Z undoes, Enter reviews your changes, Escape rejects, and Ctrl/Cmd + scroll zooms. <b>＋ Weeks</b> shows more weeks.'
       ])
     ]
   },
   rounds: {
     title: 'Rounds',
     body: () => [
-      helpP('Open <b>Rounds</b> from the Work tab. Use the switch at the top – <b>Rounds / Due / Text first / Owed</b> – or open a single round to see its customers.'),
+      helpP('Open <b>Rounds</b> from the Work tab. The switch at the top – <b>Rounds / Due / Text first / Owed</b> – changes the list; tap a round to see its customers.'),
       helpP('<b>Swipe a customer’s card</b>:'),
       helpList([
         '<b>Halfway right</b> – cleaned.',
         '<b>All the way right</b> – cleaned and paid.',
         '<b>Left</b> – paid.',
-        'An <b>Undo</b> button appears for a few seconds afterwards.',
-        'After you swipe a customer cleaned (or cleaned and paid), the list scrolls on by itself so the <b>next customer</b> is at the top, ready for you to carry on down the round.',
-        'After a clean, a “Windows cleaned today” text opens ready to send. You can turn this off in Settings.'
+        'An <b>Undo</b> button appears for a few seconds. After a clean, a “Windows cleaned today” text opens ready to send (you can turn this off in Settings).'
       ]),
-      helpP('<b>Press and hold</b> a card for a quick info box – price, <b>last cleaned</b>, <b>next due</b>, <b>last paid</b>, whether they pay by <b>Bank</b> or <b>Cash</b>, and how long they usually take to pay – handy at the door. You can switch them between Bank and Cash right there. To keep the cards uncluttered, those details aren’t shown on the card itself. Tap the <b>pencil</b> in the info box to add or edit a <b>note</b> (it’s the same note as on the customer form) – it shows right under their address. The green phone button calls and the blue compass button gives directions.'),
-      helpP('<b>What the cards show.</b> In the <b>Due</b> view cards show only cleaning information. In the <b>Owed</b> view they show only payment information. Other views show everything. Badges you may see:'),
-      helpList([
-        '<b>Couldn’t clean</b> – you couldn’t get to them last time.',
-        '<b>Chase</b> – two or more payment reminders have gone unanswered.',
-        '<b>Low by £X</b> – their price is well below the average for their property type.',
-        '<b>📈 Review</b> – it’s been 12+ months since their last price rise.'
-      ]),
-      helpP('<b>8 and 12 week customers</b> fall due on the same day as the 4-weekly customers in their round (and visit day), so you’re never making a separate trip. Their date is moved to the nearest round visit, never more than two weeks either way.'),
-      helpP('<b>Chasing payments.</b> The Owed view lists the longest-overdue customers first (filter by 0–14, 14–30 or 30+ days). Tap <b>✉️ Chase</b> on a card to text them, or <b>Remind all</b> to go down the list. The first reminder is friendly; every one after that is firmer automatically. You can edit both wordings in Settings → Message templates.'),
-      helpP('<b>Text first customers.</b> If someone likes a heads-up, tap their <b>Text first</b> badge to text them – it turns into a green <b>Texted</b> tick so you don’t send twice. <b>Text all</b> skips anyone already texted.'),
-      helpP('<b>Round notes.</b> Tap the <b>pencil</b> next to a round’s name to add a note – “park on the green”, “side gates locked until 9” – and it shows under the round’s name. Tap the note or the pencil again to change or remove it.'),
-      helpP('<b>A round’s ⋯ menu</b> has:'),
-      helpList([
-        '<b>Show map</b> – numbered stops, with a pulsing blue dot for <b>where you are now</b> (allow location access when asked). The <b>◎</b> button in the corner of the map centres on you. Drag a pin to correct an address; it then stays where you put it.',
-        '<b>Start round</b> – directions to every stop.',
-        '<b>Print</b>, <b>Defer</b> (push everyone back a day, a week, four weeks or to a date) and <b>Apply price uplift</b> (a % or £ increase for the whole round).'
-      ]),
-      helpP('<b>Reorder</b> sets your visiting order: drag the ⠿ handle or use the arrows. If a round runs over several days, the list is grouped Day 1, Day 2… and each customer moves within their own day – use the Day button on a row to move someone to a different day. <b>Suggest a route order</b> shows a shorter route and only applies it if you tap <b>Use this order</b>. Reorder, the map and directions follow whichever filter (Day, All, Due, Owed) you have on.'),
-      helpP('Customers imported from a spreadsheet have no price history. Open the customer → Price history → <b>Set last price review date</b> to fix the “Review” reminder.')
+      helpP('<b>Press and hold</b> a card for a quick info box – price, last cleaned, next due, last paid, Bank or Cash, and any note. Tap the <b>pencil</b> in it to add or edit a note. The green phone button calls and the blue compass button gives directions.'),
+      helpP('Badges you may see: <b>Couldn’t clean</b> (you couldn’t get to them last time), <b>Chase</b> (payment reminders unanswered), <b>Low by £X</b> (priced well below average for their property type) and <b>📈 Review</b> (12+ months since their last price rise).'),
+      helpP('<b>Chasing payments.</b> In <b>Owed</b>, tap <b>✉️ Chase</b> on a card to text them, or <b>Remind all</b> to go down the list. <b>Text first</b> customers: tap their badge to text them – it turns into a green <b>Texted</b> tick – or <b>Text all</b> to send to everyone not yet texted.'),
+      helpP('<b>Round notes.</b> Tap the <b>pencil</b> next to a round’s name to add a note (“park on the green”); it shows under the name.'),
+      helpP('<b>A round’s ⋯ menu</b> has <b>Show map</b>, <b>Start round</b> (directions to every stop), <b>Print</b>, <b>Defer</b> (push everyone back) and <b>Apply price uplift</b>. <b>Reorder</b> sets your visiting order – drag the ⠿ handle or use the arrows.')
     ]
   },
   jobs: {
@@ -352,10 +331,8 @@ const FOCUSED_HELP = {
     body: () => [
       helpP('For anything outside your regular rounds. Swipe <b>right</b> when it’s done and <b>left</b> when it’s paid (Undo appears for a few seconds).'),
       helpList([
-        'Type a <b>discount %</b> next to the price – it’s applied to that job’s invoice and receipt.',
-        'If the address matches a customer, the job links to them automatically and shows their Cash or Bank badge.',
-        'A finished job can be turned into a quote, invoiced, or sent as a PDF.',
-        'Payment reminders can be sent once a job is marked done.',
+        'Type a <b>discount %</b> next to the price to take it off that job’s invoice.',
+        'A finished job can be turned into a quote, invoiced, or sent as a PDF, and a payment reminder can be sent once it’s done.',
         'The printer icon prints every job with its status and value.'
       ])
     ]
@@ -363,53 +340,41 @@ const FOCUSED_HELP = {
   customer: {
     title: 'Customers',
     body: () => [
-      helpP('Tap a customer to open them. The top shows their round, price, how often they’re cleaned, what they owe and any notes. Below are <b>Actions</b>, <b>History</b> and <b>Photos</b> – tap each to open it.'),
+      helpP('Tap a customer to open them: their round, price, how often they’re cleaned, what they owe and notes. Below are <b>Actions</b>, <b>History</b> and <b>Photos</b>.'),
       helpList([
-        '<b>Add a clean / Add a payment</b> – pick the date and amount. Tap any entry in History to edit or remove it, or to send a receipt.',
-        '<b>Defer</b> – push their next clean back.',
-        '<b>Couldn’t clean</b> – use when you couldn’t get to them (locked gate, nobody in, weather). They move to the next round visit (four weeks at most) and their card shows a 🚫 badge until they’re next cleaned.',
+        '<b>Add a clean / Add a payment</b> – pick the date and amount. Tap any History entry to edit it, remove it or send a receipt.',
+        '<b>Defer</b> – push their next clean back. <b>Couldn’t clean</b> – use when you couldn’t get to them; they move to the next round visit.',
         '<b>Get a quote for this customer</b> – starts a quote with their details filled in.',
-        '<b>Pays by</b> – Bank or Cash, set when you add or edit a customer. Press and hold their card to see it (and switch it). Texts to cash customers leave out your bank details.',
-        '<b>Text before I arrive</b> – flags customers who like a heads-up text.',
-        '<b>Don’t send marketing texts</b> – leaves them out of every campaign (calls, quotes and reminders are unaffected).',
-        'You can also record property type, extras and “fronts only”.'
+        '<b>Pays by</b> – Bank or Cash. Texts to cash customers leave out your bank details.',
+        '<b>Text before I arrive</b> and <b>Don’t send marketing texts</b> – set on the customer’s edit screen.'
       ]),
-      helpP('Every text opens a preview you can edit before sending. <b>Messages</b> under History lists what you’ve sent. If you try to close the edit screen with unsaved changes, you’ll be asked whether to save first.')
+      helpP('Every text opens a preview you can edit before sending.')
     ]
   },
   photos: {
     title: 'Photos',
     body: () => [
-      helpP('Add photos from a customer’s Photos section. Tap one to open it. <b>Pinch</b> or <b>double-tap</b> to zoom, drag to move around, and swipe left or right to see the next photo. All photos are also in the <b>Photo gallery</b>, under the ⓘ button at the top.'),
-      helpP('<b>Annotate</b> – circle, draw an arrow, draw freehand or add text to point something out. Choose <b>✋ Move</b> to drag an annotation into place, then <b>🗑 Delete selected</b> to remove it. <b>Undo</b> steps back through everything you’ve done. Annotated photos are saved as a new photo; the original is kept.'),
-      helpP('<b>Before & after photo</b> – tap <b>Make a before & after photo</b> (needs two photos of the customer). Pick the Before and After, then choose:'),
-      helpList([
-        '<b>Landscape</b> – before on the left, after on the right.',
-        '<b>Portrait</b> – before on top, after underneath, in the tall shape suited to social media.'
-      ]),
-      helpP('Both are labelled BEFORE and AFTER (you can change the words). <b>Crop to fill</b> trims each photo to fit; <b>Show whole photos</b> keeps everything. Then <b>Save to photos</b> or <b>Share</b>.'),
-      helpP('<b>Send with an offer</b> – for example, a photo of blocked gutters with an offer to clear them. Choose the offer, add a price if you like, check the wording and tap <b>Send</b>. Your share sheet opens with the photo and message – pick Messages or WhatsApp. Some apps leave the text out, so it’s also copied for you to paste. Change the offer wording in Settings → Message templates.')
+      helpP('Add photos from a customer’s Photos section. Tap one to open it; pinch or double-tap to zoom, and swipe left or right for the next. Every photo is also in the <b>Photo gallery</b> (⋯ → About).'),
+      helpP('<b>Annotate</b> to circle, draw an arrow, draw freehand or add text – the annotated photo is saved as a new one and the original is kept. <b>Make a before & after photo</b> (needs two photos of the customer): pick the Before and After, choose landscape or portrait, then <b>Save to photos</b> or <b>Share</b>. <b>Send with an offer</b> adds an offer message to a photo; change its wording in Settings → Message templates.')
     ]
   },
   quotes: {
     title: 'Quotes',
     body: () => [
-      helpP('A quote is a list of items, each with a description and price, plus an optional discount. The total is the price used everywhere else.'),
+      helpP('A quote is a list of items with prices and an optional discount; the total is the price used everywhere else.'),
       helpList([
         '<b>Open a quote</b> to send it, print it or share it as a PDF, follow it up, or turn it into a customer or one-off job. The pencil edits it.',
-        '<b>Swipe right</b> to accept, <b>left</b> to decline. Accepted quotes become a job or customer – an existing customer is linked automatically.',
-        'A quote that’s still pending after 7 days counts in the <b>yellow number</b> on the Quotes tab. Each follow-up text is a little softer than the last and waits longer before the next.',
-        'A printed quote looks like an invoice but is clearly marked as a quote, with nothing due.'
+        '<b>Swipe right</b> to accept, <b>left</b> to decline.',
+        'A quote still pending after 7 days counts in the <b>yellow number</b> on the Quotes tab.'
       ])
     ]
   },
   marketing: {
     title: 'Marketing',
     body: () => [
-      helpP('Marketing is a list of campaigns (messages to send to groups of customers). Tap one to edit its name and message and to see who it’s been sent to. Tap <b>+ Add a campaign</b> to make another.'),
+      helpP('Marketing is a list of campaigns – messages to send to groups of customers. Tap one to edit its message, or tap <b>+ Add a campaign</b>.'),
       helpList([
-        '<b>Send group text</b> – tick the rounds to include (or paused and lapsed customers). You can narrow it by property type, extras or fronts-only, and skip anyone already interested, booked or texted recently.',
-        'Then tap <b>Send</b> for each customer in turn – it opens Messages or WhatsApp ready to go.',
+        '<b>Send group text</b> – tick the rounds to include, then tap <b>Send</b> for each customer in turn; it opens Messages or WhatsApp ready to go.',
         'The app can’t see replies, so afterwards record what happened and set a follow-up date if you want one.',
         'Customers marked “Don’t send marketing texts” are always left out.'
       ])
@@ -418,66 +383,49 @@ const FOCUSED_HELP = {
   reports: {
     title: 'Reports',
     body: () => [
-      helpP('Tap the printer icon for a list of reports. Every report, invoice, quote and receipt opens in a preview first, laid out on A4 pages. Scroll it, and pinch (or use − and +) to zoom. The buttons along the bottom are <b>Print</b>, <b>Share PDF</b> and <b>Share doc</b> (an editable Word file). Where a device can’t share files (most computers) they read <b>Save PDF</b> and <b>Save doc</b> and download the file instead.'),
-      helpRow('Round cleaning dates', 'List or calendar of recent cleans (4-weekly customers only)'),
-      helpRow('Earnings report', 'Totals by week, month and year'),
-      helpRow('Daily work done', 'Value completed, day by day'),
-      helpRow('Monthly schedule', 'Calendar of rounds and jobs due'),
-      helpRow('One-off jobs', 'Every job, status and value'),
-      helpRow('Property types', 'Houses and average price by type'),
-      helpRow('Mileage', 'Daily, weekly, monthly and tax-year totals, with the mileage allowance'),
-      helpRow('Price review due', 'Customers 12+ months since a price rise, or priced below average'),
-      helpRow('Upsell opportunities', 'Extras worth offering: fronts-only, conservatory, garage door, gutters')
+      helpP('Tap the printer icon for a list of reports – earnings, daily work done, monthly schedule, one-off jobs, mileage, price review and more. Every report, invoice, quote and receipt opens in a preview first. The buttons along the bottom are <b>Print</b>, <b>Share PDF</b> and <b>Share doc</b> (an editable Word file); where a device can’t share files they read <b>Save PDF</b> and <b>Save doc</b> and download the file instead.')
     ]
   },
   backup: {
     title: 'Backup and restore',
     body: () => [
-      helpP('Your data lives on this device only, so back it up regularly from the <b>⋯</b> menu (top right) → <b>Backup</b>. A pop-up reminds you if a change hasn’t been backed up for 24 hours.'),
+      helpP('Your data lives on this device only, so back it up regularly from the <b>⋯</b> menu (top right) → <b>Backup</b>. A pop-up reminds you if it’s been a day since the last backup.'),
       helpList([
-        '<b>Export backup</b> – save a full backup file. Keep a copy somewhere safe such as iCloud Drive; the app can’t do that by itself.',
-        '<b>Restore</b> – bring everything back from a backup file.',
-        '<b>Safety copies</b> – made automatically about once a day and before any restore. The latest 10 are kept, so you can roll back after a mistake. They don’t include photos and won’t help if the phone is lost.',
-        '<b>Excel, CSV and contacts exports</b> – for spreadsheets or moving to another app.',
-        '<b>Export for accounting software</b> – a list of payments received for a date range that FreeAgent, Xero and QuickBooks can import.',
-        '<b>Import customers</b> – bring in a list from a spreadsheet.'
+        '<b>Export backup</b> – saves a backup file. Keep a copy somewhere safe such as iCloud Drive.',
+        '<b>Restore</b> – brings everything back from a backup file.',
+        '<b>Safety copies</b> – made automatically about once a day and before any restore, so you can roll back after a mistake.',
+        'You can also export to Excel or CSV, export payments for accounting software, and <b>Import customers</b> from a spreadsheet.'
       ])
     ]
   },
   sync: {
     title: 'Using two devices',
     body: () => [
-      helpP('To keep a phone and iPad in step, open <b>Backup → Sync</b>. There are two ways:'),
-      helpP('<b>Live sync</b> (automatic). Changes go across within a minute or so while the app is open, through a small private mailbox on your own free Cloudflare account. Everything is scrambled with your passphrase before it leaves the device.'),
+      helpP('To keep a phone and iPad in step, open <b>Backup → Sync</b>.'),
       helpList([
-        'On the first device tap <b>Set up live sync</b> and choose a passphrase.',
-        'On the second device tap <b>Join live sync</b> and enter the same passphrase.',
-        'A small line next to the date at the top shows when it last synced. Open the app to catch up – it can’t sync while closed. Changes made offline go across when you’re back online.',
-        '<b>Turn off</b> stops it on that device; <b>Delete the cloud copy</b> also clears the mailbox.',
-        '<b>If both devices changed the same detail</b> (say a customer’s price, or a date), live sync pauses and shows both versions – <b>This device</b> and <b>Other device</b> – and you tap the one to keep. Use <b>Keep this device for all</b> / <b>Keep other device for all</b> if there are several. Your answer goes across too, so the other device doesn’t ask again. <b>Decide later</b> leaves things as they are and asks again after about 15 minutes, or tap the sync note next to the date to be asked straight away. Different changes to different details still merge on their own.',
-        'If you restore a backup, live sync stops and asks what to do, so the restore can’t undo work on your other device.'
-      ]),
-      helpP('<b>Sync by file</b> (no internet account). On one device tap <b>Send to other device</b>, choose a passphrase, and AirDrop the file across. On the other tap <b>Receive from other device</b>, pick the file and enter the same passphrase. You’ll see a summary first, and a safety copy is made. Do this in whichever direction you last made changes.'),
-      helpP('Either way, a change made on one device and a different change on the other are both kept. If both changed the same detail, live sync asks you which to keep; file sync keeps one version automatically and tells you.')
+        '<b>Live sync</b> – on the first device tap <b>Set up live sync</b> and choose a passphrase; on the second tap <b>Join live sync</b> and enter the same passphrase. Changes then go across within a minute or so while the app is open.',
+        '<b>If both devices changed the same detail</b>, you’re shown both versions and tap the one to keep.',
+        '<b>Sync by file</b> (no internet account) – tap <b>Send to other device</b>, AirDrop the file across, then tap <b>Receive from other device</b> on the other and enter the same passphrase.'
+      ])
     ]
   },
   settings: {
     title: 'Settings',
     body: () => [
       helpList([
-        '<b>Appearance</b> – text size, light, dark or automatic, and colour scheme. There are six, each with its own character: <b>Ocean</b> (cool coastal navy and clear blue), <b>Slate</b> (charcoal with a copper accent), <b>Rust</b> (earthy terracotta on sand), <b>Forest</b> (deep pine with a settled moss accent on parchment), <b>Plum</b> (aubergine with magenta on lilac-white) and <b>High contrast</b> (pure black and white with hard borders and a cobalt or yellow accent – made for bright sunlight and gloved use). The backgrounds are warm or cool to match, in both light and dark mode, and coloured text is chosen to stay easy to read.',
+        '<b>Appearance</b> – text size, light, dark or automatic, and colour scheme.',
         '<b>Messaging app</b> – Messages or WhatsApp.',
-        '<b>Swipe to text</b> – switches the “Windows cleaned today” text after a clean on or off.',
-        '<b>Business details</b> – your name, company and bank details, used in invoices and texts.',
-        '<b>Message templates</b> – the wording of every text. Use <b>{name}</b>, <b>{amount}</b>, <b>{company}</b> and <b>{yourname}</b> to fill in details automatically.',
-        '<b>Mileage rates</b> – change the allowance rates for a tax year.'
+        '<b>Swipe to text</b> – turns the “Windows cleaned today” text after a clean on or off.',
+        '<b>Business details</b> – your name, company and bank details, used on invoices and texts.',
+        '<b>Message templates</b> – the wording of every text. <b>{name}</b>, <b>{amount}</b>, <b>{company}</b> and <b>{yourname}</b> fill in automatically.',
+        '<b>Mileage rates</b> – the allowance rates for a tax year.'
       ])
     ]
   },
   reminders: {
     title: 'Reminders and banners',
     body: () => [
-      helpP('Banners across the top of the app remind you about job anniversaries, marketing follow-ups that are due, and imported customers waiting to be reviewed – dismiss them with the ✕. Quotes needing follow-up show as a yellow number on the Quotes tab, and jobs due today as a tile on Today.')
+      helpP('Banners across the top remind you about job anniversaries, marketing follow-ups that are due, and imported customers waiting to be reviewed. Dismiss them with the ✕.')
     ]
   }
 };
@@ -512,12 +460,11 @@ function openHelp(returnTo){
 
     ${helpH('Getting around')}
     ${helpList([
-      'The top bar and the four tabs along the bottom stay fixed on every screen while the page scrolls between them. Round Book works best installed as an app (in Safari: Share → Add to Home Screen) – in an ordinary browser tab the browser’s own toolbar takes up room at the bottom, so swipe the page once and it tucks away. The tabs are <b>Today</b>, <b>Work</b> (Rounds and One-off jobs), <b>Quotes</b> and <b>Marketing</b>; on a phone they’re kept large and set in from the edges so they clear the curved corners of the screen, and on an iPad or computer they sit along the top, just under the header, instead. Each remembers where you were; tap the tab you’re on to go back to the top.',
-      'The blue <b>+</b> button adds whatever suits the screen you’re on – a customer, job, quote or campaign. On <b>Today</b> it asks whether you want to add a customer, a job or a quote.',
-      'Top bar: <b>Search</b> (finds customers, jobs, quotes and rounds – it opens at the top of the screen so the keyboard never covers it), <b>⋯</b> (opens <b>Reports</b>, <b>Backup</b> and <b>About</b> – which holds the photo gallery and this guide) and <b>Settings</b>.',
-      'Any pop-up where you type (adding a customer, notes, search and so on) opens at the top of the screen so the keyboard never covers it.',
-      '<b>Voice typing:</b> text boxes (names, addresses, notes, search…) have a small <b>🎤</b> inside their right-hand end. Tap it, speak, and tap again to stop – the words appear as you talk, where your cursor was. It turns red while listening. Number, date, phone and email boxes don’t have one. If your device doesn’t allow voice typing in this app, the 🎤 icons disappear – use the microphone key on your keyboard instead.',
-      'With a keyboard (iPad or computer) press <b>Ctrl/Cmd + K</b>, or <b>/</b>, to open Search – as long as you’re not typing in a box. On a wide screen held upright the cards sit in a centred column.',
+      'Round Book works best installed as an app (in Safari: Share → Add to Home Screen). The four tabs are <b>Today</b>, <b>Work</b> (Rounds, One-off jobs and Schedule), <b>Quotes</b> and <b>Marketing</b> – along the bottom on a phone, along the top on an iPad or computer. Tap the tab you’re on to go back to its top.',
+      'The blue <b>+</b> button adds whatever suits the screen you’re on. On <b>Today</b> it asks whether you want to add a customer, a job or a quote.',
+      'Top bar: <b>Search</b>, <b>⋯</b> (opens <b>Reports</b>, <b>Backup</b> and <b>About</b> – which holds the photo gallery and this guide) and <b>Settings</b>.',
+      'Tap the <b>🎤</b> inside any text box to speak instead of typing; tap it again to stop.',
+      'On a keyboard (iPad or computer) press <b>Ctrl/Cmd + K</b>, or <b>/</b>, to open Search.',
       'A <b>?</b> next to a screen’s title opens help for just that screen.'
     ])}
 
