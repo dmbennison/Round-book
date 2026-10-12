@@ -325,7 +325,7 @@ const FOCUSED_HELP = {
         'After you swipe a customer cleaned (or cleaned and paid), the list scrolls on by itself so the <b>next customer</b> is at the top, ready for you to carry on down the round.',
         'After a clean, a “Windows cleaned today” text opens ready to send. You can turn this off in Settings.'
       ]),
-      helpP('<b>Press and hold</b> a card for a quick info box – price, <b>last cleaned</b>, <b>next due</b>, <b>last paid</b>, whether they pay by <b>Bank</b> or <b>Cash</b>, and how long they usually take to pay – handy at the door. You can switch them between Bank and Cash right there. To keep the cards uncluttered, those details aren’t shown on the card itself. The green phone button calls and the blue compass button gives directions.'),
+      helpP('<b>Press and hold</b> a card for a quick info box – price, <b>last cleaned</b>, <b>next due</b>, <b>last paid</b>, whether they pay by <b>Bank</b> or <b>Cash</b>, and how long they usually take to pay – handy at the door. You can switch them between Bank and Cash right there. To keep the cards uncluttered, those details aren’t shown on the card itself. Tap the <b>pencil</b> in the info box to add or edit a <b>note</b> (it’s the same note as on the customer form) – it shows right under their address. The green phone button calls and the blue compass button gives directions.'),
       helpP('<b>What the cards show.</b> In the <b>Due</b> view cards show only cleaning information. In the <b>Owed</b> view they show only payment information. Other views show everything. Badges you may see:'),
       helpList([
         '<b>Couldn’t clean</b> – you couldn’t get to them last time.',
@@ -336,6 +336,7 @@ const FOCUSED_HELP = {
       helpP('<b>8 and 12 week customers</b> fall due on the same day as the 4-weekly customers in their round (and visit day), so you’re never making a separate trip. Their date is moved to the nearest round visit, never more than two weeks either way.'),
       helpP('<b>Chasing payments.</b> The Owed view lists the longest-overdue customers first (filter by 0–14, 14–30 or 30+ days). Tap <b>✉️ Chase</b> on a card to text them, or <b>Remind all</b> to go down the list. The first reminder is friendly; every one after that is firmer automatically. You can edit both wordings in Settings → Message templates.'),
       helpP('<b>Text first customers.</b> If someone likes a heads-up, tap their <b>Text first</b> badge to text them – it turns into a green <b>Texted</b> tick so you don’t send twice. <b>Text all</b> skips anyone already texted.'),
+      helpP('<b>Round notes.</b> Tap the <b>pencil</b> next to a round’s name to add a note – “park on the green”, “side gates locked until 9” – and it shows under the round’s name. Tap the note or the pencil again to change or remove it.'),
       helpP('<b>A round’s ⋯ menu</b> has:'),
       helpList([
         '<b>Show map</b> – numbered stops, with a pulsing blue dot for <b>where you are now</b> (allow location access when asked). The <b>◎</b> button in the corner of the map centres on you. Drag a pin to correct an address; it then stays where you put it.',
@@ -515,6 +516,7 @@ function openHelp(returnTo){
       'The blue <b>+</b> button adds whatever suits the screen you’re on – a customer, job, quote or campaign.',
       'Top bar: <b>Search</b> (finds customers, jobs, quotes and rounds – it opens at the top of the screen so the keyboard never covers it), <b>⋯</b> (opens <b>Reports</b>, <b>Backup</b> and <b>About</b> – which holds the photo gallery and this guide) and <b>Settings</b>.',
       'Any pop-up where you type (adding a customer, notes, search and so on) opens at the top of the screen so the keyboard never covers it.',
+      '<b>Voice typing:</b> text boxes (names, addresses, notes, search…) have a small <b>🎤</b> inside their right-hand end. Tap it, speak, and tap again to stop – the words appear as you talk, where your cursor was. It turns red while listening. Number, date, phone and email boxes don’t have one. If your device doesn’t allow voice typing in this app, the 🎤 icons disappear – use the microphone key on your keyboard instead.',
       'With a keyboard (iPad or computer) press <b>Ctrl/Cmd + K</b>, or <b>/</b>, to open Search – as long as you’re not typing in a box. On a wide screen held upright the cards sit in a centred column.',
       'A <b>?</b> next to a screen’s title opens help for just that screen.'
     ])}

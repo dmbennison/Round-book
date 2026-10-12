@@ -1447,7 +1447,7 @@ function renderRoundsList(main){
   const roundNames = Object.keys(rounds).sort((a,b)=>a.localeCompare(b));
 
   let html = `<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; gap:8px;">
-    <button class="btn-open" style="width:auto; padding:8px 14px; display:inline-flex; gap:6px; align-items:center;" onclick="setTab('work')">
+    <button class="btn-open icon-plain" style="width:auto; padding:8px 14px; display:inline-flex; gap:6px; align-items:center;" onclick="setTab('work')">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 6l-6 6 6 6"/></svg> Work
     </button>
     <div style="display:flex; align-items:center; gap:8px;">
@@ -1655,6 +1655,39 @@ function openRoundActionsMenu(rn){
   `);
 }
 
+/* ---------- round notes ----------
+   A short note on a round (e.g. "park on the green", "side gates are locked until 9"), shown under the round's
+   name. Kept in settings.roundNotes, keyed by round name. */
+function getRoundNote(rn){
+  const n = data.settings && data.settings.roundNotes && data.settings.roundNotes[rn];
+  return typeof n === 'string' ? n : '';
+}
+function openRoundNoteSheet(rn){
+  const note = getRoundNote(rn);
+  openSheet(`
+    <div class="sheet-head">
+      <h2 style="flex:1; min-width:0;">${note ? 'Edit note' : 'Add note'}</h2>
+      <button class="sheet-close" onclick="closeSheet()">✕</button>
+    </div>
+    <div style="color:var(--ink-muted); font-size:0.8125rem; font-weight:600; margin-bottom:8px;">${escapeHtml(rn)}</div>
+    <textarea id="rn_note" rows="4" placeholder="e.g. Park on the green, side gates locked until 9...">${escapeHtml(note)}</textarea>
+    <div class="form-actions">
+      <button class="btn-primary" data-rn="${escapeAttr(rn)}" onclick="saveRoundNote(this.dataset.rn)">Save</button>
+    </div>
+    ${note ? `<button class="btn-danger-text" data-rn="${escapeAttr(rn)}" onclick="saveRoundNote(this.dataset.rn, true)">Remove note</button>` : ''}
+  `);
+}
+function saveRoundNote(rn, remove){
+  const el = document.getElementById('rn_note');
+  const text = remove || !el ? '' : el.value.trim();
+  if(!data.settings.roundNotes) data.settings.roundNotes = {};
+  if(text) data.settings.roundNotes[rn] = text; else delete data.settings.roundNotes[rn];
+  saveData();
+  closeSheet();
+  render();
+  toast(text ? 'Note saved' : 'Note removed');
+}
+
 function renderRoundDetail(main, rn){
   const allInRound = sortByRoute(data.customers.filter(c=>(c.round||'Unassigned')===rn));
   const scope = roundScopeList(rn); // what the filters below select — the list, map, route suggestion and Reorder all use it
@@ -1663,16 +1696,24 @@ function renderRoundDetail(main, rn){
 
   let shellHtml = `
     <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; gap:8px;">
-      <button class="btn-open" style="width:auto; padding:8px 14px; display:inline-flex; gap:6px; align-items:center;" onclick="backToRounds()">
+      <button class="btn-open icon-plain" style="width:auto; padding:8px 14px; display:inline-flex; gap:6px; align-items:center;" onclick="backToRounds()">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 6l-6 6 6 6"/></svg> All rounds
       </button>
       <button class="btn-open icon-plain" style="width:auto; padding:8px 14px; font-size:0.7812rem; font-weight:800;" onclick="toggleReorder()">${reorderMode?'Done':'↕ Reorder route'}</button>
     </div>
-    <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:12px;">
-      <h2 style="font-size:1.25rem;">${escapeHtml(rn)}</h2>
-      <button class="btn-open icon-plain" style="width:38px; height:38px; padding:0; flex-shrink:0;" onclick="openRoundActionsMenu('${escapeAttr(rn)}')" aria-label="Round actions">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
-      </button>
+    <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:8px; margin-bottom:12px;">
+      <div style="flex:1; min-width:0;">
+        <div style="min-height:38px; display:flex; align-items:center;"><h2 style="font-size:1.25rem;">${escapeHtml(rn)}</h2></div>
+        ${getRoundNote(rn) ? `<div onclick="openRoundNoteSheet('${escapeAttr(rn)}')" style="margin-top:-2px; font-size:0.8125rem; font-weight:600; color:var(--ink-muted); line-height:1.4; white-space:pre-wrap; overflow-wrap:anywhere;">${escapeHtml(getRoundNote(rn))}</div>` : ''}
+      </div>
+      <div style="display:flex; align-items:center; flex-shrink:0;">
+        <button class="btn-open icon-plain" style="width:38px; height:38px; padding:0; flex-shrink:0;" onclick="openRoundNoteSheet('${escapeAttr(rn)}')" aria-label="${getRoundNote(rn) ? 'Edit note' : 'Add note'}">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+        </button>
+        <button class="btn-open icon-plain" style="width:38px; height:38px; padding:0; flex-shrink:0;" onclick="openRoundActionsMenu('${escapeAttr(rn)}')" aria-label="Round actions">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
+        </button>
+      </div>
     </div>
     <button class="btn-open icon-plain" style="width:100%; margin-bottom:12px; font-weight:800; display:flex; align-items:center; justify-content:center; gap:7px;" onclick="showRoundMap('${escapeAttr(rn)}')">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>

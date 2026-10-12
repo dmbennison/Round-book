@@ -6,13 +6,14 @@ const STORE_KEY = 'roundBookData_v1';
 // APP_VERSION is a plain decimal number (e.g. 1.01, 1.02 ... 1.99, 2.00) —
 // bump by 0.01 for every change. formatVersion always renders it to exactly
 // two decimal places, so it's never shown as "1.1" or "1.100".
-const APP_VERSION = 2.70;
+const APP_VERSION = 2.71;
 function formatVersion(v){ return Number(v).toFixed(2); }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
 // entry (newest first) with ONE very short plain-English summary, then delete
 // entries so only the latest ten remain.
 const VERSION_HISTORY = [
+  {version: 2.71, changes: ['Voice typing: every text box and note field has a small microphone inside it — tap it, speak, tap again to stop', 'Rounds can have a note: tap the pencil next to the round name and it shows under the name', 'Press-and-hold info box: add or edit a note (the same note as on the customer form), shown under the address', 'The Work / All rounds back buttons no longer have a background, like the other icon buttons']},
   {version: 2.70, changes: ['iPad and desktop: the Schedule editor now fits between the top bar and tabs, with the tools in a column down the left, a ＋ Weeks button, more weeks on tall screens, arrow-key moves, Ctrl/Cmd + Z to undo, Enter to review, Ctrl/Cmd + scroll to zoom and centred dialogs', 'Ctrl/Cmd + K or / opens Search on a keyboard', 'On a wide screen held upright the cards sit in a centred column', 'Report buttons read Save PDF / Save doc where the device cannot share files', 'Phone layout and behaviour are unchanged']},
   {version: 2.69, changes: ['Every pop-up with somewhere to type now opens at the top of the screen so the keyboard can never cover it', 'The press-and-hold info box now shows Next due alongside Last cleaned and Last paid', 'Customer cards no longer show the Cleaned date, Next due date or Bank/Cash badge — they are in the info box instead']},
   {version: 2.68, changes: ['The four bottom tabs are taller and sit further in from the sides, so they clear the curved corners of the screen', 'Search now opens at the top of the screen so the keyboard no longer covers it']},
@@ -22,7 +23,6 @@ const VERSION_HISTORY = [
   {version: 2.64, changes: ['Colour schemes redesigned so each has its own personality: Slate is charcoal with a copper accent, Rust is terracotta on cream, Forest is green with a mossy accent on parchment, Plum is aubergine with magenta, Ruby is wine with crimson — with warm or cool backgrounds in light and dark mode. Ocean is unchanged']},
   {version: 2.63, changes: ['In a browser tab the page scrolls normally again so the browser toolbar can tuck away and the tabs reach the bottom; About now shows whether you are in a browser tab or the installed app']},
   {version: 2.62, changes: ['The bottom tabs now sit right at the bottom edge of the screen instead of floating above the home-bar space']},
-  {version: 2.61, changes: ['The top bar and bottom tabs now stay fixed on every screen (only the middle scrolls); the three top buttons moved to the very top, with the date and sync note running underneath them']},
 ];
 const DIRECTIONS_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>';
 const CALL_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>';
@@ -333,6 +333,8 @@ function migrateData(parsed){
   if(parsed.settings.bankAccountNumber == null) parsed.settings.bankAccountNumber = '';
   if(parsed.settings.bankSortCode == null) parsed.settings.bankSortCode = '';
   if(parsed.settings.nextAccountNumber == null) parsed.settings.nextAccountNumber = 1001;
+  // A short note per round, keyed by round name (rounds themselves are just the name on each customer).
+  if(!parsed.settings.roundNotes || typeof parsed.settings.roundNotes !== 'object' || Array.isArray(parsed.settings.roundNotes)) parsed.settings.roundNotes = {};
   parsed.customers.forEach(c=>{
     if(c.pauseReason == null) c.pauseReason = '';
     if(c.pauseDate == null) c.pauseDate = '';

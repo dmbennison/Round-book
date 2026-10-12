@@ -196,7 +196,7 @@ function openCustomerForm(existing){
     <label>Referred by <span style="text-transform:none; font-weight:500; opacity:0.7;">(optional)</span></label>
     <input type="text" id="f_referredBy" value="${escapeAttr(c.referredBy||'')}" placeholder="e.g. Mrs Patterson, 12 Elm Grove">
     <label>Account number <span style="text-transform:none; font-weight:500; opacity:0.7;">(shown on invoices/receipts)</span></label>
-    <input type="text" id="f_accountNumber" value="${escapeAttr(c.accountNumber || (existing ? '' : String(data.settings.nextAccountNumber)))}" placeholder="e.g. 1001">
+    <input type="text" id="f_accountNumber" data-novoice value="${escapeAttr(c.accountNumber || (existing ? '' : String(data.settings.nextAccountNumber)))}" placeholder="e.g. 1001">
     <label>Pays by</label>
     <div class="seg-row" id="f_payMethodRow">
       <button type="button" class="seg-btn ${c.paymentMethod==='cash'?'':'active'}" data-pm="bank" onclick="setFormPayMethod('bank')">🏦 Bank</button>
@@ -446,6 +446,34 @@ function setInfoPayMethod(id, method){
   render();
   toast(c.paymentMethod === 'cash' ? 'Marked as pays by cash' : 'Marked as pays by bank');
 }
+// Add / edit a customer's note from the info box. It's the same note as the "Gate code, dog, access notes..."
+// field on the customer form, so it also shows on their full record. Saving (or backing out) returns to the info box.
+function openCustomerNoteSheet(id){
+  const c = data.customers.find(x=>x.id===id);
+  if(!c) return;
+  openSheet(`
+    <div class="sheet-head">
+      <h2 style="flex:1; min-width:0;">${c.notes ? 'Edit note' : 'Add note'}</h2>
+      <button class="sheet-close" onclick="openCustomerInfoBox('${id}')">✕</button>
+    </div>
+    <div style="color:var(--ink-muted); font-size:0.8125rem; font-weight:600; margin-bottom:8px;">${escapeHtml(c.address || c.name || 'Customer')}</div>
+    <textarea id="cn_note" rows="4" placeholder="Gate code, dog, access notes...">${escapeHtml(c.notes||'')}</textarea>
+    <div class="form-actions">
+      <button class="btn-primary" onclick="saveCustomerNote('${id}')">Save</button>
+    </div>
+    ${c.notes ? `<button class="btn-danger-text" onclick="saveCustomerNote('${id}', true)">Remove note</button>` : ''}
+  `);
+}
+function saveCustomerNote(id, remove){
+  const c = data.customers.find(x=>x.id===id);
+  const el = document.getElementById('cn_note');
+  if(!c) return;
+  c.notes = remove || !el ? '' : el.value.trim();
+  saveData();
+  render();
+  openCustomerInfoBox(id);
+  toast(c.notes ? 'Note saved' : 'Note removed');
+}
 function openCustomerInfoBox(id){
   const c = data.customers.find(x=>x.id===id);
   if(!c) return;
@@ -515,9 +543,13 @@ function openCustomerInfoBox(id){
       <div style="flex:1; min-width:0;">
         <h2 style="margin:0;">${escapeHtml(c.address||'No address')}</h2>
         ${c.name ? `<div style="font-size:0.8125rem; font-weight:600; color:var(--ink-muted); margin-top:2px;">${escapeHtml(c.name)}</div>` : ''}
+        ${c.notes ? `<div onclick="openCustomerNoteSheet('${c.id}')" style="margin-top:6px; font-size:0.8125rem; font-weight:600; color:var(--ink); line-height:1.4; white-space:pre-wrap; overflow-wrap:anywhere; background:var(--card-tint); border-radius:8px; padding:6px 9px;">${escapeHtml(c.notes)}</div>` : ''}
         <div style="font-size:0.75rem; font-weight:600; color:var(--ink-muted); margin-top:4px; line-height:1.4;">${quickLine}</div>
       </div>
-      <button class="sheet-close" onclick="closeSheet()">✕</button>
+      <button class="sheet-close" style="flex-shrink:0; margin-right:6px;" onclick="openCustomerNoteSheet('${c.id}')" aria-label="${c.notes ? 'Edit note' : 'Add note'}">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+      </button>
+      <button class="sheet-close" style="flex-shrink:0;" onclick="closeSheet()">✕</button>
     </div>
     <div style="display:flex; gap:8px; margin:4px 0 4px;">
       <div class="ib-half">
