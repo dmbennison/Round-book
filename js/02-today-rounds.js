@@ -1935,7 +1935,9 @@ function scrollToCustomerCard(id){
   const el = document.querySelector(`#main .cust-card[data-kind="customer"][data-id="${CSS.escape(id)}"]`);
   if(!el) return;
   const header = document.querySelector('header');
-  const top = el.getBoundingClientRect().top + window.scrollY - (header ? header.offsetHeight : 0) - 14;
+  // the fixed bar across the top: the header, plus the tabs where they sit underneath it (iPad / desktop)
+  const covered = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--header-h')) || (header ? header.offsetHeight : 0);
+  const top = el.getBoundingClientRect().top + window.scrollY - covered - 14;
   window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
 }
 function quickClean(id, fromSwipe){

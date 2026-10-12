@@ -1114,6 +1114,7 @@ function rpBind(){
 const RP_PAGE_W = 794, RP_PAGE_H = 1123, RP_PAD_X = 32, RP_PAD_T = 32, RP_PAD_B = 44;
 const RP_CONTENT_W = RP_PAGE_W - RP_PAD_X*2;
 const RP_CONTENT_H = RP_PAGE_H - RP_PAD_T - RP_PAD_B;
+const RP_FLOW_BELOW = 0.4; // a sheet filled less than this far counts as "just a heading" (see paginateReport)
 
 async function paginateReport(){
   const stage = document.createElement('div');
@@ -1192,7 +1193,11 @@ async function paginateReport(){
       probe.appendChild(node);
       const h = probe.offsetHeight;
       probe.removeChild(node);
-      if(h <= RP_CONTENT_H){            // fits on a sheet of its own: move it over
+      // Fits on a sheet of its own, so normally it's moved over whole — except a table landing on a sheet that so
+      // far holds only a heading or two. Moving it then strands that heading alone on a page of its own (a round
+      // that is a little too long to sit under its title), so the table starts here and flows onto the next sheet.
+      const flowsFromHere = node.tagName === 'TABLE' && !pageEmpty() && box.offsetHeight < RP_CONTENT_H * RP_FLOW_BELOW;
+      if(h <= RP_CONTENT_H && !flowsFromHere){
         if(!pageEmpty()) startPage();
         target().appendChild(node);
         return;

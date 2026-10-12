@@ -338,21 +338,23 @@ function onSwipeCancel(){
 (function(){
   const header = document.querySelector('header');
   if(!header) return;
-  const sync = () => document.documentElement.style.setProperty('--header-h', header.offsetHeight + 'px');
+  // The tab bar is fixed to the bottom on a phone, so the page, the + button and pop-up messages sit just above
+  // it. On an iPad / desktop (same size test as the tablet block in index.html) it moves to sit directly under
+  // the header instead: --header-h then covers both, --tabbar-h is 0, and --header-only-h tells the tab bar
+  // where to start. Phones get exactly the values they always did.
+  const bar = document.getElementById('tabBar');
+  const tabsOnTop = () => !!(window.matchMedia && window.matchMedia('screen and (min-width: 700px) and (min-height: 600px)').matches);
+  const sync = () => {
+    const root = document.documentElement.style;
+    const h = header.offsetHeight, b = bar ? bar.offsetHeight : 0, top = tabsOnTop();
+    root.setProperty('--header-only-h', h + 'px');
+    root.setProperty('--header-h', (h + (top ? b : 0)) + 'px');
+    root.setProperty('--tabbar-h', (top ? 0 : b) + 'px');
+  };
   sync();
   window.addEventListener('resize', sync);
   window.addEventListener('orientationchange', sync);
-  if(window.ResizeObserver) new ResizeObserver(sync).observe(header);
-  // The tab bar is fixed to the bottom; keep its measured height too, so the page, the + button and
-  // pop-up messages sit just above it.
-  const bar = document.getElementById('tabBar');
-  if(bar){
-    const syncBar = () => document.documentElement.style.setProperty('--tabbar-h', bar.offsetHeight + 'px');
-    syncBar();
-    window.addEventListener('resize', syncBar);
-    window.addEventListener('orientationchange', syncBar);
-    if(window.ResizeObserver) new ResizeObserver(syncBar).observe(bar);
-  }
+  if(window.ResizeObserver){ const ro = new ResizeObserver(sync); ro.observe(header); if(bar) ro.observe(bar); }
 })();
 document.getElementById('dateNow').textContent = new Date().toLocaleDateString('en-GB',{weekday:'long', day:'numeric', month:'long'});
 
