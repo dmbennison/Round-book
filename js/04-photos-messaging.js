@@ -2090,6 +2090,28 @@ function handleFabClick(){
   if(currentTab === 'jobs') openJobForm();
   else if(currentTab === 'quotes') openQuoteForm();
   else if(currentTab === 'marketing') openGroupMarketingText();
+  else if(currentTab === 'today') openAddChoice();
   else openCustomerForm();
+}
+// The other tabs are each about one thing, so + adds that. Today isn't, so it asks what you want to add.
+function openAddChoice(){
+  openSheet(`
+    <div class="sheet-head">
+      <h2 style="flex:1; min-width:0;">Add</h2>
+      <button class="sheet-close" onclick="closeSheet()">✕</button>
+    </div>
+    <button class="backup-btn" onclick="closeSheet(); openCustomerForm()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+      <div><div class="t1">Customer</div><div class="t2">Add someone to one of your rounds</div></div>
+    </button>
+    <button class="backup-btn" onclick="closeSheet(); openJobForm()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+      <div><div class="t1">Job</div><div class="t2">A one-off job outside your regular rounds</div></div>
+    </button>
+    <button class="backup-btn" onclick="closeSheet(); openQuoteForm()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      <div><div class="t1">Quote</div><div class="t2">Price up a job before you do it</div></div>
+    </button>
+  `);
 }
 
