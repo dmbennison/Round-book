@@ -379,10 +379,11 @@
   /* Schedule editor: a full-screen calendar whose chips can be moved, then committed or rejected */
   .sched-editor{position:fixed; inset:0; z-index:56; display:none; flex-direction:column; background:var(--bg); color:var(--ink);}
   .sched-editor.show{display:flex;}
-  .se-bar{flex:none; padding:calc(env(safe-area-inset-top, 0px) + 12px) 14px 8px; border-bottom:1px solid var(--line);}
+  .se-bar{flex:none; display:flex; align-items:center; gap:10px; padding:calc(env(safe-area-inset-top, 0px) + 12px) 14px 8px; border-bottom:1px solid var(--line);}
+  .se-bar-text{flex:1; min-width:0;}
+  .se-bar .sheet-close{flex-shrink:0;}
   .se-title{font-size:1.125rem; font-weight:800;}
   .se-count{font-size:0.8125rem; font-weight:700; color:var(--ink-muted); margin-top:2px;}
-  .se-hint{font-size:0.75rem; color:var(--ink-muted); line-height:1.45; margin-top:4px;}
   .se-scroll{flex:1; min-height:0; overflow:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; touch-action:pan-x pan-y;}
   .se-grid{--z:1.4; display:grid; grid-template-columns:repeat(7, minmax(calc(112px * var(--z)), 1fr)); min-width:calc(784px * var(--z));}
   .se-dayname{position:sticky; top:0; z-index:2; background:var(--bg); padding:6px 4px; text-align:center; font-size:max(0.5625rem, calc(0.6875rem * var(--z,1.4))); font-weight:800; color:var(--ink-muted); border-bottom:1px solid var(--line);}
@@ -996,9 +997,13 @@
 <div class="print-area" id="printArea"></div>
 <div class="sched-editor" id="schedEditor">
   <div class="se-bar">
-    <div class="se-title">📅 Schedule</div>
-    <div class="se-count" id="seCount">No changes yet</div>
-    <div class="se-hint" id="seHint">Press and hold a chip until it lifts, then drag it to another day (or tap a chip and then tap a day). The number is how many customers are in it. Tap an empty day to select it. Pinch or use 🔍 to zoom. Nothing changes until you Commit.</div>
+    <div class="se-bar-text">
+      <div class="se-title">📅 Schedule</div>
+      <div class="se-count" id="seCount">No changes yet</div>
+    </div>
+    <button class="sheet-close" onclick="seHelpOpen()" aria-label="Help">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    </button>
   </div>
   <div class="se-tools" id="seTools">
     <button class="se-tool" onclick="seScrollToToday()">📍 Today</button>
