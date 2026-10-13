@@ -299,7 +299,7 @@ const FOCUSED_HELP = {
       helpList([
         '<b>Move a tile</b> – press and hold it until it lifts, then drag it to another day. Or tap the tile, then tap the day. (With a mouse, just drag.) Swiping across the calendar only scrolls. You can’t move work to a day that’s past or marked off.',
         '<b>📍 Today</b> jumps to today. <b>🔍−</b> and <b>🔍＋</b> (or pinching) zoom the calendar. <b>↶ Undo</b> takes back your last change.',
-        '<b>☔ Push back</b> – for a rained-off day: choose the day and how many working days to push it, for just that day or every day after it.',
+        '<b>⋯ More…</b> shows or hides the next four tools (the calendar opens with them tucked away, and shows 5 weeks – tap <b>＋ Show 4 more weeks</b> at the bottom to look further ahead). <b>☔ Push back</b> – for a rained-off day: choose the day and how many working days to push it, for just that day or every day after it.',
         '<b>☑ Multi</b> – tap several tiles, then a day, to move them together. <b>👥 Split</b> – tap a round’s tile first, then choose which customers to move.',
         '<b>＋ Job</b> adds a one-off job to a day (tap the day first). <b>🚫 Days off</b> sets your regular days off and any holidays.',
         '<b>✓ Commit</b> shows what will change first; confirm and the new dates apply (an Undo button appears for about 15 seconds). <b>✕ Reject</b> throws away every change.',

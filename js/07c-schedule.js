@@ -9,9 +9,7 @@
    review step before committing, and a "+4 weeks" button to look further ahead.
    Part of Round Book's split JS bundle; loaded in numeric order from index.html. */
 
-const SE_WEEKS = 9;           // weeks shown when the editor opens, starting with the Monday of this week
-const SE_WEEKS_TALL = 13;     // ...or this many on a big landscape screen (see seStartWeeks)
-const SE_TALL_PX = 800;       // how tall (px) the window must be to count as big
+const SE_WEEKS = 5;           // weeks shown when the editor opens, starting with the Monday of this week
 const SE_MORE_WEEKS = 4;      // weeks added by the "+ more weeks" button
 const SE_HOLD_MS = 350;       // touchscreens: how long to press and hold a tile before it lifts
 const SE_MAX_WEEKS = 52;      // furthest the calendar can be extended
@@ -47,8 +45,8 @@ function sePrevWorking(iso, n){
   while(left > 0 && guard++ < 500){ d = seAddDays(d, -1); if(!seIsOff(d)) left--; }
   return d;
 }
-// A big desktop / iPad window has room for more weeks, so opens with more. Phones (even tall ones) keep SE_WEEKS.
-function seStartWeeks(){ return (isWideSplitView() && window.innerHeight > SE_TALL_PX) ? SE_WEEKS_TALL : SE_WEEKS; }
+// Every device opens with the same number of weeks (SE_WEEKS); "＋ Show 4 more weeks" looks further ahead.
+function seStartWeeks(){ return SE_WEEKS; }
 function sePlural(n, w){ return n + ' ' + w + (n === 1 ? '' : 's'); }
 
 function openScheduleEditor(){
@@ -97,6 +95,7 @@ function openScheduleEditor(){
          offWeekdays, blocked, origOff:offWeekdays.slice(), origBlocked:blocked.slice(),
          history:[], drag:null, chipIndex:{}, ignoreClickUntil:0, pendingRender:false, offPending:null };
   const { root, scroll } = seEls();
+  seSetMoreTools(false); // Push back / Multi / Split / Job start tucked away behind ⋯ More…
   seBind();
   seCloseModal();
   pageScrollLock('schedule', true);
@@ -243,6 +242,16 @@ function seMoveChips(ids, iso){
   chips.forEach(ch => ch.items.forEach(it => { it.date = iso; }));
   se.sel = []; se.selDay = null;
   renderScheduleEditor();
+}
+// The ⋯ More… button shows or hides Push back, Multi, Split and ＋ Job (the .se-extra buttons).
+function seSetMoreTools(open){
+  const tools = document.getElementById('seTools'), btn = document.getElementById('seMoreToolsBtn');
+  if(tools) tools.classList.toggle('more-open', !!open);
+  if(btn){ btn.textContent = open ? '⋯ Less' : '⋯ More…'; btn.setAttribute('aria-expanded', open ? 'true' : 'false'); }
+}
+function seToggleMoreTools(){
+  const tools = document.getElementById('seTools');
+  seSetMoreTools(!(tools && tools.classList.contains('more-open')));
 }
 function seToggleMulti(){
   if(!se) return;
