@@ -804,6 +804,7 @@ function liveSyncSectionHtml(meta){
   const stateText = { syncing:'Syncing…', ok: s.okAt ? 'Up to date — checked ' + liveAgo(s.okAt) : 'On', waiting:'On — waiting for your other device to join', offline:'Offline — will sync when you\'re back online', locked:'Locked — enter your passphrase to resume', attention:'Needs your attention', error:'Problem' }[s.state] || 'On';
   lines.push(`<div style="font-size:0.8125rem; margin-top:4px;">${escapeHtml(stateText)}</div>`);
   if(s.text) lines.push(`<div style="font-size:0.8125rem; margin-top:6px; color:var(--red); line-height:1.5;">${escapeHtml(s.text)}</div>`);
+  if(live.url) lines.push(`<div style="font-size:0.75rem; margin-top:6px; color:var(--ink-muted); line-height:1.5; word-break:break-all;">Cloudflare address: <b style="color:var(--ink);">${escapeHtml(String(live.url))}</b></div>`);
   if(live.lastPushAt) lines.push(`<div style="font-size:0.75rem; margin-top:6px; color:var(--ink-muted);">Last sent ${liveAgo(live.lastPushAt)}${live.lastPullAt ? ' · last received ' + liveAgo(live.lastPullAt) : ''}${live.lastSummary ? ' · ' + escapeHtml(live.lastSummary) : ''}</div>`);
   let actions = '';
   if(!(live.key || liveMem.key)) actions += btn('🔒 Unlock with passphrase', 'liveUnlock()', 'background:var(--navy); color:#fff;');

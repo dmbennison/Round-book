@@ -150,6 +150,10 @@ function openMoreMenu(){
       ${ico('<path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/>')}
       <div><div class="t1">Reports</div><div class="t2">Print or save schedules, customer lists, mileage and more</div></div>
     </button>
+    <button class="backup-btn" onclick="openPhotoGallery()">
+      ${ico('<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/>')}
+      <div><div class="t1">Photo gallery</div><div class="t2">Browse every customer's photos in one place</div></div>
+    </button>
     <button class="backup-btn" onclick="openBackup()">
       ${ico('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/>')}
       <div><div class="t1">Backup</div><div class="t2">Save a copy of your data, restore, and sync between devices</div></div>
@@ -160,16 +164,6 @@ function openMoreMenu(){
     </button>
   `);
 }
-/* Shown in About: whether Round Book is running as the installed app or in a browser tab, plus the screen sizes —
-   handy when the bottom tabs don't seem to reach the bottom of the screen. */
-function screenModeNoteHtml(){
-  const inBrowser = document.documentElement.classList.contains('in-browser');
-  const sab = (() => { try{ const d = document.createElement('div'); d.style.cssText = 'position:fixed; visibility:hidden; padding-bottom:env(safe-area-inset-bottom);'; document.body.appendChild(d); const v = parseFloat(getComputedStyle(d).paddingBottom) || 0; d.remove(); return Math.round(v); }catch(e){ return 0; } })();
-  const tip = inBrowser && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
-    ? '<br>You’re using Round Book in a browser tab, so the browser’s own toolbar takes up room at the bottom of the screen and the tabs can’t sit lower than it. For the full screen, tap <b>Share → Add to Home Screen</b> and open Round Book from that icon.'
-    : '';
-  return `<p style="color:var(--ink-muted); font-size:0.75rem; line-height:1.6; margin:0 2px 12px;">Display: <b style="color:var(--ink);">${inBrowser ? 'browser tab' : 'installed app'}</b> · window ${window.innerWidth}×${window.innerHeight} of screen ${screen.width}×${screen.height} · bottom safe area ${sab}px${tip}</p>`;
-}
 function openInfo(){
   openSheet(`
     <div class="sheet-head">
@@ -179,11 +173,6 @@ function openInfo(){
     <p style="color:var(--ink); font-size:0.875rem; line-height:1.6; margin:0 2px 16px;">
       Round Book is a simple, offline window cleaning round tracker — built to keep on top of customers, rounds, cleaning and payment dates, all stored privately on your own phone.
     </p>
-    <button onclick="openPhotoGallery()" style="display:flex; align-items:center; gap:10px; width:100%; text-align:left; background:var(--blue-dim); color:var(--blue-deep); border:1px solid var(--box-border); border-radius:12px; padding:13px 14px; font-weight:800; margin-bottom:10px;">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px; height:20px; flex-shrink:0;"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></svg>
-      <span style="flex:1;">Photo gallery — every customer's photos</span>
-      <span style="opacity:0.6;">›</span>
-    </button>
     <button onclick="openHelp()" style="display:flex; align-items:center; gap:10px; width:100%; text-align:left; background:var(--blue-dim); color:var(--blue-deep); border:1px solid var(--box-border); border-radius:12px; padding:13px 14px; font-weight:800; font-size:0.9375rem; margin-bottom:10px;">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px; height:20px; flex-shrink:0;"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
       <span style="flex:1;">User guide — how everything works</span>
@@ -199,18 +188,10 @@ function openInfo(){
       <span style="flex:1;">Share Round Book</span>
       <span style="opacity:0.6;">›</span>
     </button>
-    ${screenModeNoteHtml()}
-    <p style="color:var(--ink-muted); font-size:0.8125rem; line-height:1.6; margin:0 2px 6px;">
-      Created by <b style="color:var(--ink);">D M Bennison using Claude</b>.
-    </p>
     <p style="color:var(--ink-muted); font-size:0.75rem; line-height:1.6; margin:0 2px 6px;">
       Version ${formatVersion(APP_VERSION)}
     </p>
-    <button onclick="openVersionHistory()" style="background:none; border:none; padding:0; color:var(--blue); font-size:0.75rem; font-weight:700; margin:0 2px 18px; display:block;">What's changed recently →</button>
-    <p style="color:var(--ink-muted); font-size:0.7812rem; line-height:1.6; margin:0 2px 10px;">
-      Spotted a problem, got an idea for an improvement, or just want to say something about the app? Get in touch — feedback's always welcome.
-    </p>
-    <a href="mailto:dmbennison@gmail.com?subject=Round%20Book%20feedback" style="display:block; text-decoration:none; background:var(--blue-dim); color:var(--blue-deep); border-radius:12px; padding:12px; text-align:center; font-weight:800; font-size:0.875rem;">✉️ dmbennison@gmail.com</a>
+    <button onclick="openVersionHistory()" style="background:none; border:none; padding:0; color:var(--blue); font-size:0.75rem; font-weight:700; margin:0 2px 6px; display:block;">What's changed recently →</button>
   `);
 }
 
@@ -355,7 +336,7 @@ const FOCUSED_HELP = {
   photos: {
     title: 'Photos',
     body: () => [
-      helpP('Add photos from a customer’s Photos section. Tap one to open it; pinch or double-tap to zoom, and swipe left or right for the next. Every photo is also in the <b>Photo gallery</b> (⋯ → About).'),
+      helpP('Add photos from a customer’s Photos section. Tap one to open it; pinch or double-tap to zoom, and swipe left or right for the next. Every photo is also in the <b>Photo gallery</b> (⋯ → Photo gallery).'),
       helpP('<b>Annotate</b> to circle, draw an arrow, draw freehand or add text – the annotated photo is saved as a new one and the original is kept. <b>Make a before & after photo</b> (needs two photos of the customer): pick the Before and After, choose landscape or portrait, then <b>Save to photos</b> or <b>Share</b>. <b>Send with an offer</b> adds an offer message to a photo; change its wording in Settings → Message templates.')
     ]
   },
@@ -464,7 +445,7 @@ function openHelp(returnTo){
     ${helpList([
       'Round Book works best installed as an app (in Safari: Share → Add to Home Screen). The four tabs are <b>Today</b>, <b>Work</b> (Rounds, One-off jobs and Schedule), <b>Quotes</b> and <b>Marketing</b> – along the bottom on a phone, along the top on an iPad or computer. Tap the tab you’re on to go back to its top.',
       'The blue <b>+</b> button adds whatever suits the screen you’re on. On <b>Today</b> it asks whether you want to add a customer, a job or a quote.',
-      'Top bar: <b>Search</b>, <b>⋯</b> (opens <b>Reports</b>, <b>Backup</b> and <b>About</b> – which holds the photo gallery and this guide) and <b>Settings</b>.',
+      'Top bar: <b>Search</b>, <b>⋯</b> (opens <b>Reports</b>, <b>Photo gallery</b>, <b>Backup</b> and <b>About</b> – which holds this guide) and <b>Settings</b>.',
       'Tap the <b>🎤</b> inside any text box to speak instead of typing; tap it again to stop.',
       'On a keyboard (iPad or computer) press <b>Ctrl/Cmd + K</b>, or <b>/</b>, to open Search.',
       'A <b>?</b> next to a screen’s title opens help for just that screen.'

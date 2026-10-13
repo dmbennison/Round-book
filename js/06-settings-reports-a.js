@@ -827,7 +827,7 @@ function openPhotoGallery(){
     </div>
     <input type="text" id="gallery_search_input" placeholder="Filter by address or name..." oninput="renderPhotoGallery()" style="margin-top:0; margin-bottom:14px;">
     <div id="gallery_results"></div>
-  `, () => openInfo());
+  `, () => openMoreMenu());
   renderPhotoGallery();
 }
 function renderPhotoGallery(){
