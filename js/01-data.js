@@ -6,13 +6,14 @@ const STORE_KEY = 'roundBookData_v1';
 // APP_VERSION is a plain decimal number (e.g. 1.01, 1.02 ... 1.99, 2.00) —
 // bump by 0.01 for every change. formatVersion always renders it to exactly
 // two decimal places, so it's never shown as "1.1" or "1.100".
-const APP_VERSION = 2.75;
+const APP_VERSION = 2.76;
 function formatVersion(v){ return Number(v).toFixed(2); }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
 // entry (newest first) with ONE very short plain-English summary, then delete
 // entries so only the latest ten remain.
 const VERSION_HISTORY = [
+  {version: 2.76, changes: ['Faster start-up: Excel, PDF, Word and map tools now load only the first time you use them, and are kept for offline use afterwards']},
   {version: 2.75, changes: ['Rounds that run over several days now list every customer under the right day (Day 1, Day 2…) when viewing all days, instead of the days being mixed up — in the list, Owed view, map, directions, printouts and exports']},
   {version: 2.74, changes: ['Swiping a card now gives haptic feedback: a tick as the swipe reaches the point where it will act (stronger for clean + paid) and a double tap when it happens', 'Schedule editor: a ? Help icon in the top right corner shows the Schedule help, and the instruction text at the top is gone, leaving more room for the calendar', 'In-app help simplified: every topic is shorter and covers only what you need to use the app']},
   {version: 2.73, changes: ['Today screen: the + button now asks whether you want to add a customer, a job or a quote (the other tabs work as before)']},
@@ -22,8 +23,63 @@ const VERSION_HISTORY = [
   {version: 2.69, changes: ['Every pop-up with somewhere to type now opens at the top of the screen so the keyboard can never cover it', 'The press-and-hold info box now shows Next due alongside Last cleaned and Last paid', 'Customer cards no longer show the Cleaned date, Next due date or Bank/Cash badge — they are in the info box instead']},
   {version: 2.68, changes: ['The four bottom tabs are taller and sit further in from the sides, so they clear the curved corners of the screen', 'Search now opens at the top of the screen so the keyboard no longer covers it']},
   {version: 2.67, changes: ['The page behind a pop-up no longer scrolls, so lists are where you left them when it closes', 'After swiping a customer cleaned the list moves on to the next customer', 'Round maps show a "you are here" pin and a locate button', 'Ruby colour scheme removed']},
-  {version: 2.66, changes: ['Colour schemes redesigned again: Slate, Rust, Forest, Plum and Ruby each have a stronger identity, Ruby is now a bordeaux wine instead of warning red, Forest a deeper moss, and a new High contrast scheme for outdoor use. Accent text now passes accessibility contrast in light and dark mode']},
 ];
+/* ---------- on-demand libraries ----------
+   Excel (xlsx), Word (docx), PDF (jsPDF + html2canvas) and the map (Leaflet) are only needed when you
+   use those features, so they are no longer loaded at start-up. loadLib('xlsx') etc. loads one the first
+   time it's needed and remembers it afterwards. Each library is looked for first in this app's own /lib/
+   folder, then on the CDN; the service worker keeps whichever copy was used for offline use. */
+const LIB_SOURCES = {
+  xlsx:        { global:'XLSX',        urls:['lib/xlsx.full.min.js',   'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'] },
+  docx:        { global:'docx',        urls:['lib/docx.umd.js',        'https://cdn.jsdelivr.net/npm/docx@8.2.4/build/index.umd.js'] },
+  html2canvas: { global:'html2canvas', urls:['lib/html2canvas.min.js', 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'] },
+  jspdf:       { global:'jspdf',       urls:['lib/jspdf.umd.min.js',   'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'] },
+  leaflet:     { global:'L',           urls:['lib/leaflet.js',         'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js'],
+                 css:['lib/leaflet.css', 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css'] }
+};
+const libPromises = {};
+function libLoadScript(url){
+  return new Promise((resolve, reject) => {
+    const el = document.createElement('script');
+    el.src = url;
+    el.onload = () => resolve();
+    el.onerror = () => { el.remove(); reject(new Error('failed')); };
+    document.head.appendChild(el);
+  });
+}
+function libLoadCss(url){
+  return new Promise((resolve, reject) => {
+    const el = document.createElement('link');
+    el.rel = 'stylesheet'; el.href = url;
+    el.onload = () => resolve();
+    el.onerror = () => { el.remove(); reject(new Error('failed')); };
+    document.head.appendChild(el);
+  });
+}
+// Tries each address in turn. A server that answers a missing file with the home page "loads"
+// fine but defines nothing, so success is judged by the library's global actually existing.
+async function libTryEach(urls, loader, isReady){
+  for(const url of urls){
+    try{ await loader(url); if(!isReady || isReady()) return true; }catch(e){}
+  }
+  return false;
+}
+// Resolves true once the library is ready, false if it couldn't be loaded (usually: no signal the first time).
+function loadLib(name){
+  const src = LIB_SOURCES[name];
+  if(!src) return Promise.resolve(false);
+  if(typeof window[src.global] !== 'undefined') return Promise.resolve(true);
+  if(libPromises[name]) return libPromises[name];
+  const p = (async () => {
+    if(src.css) await libTryEach(src.css, libLoadCss, null);
+    return libTryEach(src.urls, libLoadScript, () => typeof window[src.global] !== 'undefined');
+  })();
+  libPromises[name] = p;
+  p.then(ok => { if(!ok) delete libPromises[name]; }); // allow another try later
+  return p;
+}
+const LIB_NEEDS_SIGNAL = 'Couldn’t load that tool — it needs a signal the first time you use it';
+
 const DIRECTIONS_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>';
 const CALL_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>';
 const ADD_CONTACT_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="16" y1="11" x2="22" y2="11"/></svg>';

@@ -1292,6 +1292,8 @@ function sanitizeFilename(str){
 // offscreen, rasterized, and placed on its own full A4 page.
 async function generatePendingReportPdfBlob(){
   const pages = await paginateReport();
+  const libsOk = (await Promise.all([loadLib('jspdf'), loadLib('html2canvas')])).every(Boolean);
+  if(!libsOk){ toast(LIB_NEEDS_SIGNAL); throw new Error('PDF tools unavailable'); }
   const { jsPDF } = window.jspdf;
   const pdf = new jsPDF({ unit: 'pt', format: 'a4' });
   const pw = pdf.internal.pageSize.getWidth();
@@ -1560,8 +1562,8 @@ function htmlToDocxElements(bodyHtml){
 
 async function exportPendingReportDocx(){
   if(typeof docx === 'undefined'){
-    toast('Still loading — try again in a moment, or once you have signal');
-    return;
+    toast('Loading Word tools…');
+    if(!(await loadLib('docx'))){ toast(LIB_NEEDS_SIGNAL); return; }
   }
   rpSetBusy('rpBtnDoc', true);
   try{

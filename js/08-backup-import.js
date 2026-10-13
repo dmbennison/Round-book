@@ -395,7 +395,8 @@ const FOCUSED_HELP = {
         '<b>Export backup</b> – saves a backup file. Keep a copy somewhere safe such as iCloud Drive.',
         '<b>Restore</b> – brings everything back from a backup file.',
         '<b>Safety copies</b> – made automatically about once a day and before any restore, so you can roll back after a mistake.',
-        'You can also export to Excel or CSV, export payments for accounting software, and <b>Import customers</b> from a spreadsheet.'
+        'You can also export to Excel or CSV, export payments for accounting software, and <b>Import customers</b> from a spreadsheet.',
+        '<b>First use of Excel, PDF, Word or the round map</b> – these tools load the first time you use them, so you need a signal that once. After that they work offline.'
       ])
     ]
   },
@@ -777,13 +778,17 @@ function guessColumnMap(headers){
   });
   return map;
 }
-document.getElementById('importSpreadsheetFile').addEventListener('change', function(e){
-  const file = e.target.files[0];
+document.getElementById('importSpreadsheetFile').addEventListener('change', async function(e){
+  const input = e.target;
+  const file = input.files[0];
   if(!file) return;
   if(typeof XLSX === 'undefined'){
-    toast('Still loading — try again in a moment, or once you have signal');
-    e.target.value = '';
-    return;
+    toast('Loading spreadsheet tools…');
+    if(!(await loadLib('xlsx'))){
+      toast(LIB_NEEDS_SIGNAL);
+      input.value = '';
+      return;
+    }
   }
   const reader = new FileReader();
   reader.onload = function(evt){
@@ -965,8 +970,8 @@ async function exportCustomersCSV(){
 }
 async function exportExcel(){
   if(typeof XLSX === 'undefined'){
-    toast('Still loading — try again in a moment, or once you have signal');
-    return;
+    toast('Loading spreadsheet tools…');
+    if(!(await loadLib('xlsx'))){ toast(LIB_NEEDS_SIGNAL); return; }
   }
   const rounds = groupByRound(data.customers);
   const roundNames = Object.keys(rounds).sort((a,b)=>a.localeCompare(b));

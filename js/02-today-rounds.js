@@ -1186,9 +1186,15 @@ function roundMapPinIcon(num, isApprox, isMoved){
     iconSize: [26,26], iconAnchor: [13,26]
   });
 }
-function initRoundMapLeaflet(customers, fallbackCoords){
+async function initRoundMapLeaflet(customers, fallbackCoords){
   const el = document.getElementById('roundMapEl');
   if(!el) return; // sheet was closed again before this fired
+  if(typeof L === 'undefined'){
+    el.innerHTML = '<div style="padding:24px; text-align:center; color:var(--ink-muted); font-size:0.8125rem;">Loading map…</div>';
+    await loadLib('leaflet');
+  }
+  if(!document.getElementById('roundMapEl')) return; // closed while the map tools were loading
+  if(el !== document.getElementById('roundMapEl')) return;
   if(typeof L === 'undefined'){
     el.innerHTML = '<div style="padding:24px; text-align:center; color:var(--ink-muted); font-size:0.8125rem;">Map could not load — check your connection and try again.</div>';
     return;
