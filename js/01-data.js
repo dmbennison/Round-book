@@ -6,14 +6,15 @@ const STORE_KEY = 'roundBookData_v1';
 // APP_VERSION is a plain decimal number (e.g. 1.01, 1.02 ... 1.99, 2.00) —
 // bump by 0.01 for every change. formatVersion always renders it to exactly
 // two decimal places, so it's never shown as "1.1" or "1.100".
-const APP_VERSION = 2.80;
+const APP_VERSION = 2.81;
 function formatVersion(v){ return Number(v).toFixed(2); }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
 // entry (newest first) with ONE very short plain-English summary, then delete
 // entries so only the latest ten remain.
 const VERSION_HISTORY = [
-  {version: 2.80, changes: ['Photo gallery moved from About into the ⋯ menu, next to Reports and Backup. About is tidier, and Backup → Sync now shows your Cloudflare address when live sync is on']},
+  {version: 2.81, changes: ['Live sync now uses your Round Book sync service automatically — there is no address to type in']},
+  {version: 2.80, changes: ['Photo gallery moved from About into the ⋯ menu, next to Reports and Backup, and About is tidier']},
   {version: 2.79, changes: ['Schedule: iPad and desktop now open with 5 weeks too, the same as on a phone']},
   {version: 2.78, changes: ['Schedule: opens showing 5 weeks instead of 9 (＋ Show 4 more weeks is still there), and Push back, Multi, Split and Job now sit behind a ⋯ More… button']},
   {version: 2.77, changes: ['Excel, PDF, Word and map tools are now stored with the app itself, so installing no longer depends on an outside website']},
@@ -22,7 +23,6 @@ const VERSION_HISTORY = [
   {version: 2.74, changes: ['Swiping a card now gives haptic feedback: a tick as the swipe reaches the point where it will act (stronger for clean + paid) and a double tap when it happens', 'Schedule editor: a ? Help icon in the top right corner shows the Schedule help, and the instruction text at the top is gone, leaving more room for the calendar', 'In-app help simplified: every topic is shorter and covers only what you need to use the app']},
   {version: 2.73, changes: ['Today screen: the + button now asks whether you want to add a customer, a job or a quote (the other tabs work as before)']},
   {version: 2.72, changes: ['Printing: a round that was a little too long to sit under its title no longer leaves a blank first page with just the header — the list now starts straight under the title and carries on over the pages', 'iPad and desktop: the four tabs now sit along the top, directly under the header, instead of the bottom', 'Phone is unchanged']},
-  {version: 2.71, changes: ['Voice typing: every text box and note field has a small microphone inside it — tap it, speak, tap again to stop', 'Rounds can have a note: tap the pencil next to the round name and it shows under the name', 'Press-and-hold info box: add or edit a note (the same note as on the customer form), shown under the address', 'The Work / All rounds back buttons no longer have a background, like the other icon buttons']},
 ];
 /* ---------- on-demand libraries ----------
    Excel (xlsx), Word (docx), PDF (jsPDF + html2canvas) and the map (Leaflet) are only needed when you

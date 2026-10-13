@@ -5,9 +5,8 @@
    storage) — only the transport is new. Loaded after 08b-sync.js, before 09-boot.js.
    Part of Round Book's split JS bundle; loaded in numeric order from index.html. */
 
-// Paste your Cloudflare address here once (e.g. 'https://round-book-sync.yourname.workers.dev')
-// and it never needs typing on any device. Left empty, the app asks for it during set-up.
-const LIVE_SYNC_DEFAULT_URL = '';
+// The Round Book sync service every device uses. It is built in, so nobody is ever asked to type it in.
+const LIVE_SYNC_DEFAULT_URL = 'https://round-book-sync.dmbennison.workers.dev';
 
 const LIVE_POLL_MS = 60*1000;
 const LIVE_PUSH_DELAY_MS = 20*1000;        // wait this long after an edit before sending
@@ -603,30 +602,7 @@ async function liveForgetBase(){
 
 /* ---------- set-up flows ---------- */
 async function liveEnsureUrl(){
-  const meta = await syncMetaGet();
-  const known = String(meta.liveUrl || LIVE_SYNC_DEFAULT_URL || '').trim();
-  if(known) return known;
-  return new Promise(resolve => {
-    appConfirm('Paste the address of your Cloudflare sync service — it ends in .workers.dev.', {
-      title: 'Cloudflare address', confirmLabel: 'Check it', danger: false,
-      input: { type:'url', placeholder:'https://round-book-sync.yourname.workers.dev' },
-      onCancel: () => resolve(null),
-      onConfirm: async (v) => {
-        let url = String(v || '').trim().replace(/\/+$/, '');
-        if(!/^https:\/\/[^\s/]+$/i.test(url)){ appAlert('That doesn\'t look right. It should look like https://round-book-sync.yourname.workers.dev', {title:'Cloudflare address'}); resolve(null); return; }
-        try{
-          const r = await fetch(url + '/', { cache:'no-store' });
-          const j = await r.json();
-          if(!j || j.app !== 'round-book-sync') throw new Error('not ours');
-        }catch(e){
-          appAlert('Couldn\'t reach a Round Book sync service at that address. Check it, that the Worker is deployed, and that you have a signal.', {title:'Cloudflare address'});
-          resolve(null); return;
-        }
-        try{ await syncMetaPut(Object.assign({}, await syncMetaGet(), { liveUrl: url })); }catch(e){}
-        resolve(url);
-      }
-    });
-  });
+  return LIVE_SYNC_DEFAULT_URL;
 }
 async function liveEnable(settings){
   const meta = await syncMetaGet();
@@ -778,13 +754,6 @@ function liveDeleteCloud(){
     }
   });
 }
-async function liveChangeUrl(){
-  const meta = await syncMetaGet();
-  delete meta.liveUrl;
-  try{ await syncMetaPut(meta); }catch(e){}
-  toast('Address cleared — you\'ll be asked for it next time');
-}
-
 /* ---------- the "Live sync" block at the top of Backup → Sync ---------- */
 function liveSyncSectionHtml(meta){
   const live = meta && meta.live;
@@ -804,7 +773,6 @@ function liveSyncSectionHtml(meta){
   const stateText = { syncing:'Syncing…', ok: s.okAt ? 'Up to date — checked ' + liveAgo(s.okAt) : 'On', waiting:'On — waiting for your other device to join', offline:'Offline — will sync when you\'re back online', locked:'Locked — enter your passphrase to resume', attention:'Needs your attention', error:'Problem' }[s.state] || 'On';
   lines.push(`<div style="font-size:0.8125rem; margin-top:4px;">${escapeHtml(stateText)}</div>`);
   if(s.text) lines.push(`<div style="font-size:0.8125rem; margin-top:6px; color:var(--red); line-height:1.5;">${escapeHtml(s.text)}</div>`);
-  if(live.url) lines.push(`<div style="font-size:0.75rem; margin-top:6px; color:var(--ink-muted); line-height:1.5; word-break:break-all;">Cloudflare address: <b style="color:var(--ink);">${escapeHtml(String(live.url))}</b></div>`);
   if(live.lastPushAt) lines.push(`<div style="font-size:0.75rem; margin-top:6px; color:var(--ink-muted);">Last sent ${liveAgo(live.lastPushAt)}${live.lastPullAt ? ' · last received ' + liveAgo(live.lastPullAt) : ''}${live.lastSummary ? ' · ' + escapeHtml(live.lastSummary) : ''}</div>`);
   let actions = '';
   if(!(live.key || liveMem.key)) actions += btn('🔒 Unlock with passphrase', 'liveUnlock()', 'background:var(--navy); color:#fff;');
