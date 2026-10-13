@@ -471,8 +471,13 @@ function renderImportReviewBanner(){
 }
 function dismissImportReview(){ importReviewDismissed = true; renderImportReviewBanner(); }
 
+// In route order. A round that runs over several visit days comes out grouped by day (all of Day 1, then all
+// of Day 2…), each day in its own route order — whatever order numbers people happen to carry, so the days
+// can never be shown mixed up (and every list, print and export that goes through here agrees).
 function sortByRoute(custs){
   return custs.slice().sort((a,b)=>{
+    const da = a.visitDay || 1, db = b.visitDay || 1;
+    if(da !== db) return da - db;
     const oa = a.order!=null ? a.order : 9999;
     const ob = b.order!=null ? b.order : 9999;
     return oa-ob || (a.address||'').localeCompare(b.address||'');
@@ -495,7 +500,7 @@ function roundDuePredicate(c){
   const cleanedToday = s.lastClean === todayISO();
   return !c.paused && (dueNow || cleanedToday);
 }
-// In route order. (The Owed view displays its own oldest-first sort on top of this.)
+// In route order, grouped by day. (The Owed view displays its own oldest-first sort within each day.)
 function roundScopeList(rn){
   let list = sortByRoute(data.customers.filter(c=>(c.round||'Unassigned')===rn));
   if(roundDaysUsed(list).length > 1 && roundDayFilter !== 'all'){
@@ -1783,8 +1788,9 @@ function renderRoundDetail(main, rn){
 
   let baseList = scope;
   if(roundFilterMode === 'owed'){
+    // oldest first — but within each day, so the days stay grouped
     baseList = baseList.slice()
-      .sort((a,b)=> (daysSinceLastPayment(b)-daysSinceLastPayment(a)) || (custStatus(b).balance-custStatus(a).balance));
+      .sort((a,b)=> ((a.visitDay||1)-(b.visitDay||1)) || (daysSinceLastPayment(b)-daysSinceLastPayment(a)) || (custStatus(b).balance-custStatus(a).balance));
   }
   const custs = baseList;
   // Due and Owed filters show slimmed-down cards (see custCardHtml).

@@ -312,6 +312,7 @@ const FOCUSED_HELP = {
     title: 'Rounds',
     body: () => [
       helpP('Open <b>Rounds</b> from the Work tab. The switch at the top – <b>Rounds / Due / Text first / Owed</b> – changes the list; tap a round to see its customers.'),
+      helpP('If a round is split over several days, its customers are grouped under <b>Day 1</b>, <b>Day 2</b>… – tap a Day button to see just that day.'),
       helpP('<b>Swipe a customer’s card</b>:'),
       helpList([
         '<b>Halfway right</b> – cleaned.',

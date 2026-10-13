@@ -6,13 +6,14 @@ const STORE_KEY = 'roundBookData_v1';
 // APP_VERSION is a plain decimal number (e.g. 1.01, 1.02 ... 1.99, 2.00) —
 // bump by 0.01 for every change. formatVersion always renders it to exactly
 // two decimal places, so it's never shown as "1.1" or "1.100".
-const APP_VERSION = 2.74;
+const APP_VERSION = 2.75;
 function formatVersion(v){ return Number(v).toFixed(2); }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
 // entry (newest first) with ONE very short plain-English summary, then delete
 // entries so only the latest ten remain.
 const VERSION_HISTORY = [
+  {version: 2.75, changes: ['Rounds that run over several days now list every customer under the right day (Day 1, Day 2…) when viewing all days, instead of the days being mixed up — in the list, Owed view, map, directions, printouts and exports']},
   {version: 2.74, changes: ['Swiping a card now gives haptic feedback: a tick as the swipe reaches the point where it will act (stronger for clean + paid) and a double tap when it happens', 'Schedule editor: a ? Help icon in the top right corner shows the Schedule help, and the instruction text at the top is gone, leaving more room for the calendar', 'In-app help simplified: every topic is shorter and covers only what you need to use the app']},
   {version: 2.73, changes: ['Today screen: the + button now asks whether you want to add a customer, a job or a quote (the other tabs work as before)']},
   {version: 2.72, changes: ['Printing: a round that was a little too long to sit under its title no longer leaves a blank first page with just the header — the list now starts straight under the title and carries on over the pages', 'iPad and desktop: the four tabs now sit along the top, directly under the header, instead of the bottom', 'Phone is unchanged']},
@@ -22,7 +23,6 @@ const VERSION_HISTORY = [
   {version: 2.68, changes: ['The four bottom tabs are taller and sit further in from the sides, so they clear the curved corners of the screen', 'Search now opens at the top of the screen so the keyboard no longer covers it']},
   {version: 2.67, changes: ['The page behind a pop-up no longer scrolls, so lists are where you left them when it closes', 'After swiping a customer cleaned the list moves on to the next customer', 'Round maps show a "you are here" pin and a locate button', 'Ruby colour scheme removed']},
   {version: 2.66, changes: ['Colour schemes redesigned again: Slate, Rust, Forest, Plum and Ruby each have a stronger identity, Ruby is now a bordeaux wine instead of warning red, Forest a deeper moss, and a new High contrast scheme for outdoor use. Accent text now passes accessibility contrast in light and dark mode']},
-  {version: 2.65, changes: ['Fixed the gap under the bottom tabs on iPhone and iPad: pages can now always scroll a little, which stops the screen shrinking on short pages']},
 ];
 const DIRECTIONS_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>';
 const CALL_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>';
