@@ -410,6 +410,7 @@
   .se-tool{flex:none; padding:7px 11px; border:1px solid var(--line); border-radius:10px; background:var(--surface); color:var(--ink); font-size:0.75rem; font-weight:800; white-space:nowrap;}
   .se-tool.active{background:var(--blue); border-color:var(--blue); color:var(--on-accent, #fff);}
   .se-tool:disabled{opacity:0.4;}
+  .se-tools:not(.more-open) .se-extra:not(.active){display:none;} /* tucked behind ⋯ More… (Multi stays visible while it's switched on) */
   .se-tool.se-tool-weeks{display:none;} /* only shown in the wide-screen tool rail (see the landscape block below) */
   .se-more{display:block; width:calc(100% - 20px); margin:12px 10px 16px; padding:11px; border:1px dashed var(--line); border-radius:12px; background:transparent; color:var(--ink-muted); font-size:0.8125rem; font-weight:800;}
   .se-modal{position:absolute; inset:0; z-index:5; display:none; align-items:flex-end; justify-content:center; background:rgba(11,36,56,0.45);}
@@ -1004,10 +1005,11 @@
     <button class="se-tool" onclick="seZoomBy(1/1.25)" aria-label="Zoom out">🔍−</button>
     <button class="se-tool" onclick="seZoomBy(1.25)" aria-label="Zoom in">🔍＋</button>
     <button class="se-tool" id="seUndo" onclick="seUndo()">↶ Undo</button>
-    <button class="se-tool" onclick="sePushBackOpen()">☔ Push back</button>
-    <button class="se-tool" id="seMultiBtn" onclick="seToggleMulti()">☑ Multi</button>
-    <button class="se-tool" id="seSplitBtn" onclick="seSplitOpen()">👥 Split</button>
-    <button class="se-tool" onclick="seAddJobOpen()">＋ Job</button>
+    <button class="se-tool" id="seMoreToolsBtn" onclick="seToggleMoreTools()" aria-expanded="false">⋯ More…</button>
+    <button class="se-tool se-extra" onclick="sePushBackOpen()">☔ Push back</button>
+    <button class="se-tool se-extra" id="seMultiBtn" onclick="seToggleMulti()">☑ Multi</button>
+    <button class="se-tool se-extra" id="seSplitBtn" onclick="seSplitOpen()">👥 Split</button>
+    <button class="se-tool se-extra" onclick="seAddJobOpen()">＋ Job</button>
     <button class="se-tool" onclick="seDaysOffOpen()">🚫 Days off</button>
     <button class="se-tool se-tool-weeks" id="seWeeksBtn" onclick="seShowMoreWeeks()">＋ Weeks</button>
   </div>
