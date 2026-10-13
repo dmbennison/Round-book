@@ -1,4 +1,4 @@
-const CACHE_NAME = 'round-book-v2.75';
+const CACHE_NAME = 'round-book-v2.76';
 const ASSETS = [
   './',
   './manifest.json',
@@ -16,14 +16,27 @@ const ASSETS = [
   './js/08-backup-import.js',
   './js/08b-sync.js',
   './js/08c-live-sync.js',
-  './js/09-boot.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',
-  'https://cdn.jsdelivr.net/npm/docx@8.2.4/build/index.umd.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css',
-  'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js'
+  './js/09-boot.js'
 ];
+
+// Libraries the app loads on demand (see loadLib in 01-data.js). Each is kept for offline use:
+// the copy in this app's own /lib/ folder if it exists, otherwise the CDN copy.
+const LIB_GROUPS = [
+  ['./lib/xlsx.full.min.js',   'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'],
+  ['./lib/docx.umd.js',        'https://cdn.jsdelivr.net/npm/docx@8.2.4/build/index.umd.js'],
+  ['./lib/html2canvas.min.js', 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'],
+  ['./lib/jspdf.umd.min.js',   'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'],
+  ['./lib/leaflet.css',        'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css'],
+  ['./lib/leaflet.js',         'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js']
+];
+
+// A host that answers a missing script/stylesheet with the app's home page (as single-page-app
+// hosting often does) returns "200 OK" HTML. That must never be stored as if it were the library.
+function isWrongType(url, response){
+  const isCode = /\.(js|css)(\?|$)/i.test(url);
+  const type = (response.headers && response.headers.get('content-type')) || '';
+  return isCode && /text\/html/i.test(type);
+}
 
 // Safari refuses to let a service worker answer a page-load request with a
 // response that was redirected (e.g. Cloudflare Pages redirecting
@@ -47,6 +60,18 @@ async function precache(){
       const plain = response.redirected ? await toPlainResponse(response) : response;
       await cache.put(url, plain);
     }catch(e){ /* ignore individual failures, rest still cache */ }
+  }));
+  // Library groups: keep the first address that really returns the file.
+  await Promise.all(LIB_GROUPS.map(async (urls) => {
+    for(const url of urls){
+      try{
+        const response = await fetch(url, { redirect: 'follow' });
+        if(!response || !response.ok || isWrongType(url, response)) continue;
+        const plain = response.redirected ? await toPlainResponse(response) : response;
+        await cache.put(url, plain);
+        return;
+      }catch(e){ /* try the next address */ }
+    }
   }));
 }
 
@@ -79,7 +104,7 @@ self.addEventListener('fetch', (event) => {
     const networkFetch = (async () => {
       try{
         const response = await fetch(event.request, { redirect: 'follow' });
-        if(response && response.ok){
+        if(response && response.ok && !isWrongType(event.request.url, response)){
           const plain = response.redirected ? await toPlainResponse(response.clone()) : response.clone();
           const cache = await caches.open(CACHE_NAME);
           cache.put(event.request, plain);
