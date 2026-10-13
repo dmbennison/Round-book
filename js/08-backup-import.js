@@ -396,7 +396,7 @@ const FOCUSED_HELP = {
         '<b>Restore</b> – brings everything back from a backup file.',
         '<b>Safety copies</b> – made automatically about once a day and before any restore, so you can roll back after a mistake.',
         'You can also export to Excel or CSV, export payments for accounting software, and <b>Import customers</b> from a spreadsheet.',
-        '<b>First use of Excel, PDF, Word or the round map</b> – these tools load the first time you use them, so you need a signal that once. After that they work offline.'
+        '<b>Excel, PDF, Word and the round map</b> – these tools are kept inside the app and load the first time you use them, so they work offline. (The map still needs a signal to show its street tiles.)'
       ])
     ]
   },

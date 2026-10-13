@@ -6,13 +6,14 @@ const STORE_KEY = 'roundBookData_v1';
 // APP_VERSION is a plain decimal number (e.g. 1.01, 1.02 ... 1.99, 2.00) —
 // bump by 0.01 for every change. formatVersion always renders it to exactly
 // two decimal places, so it's never shown as "1.1" or "1.100".
-const APP_VERSION = 2.76;
+const APP_VERSION = 2.77;
 function formatVersion(v){ return Number(v).toFixed(2); }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
 // entry (newest first) with ONE very short plain-English summary, then delete
 // entries so only the latest ten remain.
 const VERSION_HISTORY = [
+  {version: 2.77, changes: ['Excel, PDF, Word and map tools are now stored with the app itself, so installing no longer depends on an outside website']},
   {version: 2.76, changes: ['Faster start-up: Excel, PDF, Word and map tools now load only the first time you use them, and are kept for offline use afterwards']},
   {version: 2.75, changes: ['Rounds that run over several days now list every customer under the right day (Day 1, Day 2…) when viewing all days, instead of the days being mixed up — in the list, Owed view, map, directions, printouts and exports']},
   {version: 2.74, changes: ['Swiping a card now gives haptic feedback: a tick as the swipe reaches the point where it will act (stronger for clean + paid) and a double tap when it happens', 'Schedule editor: a ? Help icon in the top right corner shows the Schedule help, and the instruction text at the top is gone, leaving more room for the calendar', 'In-app help simplified: every topic is shorter and covers only what you need to use the app']},
@@ -22,7 +23,6 @@ const VERSION_HISTORY = [
   {version: 2.70, changes: ['iPad and desktop: the Schedule editor now fits between the top bar and tabs, with the tools in a column down the left, a ＋ Weeks button, more weeks on tall screens, arrow-key moves, Ctrl/Cmd + Z to undo, Enter to review, Ctrl/Cmd + scroll to zoom and centred dialogs', 'Ctrl/Cmd + K or / opens Search on a keyboard', 'On a wide screen held upright the cards sit in a centred column', 'Report buttons read Save PDF / Save doc where the device cannot share files', 'Phone layout and behaviour are unchanged']},
   {version: 2.69, changes: ['Every pop-up with somewhere to type now opens at the top of the screen so the keyboard can never cover it', 'The press-and-hold info box now shows Next due alongside Last cleaned and Last paid', 'Customer cards no longer show the Cleaned date, Next due date or Bank/Cash badge — they are in the info box instead']},
   {version: 2.68, changes: ['The four bottom tabs are taller and sit further in from the sides, so they clear the curved corners of the screen', 'Search now opens at the top of the screen so the keyboard no longer covers it']},
-  {version: 2.67, changes: ['The page behind a pop-up no longer scrolls, so lists are where you left them when it closes', 'After swiping a customer cleaned the list moves on to the next customer', 'Round maps show a "you are here" pin and a locate button', 'Ruby colour scheme removed']},
 ];
 /* ---------- on-demand libraries ----------
    Excel (xlsx), Word (docx), PDF (jsPDF + html2canvas) and the map (Leaflet) are only needed when you
