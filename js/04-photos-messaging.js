@@ -1232,10 +1232,30 @@ function normalizePhoneForWhatsApp(phone){
 // leaves an orphaned blank Safari tab behind when the person switches back from
 // WhatsApp on an installed PWA. A same-context navigation lets iOS/Android hand off
 // to the WhatsApp app directly, so "back" returns to Round Book instead.
+// Which app a message to this number goes by. A customer can have their own "Message by" choice
+// (c.msgApp = 'sms' or 'whatsapp', set in their Edit screen or via "Not on WhatsApp?" on the message
+// screen); anyone without one follows the default in Settings. Found by matching the phone number.
+function findCustomerByPhone(phone){
+  const key = normalizePhoneForWhatsApp(phone || '');
+  if(!key) return null;
+  const matches = data.customers.filter(x => x.phone && normalizePhoneForWhatsApp(x.phone) === key);
+  return matches.find(x => x.msgApp === 'sms' || x.msgApp === 'whatsapp') || matches[0] || null;
+}
+function messagingAppFor(phone){
+  const c = findCustomerByPhone(phone);
+  if(c && (c.msgApp === 'sms' || c.msgApp === 'whatsapp')) return c.msgApp;
+  return data.settings.messagingApp === 'whatsapp' ? 'whatsapp' : 'sms';
+}
+// Wording for the group-send screens: the default app, or both if any customer has their own choice.
+function bulkSendAppNote(){
+  const anyOwn = data.customers.some(x => x.msgApp === 'sms' || x.msgApp === 'whatsapp');
+  if(anyOwn) return 'WhatsApp or Messages (as set for each customer)';
+  return data.settings.messagingApp === 'whatsapp' ? 'WhatsApp' : 'Messages';
+}
 function sendPhoneMessage(phone, msg){
   const clean = (phone||'').replace(/\s+/g,'');
   if(!clean) return;
-  if(data.settings.messagingApp === 'whatsapp'){
+  if(messagingAppFor(clean) === 'whatsapp'){
     window.location.href = `https://wa.me/${normalizePhoneForWhatsApp(clean)}?text=${encodeURIComponent(msg)}`;
   } else {
     const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
@@ -1352,9 +1372,20 @@ function openMessagePreview(title, phone, msg, afterSend, returnTo, logInfo){
     <label style="margin-top:0;">Message</label>
     <textarea id="msg_preview_text" rows="7">${escapeHtml(msg)}</textarea>
     <div class="form-actions">
-      <button class="btn-primary" onclick="sendPreviewedMessage()">Send ${data.settings.messagingApp==='whatsapp'?'via WhatsApp':'as text'}</button>
+      <button class="btn-primary" id="msg_preview_send" onclick="sendPreviewedMessage()">Send ${messagingAppFor(phone)==='whatsapp'?'via WhatsApp':'as text'}</button>
     </div>
+    ${(messagingAppFor(phone)==='whatsapp' && findCustomerByPhone(phone)) ? `<button class="btn" id="msg_preview_nowa" style="width:100%; margin-top:8px; background:var(--blue-dim); color:var(--blue-deep);" onclick="useTextForPreviewCustomer()">Not on WhatsApp? Use text for ${escapeHtml(((findCustomerByPhone(phone).name||'').trim().split(' ')[0]) || 'this customer')}</button>` : ''}
   `, returnTo);
+}
+// "Not on WhatsApp?" on the message screen: remember text for this customer, and switch this message over now.
+function useTextForPreviewCustomer(){
+  const c = findCustomerByPhone(pendingMsgPhone);
+  if(!c) return;
+  c.msgApp = 'sms';
+  saveData();
+  const btn = document.getElementById('msg_preview_send'); if(btn) btn.textContent = 'Send as text';
+  const link = document.getElementById('msg_preview_nowa'); if(link) link.style.display = 'none';
+  toast('Will use text for ' + (((c.name||'').trim().split(' ')[0]) || 'this customer') + ' from now on');
 }
 function sendPreviewedMessage(){
   const text = document.getElementById('msg_preview_text').value;
@@ -1406,7 +1437,7 @@ function openReceiptOptions(id, dateISO, amount){
     <p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 16px; line-height:1.5;">${escapeHtml(c.name||c.address||'This customer')} · ${money(amount)} on ${fmtDate(dateISO)}</p>
     ${(mobile||c.email) ? `<button class="backup-btn" onclick="sendReceipt('${id}','${dateISO}',${amount})">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-      <div><div class="t1">Quick text message</div><div class="t2">${mobile?(data.settings.messagingApp==='whatsapp'?'Sends via WhatsApp':'Sends as a text'):'Sends by email'}, using your receipt wording</div></div>
+      <div><div class="t1">Quick text message</div><div class="t2">${mobile?(messagingAppFor(c.phone)==='whatsapp'?'Sends via WhatsApp':'Sends as a text'):'Sends by email'}, using your receipt wording</div></div>
     </button>` : ''}
     <button class="backup-btn" onclick="printReceipt('${id}','${dateISO}',${amount})">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
@@ -1677,7 +1708,7 @@ function openBulkReminders(kind, roundName){
     ${kind==='owed' ? `<label>Follow-up (2nd chase onwards)</label>
     <textarea id="bulk_msg2" rows="4">${escapeHtml(tpl2)}</textarea>` : ''}
     <p style="color:var(--ink-muted); font-size:0.7812rem; margin:10px 2px 14px; line-height:1.5;">
-      Tap Send for each customer — it opens ${data.settings.messagingApp==='whatsapp'?'WhatsApp':'Messages'} pre-filled and ready to go. ${kind==='owed' ? 'Anyone who has already been chased gets the firmer follow-up wording automatically. ' : ''}Come back here for the next one.
+      Tap Send for each customer — it opens ${bulkSendAppNote()} pre-filled and ready to go. ${kind==='owed' ? 'Anyone who has already been chased gets the firmer follow-up wording automatically. ' : ''}Come back here for the next one.
     </p>
     ${list.map(c=>{
       const s = custStatus(c);
@@ -1713,7 +1744,7 @@ function openBulkTextBeforeVisit(){
     <label style="margin-top:0;">Message <span style="text-transform:none; font-weight:500; opacity:0.7;">({name}, {company}, {yourname})</span></label>
     <textarea id="bulk_msg" rows="4">${escapeHtml(tpl)}</textarea>
     <p style="color:var(--ink-muted); font-size:0.7812rem; margin:10px 2px 14px; line-height:1.5;">
-      Tap Send for each customer — it opens ${data.settings.messagingApp==='whatsapp'?'WhatsApp':'Messages'} pre-filled and ready to go. Come back here for the next one. Anyone already texted is shown as Sent.
+      Tap Send for each customer — it opens ${bulkSendAppNote()} pre-filled and ready to go. Come back here for the next one. Anyone already texted is shown as Sent.
     </p>
     ${Object.keys(byRound).map(rn=>{
       const list = byRound[rn].filter(c=>isMobileNumber(c.phone));
@@ -1940,7 +1971,7 @@ function openGroupMarketingText(){
     <label style="margin-top:0;">Message <span style="text-transform:none; font-weight:500; opacity:0.7;">({name}, {company}, {yourname})</span></label>
     <textarea id="mkt_msg" rows="4">${escapeHtml(tpl)}</textarea>
     <p style="color:var(--ink-muted); font-size:0.7812rem; margin:10px 2px 14px; line-height:1.5;">
-      Tap Send for each customer — it opens ${data.settings.messagingApp==='whatsapp'?'WhatsApp':'Messages'} pre-filled and ready to go. Come back here for the next one.
+      Tap Send for each customer — it opens ${bulkSendAppNote()} pre-filled and ready to go. Come back here for the next one.
     </p>
     <div style="color:var(--ink-muted); font-size:0.75rem; font-weight:700; margin:0 2px 8px;">${list.length} customer${list.length===1?'':'s'} to send to</div>
     ${list.length ? list.map(c=>{

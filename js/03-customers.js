@@ -177,6 +177,12 @@ function openCustomerForm(existing){
         <input type="text" id="f_email" value="${escapeAttr(c.email||'')}" placeholder="name@email.com" inputmode="email">
       </div>
     </div>
+    <label>Message by <span style="text-transform:none; font-weight:500; opacity:0.7;">(texts, reminders, receipts)</span></label>
+    <select id="f_msgApp">
+      <option value="" ${(c.msgApp==='sms'||c.msgApp==='whatsapp')?'':'selected'}>Use my default (${data.settings.messagingApp==='whatsapp'?'WhatsApp':'text message'})</option>
+      <option value="sms" ${c.msgApp==='sms'?'selected':''}>Text message</option>
+      <option value="whatsapp" ${c.msgApp==='whatsapp'?'selected':''}>WhatsApp</option>
+    </select>
     <label>Round</label>
     <input type="text" id="f_round" value="${escapeAttr(c.round||'')}" placeholder="e.g. Tuesday Round" list="roundOptions">
     <datalist id="roundOptions">${rounds.map(r=>`<option value="${escapeAttr(r)}">`).join('')}</datalist>
@@ -235,6 +241,7 @@ function readCustomerFormFields(){
     address: document.getElementById('f_address').value.trim(),
     phone: document.getElementById('f_phone').value.trim(),
     email: document.getElementById('f_email').value.trim(),
+    msgApp: document.getElementById('f_msgApp').value,
     round: document.getElementById('f_round').value.trim(),
     price: document.getElementById('f_price').value,
     frequencyWeeks: document.getElementById('f_freq').value,
@@ -334,6 +341,7 @@ function finishSavingCustomerForm(id, afterAttempt){
     address: document.getElementById('f_address').value.trim(),
     phone: document.getElementById('f_phone').value.trim(),
     email: document.getElementById('f_email').value.trim(),
+    msgApp: document.getElementById('f_msgApp').value,
     round: document.getElementById('f_round').value.trim() || 'Unassigned',
     price: parseFloat(document.getElementById('f_price').value) || 0,
     frequencyWeeks: parseInt(document.getElementById('f_freq').value) || 4,

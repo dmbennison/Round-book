@@ -397,7 +397,7 @@ const FOCUSED_HELP = {
     body: () => [
       helpList([
         '<b>Appearance</b> – text size, light, dark or automatic, and colour scheme.',
-        '<b>Messaging app</b> – Messages or WhatsApp.',
+        '<b>Messaging app</b> – your default: Messages or WhatsApp. Any customer can have their own under <b>Message by</b> when you edit them. If a WhatsApp message turns out to be for someone who isn\'t on it, tap <b>Not on WhatsApp?</b> on the message screen and that customer switches to text for good.',
         '<b>Swipe to text</b> – turns the “Windows cleaned today” text after a clean on or off.',
         '<b>Business details</b> – your name, company and bank details, used on invoices and texts.',
         '<b>Message templates</b> – the wording of every text. <b>{name}</b>, <b>{amount}</b>, <b>{company}</b> and <b>{yourname}</b> fill in automatically.',

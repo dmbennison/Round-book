@@ -213,7 +213,7 @@ function openSettings(){
       <button class="seg-btn ${data.settings.messagingApp!=='whatsapp'?'active':''}" onclick="setMessagingApp('sms')">💬 Text message</button>
       <button class="seg-btn ${data.settings.messagingApp==='whatsapp'?'active':''}" onclick="setMessagingApp('whatsapp')">🟢 WhatsApp</button>
     </div>
-    <p style="color:var(--ink-muted); font-size:0.75rem; margin:4px 2px 16px; line-height:1.5;">Used whenever a message is sent straight to a customer's phone — cleaning and payment reminders, receipts, quotes, and group marketing texts.</p>
+    <p style="color:var(--ink-muted); font-size:0.75rem; margin:4px 2px 16px; line-height:1.5;">This is your default for messages sent straight to a customer's phone — cleaning and payment reminders, receipts, quotes, and group marketing texts. Anyone who isn't on WhatsApp (or prefers texts) can have their own choice under <b>Message by</b> when you edit them.</p>
     <div class="section-label">After swiping to mark cleaned</div>
     <div class="seg-row">
       <button class="seg-btn ${data.settings.autoCleanedText!==false?'active':''}" onclick="setAutoCleanedText(true)">Open the text</button>
