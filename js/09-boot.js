@@ -442,3 +442,172 @@ if ('serviceWorker' in navigator) {
     }).catch(() => {});
   });
 }
+
+/* ---------- built-in self-tests ----------
+   Only run when the address has ?test (or #test) on the end, e.g. https://yoursite/?test
+   The result counts appear as a toast and the details go to the browser console. They work on
+   throw-away copies of the data and never save anything, so your real customers are never touched. */
+function runSelfTests(){
+  const results = [];
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  const eq = (name, actual, expected) => {
+    const pass = same(actual, expected);
+    results.push({ name, pass, detail: pass ? '' : 'got ' + JSON.stringify(actual) + ', expected ' + JSON.stringify(expected) });
+  };
+  const yes = (name, cond) => eq(name, !!cond, true);
+  const group = (title, fn) => {
+    try{ fn(); }catch(e){ results.push({ name: title + ' threw an error', pass: false, detail: String((e && e.message) || e) }); }
+  };
+  const T = todayISO();
+  const day = (n, from) => { const d = new Date((from || T) + 'T00:00:00'); d.setDate(d.getDate() + n); return localISO(d); };
+  const cust = o => Object.assign({ id: 't' + Math.random().toString(36).slice(2, 7), round: 'Test', visitDay: 1, frequencyWeeks: 4, paused: false, price: 20, cleanHistory: [], paymentHistory: [] }, o);
+  const clean = (date, amount) => ({ date, amount: amount == null ? 20 : amount });
+  // Run something against a throw-away customer list (the calculations read the global `data`), then put the real data back.
+  const withData = (customers, fn) => {
+    const savedData = data, savedCache = roundPhaseCache;
+    try{ data = { customers, oneOffJobs: [], quotes: [], settings: {} }; roundPhaseCache = null; return fn(); }
+    finally{ data = savedData; roundPhaseCache = savedCache; }
+  };
+
+  group('taxYearStart', () => {
+    eq('taxYearStart: on 6 April starts that year', taxYearStart('2025-04-06'), '2025-04-06');
+    eq('taxYearStart: 5 April belongs to the previous tax year', taxYearStart('2025-04-05'), '2024-04-06');
+    eq('taxYearStart: 1 January is in the tax year that began the previous April', taxYearStart('2026-01-01'), '2025-04-06');
+  });
+
+  group('computedDueISO', () => {
+    withData([], () => {
+      eq('computedDueISO: never cleaned has no due date', computedDueISO(cust({})), null);
+      eq('computedDueISO: 4-weekly is last clean + 28 days', computedDueISO(cust({ cleanHistory: [clean('2025-01-06')] })), '2025-02-03');
+      eq('computedDueISO: 6-weekly (not a multiple of 4) is last clean + 42 days', computedDueISO(cust({ frequencyWeeks: 6, cleanHistory: [clean('2025-01-06')] })), '2025-02-17');
+      eq('computedDueISO: 8-weekly with no 4-weekly neighbours is last clean + 56 days', computedDueISO(cust({ frequencyWeeks: 8, cleanHistory: [clean('2025-01-06')] })), '2025-03-03');
+    });
+    const peers = [cust({ cleanHistory: [clean('2025-01-06')] }), cust({ cleanHistory: [clean('2025-01-06')] })];
+    const eight = cust({ frequencyWeeks: 8, cleanHistory: [clean('2025-01-08')] });
+    withData(peers.concat([eight]), () => {
+      eq('computedDueISO: 8-weekly is pulled onto the round\'s 4-weekly dates', computedDueISO(eight), '2025-03-03');
+    });
+    const moved = cust({ cleanHistory: [clean('2025-01-06')], dueOverride: { date: '2025-03-10', base: '2025-01-06' } });
+    withData([moved], () => {
+      eq('nextDueISO: a hand-set date is used while it still matches the latest clean', nextDueISO(moved), '2025-03-10');
+      moved.cleanHistory.push(clean('2025-02-03'));
+      eq('nextDueISO: a hand-set date lapses once the customer is cleaned again', nextDueISO(moved), '2025-03-03');
+    });
+  });
+
+  group('roundPhases', () => {
+    const ph = last => (((isoToDays(last) + 28) % 28) + 28) % 28;
+    withData([], () => eq('roundPhases: no customers gives no rounds', roundPhases(), {}));
+    withData([cust({ round: 'Tue', cleanHistory: [clean('2025-01-06')] })], () =>
+      eq('roundPhases: one 4-weekly customer sets their round\'s rhythm', roundPhases(), { 'Tue|1': ph('2025-01-06') }));
+    withData([
+      cust({ round: 'Tue', cleanHistory: [clean('2025-01-06')] }),
+      cust({ round: 'Tue', cleanHistory: [clean('2025-01-06')] }),
+      cust({ round: 'Tue', cleanHistory: [clean('2025-01-07')] })
+    ], () => eq('roundPhases: the most common rhythm in a round wins', roundPhases()['Tue|1'], ph('2025-01-06')));
+    withData([
+      cust({ round: 'Tue', paused: true, cleanHistory: [clean('2025-01-06')] }),
+      cust({ round: 'Tue', frequencyWeeks: 8, cleanHistory: [clean('2025-01-06')] }),
+      cust({ round: 'Wed', visitDay: 3, cleanHistory: [clean('2025-01-09')] })
+    ], () => eq('roundPhases: paused and non-4-weekly customers are ignored, and each visit day is separate', roundPhases(), { 'Wed|3': ph('2025-01-09') }));
+  });
+
+  group('daysSinceLastPayment', () => {
+    withData([], () => {
+      eq('daysSinceLastPayment: nothing owed is 0', daysSinceLastPayment(cust({ cleanHistory: [clean(day(-10))], paymentHistory: [{ date: day(-9), amount: 20 }] })), 0);
+      eq('daysSinceLastPayment: one unpaid clean counts from that clean', daysSinceLastPayment(cust({ cleanHistory: [clean(day(-10))] })), 10);
+      eq('daysSinceLastPayment: payments cover the oldest charges first', daysSinceLastPayment(cust({ cleanHistory: [clean(day(-30)), clean(day(-10))], paymentHistory: [{ date: day(-20), amount: 20 }] })), 10);
+      eq('daysSinceLastPayment: a part-payment leaves the oldest clean outstanding', daysSinceLastPayment(cust({ cleanHistory: [clean(day(-30))], paymentHistory: [{ date: day(-5), amount: 10 }] })), 30);
+      eq('daysSinceLastPayment: being in credit is 0', daysSinceLastPayment(cust({ cleanHistory: [clean(day(-10))], paymentHistory: [{ date: day(-9), amount: 50 }] })), 0);
+    });
+  });
+
+  group('deferredDateFor', () => {
+    withData([], () => {
+      eq('deferredDateFor: not yet due pushes the whole cycle out (due in 21 days + 7)', deferredDateFor(cust({ cleanHistory: [clean(day(-7))] }), 7), day(28));
+      eq('deferredDateFor: already overdue counts from today', deferredDateFor(cust({ cleanHistory: [clean(day(-60))] }), 28), day(28));
+      eq('deferredDateFor: defaults to 28 days', deferredDateFor(cust({ cleanHistory: [clean(day(-60))] })), day(28));
+      eq('deferredDateFor: deferring again stacks on the existing deferral', deferredDateFor(cust({ cleanHistory: [clean(day(-60))], deferUntil: day(40) }), 7), day(47));
+      eq('deferredDateFor: an existing deferral that has already passed is ignored', deferredDateFor(cust({ cleanHistory: [clean(day(-60))], deferUntil: day(-3) }), 7), day(7));
+    });
+  });
+
+  group('quoteNeedsFollowUp', () => {
+    const q = o => Object.assign({ status: 'pending', date: day(-7), followUpDays: 7, quoteFollowUpCount: 0 }, o);
+    yes('quoteNeedsFollowUp: due exactly on the follow-up day', quoteNeedsFollowUp(q({}), T));
+    eq('quoteNeedsFollowUp: not due the day before', quoteNeedsFollowUp(q({ date: day(-6) }), T), false);
+    eq('quoteNeedsFollowUp: accepted or declined quotes never need chasing', quoteNeedsFollowUp(q({ status: 'accepted' }), T), false);
+    eq('quoteNeedsFollowUp: each chase doubles the wait (not due at 13 days after one chase)', quoteNeedsFollowUp(q({ date: day(-13), quoteFollowUpCount: 1 }), T), false);
+    yes('quoteNeedsFollowUp: each chase doubles the wait (due at 14 days after one chase)', quoteNeedsFollowUp(q({ date: day(-14), quoteFollowUpCount: 1 }), T));
+  });
+
+  group('syncMergeArray', () => {
+    eq('syncMergeArray: entries added on each device both survive', syncMergeArray(['a'], ['a', 'b'], ['a', 'c']), ['a', 'b', 'c']);
+    eq('syncMergeArray: a removal on one device is respected', syncMergeArray(['a', 'b'], ['a', 'b'], ['a']), ['a']);
+    eq('syncMergeArray: removal on one device and an addition on the other both apply', syncMergeArray(['a', 'b'], ['a'], ['a', 'b', 'c']), ['a', 'c']);
+    eq('syncMergeArray: genuine duplicates are kept', syncMergeArray([], ['x', 'x'], ['x']), ['x', 'x']);
+    eq('syncMergeArray: message logs come out newest first', syncMergeArray([], [{ time: 3, kind: 'a' }], [{ time: 5, kind: 'b' }]).map(x => x.time), [5, 3]);
+    const many = []; for(let i = 1; i <= 35; i++) many.push({ time: i, kind: 'k' });
+    eq('syncMergeArray: message logs are capped at 30', syncMergeArray([], many, []).length, 30);
+  });
+
+  group('syncMergeStates', () => {
+    const S = (customers, settings) => ({ customers, oneOffJobs: [], quotes: [], mileageLog: [], settings: settings || {} });
+    const merge = (b, l, r, pref) => syncMergeStates(b, l, r, { preferRemote: !!pref });
+    const c1 = { id: 'c1', name: 'Anna', phone: '555', price: 10 };
+    const c2 = { id: 'c2', name: 'Ben', phone: '', price: 12 };
+    const c3 = { id: 'c3', name: 'Cat', phone: '', price: 14 };
+    const ids = res => res.merged.customers.map(x => x.id).sort();
+    const get = (res, id) => res.merged.customers.find(x => x.id === id);
+    const base = S([c1, c2]);
+
+    let res = merge(base, S([c1, c2]), S([c1, c2, c3]));
+    eq('syncMergeStates: a customer added on the other device arrives (and is counted as added)', [ids(res), res.stats.customers.added], [['c1', 'c2', 'c3'], 1]);
+    res = merge(base, S([c1, c2, c3]), S([c1, c2]));
+    eq('syncMergeStates: a customer added here stays', ids(res), ['c1', 'c2', 'c3']);
+    res = merge(base, S([c1, c2]), S([Object.assign({}, c1, { price: 15 }), c2]));
+    eq('syncMergeStates: an edit on the other device is taken', get(res, 'c1').price, 15);
+    res = merge(base, S([Object.assign({}, c1, { price: 11 }), c2]), S([Object.assign({}, c1, { phone: '999' }), c2]));
+    eq('syncMergeStates: edits to different fields both survive', [get(res, 'c1').price, get(res, 'c1').phone, res.clashes.length], [11, '999', 0]);
+    res = merge(base, S([Object.assign({}, c1, { price: 11 }), c2]), S([Object.assign({}, c1, { price: 15 }), c2]));
+    const clashRemote = merge(base, S([Object.assign({}, c1, { price: 11 }), c2]), S([Object.assign({}, c1, { price: 15 }), c2]), true);
+    eq('syncMergeStates: the same field changed on both devices is a clash (this device\'s value kept, or the other\'s when preferred)', [res.clashes.length, get(res, 'c1').price, get(clashRemote, 'c1').price], [1, 11, 15]);
+    res = merge(base, S([Object.assign({}, c1, { phone: '07' }), c2]), S([Object.assign({}, c1, { phone: '' }), c2]));
+    eq('syncMergeStates: blank on one side and filled on the other is not a clash', [get(res, 'c1').phone, res.clashes.length], ['07', 0]);
+    res = merge(base, S([c1, c2]), S([c1]));
+    eq('syncMergeStates: a customer deleted on the other device (and untouched here) is removed', [ids(res), res.stats.customers.removed], [['c1'], 1]);
+    res = merge(base, S([c1, Object.assign({}, c2, { price: 13 })]), S([c1]));
+    eq('syncMergeStates: a customer deleted there but edited here is kept', [ids(res), res.stats.customers.kept], [['c1', 'c2'], 1]);
+    res = merge(base, S([c1]), S([c1, c2]));
+    eq('syncMergeStates: a customer deleted here (and untouched there) stays deleted', ids(res), ['c1']);
+    res = merge(base, S([c1]), S([c1, Object.assign({}, c2, { price: 13 })]));
+    eq('syncMergeStates: a customer deleted here but edited there comes back', [ids(res), res.stats.customers.restored], [['c1', 'c2'], 1]);
+    res = merge(S([]), S([{ id: 'ca', name: 'A', accountNumber: '1002' }], { nextAccountNumber: 1002 }), S([{ id: 'cb', name: 'B', accountNumber: '1002' }], { nextAccountNumber: 1002 }));
+    eq('syncMergeStates: two customers given the same account number on different devices are renumbered', [get(res, 'ca').accountNumber, get(res, 'cb').accountNumber, res.renumbered], ['1002', '1003', 1]);
+    res = merge(S([], { companyName: 'X', yourName: 'Y' }), S([], { companyName: 'X', yourName: 'Z' }), S([], { companyName: 'W', yourName: 'Y' }));
+    eq('syncMergeStates: settings changed on different devices are combined field by field', [res.merged.settings.companyName, res.merged.settings.yourName], ['W', 'Z']);
+    res = merge(
+      S([], { marketingCampaigns: [{ id: 'g', name: 'G', body: 'a' }] }),
+      S([], { marketingCampaigns: [{ id: 'g', name: 'G', body: 'a' }, { id: 'n', name: 'N', body: 'x' }] }),
+      S([], { marketingCampaigns: [{ id: 'g', name: 'G', body: 'b' }] }));
+    eq('syncMergeStates: marketing campaigns merge entry by entry', res.merged.settings.marketingCampaigns.map(x => x.id + ':' + x.body), ['g:b', 'n:x']);
+    res = merge(S([], { nextAccountNumber: 1005 }), S([], { nextAccountNumber: 1010 }), S([], { nextAccountNumber: 1020 }));
+    eq('syncMergeStates: nextAccountNumber takes the higher value instead of clashing', [res.merged.settings.nextAccountNumber, res.clashes.length], [1020, 0]);
+    const withCamps = n => ({ yourName: n, marketingCampaigns: [] });
+    const same2 = merge(S([], withCamps('A')), S([], withCamps('A')), S([], withCamps('A')));
+    const changed2 = merge(S([], withCamps('A')), S([], withCamps('A')), S([], withCamps('B')));
+    eq('syncMergeStates: settings are reported as changed only when the other device changed them', [same2.stats.settingsChanged, changed2.stats.settingsChanged], [false, true]);
+  });
+
+  const failed = results.filter(r => !r.pass);
+  console.log('Round Book self-tests: ' + (results.length - failed.length) + ' passed, ' + failed.length + ' failed');
+  failed.forEach(r => console.error('FAIL: ' + r.name + (r.detail ? ' — ' + r.detail : '')));
+  return { total: results.length, passed: results.length - failed.length, failed };
+}
+// Only when the address ends ?test or #test — never during normal use.
+if(/[?&#]test(?:[=&#]|$)/i.test(location.search + location.hash)){
+  window.addEventListener('load', () => setTimeout(() => {
+    const r = runSelfTests();
+    toast(r.failed.length ? `Tests: ${r.passed} passed, ${r.failed.length} FAILED (details in the console)` : `Tests: all ${r.passed} passed`);
+  }, 1500));
+}

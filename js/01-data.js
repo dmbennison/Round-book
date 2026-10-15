@@ -6,13 +6,14 @@ const STORE_KEY = 'roundBookData_v1';
 // APP_VERSION is a plain decimal number (e.g. 1.01, 1.02 ... 1.99, 2.00) —
 // bump by 0.01 for every change. formatVersion always renders it to exactly
 // two decimal places, so it's never shown as "1.1" or "1.100".
-const APP_VERSION = 2.83;
+const APP_VERSION = 2.84;
 function formatVersion(v){ return Number(v).toFixed(2); }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
 // entry (newest first) with ONE very short plain-English summary, then delete
 // entries so only the latest ten remain.
 const VERSION_HISTORY = [
+  {version: 2.84, changes: ['Behind the scenes: adding ?test to the end of the web address now runs 50 automatic self-checks on the due-date, owing, quote and sync calculations and shows how many passed. Normal use is unchanged']},
   {version: 2.83, changes: ['Each customer can now have their own Message by choice (default, text or WhatsApp). If someone isn\'t on WhatsApp, tap Not on WhatsApp? on the message screen and they switch to text for good']},
   {version: 2.82, changes: ['Colour schemes: Ocean, Rust, Forest and Plum now have calmer, near-neutral backgrounds and a contrasting accent colour (coral, cobalt, ochre and teal), the same approach as Slate. Slate and High contrast are unchanged']},
   {version: 2.81, changes: ['Live sync now uses your Round Book sync service automatically — there is no address to type in']},
@@ -22,7 +23,6 @@ const VERSION_HISTORY = [
   {version: 2.77, changes: ['Excel, PDF, Word and map tools are now stored with the app itself, so installing no longer depends on an outside website']},
   {version: 2.76, changes: ['Faster start-up: Excel, PDF, Word and map tools now load only the first time you use them, and are kept for offline use afterwards']},
   {version: 2.75, changes: ['Rounds that run over several days now list every customer under the right day (Day 1, Day 2…) when viewing all days, instead of the days being mixed up — in the list, Owed view, map, directions, printouts and exports']},
-  {version: 2.74, changes: ['Swiping a card now gives haptic feedback: a tick as the swipe reaches the point where it will act (stronger for clean + paid) and a double tap when it happens', 'Schedule editor: a ? Help icon in the top right corner shows the Schedule help, and the instruction text at the top is gone, leaving more room for the calendar', 'In-app help simplified: every topic is shorter and covers only what you need to use the app']},
 ];
 /* ---------- on-demand libraries ----------
    Excel (xlsx), Word (docx), PDF (jsPDF + html2canvas) and the map (Leaflet) are only needed when you
