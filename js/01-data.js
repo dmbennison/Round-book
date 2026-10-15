@@ -6,13 +6,14 @@ const STORE_KEY = 'roundBookData_v1';
 // APP_VERSION is a plain decimal number (e.g. 1.01, 1.02 ... 1.99, 2.00) —
 // bump by 0.01 for every change. formatVersion always renders it to exactly
 // two decimal places, so it's never shown as "1.1" or "1.100".
-const APP_VERSION = 2.84;
+const APP_VERSION = 2.85;
 function formatVersion(v){ return Number(v).toFixed(2); }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
 // entry (newest first) with ONE very short plain-English summary, then delete
 // entries so only the latest ten remain.
 const VERSION_HISTORY = [
+  {version: 2.85, changes: ['Under the hood: app updates now install all-or-nothing so the app can never end up half-updated; live sync and saving are much lighter on the phone with a big customer list; the photo gallery loads a page at a time; email links are made safer; plus 16 more automatic self-checks (add ?test to the web address)']},
   {version: 2.84, changes: ['Behind the scenes: adding ?test to the end of the web address now runs 50 automatic self-checks on the due-date, owing, quote and sync calculations and shows how many passed. Normal use is unchanged']},
   {version: 2.83, changes: ['Each customer can now have their own Message by choice (default, text or WhatsApp). If someone isn\'t on WhatsApp, tap Not on WhatsApp? on the message screen and they switch to text for good']},
   {version: 2.82, changes: ['Colour schemes: Ocean, Rust, Forest and Plum now have calmer, near-neutral backgrounds and a contrasting accent colour (coral, cobalt, ochre and teal), the same approach as Slate. Slate and High contrast are unchanged']},
@@ -22,7 +23,6 @@ const VERSION_HISTORY = [
   {version: 2.78, changes: ['Schedule: opens showing 5 weeks instead of 9 (＋ Show 4 more weeks is still there), and Push back, Multi, Split and Job now sit behind a ⋯ More… button']},
   {version: 2.77, changes: ['Excel, PDF, Word and map tools are now stored with the app itself, so installing no longer depends on an outside website']},
   {version: 2.76, changes: ['Faster start-up: Excel, PDF, Word and map tools now load only the first time you use them, and are kept for offline use afterwards']},
-  {version: 2.75, changes: ['Rounds that run over several days now list every customer under the right day (Day 1, Day 2…) when viewing all days, instead of the days being mixed up — in the list, Owed view, map, directions, printouts and exports']},
 ];
 /* ---------- on-demand libraries ----------
    Excel (xlsx), Word (docx), PDF (jsPDF + html2canvas) and the map (Leaflet) are only needed when you
@@ -231,7 +231,7 @@ async function exportAccountingCSV(){
   if(range === 'tytd'){
     fromISO = tyStart; toISO = today;
   } else if(range === 'lasty'){
-    const lastYEnd = new Date(tyStart+'T00:00:00'); lastYEnd.setDate(lastYEnd.getDate()-1);
+    const lastYEnd = isoToDate(tyStart); lastYEnd.setDate(lastYEnd.getDate()-1);
     toISO = localISO(lastYEnd);
     fromISO = taxYearStart(toISO);
   } else if(range === 'custom'){
@@ -460,8 +460,30 @@ async function loadData(){
 // waiting on it — same fire-and-forget pattern already used for photo saves.
 // The 3 call sites that DO need to know whether the save actually succeeded
 // (logo/photo uploads, which only navigate onward on success) `await` it instead.
-async function saveData(){
+// Saves are queued so a burst of changes (ticking several customers, a big import) writes the whole
+// database at most twice instead of once per change: the first save goes straight out, and anything
+// asked for while it is still being written is folded into ONE follow-up save that picks up the latest data.
+let saveRunning = false, savePending = null;
+function saveData(){
   roundPhaseCache = null; // due-date alignment (see roundPhases) depends on the data
+  if(!saveRunning){ saveRunning = true; return runSaveQueue(); }
+  if(!savePending){ savePending = {}; savePending.promise = new Promise(res => { savePending.resolve = res; }); }
+  return savePending.promise;
+}
+async function runSaveQueue(){
+  let first = false;
+  try{ first = await saveDataNow(); }catch(e){ first = false; }
+  while(savePending){
+    const pending = savePending; savePending = null;
+    let ok = false;
+    try{ ok = await saveDataNow(); }catch(e){ ok = false; }
+    pending.resolve(ok);
+  }
+  saveRunning = false;
+  return first;
+}
+async function saveDataNow(){
+  roundPhaseCache = null;
   try{
     await idbSaveAppData(data);
     // Once IndexedDB genuinely holds the current data, drop any stale localStorage
@@ -725,9 +747,12 @@ function uid(){ return 'c' + Date.now().toString(36) + Math.random().toString(36
 // Summer Time lands a day early for local-midnight dates.)
 function localISO(d){ return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
 function todayISO(){ return localISO(new Date()); }
+// YYYY-MM-DD as a Date at local midnight, and the date n days on (or back, if n is negative) as YYYY-MM-DD.
+function isoToDate(iso){ return new Date(iso + 'T00:00:00'); }
+function addDaysISO(iso, n){ const d = isoToDate(iso); d.setDate(d.getDate() + n); return localISO(d); }
 function fmtDate(iso){
   if(!iso) return '—';
-  const d = new Date(iso+'T00:00:00');
+  const d = isoToDate(iso);
   const dd = String(d.getDate()).padStart(2,'0');
   const mm = String(d.getMonth()+1).padStart(2,'0');
   const yy = String(d.getFullYear()).slice(-2);
@@ -745,11 +770,34 @@ function fmtTime(t){
   return `${h12}:${m} ${period}`;
 }
 function daysBetween(a,b){
-  const d1=new Date(a+'T00:00:00'), d2=new Date(b+'T00:00:00');
+  const d1=isoToDate(a), d2=isoToDate(b);
   return Math.round((d2-d1)/86400000);
 }
-function lastOf(arr){ if(!arr||!arr.length) return null; return [...arr].sort().slice(-1)[0]; }
-function lastDateOf(arr){ if(!arr||!arr.length) return null; return [...arr.map(e=>e.date)].sort().slice(-1)[0]; }
+// The latest value, found in one pass — these run for every customer on every screen draw, so they no longer
+// copy and sort the whole history each time. Same answer as sorting and taking the last item: values compare
+// as text, an undefined entry counts as "last", and of two equal values the later one wins.
+function lastOf(arr){
+  if(!arr||!arr.length) return null;
+  let best, bestS;
+  for(let i=0; i<arr.length; i++){
+    const v = arr[i];
+    if(v === undefined) return undefined;
+    const sv = String(v);
+    if(i === 0 || sv >= bestS){ best = v; bestS = sv; }
+  }
+  return best;
+}
+function lastDateOf(arr){
+  if(!arr||!arr.length) return null;
+  let best, bestS;
+  for(let i=0; i<arr.length; i++){
+    const v = arr[i].date;
+    if(v === undefined) return undefined;
+    const sv = String(v);
+    if(i === 0 || sv >= bestS){ best = v; bestS = sv; }
+  }
+  return best;
+}
 function money(n){ const v=Number(n||0); return '£'+v.toFixed(v%1?2:0); }
 // One-off jobs can carry a discount percentage (next to price on the job form,
 // default 0) which is applied when the job's total is shown on invoices and
@@ -876,11 +924,7 @@ function computedDueISO(c){
 function naturalNextDueISO(c){
   const lastClean = lastDateOf(c.cleanHistory);
   if(!lastClean) return null;
-  const d = new Date(lastClean+'T00:00:00');
-  d.setDate(d.getDate() + freqDays(c));
-  // Built from local date parts — toISOString() converts to UTC, which in British
-  // Summer Time shifted the result back a day.
-  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  return addDaysISO(lastClean, freqDays(c)); // local date parts (see localISO) — not toISOString(), which is a day out in summer
 }
 // The next-due date shared by the most customers in a round (their next-due
 // date, not their price — see nextDueISO) — used to give a brand new

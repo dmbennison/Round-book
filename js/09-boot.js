@@ -447,7 +447,7 @@ if ('serviceWorker' in navigator) {
    Only run when the address has ?test (or #test) on the end, e.g. https://yoursite/?test
    The result counts appear as a toast and the details go to the browser console. They work on
    throw-away copies of the data and never save anything, so your real customers are never touched. */
-function runSelfTests(){
+async function runSelfTests(){
   const results = [];
   const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
   const eq = (name, actual, expected) => {
@@ -457,6 +457,9 @@ function runSelfTests(){
   const yes = (name, cond) => eq(name, !!cond, true);
   const group = (title, fn) => {
     try{ fn(); }catch(e){ results.push({ name: title + ' threw an error', pass: false, detail: String((e && e.message) || e) }); }
+  };
+  const agroup = async (title, fn) => {
+    try{ await fn(); }catch(e){ results.push({ name: title + ' threw an error', pass: false, detail: String((e && e.message) || e) }); }
   };
   const T = todayISO();
   const day = (n, from) => { const d = new Date((from || T) + 'T00:00:00'); d.setDate(d.getDate() + n); return localISO(d); };
@@ -599,6 +602,41 @@ function runSelfTests(){
     eq('syncMergeStates: settings are reported as changed only when the other device changed them', [same2.stats.settingsChanged, changed2.stats.settingsChanged], [false, true]);
   });
 
+  group('date helpers', () => {
+    const d = isoToDate('2025-03-30');
+    eq('isoToDate: gives local midnight on that date', [d.getFullYear(), d.getMonth(), d.getDate(), d.getHours()], [2025, 2, 30, 0]);
+    eq('addDaysISO: crosses a month and year end', [addDaysISO('2025-12-30', 3), addDaysISO('2025-03-01', -1)], ['2026-01-02', '2025-02-28']);
+    eq('addDaysISO: stays right across the clocks changing (spring and autumn)', [addDaysISO('2025-03-29', 2), addDaysISO('2025-10-25', 2)], ['2025-03-31', '2025-10-27']);
+    eq('lastOf / lastDateOf: pick the latest however the list is ordered', [lastOf(['2025-02-01', '2025-03-01', '2025-01-01']), lastDateOf([{ date: '2025-02-01' }, { date: '2025-03-01' }, { date: '2025-01-01' }])], ['2025-03-01', '2025-03-01']);
+    eq('lastOf / lastDateOf: empty or missing lists give null', [lastOf([]), lastDateOf(null), lastDateOf([])], [null, null, null]);
+  });
+
+  group('mailtoAddress', () => {
+    eq('mailtoAddress: an ordinary address is left alone', mailtoAddress('anna@example.com'), 'anna@example.com');
+    eq('mailtoAddress: ? & # cannot be used to add recipients or headers', mailtoAddress('a@b.com?bcc=x@y.com&cc=z'), 'a@b.com%3Fbcc=x@y.com%26cc=z');
+  });
+
+  group('syncStable / syncEq', () => {
+    eq('syncStable: keys sorted, missing values dropped, odd numbers null', syncStable({ b: 1, a: [true, null, undefined, NaN], c: undefined, d: 'x"y' }), '{"a":[true,null,null,null],"b":1,"d":"x\\"y"}');
+    eq('syncStable: unicode and nesting', syncStable({ z: { y: 'é', x: [] } }), '{"z":{"x":[],"y":"é"}}');
+    yes('syncEq: the same data with keys in a different order is equal', syncEq({ a: 1, b: { c: 2, d: [1, 2] } }, { b: { d: [1, 2], c: 2 }, a: 1 }));
+    eq('syncEq: different data is not equal', syncEq({ a: 1 }, { a: 2 }), false);
+  });
+
+  await agroup('sync encryption', async () => {
+    const salt = syncB64(crypto.getRandomValues(new Uint8Array(16)));
+    const key = await syncDeriveKey('correct horse battery staple', salt);
+    const wrongKey = await syncDeriveKey('a different passphrase', salt);
+    const payload = { customers: [{ id: 'c1', name: 'Zoë Müller', notes: '東京 ✓', price: 12.5 }], big: 'x'.repeat(5000) };
+    const env = JSON.parse(await syncEncrypt(payload, key, salt));
+    eq('encryption: what goes in comes back out unchanged', await syncDecrypt(env, key), payload);
+    eq('encryption: the wrong passphrase gets nothing back', await syncDecrypt(env, wrongKey), null);
+    eq('encryption: a tampered file is rejected', await syncDecrypt(Object.assign({}, env, { ct: env.ct.slice(0, -6) + (env.ct.slice(-6) === 'AAAAAA' ? 'BBBBBB' : 'AAAAAA') }), key), null);
+    eq('encryption: a file with its salt label altered is rejected', await syncDecrypt(Object.assign({}, env, { salt: syncB64(crypto.getRandomValues(new Uint8Array(16))) }), key), null);
+    const plainEnv = JSON.parse(await syncEncrypt(payload, key, salt, { compress: false }));
+    eq('encryption: uncompressed files (photos) round-trip too', [plainEnv.z, await syncDecrypt(plainEnv, key)], [0, payload]);
+  });
+
   const failed = results.filter(r => !r.pass);
   console.log('Round Book self-tests: ' + (results.length - failed.length) + ' passed, ' + failed.length + ' failed');
   failed.forEach(r => console.error('FAIL: ' + r.name + (r.detail ? ' — ' + r.detail : '')));
@@ -606,8 +644,9 @@ function runSelfTests(){
 }
 // Only when the address ends ?test or #test — never during normal use.
 if(/[?&#]test(?:[=&#]|$)/i.test(location.search + location.hash)){
-  window.addEventListener('load', () => setTimeout(() => {
-    const r = runSelfTests();
+  window.addEventListener('load', () => setTimeout(async () => {
+    toast('Running self-tests…');
+    const r = await runSelfTests();
     toast(r.failed.length ? `Tests: ${r.passed} passed, ${r.failed.length} FAILED (details in the console)` : `Tests: all ${r.passed} passed`);
   }, 1500));
 }

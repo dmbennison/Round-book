@@ -386,15 +386,6 @@ function updateQuotesBadge(){
   el.textContent = n > 99 ? '99+' : String(n);
   el.hidden = n === 0;
 }
-// Among quotes already needing a follow-up, how many are well overdue — more
-// than double their own follow-up window — worth calling out on the Today tile.
-function quotesWellOverdueCount(){
-  const today = todayISO();
-  return quotesNeedingFollowUp().filter(q=>{
-    const followUpDays = q.followUpDays != null ? q.followUpDays : 7;
-    return daysBetween(q.date, today) >= followUpDays * 2;
-  }).length;
-}
 
 // A pending marketing action (a call to make, a text to send again) is only
 // "due" for the banner once it has a follow-up date that's arrived — an action

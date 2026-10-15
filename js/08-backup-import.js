@@ -237,13 +237,6 @@ function helpIconBtn(topic, returnTo){
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
   </button>`;
 }
-function helpRow(left, right){
-  return `<div style="display:flex; justify-content:space-between; gap:12px; align-items:center; padding:10px 2px; border-bottom:1px solid var(--line);">
-    <span style="font-size:0.8125rem; font-weight:700; color:var(--ink);">${left}</span>
-    <span style="font-size:0.8125rem; color:var(--ink-muted); text-align:right;">${right}</span>
-  </div>`;
-}
-
 // Bullet list used by the guide sections below.
 function helpList(items){
   return `<ul style="margin:0 2px 14px; padding-left:20px; color:var(--ink); font-size:0.8438rem; line-height:1.6;">${items.map(i => `<li style="margin-bottom:6px;">${i}</li>`).join('')}</ul>`;

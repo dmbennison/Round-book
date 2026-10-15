@@ -28,9 +28,9 @@ function seEls(){
 }
 
 /* ---------- small date helpers (isoToDays / daysToISO live in 01-data.js) ---------- */
-function seFmtDay(iso){ return new Date(iso + 'T00:00:00').toLocaleDateString('en-GB', {weekday:'short', day:'numeric', month:'short'}); }
+function seFmtDay(iso){ return isoToDate(iso).toLocaleDateString('en-GB', {weekday:'short', day:'numeric', month:'short'}); }
 function seAddDays(iso, n){ return daysToISO(isoToDays(iso) + n); }
-function seDow(iso){ return new Date(iso + 'T00:00:00').getDay(); }
+function seDow(iso){ return isoToDate(iso).getDay(); }
 // A day is "off" if its weekday is a regular day off (Sundays by default) or it's been marked off.
 function seIsOff(iso){ return se.offWeekdays.includes(seDow(iso)) || se.blocked.includes(iso); }
 // The n-th working day after iso (skipping days off).
@@ -169,7 +169,7 @@ function renderScheduleEditor(){
 
   const dayNames = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
   let html = dayNames.map(d => `<div class="se-dayname">${d}</div>`).join('');
-  const start = new Date(se.startISO + 'T00:00:00');
+  const start = isoToDate(se.startISO);
   for(let i = 0; i < se.weeks * 7; i++){
     const d = new Date(start); d.setDate(d.getDate() + i);
     const iso = localISO(d);

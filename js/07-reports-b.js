@@ -690,7 +690,7 @@ function printPropertyTypesReport(){
 // UK tax year runs 6 April to 5 April the following year — returns the ISO
 // date (YYYY-MM-DD) the current tax year started, given any date within it.
 function taxYearStart(dateStr){
-  const d = new Date(dateStr+'T00:00:00');
+  const d = isoToDate(dateStr);
   const y = d.getFullYear();
   const aprSixThisYear = `${y}-04-06`;
   return dateStr >= aprSixThisYear ? aprSixThisYear : `${y-1}-04-06`;
@@ -698,7 +698,7 @@ function taxYearStart(dateStr){
 // Monday of the week containing this date, as an ISO date — used to group
 // mileage into Monday–Sunday weeks.
 function mondayOfWeek(dateStr){
-  const d = new Date(dateStr+'T00:00:00');
+  const d = isoToDate(dateStr);
   const dayIdx = (d.getDay()+6)%7; // 0 = Monday
   d.setDate(d.getDate()-dayIdx);
   return localISO(d);
@@ -756,7 +756,7 @@ function printMileageReport(){
   }
   const today = todayISO();
   const tyStart = taxYearStart(today);
-  const tyEnd = (()=>{ const d = new Date(tyStart+'T00:00:00'); d.setFullYear(d.getFullYear()+1); d.setDate(d.getDate()-1); return localISO(d); })();
+  const tyEnd = (()=>{ const d = isoToDate(tyStart); d.setFullYear(d.getFullYear()+1); d.setDate(d.getDate()-1); return localISO(d); })();
   const tyMiles = entries.filter(e=>e.date >= tyStart).reduce((s,e)=>s+e.miles,0);
 
   // Every tax year that has any logged mileage, oldest first for the table —
@@ -765,7 +765,7 @@ function printMileageReport(){
   entries.forEach(e=>{ const ty = taxYearStart(e.date); tyTotals[ty] = (tyTotals[ty]||0) + e.miles; });
   const tyAllowanceRows = Object.keys(tyTotals).sort((a,b)=>b.localeCompare(a)).map(ty=>{
     const miles = tyTotals[ty];
-    const end = new Date(ty+'T00:00:00'); end.setFullYear(end.getFullYear()+1); end.setDate(end.getDate()-1);
+    const end = isoToDate(ty); end.setFullYear(end.getFullYear()+1); end.setDate(end.getDate()-1);
     const label = `6 Apr ${ty.slice(0,4)} – ${fmtDate(localISO(end))}`;
     return `<tr><td>${label}</td><td style="text-align:right;">${miles.toFixed(1)}</td><td style="text-align:right;">${money(mileageAllowanceForMiles(miles, ty))}</td></tr>`;
   }).join('');
@@ -780,7 +780,7 @@ function printMileageReport(){
   const weekTotals = {};
   entries.forEach(e=>{ const wk = mondayOfWeek(e.date); weekTotals[wk] = (weekTotals[wk]||0) + e.miles; });
   const weekRows = Object.keys(weekTotals).sort((a,b)=>b.localeCompare(a)).map(wk=>{
-    const end = new Date(wk+'T00:00:00'); end.setDate(end.getDate()+6);
+    const end = isoToDate(wk); end.setDate(end.getDate()+6);
     return `<tr><td>${fmtDate(wk)} – ${fmtDate(localISO(end))}</td><td style="text-align:right;">${weekTotals[wk].toFixed(1)}</td></tr>`;
   }).join('');
 
@@ -831,7 +831,7 @@ function printEarnings(){
   const weekAgo = new Date(now); weekAgo.setDate(weekAgo.getDate()-7);
   const monthAgo = new Date(now); monthAgo.setMonth(monthAgo.getMonth()-1);
   const yearAgo = new Date(now); yearAgo.setFullYear(yearAgo.getFullYear()-1);
-  const sumSince = (from) => payments.filter(p=>new Date(p.date+'T00:00:00') >= from).reduce((s,p)=>s+p.amount,0);
+  const sumSince = (from) => payments.filter(p=>isoToDate(p.date) >= from).reduce((s,p)=>s+p.amount,0);
   const allTime = payments.reduce((s,p)=>s+p.amount,0);
 
   const byMonth = {};

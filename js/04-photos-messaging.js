@@ -899,11 +899,7 @@ function deferredDateFor(c, days){
   const naturalDue = nextDueISO(c) || today;
   let base = naturalDue > today ? naturalDue : today;
   if(c.deferUntil && c.deferUntil > base) base = c.deferUntil;
-  const d = new Date(base+'T00:00:00');
-  d.setDate(d.getDate() + days);
-  // Local date parts — toISOString() converts to UTC, which in British Summer Time
-  // lands a day early.
-  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  return addDaysISO(base, days); // local date parts — toISOString() is a day out in British Summer Time
 }
 function deferLabel(days){
   if(days===1) return '1 day';
@@ -1252,6 +1248,10 @@ function bulkSendAppNote(){
   if(anyOwn) return 'WhatsApp or Messages (as set for each customer)';
   return data.settings.messagingApp === 'whatsapp' ? 'WhatsApp' : 'Messages';
 }
+// An email address made safe to put straight after "mailto:" — a stray ? # or & in it can't add extra recipients or headers.
+function mailtoAddress(email){
+  return encodeURI(String(email || '').trim()).replace(/[?#&]/g, ch => encodeURIComponent(ch));
+}
 function sendPhoneMessage(phone, msg){
   const clean = (phone||'').replace(/\s+/g,'');
   if(!clean) return;
@@ -1421,7 +1421,7 @@ function sendReceipt(id, dateISO, amount){
   if(mobile){
     openMessagePreview('Send receipt', c.phone, msg, null, () => openReceiptOptions(id, dateISO, amount), {item: c, kind: 'receipt'});
   } else {
-    window.location.href = `mailto:${c.email}?subject=${encodeURIComponent('Receipt')}&body=${encodeURIComponent(msg)}`;
+    window.location.href = `mailto:${mailtoAddress(c.email)}?subject=${encodeURIComponent('Receipt')}&body=${encodeURIComponent(msg)}`;
   }
 }
 
@@ -1577,7 +1577,7 @@ function sendQuoteText(id, mode){
     if(countsAsChase) q.quoteFollowUpCount = (q.quoteFollowUpCount||0) + 1;
     saveData();
     render();
-    window.location.href = `mailto:${q.email}?subject=${encodeURIComponent('Your window cleaning quote')}&body=${encodeURIComponent(msg)}`;
+    window.location.href = `mailto:${mailtoAddress(q.email)}?subject=${encodeURIComponent('Your window cleaning quote')}&body=${encodeURIComponent(msg)}`;
   }
 }
 

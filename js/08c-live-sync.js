@@ -9,6 +9,9 @@
 const LIVE_SYNC_DEFAULT_URL = 'https://round-book-sync.dmbennison.workers.dev';
 
 const LIVE_POLL_MS = 60*1000;
+// Counts every save, so a sync check can tell "nothing has changed since I last confirmed the other
+// device has exactly this" and skip rebuilding and hashing the whole database.
+let liveDataVersion = 0, liveCleanVersion = -1, liveCleanHash = null;
 const LIVE_PUSH_DELAY_MS = 20*1000;        // wait this long after an edit before sending
 const LIVE_PUSH_MIN_GAP_MS = 45*1000;      // never send more often than this
 const LIVE_PUSH_MAX_WAIT_MS = 60*1000;     // ...but always within this of the first unsent edit
@@ -482,9 +485,15 @@ async function livePushInner(opts){
   if(!key || live.base == null) return { ok:false };
   if(live.pausedUntil && Date.now() < live.pausedUntil) return { ok:false };
   if(!navigator.onLine){ liveSetStatus('offline'); return { ok:false }; }
-  const state = syncBuildState(data);
-  const hash = await liveHashState(state);
-  if(opts.force || hash !== live.lastPushHash){
+  const versionAtStart = liveDataVersion;
+  const unchanged = !opts.force && !!live.lastPushHash && liveCleanVersion === versionAtStart && liveCleanHash === live.lastPushHash;
+  let state = null, hash = live.lastPushHash;
+  if(!unchanged){
+    state = syncBuildState(data);
+    hash = await liveHashState(state);
+    if(!opts.force && hash === live.lastPushHash){ liveCleanVersion = versionAtStart; liveCleanHash = hash; }
+  }
+  if(!unchanged && (opts.force || hash !== live.lastPushHash)){
     const day = liveDay(), now = Date.now();
     const used = live.pushDay === day ? (live.pushCount || 0) : 0;
     if(used >= LIVE_DAILY_PUSH_CAP){
@@ -506,6 +515,7 @@ async function livePushInner(opts){
     livePushTimes.push(now);
     liveLastPushAt = now;
     await liveUpdate({ lastPushHash: hash, lastPushAt: now, pushDay: day, pushCount: used + 1 });
+    if(liveDataVersion === versionAtStart){ liveCleanVersion = versionAtStart; liveCleanHash = hash; }
   }
   let up;
   try{ up = await liveUploadPhotos(await liveMeta(), key); }catch(e){ liveSetStatus('offline'); return { ok:false }; }
@@ -558,6 +568,7 @@ function liveNoteChange(){
 (function wrapSaveData(){
   const original = saveData;
   saveData = function(){
+    liveDataVersion++;
     const r = original.apply(this, arguments);
     try{ liveNoteChange(); }catch(e){}
     return r;

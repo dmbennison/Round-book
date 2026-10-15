@@ -823,13 +823,17 @@ function openRoundFromSearch(rn){
 // Photo gallery — every customer with at least one photo (their own, or from a
 // linked one-off job), address first then a thumbnail grid, so photos can be
 // browsed across the whole customer base rather than one customer at a time.
+// The gallery draws a page of customers at a time, so hundreds of photos aren't all loaded and decoded at once.
+const GALLERY_PAGE = 25;
+let galleryLimit = GALLERY_PAGE;
 function openPhotoGallery(){
+  galleryLimit = GALLERY_PAGE;
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">Photo gallery</h2>
       <button class="sheet-close" onclick="closeSheet()">✕</button>
     </div>
-    <input type="text" id="gallery_search_input" placeholder="Filter by address or name..." oninput="renderPhotoGallery()" style="margin-top:0; margin-bottom:14px;">
+    <input type="text" id="gallery_search_input" placeholder="Filter by address or name..." oninput="galleryLimit = GALLERY_PAGE; renderPhotoGallery()" style="margin-top:0; margin-bottom:14px;">
     <div id="gallery_results"></div>
   `, () => openMoreMenu());
   renderPhotoGallery();
@@ -862,16 +866,18 @@ function renderPhotoGallery(){
     resultsEl.innerHTML = `<p style="color:var(--ink-muted); font-size:0.8438rem; text-align:center; margin-top:24px;">${q ? `No matches for "${escapeHtml(raw)}".` : "No photos added yet — they'll show up here once you add some from a customer's or job's screen."}</p>`;
     return;
   }
+  const totalEntries = entries.length;
+  entries = entries.slice(0, galleryLimit);
   resultsEl.innerHTML = entries.map(({kind, id, address, name, list}) => `
     <div style="margin-bottom:20px;">
       <div class="t1" style="margin-bottom:8px;">${escapeHtml(address||name||'Customer')}${name && address ? `<span style="font-weight:500; color:var(--ink-muted);"> · ${escapeHtml(name)}</span>` : ''}${kind==='job' ? `<span style="font-weight:600; color:var(--ink-muted); font-size:0.6875rem; text-transform:uppercase; letter-spacing:0.02em;"> · One-off job</span>` : ''}</div>
       <div style="display:flex; flex-wrap:wrap; gap:8px;">
         ${kind==='customer'
-          ? list.map((entry,i) => `<img src="${photoEntrySrc(entry)}" onclick="openPhotoViewerAt(buildCustomerPhotoList('${id}'), ${i}, () => openPhotoGalleryReturn())" style="width:72px; height:72px; object-fit:cover; border-radius:10px; border:1px solid var(--line); cursor:pointer;">`).join('')
-          : list.map((entry,i) => `<img src="${photoEntrySrc(entry)}" onclick="openPhotoViewerAt(buildJobPhotoList('${id}'), ${i}, () => openPhotoGalleryReturn())" style="width:72px; height:72px; object-fit:cover; border-radius:10px; border:1px solid var(--line); cursor:pointer;">`).join('')}
+          ? list.map((entry,i) => `<img loading="lazy" decoding="async" src="${photoEntrySrc(entry)}" onclick="openPhotoViewerAt(buildCustomerPhotoList('${id}'), ${i}, () => openPhotoGalleryReturn())" style="width:72px; height:72px; object-fit:cover; border-radius:10px; border:1px solid var(--line); cursor:pointer;">`).join('')
+          : list.map((entry,i) => `<img loading="lazy" decoding="async" src="${photoEntrySrc(entry)}" onclick="openPhotoViewerAt(buildJobPhotoList('${id}'), ${i}, () => openPhotoGalleryReturn())" style="width:72px; height:72px; object-fit:cover; border-radius:10px; border:1px solid var(--line); cursor:pointer;">`).join('')}
       </div>
     </div>
-  `).join('');
+  `).join('') + (totalEntries > entries.length ? `<button class="btn" style="width:100%; margin-bottom:12px;" onclick="galleryLimit += GALLERY_PAGE; renderPhotoGallery()">Show more (${totalEntries - entries.length} more with photos)</button>` : '');
 }
 // Reopens the gallery (preserving nothing fancier than a fresh, unfiltered list)
 // after closing a photo that was opened from it — mirrors the pattern used for

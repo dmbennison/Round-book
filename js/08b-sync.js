@@ -151,6 +151,10 @@ function syncStable(v){
 }
 function syncEq(a, b){
   if(a === undefined || b === undefined) return a === b;
+  if(a === b) return true;
+  // Quick check first: identical plain text means identical. Only when that differs (it can also differ
+  // just because keys are in another order) do we do the slower sorted comparison.
+  try{ if(JSON.stringify(a) === JSON.stringify(b)) return true; }catch(e){}
   return syncStable(a) === syncStable(b);
 }
 function syncIsObj(v){ return v && typeof v === 'object' && !Array.isArray(v); }
@@ -223,7 +227,7 @@ function syncMergeCollection(baseArr, localArr, remoteArr, keyOf, labelOf, ctx, 
       ctx.label = labelOf(l) || labelOf(r);
       ctx.itemKey = k;
       const merged = syncMerge3(b || {}, l, r, ctx, []);
-      if(!syncEq(merged, l)) bucket.updated++;
+      if(merged !== l && !syncEq(merged, l)) bucket.updated++;
       out.push(syncClone(merged));
     } else if(l){
       if(b){
