@@ -15,31 +15,29 @@
    Every pairing was checked with a contrast calculator: ink >= 7:1, muted and accent >= 4.5:1, white on
    navy >= 7:1. If you change a value, re-check it (e.g. webaim.org/resources/contrastchecker). */
 const THEMES = {
-  // OCEAN — cool coastal navy with a crisp, clear-water blue accent; pale blue-white pages and clean white cards.
-  // Accent is a touch deeper than the old sky blue so it passes AA as text; the bright sky blue lives on in dark mode.
-  ocean: { name:'Ocean', navy:'#164559', blue:'#187096', blueDark:'#5CC0EA', glow:'#2E9E5B',
-    light:{ bg:'#EAF3F8', surface:'#FFFFFF', ink:'#14283A', muted:'#556B7C', line:'#D3E2EB' },
-    dark: { bg:'#0C1A25', surface:'#14232F', ink:'#EAF1F6', muted:'#93A8B9', line:'#27394A' } },
+  // OCEAN — deep sea-blue header on a cool, near-neutral grey page with white cards. The only strong colours are the
+  // header and a warm coral accent that stands out against the blue (the same recipe as Slate: neutral base, one contrasting accent).
+  // `tint` and `orb` (both 0-1) scale how much accent colour washes into cards and the soft page glow; Slate keeps the full amount.
+  ocean: { name:'Ocean', navy:'#164559', blue:'#B83E27', blueDark:'#FF8C74', glow:'#2F7A96', tint:0.45, orb:0.6,
+    light:{ bg:'#EEF1F3', surface:'#FFFFFF', ink:'#14283A', muted:'#556B7C', line:'#D9DFE3' },
+    dark: { bg:'#0F1418', surface:'#171E24', ink:'#EAF1F6', muted:'#93A8B9', line:'#2A343C' } },
   // SLATE — professional and neutral: true charcoal header, stone-grey pages, and one warm copper accent for contrast.
   // Almost no hue except the copper, so it reads as a tool, not a theme.
   slate: { name:'Slate', navy:'#2B2F34', blue:'#99531D', blueDark:'#E3995A', glow:'#8E9AA6',
     light:{ bg:'#ECECEA', surface:'#FAFAF8', ink:'#212427', muted:'#62656A', line:'#D6D6D2' },
     dark: { bg:'#101112', surface:'#1B1D1F', ink:'#ECEAE6', muted:'#A09D97', line:'#303234' } },
-  // RUST — earthy and warm: brown-terracotta header, sand and cream pages, burnt-orange accent, amber glow.
-  // The warmest scheme; light mode should feel like paper and clay.
-  rust: { name:'Rust', navy:'#5A2E1C', blue:'#A93E0D', blueDark:'#F08A55', glow:'#E0A33C',
-    light:{ bg:'#F3E4D0', surface:'#FFF6E8', ink:'#33201A', muted:'#795B4E', line:'#E3CDB3' },
-    dark: { bg:'#1A110D', surface:'#271B15', ink:'#F3E9DD', muted:'#B49C8A', line:'#412D23' } },
-  // FOREST — settled and natural: deep pine header, parchment pages with a green-gold tint, a deep moss accent.
-  // Moss is deliberately dark and grey-leaning (not lime) so it looks established, not unripe.
-  forest: { name:'Forest', navy:'#14402C', blue:'#486D1F', blueDark:'#A6C65F', glow:'#B9C65A',
-    light:{ bg:'#E8EBD2', surface:'#F9FAEC', ink:'#1C2B20', muted:'#576852', line:'#D3D8B8' },
-    dark: { bg:'#0C160F', surface:'#15231A', ink:'#E7EFE2', muted:'#94AA94', line:'#263D2D' } },
-  // PLUM — rich and a little luxurious: aubergine header, lilac-white pages, a vivid magenta accent, violet glow.
-  // Barely changed from before; accent nudged slightly deeper to pass AA as text.
-  plum: { name:'Plum', navy:'#3F1A47', blue:'#B01F82', blueDark:'#E86CC2', glow:'#7E5BD6',
-    light:{ bg:'#EFE6F1', surface:'#FFFBFE', ink:'#2D1B33', muted:'#705C77', line:'#E0D1E2' },
-    dark: { bg:'#150D19', surface:'#211528', ink:'#F1E8F4', muted:'#A891B1', line:'#38263F' } },
+  // RUST — brown-terracotta header on a warm-grey page with cream cards, and a clear cobalt-blue accent that contrasts with the clay.
+  rust: { name:'Rust', navy:'#5A2E1C', blue:'#1D5FA8', blueDark:'#7DB4F2', glow:'#8A5A44', tint:0.45, orb:0.6,
+    light:{ bg:'#F1EEEA', surface:'#FFFCF8', ink:'#33201A', muted:'#6F5A50', line:'#E1DAD1' },
+    dark: { bg:'#151210', surface:'#1F1B18', ink:'#F3E9DD', muted:'#B49C8A', line:'#38302B' } },
+  // FOREST — deep pine header on a soft stone page with off-white cards, and a golden ochre accent against the green.
+  forest: { name:'Forest', navy:'#14402C', blue:'#8A6508', blueDark:'#E8B94C', glow:'#3E7A57', tint:0.45, orb:0.6,
+    light:{ bg:'#EEF0EA', surface:'#FBFCF8', ink:'#1C2B20', muted:'#576852', line:'#D9DDD0' },
+    dark: { bg:'#0F1311', surface:'#181E1A', ink:'#E7EFE2', muted:'#94AA94', line:'#2B342D' } },
+  // PLUM — aubergine header on a quiet grey-lilac page with white cards, and a teal accent that contrasts with the purple.
+  plum: { name:'Plum', navy:'#3F1A47', blue:'#0F766E', blueDark:'#4FD1C5', glow:'#7A4A86', tint:0.45, orb:0.6,
+    light:{ bg:'#F2EFF3', surface:'#FFFDFF', ink:'#2D1B33', muted:'#6A5871', line:'#E2DCE4' },
+    dark: { bg:'#131014', surface:'#1C181F', ink:'#F1E8F4', muted:'#A891B1', line:'#302933' } },
   // HIGH CONTRAST — for outdoor and gloved use: pure black and white, hard borders, solid (non-glass) cards, no glow.
   // Light: black on white with a cobalt accent. Dark: white on black with a signal-yellow accent. See `flat` handling in applyTheme.
   contrast: { name:'High contrast', navy:'#000000', blue:'#0033CC', blueDark:'#FFD60A', glow:'#FFFFFF',
@@ -119,6 +117,7 @@ function applyTheme(){
   // --bg etc. directly on body/body.dark and would otherwise win over anything
   // inherited from an ancestor regardless of dark mode state.
   const root = document.body.style;
+  const tint = (t.tint != null) ? t.tint : 1; // how strongly the accent washes into cards (1 = full)
   root.setProperty('--navy', t.navy);
   root.setProperty('--blue', acc);
   root.setProperty('--orb-glow', t.glow);
@@ -149,8 +148,8 @@ function applyTheme(){
     : `0 10px 30px ${hexToRgba(t.navy, 0.16)}, 0 2px 6px ${hexToRgba(t.navy, 0.08)}`);
   // Cards (cust-card, round-card, backup-btn, cust-section): a translucent fill of the scheme's surface colour
   // (nudged toward the accent in dark mode so schemes stay distinct), a faint accent wash, and a soft shadow.
-  root.setProperty('--card-surface', flat ? p.surface : (darkMode ? hexToRgba(mixHex(p.surface, acc, 0.12), 0.58) : hexToRgba(p.surface, 0.66)));
-  root.setProperty('--card-tint', flat ? 'transparent' : (darkMode ? hexToRgba(acc, 0.10) : hexToRgba(acc, 0.07)));
+  root.setProperty('--card-surface', flat ? p.surface : (darkMode ? hexToRgba(mixHex(p.surface, acc, 0.12 * tint), 0.58) : hexToRgba(p.surface, 0.66)));
+  root.setProperty('--card-tint', flat ? 'transparent' : (darkMode ? hexToRgba(acc, 0.10 * tint) : hexToRgba(acc, 0.07 * tint)));
   root.setProperty('--card-border', flat ? p.line : (darkMode ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.85)'));
   root.setProperty('--card-shadow', flat ? 'none' : (darkMode
     ? `inset 0 1px 0 rgba(255,255,255,0.22), inset 0 0 0 1px rgba(255,255,255,0.05), 0 10px 28px ${hexToRgba(mixHex(t.navy, '#000000', 0.6), 0.50)}`
@@ -162,6 +161,11 @@ function applyTheme(){
     '--glass-blur': 'none', '--orb-a': '0%', '--orb-b': '0%', '--orb-c': '0%'
   };
   Object.keys(flatVars).forEach(k => { if(flat) root.setProperty(k, flatVars[k]); else root.removeProperty(k); });
+  // A scheme can soften the soft background glow (the accent-coloured light behind the page) with `orb`.
+  if(!flat && t.orb != null){
+    const orbBase = darkMode ? [30,20,14] : [34,22,16];
+    ['--orb-a','--orb-b','--orb-c'].forEach((k,i) => root.setProperty(k, Math.round(orbBase[i] * t.orb) + '%'));
+  }
   const meta = document.querySelector('meta[name="theme-color"]');
   if(meta) meta.setAttribute('content', t.navy);
 }
