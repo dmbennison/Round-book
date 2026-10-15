@@ -1,10 +1,11 @@
-const CACHE_NAME = 'round-book-v2.84';
-const ASSETS = [
+const CACHE_NAME = 'round-book-v2.85';
+
+// The app itself. These are all-or-nothing: a new version only takes over once EVERY one of
+// these has downloaded fresh. If any fails (a dropped connection, a half-finished deploy) the
+// install fails and the version already on the phone carries on untouched, so the app can
+// never end up running a mixture of old and new files.
+const CORE = [
   './',
-  './manifest.json',
-  './icon-192.png',
-  './icon-512.png',
-  './apple-touch-icon.png',
   './js/01-data.js',
   './js/02-today-rounds.js',
   './js/03-customers.js',
@@ -19,6 +20,14 @@ const ASSETS = [
   './js/09-boot.js'
 ];
 
+// Nice to have, but the app works without them, so a failure here never blocks an update.
+const EXTRA = [
+  './manifest.json',
+  './icon-192.png',
+  './icon-512.png',
+  './apple-touch-icon.png'
+];
+
 // Libraries the app loads on demand (see loadLib in 01-data.js). Each is kept for offline use:
 // the copy in this app's own /lib/ folder if it exists, otherwise the CDN copy.
 const LIB_GROUPS = [
@@ -29,6 +38,7 @@ const LIB_GROUPS = [
   ['./lib/leaflet.css',        'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css'],
   ['./lib/leaflet.js',         'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js']
 ];
+const CDN_LIB_URLS = new Set(LIB_GROUPS.map(g => g[1]));
 
 // A host that answers a missing script/stylesheet with the app's home page (as single-page-app
 // hosting often does) returns "200 OK" HTML. That must never be stored as if it were the library.
@@ -51,71 +61,74 @@ async function toPlainResponse(response){
   });
 }
 
+// `cache: 'reload'` skips the browser's own HTTP cache, which on some hosts holds files for
+// several minutes and could otherwise hand an update an out-of-date copy of one file.
+async function fetchFresh(url, fresh){
+  const response = await fetch(url, { redirect: 'follow', cache: fresh ? 'reload' : 'default' });
+  if(!response || !response.ok) throw new Error('HTTP ' + (response && response.status) + ' for ' + url);
+  if(isWrongType(url, response)) throw new Error('Wrong file type for ' + url);
+  return response.redirected ? await toPlainResponse(response) : response;
+}
+
 async function precache(){
   const cache = await caches.open(CACHE_NAME);
-  await Promise.all(ASSETS.map(async (url) => {
-    try{
-      const response = await fetch(url, { redirect: 'follow' });
-      if(!response || !response.ok) return;
-      const plain = response.redirected ? await toPlainResponse(response) : response;
-      await cache.put(url, plain);
-    }catch(e){ /* ignore individual failures, rest still cache */ }
+  try{
+    // Download every core file first, store them only if all arrived.
+    const core = await Promise.all(CORE.map(async (url) => [url, await fetchFresh(url, true)]));
+    for(const [url, response] of core) await cache.put(url, response);
+  }catch(e){
+    await caches.delete(CACHE_NAME); // don't leave a half-filled cache behind
+    throw e;                          // fails the install, so the current version stays in charge
+  }
+  await Promise.all(EXTRA.map(async (url) => {
+    try{ await cache.put(url, await fetchFresh(url, true)); }catch(e){ /* optional */ }
   }));
   // Library groups: keep the first address that really returns the file.
   await Promise.all(LIB_GROUPS.map(async (urls) => {
     for(const url of urls){
-      try{
-        const response = await fetch(url, { redirect: 'follow' });
-        if(!response || !response.ok || isWrongType(url, response)) continue;
-        const plain = response.redirected ? await toPlainResponse(response) : response;
-        await cache.put(url, plain);
-        return;
-      }catch(e){ /* try the next address */ }
+      try{ await cache.put(url, await fetchFresh(url, false)); return; }catch(e){ /* try the next address */ }
     }
   }));
 }
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(precache());
-  self.skipWaiting();
+  event.waitUntil(precache().then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
-    )
+    ).then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
-// Cache-first: works fully offline once installed. Falls back to network,
-// and updates the cache in the background when a connection is available.
+// Cache-first, so the app works fully offline once installed. The app's own files are only ever
+// replaced by installing a new version (above) — never one file at a time in the background,
+// which could leave a mixture of old and new if it was interrupted part-way.
+// Only the app's own files and the on-demand libraries go through here; everything else
+// (route and address look-ups, live sync traffic, map pictures) goes straight to the network.
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
-  const host = new URL(event.request.url).hostname;
-  // Live sync mailbox traffic must never be served from (or stored in) the cache.
   const u = new URL(event.request.url);
-  if (host.endsWith('.workers.dev') || (u.origin !== self.location.origin && u.pathname.startsWith('/v1/'))) return;
+  const sameOrigin = u.origin === self.location.origin;
+  if (!sameOrigin && !CDN_LIB_URLS.has(event.request.url)) return;
+  if (sameOrigin && u.pathname.startsWith('/v1/')) return;
 
   event.respondWith((async () => {
-    const cached = await caches.match(event.request);
-
-    const networkFetch = (async () => {
-      try{
-        const response = await fetch(event.request, { redirect: 'follow' });
-        if(response && response.ok && !isWrongType(event.request.url, response)){
-          const plain = response.redirected ? await toPlainResponse(response.clone()) : response.clone();
-          const cache = await caches.open(CACHE_NAME);
-          cache.put(event.request, plain);
-        }
-        return response;
-      }catch(e){
-        return cached;
+    // A page address with something extra on the end (?test, ?utm=...) is still the same page.
+    const cached = await caches.match(event.request, { ignoreSearch: event.request.mode === 'navigate' });
+    if(cached) return cached;
+    try{
+      const response = await fetch(event.request, { redirect: 'follow' });
+      if(response && response.ok && !isWrongType(event.request.url, response)){
+        const plain = response.redirected ? await toPlainResponse(response.clone()) : response.clone();
+        const cache = await caches.open(CACHE_NAME);
+        cache.put(event.request, plain);
       }
-    })();
-
-    return cached || networkFetch;
+      return response;
+    }catch(e){
+      return cached;
+    }
   })());
 });
-
