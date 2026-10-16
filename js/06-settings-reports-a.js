@@ -478,7 +478,7 @@ function renderMarketing(main){
   html += campaigns.map(camp=>{
     const sentCount = data.customers.filter(c=>c.marketingCampaign===camp.id).length;
     const preview = (camp.body||'').replace(/\s+/g,' ').trim();
-    return `<button class="backup-btn" onclick="openCampaignDetail('${camp.id}')">
+    return `<button class="backup-btn" data-ctx-kind="campaign" data-ctx-id="${escapeAttr(camp.id)}" onclick="openCampaignDetail('${camp.id}')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-5v12L3 13z"/><path d="M11.6 16.8a3 3 0 0 1-5.8-1.6"/></svg>
       <div style="flex:1; min-width:0;">
         <div class="t1">${escapeHtml(camp.name)}</div>
@@ -580,7 +580,7 @@ function renderCampaignResponseRows(campaignId){
       const status = MARKETING_STATUS_OPTIONS[c.marketingStatus] || MARKETING_STATUS_OPTIONS.awaiting;
       const actionLabel = MARKETING_ACTION_OPTIONS[c.marketingNextAction] || MARKETING_ACTION_OPTIONS.none;
       const canText = isMobileNumber(c.phone);
-      return `<div class="backup-btn" style="text-align:left; align-items:flex-start; cursor:pointer;" onclick="openMarketingResponseEditor('${c.id}')">
+      return `<div class="backup-btn" data-ctx-kind="customer" data-ctx-id="${c.id}" style="text-align:left; align-items:flex-start; cursor:pointer;" onclick="openMarketingResponseEditor('${c.id}')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-top:2px;"><path d="M3 11l18-5v12L3 13z"/><path d="M11.6 16.8a3 3 0 0 1-5.8-1.6"/></svg>
         <div style="flex:1; min-width:0;">
           <div class="t1">${escapeHtml(c.address||c.name||'Customer')}</div>
@@ -767,7 +767,7 @@ function renderUniversalSearchResults(){
     html += universalSearchSectionLabel('Customers', firstSection); firstSection = false;
     html += custMatches.map(c=>{
       const subtitle = [c.name, c.round||'Unassigned', c.accountNumber?`Acct #${c.accountNumber}`:''].filter(Boolean).join(' · ');
-      return `<button class="backup-btn" onclick="searchResultTap('${c.id}')" style="margin-bottom:8px;">
+      return `<button class="backup-btn" data-ctx-kind="customer" data-ctx-id="${c.id}" onclick="searchResultTap('${c.id}')" style="margin-bottom:8px;">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
         <div style="flex:1; min-width:0;">
           <div class="t1">${highlightMatch(c.address||c.name||'Customer', raw)}</div>
@@ -778,7 +778,7 @@ function renderUniversalSearchResults(){
   }
   if(jobMatches.length){
     html += universalSearchSectionLabel('One-off jobs', firstSection); firstSection = false;
-    html += jobMatches.map(j=>`<button class="backup-btn" onclick="openJobFromSearch('${j.id}')" style="margin-bottom:8px;">
+    html += jobMatches.map(j=>`<button class="backup-btn" data-ctx-kind="job" data-ctx-id="${j.id}" onclick="openJobFromSearch('${j.id}')" style="margin-bottom:8px;">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
       <div style="flex:1; min-width:0;">
         <div class="t1">${highlightMatch(j.address||j.name||'Job', raw)}</div>
@@ -788,7 +788,7 @@ function renderUniversalSearchResults(){
   }
   if(quoteMatches.length){
     html += universalSearchSectionLabel('Quotes', firstSection); firstSection = false;
-    html += quoteMatches.map(qt=>`<button class="backup-btn" onclick="openQuoteFromSearch('${qt.id}')" style="margin-bottom:8px;">
+    html += quoteMatches.map(qt=>`<button class="backup-btn" data-ctx-kind="quote" data-ctx-id="${qt.id}" onclick="openQuoteFromSearch('${qt.id}')" style="margin-bottom:8px;">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
       <div style="flex:1; min-width:0;">
         <div class="t1">${highlightMatch(qt.address||qt.name||'Quote', raw)}</div>
@@ -907,10 +907,10 @@ function openRoundReports(){
   `);
 }
 
-// Idea, not done: on the wide split view this could be two columns — this list on the left, a live preview of the
-// picked report on the right. Skipped because every report goes through runPrint() into the one full-screen
-// preview, which is tied to fixed element ids and the pendingReport* / rp* globals; embedding it would mean making
-// those container-aware first.
+// On the wide split view the picked report's preview opens in the right-hand pane (see openReportPreview) instead
+// of covering the whole screen. This is the smaller version of the "two columns" idea: the preview element and the
+// pendingReport* / rp* globals stay single and global, and only where the preview is drawn changes (the same trick the
+// sheets use). The Reports list stays underneath it and comes back when the preview is closed.
 function openReports(){
   openSheet(`
     <div class="sheet-head">
@@ -1037,7 +1037,7 @@ function runPrint(titleHtml, bodyHtml, hideCompanyHeader, allowPdfShare, returnT
 }
 
 /* ---------- report preview ----------
-   A full-screen "paper" view: the report on an A4-width white page that scrolls
+   A full-screen (or, on the wide split view, right-hand-pane) "paper" view: the report on an A4-width white page that scrolls
    in both directions and zooms by pinching (two fingers), the +/- buttons, or
    Ctrl + mouse wheel on a computer. */
 const RP_PAPER_W = 794;      // A4 at 96 dpi, matches the PDF layout
@@ -1106,6 +1106,7 @@ function rpBind(){
   }, {passive:false});
   const refit = () => {
     if(!document.getElementById('reportPreview').classList.contains('show')) return;
+    rpSyncPlacement(); // the window may have changed shape (pane <-> full screen) or the divider may have moved
     if(rpAtFit) rpFit(); else rpApply(rpScale, 0, 0);
   };
   window.addEventListener('resize', refit);
@@ -1250,6 +1251,18 @@ function rpLabelShareButtons(){
   label('rpBtnDoc', canShareFile('report.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'), 'Share doc', 'Save doc');
 }
 let rpToken = 0;
+// True while the preview is drawn in the right-hand pane of the wide split view rather than full screen. Only the
+// full-screen preview locks the page behind it; in the pane the list on the left has to stay usable.
+let rpInPane = false, rpScrollLocked = false;
+// Puts the preview in (or out of) the pane to match the current screen, and the page lock to match. Called when it
+// opens and again if the window changes shape while it's up (an iPad turned from landscape to portrait).
+function rpSyncPlacement(){
+  const root = document.getElementById('reportPreview');
+  rpInPane = isWideSplitView();
+  root.classList.toggle('in-pane', rpInPane);
+  if(!rpInPane && !rpScrollLocked){ pageScrollLock('report', true); rpScrollLocked = true; }
+  else if(rpInPane && rpScrollLocked){ pageScrollLock('report', false); rpScrollLocked = false; }
+}
 async function openReportPreview(){
   const { root, paper } = rpEls();
   rpBind();
@@ -1257,8 +1270,8 @@ async function openReportPreview(){
   const token = ++rpToken;
   document.getElementById('rpTitle').innerHTML = pendingReportTitle;
   paper.innerHTML = '<div class="rp-wait">Preparing preview…</div>';
-  pageScrollLock('report', true);
   root.classList.add('show');
+  rpSyncPlacement();
   rpScale = 1; rpAtFit = true;
   rpFit();
   let pages;
@@ -1269,17 +1282,27 @@ async function openReportPreview(){
   rpScale = 1; rpAtFit = true;
   rpFit();
 }
-function closeReportPreview(){
+// quiet: close without taking the person "back" to where the report was opened from — used when something else
+// (a sheet opened from the list on the left) is taking over the pane, so it isn't pushed aside by the return.
+function closeReportPreview(quiet){
   rpToken++;
   const { root, paper } = rpEls();
-  pageScrollLock('report', false);
-  root.classList.remove('show');
+  if(rpScrollLocked){ pageScrollLock('report', false); rpScrollLocked = false; }
+  rpInPane = false;
+  root.classList.remove('show', 'in-pane');
   paper.innerHTML = '';
   const back = pendingReportReturnTo;
   pendingReportReturnTo = null;
+  if(quiet === true) return;
   // If whatever the report was opened from is still showing underneath, we're
   // already back there; otherwise take the person back to where they came from.
   if(back && !document.getElementById('overlay').classList.contains('show')){ try{ back(); }catch(e){} }
+}
+// A sheet opening over the pane (openSheet calls this) replaces the in-pane preview rather than hiding behind it.
+// The full-screen preview on a phone is untouched: nothing there can open a sheet while it's up.
+function rpDismissForSheet(){
+  const root = document.getElementById('reportPreview');
+  if(root && root.classList.contains('show') && root.classList.contains('in-pane')) closeReportPreview(true);
 }
 function rpSetBusy(id, busy){
   const b = document.getElementById(id);

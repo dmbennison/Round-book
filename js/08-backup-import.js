@@ -295,7 +295,7 @@ const FOCUSED_HELP = {
         'An <b>Undo</b> button appears for a few seconds.'
       ]),
       helpP('<b>Press and hold</b> a card for a quick info box – price, last cleaned, next due, last paid, Bank or Cash, and any note. Tap the <b>pencil</b> in it to add or edit a note. The green phone button calls and the blue compass button gives directions.'),
-      helpP('Badges you may see: <b>Couldn’t clean</b> (you couldn’t get to them last time), <b>Chase</b> (payment reminders unanswered), <b>Low by £X</b> (priced well below average for their property type) and <b>📈 Review</b> (12+ months since their last price rise).'),
+      helpP('Badges you may see: <b>✓ Cleaned today</b> (shown on a customer you’ve cleaned today who has no mobile number, so there’s no text to send), <b>Couldn’t clean</b> (you couldn’t get to them last time), <b>Chase</b> (payment reminders unanswered), <b>Low by £X</b> (priced well below average for their property type) and <b>📈 Review</b> (12+ months since their last price rise).'),
       helpP('<b>Chasing payments.</b> In <b>Owed</b>, tap <b>✉️ Chase</b> on a card to text them, or <b>Remind all</b> to go down the list. <b>Text first</b> customers: tap their badge to text them – it turns into a green <b>Texted</b> tick – or <b>Text all</b> to send to everyone not yet texted.'),
       helpP('<b>Round notes.</b> Tap the <b>pencil</b> next to a round’s name to add a note (“park on the green”); it shows under the name.'),
       helpP('<b>A round’s ⋯ menu</b> has <b>Show map</b>, <b>Start round</b> (directions to every stop), <b>Print</b>, <b>Defer</b> (push everyone back) and <b>Apply price uplift</b>. <b>Reorder</b> sets your visiting order – drag the ⠿ handle or use the arrows.')
@@ -358,7 +358,7 @@ const FOCUSED_HELP = {
   reports: {
     title: 'Reports',
     body: () => [
-      helpP('Tap the printer icon for a list of reports – earnings, daily work done, monthly schedule, one-off jobs, mileage, price review and more. Every report, invoice, quote and receipt opens in a preview first. The buttons along the bottom are <b>Print</b>, <b>Share PDF</b> and <b>Share doc</b> (an editable Word file); where a device can’t share files they read <b>Save PDF</b> and <b>Save doc</b> and download the file instead.')
+      helpP('Tap the printer icon for a list of reports – earnings, daily work done, monthly schedule, one-off jobs, mileage, price review and more. Every report, invoice, quote and receipt opens in a preview first. The buttons along the bottom are <b>Print</b>, <b>Share PDF</b> and <b>Share doc</b> (an editable Word file); where a device can’t share files they read <b>Save PDF</b> and <b>Save doc</b> and download the file instead. On a wide screen (an iPad held sideways, or a computer) the preview opens in the pane beside your list rather than covering the whole screen – close it with the ✕ or <b>Esc</b>.')
     ]
   },
   backup: {
@@ -398,6 +398,25 @@ const FOCUSED_HELP = {
       ])
     ]
   },
+  desktop: {
+    title: 'iPad and computer',
+    body: () => [
+      helpP('On a wide screen – an iPad held sideways, or a computer – Round Book shows your list on the left and whatever you open on the right. On a phone, or an iPad held upright, none of this changes.'),
+      helpList([
+        '<b>Summary panel</b> – with nothing open, the right-hand side summarises the tab you’re on: <b>Rounds</b> (customers, value, who owes most), <b>Jobs</b> (done and paid this week, and what’s outstanding), <b>Quotes</b> (pending against converted, and the oldest still waiting) and <b>Marketing</b> (replies that need action). Tap a row to open it. Today keeps its own full-width screen.',
+        '<b>Reports</b> – a report previews on the right, with <b>Print</b>, <b>Share PDF</b> and <b>Share doc</b> along its bottom. Close it with the ✕ or <b>Esc</b> to get back to the list of reports. Opening something from the list on the left replaces it.',
+        '<b>Resize</b> – drag the thin divider between the list and the right-hand side (or click it and use ← →). Double-click it to put it back. Round Book remembers where you left it.'
+      ]),
+      helpP('<b>With a mouse or trackpad</b>, cards, buttons and tabs light up as you point at them, and <b>right-clicking</b> a customer, job, quote, round or campaign opens a menu of what you can do with it – the same things as swiping or press-and-hold, plus the actions on its detail screen. Touch screens keep swiping and press-and-hold.'),
+      helpP('<b>With a keyboard</b>, on a list:'),
+      helpList([
+        '<b>J</b> / <b>K</b>, or <b>↓</b> / <b>↑</b> – move the highlight to the next or previous card. <b>Enter</b> opens it and <b>M</b> shows its right-click menu.',
+        '<b>C</b> – cleaned (customer), done (job) or accepted (quote). <b>P</b> – paid. <b>B</b> – cleaned and paid. <b>X</b> – declined (quote). An <b>Undo</b> button appears, as with a swipe. <b>C</b> doesn’t open a “cleaned today” text – use the right-click menu’s <b>Mark cleaned and send text</b> for that.',
+        '<b>Esc</b> – closes whatever is open on the right; press it again to clear the highlight.',
+        'The keys do nothing while you’re typing in a box or while a pop-up, report or the Schedule editor is open.'
+      ])
+    ]
+  },
   reminders: {
     title: 'Reminders and banners',
     body: () => [
@@ -405,7 +424,7 @@ const FOCUSED_HELP = {
     ]
   }
 };
-const FOCUSED_HELP_ORDER = ['today','work','schedule','rounds','jobs','customer','photos','quotes','marketing','reports','backup','sync','settings','reminders'];
+const FOCUSED_HELP_ORDER = ['today','work','schedule','rounds','jobs','customer','photos','quotes','marketing','reports','backup','sync','settings','desktop','reminders'];
 
 function openFocusedHelp(topic, explicitReturnTo){
   const h = FOCUSED_HELP[topic];
@@ -440,7 +459,7 @@ function openHelp(returnTo){
       'The blue <b>+</b> button adds whatever suits the screen you’re on. On <b>Today</b> it asks whether you want to add a customer, a job or a quote.',
       'Top bar: <b>Search</b>, <b>⋯</b> (opens <b>Reports</b>, <b>Photo gallery</b>, <b>Backup</b> and <b>About</b> – which holds this guide) and <b>Settings</b>.',
       'Tap the <b>🎤</b> inside any text box to speak instead of typing; tap it again to stop.',
-      'On a keyboard (iPad or computer) press <b>Ctrl/Cmd + K</b>, or <b>/</b>, to open Search.',
+      'On a keyboard (iPad or computer) press <b>Ctrl/Cmd + K</b>, or <b>/</b>, to open Search. There are more shortcuts for moving through your lists – see <b>iPad and computer</b> below.',
       'A <b>?</b> next to a screen’s title opens help for just that screen.'
     ])}
 

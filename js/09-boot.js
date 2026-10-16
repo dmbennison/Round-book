@@ -212,9 +212,11 @@ function initSwipeHandlers(){
   main.addEventListener('touchmove', onLongPressMove, {passive:true});
   main.addEventListener('touchend', cancelLongPress, {passive:true});
   main.addEventListener('touchcancel', cancelLongPress, {passive:true});
-  // Android fires a context menu on long-press (and desktop on right-click) —
-  // swallow it on customer cards and show the info box instead.
+  // Android fires a context menu on long-press — swallow it on customer cards and show the info box
+  // instead. A desktop right-click (mouse or trackpad) gets a real menu from 08d-desktop.js, which has
+  // already handled the event (preventDefault) by the time it gets here.
   main.addEventListener('contextmenu', (e)=>{
+    if(e.defaultPrevented) return;
     const card = e.target.closest('.cust-card[data-id][data-kind="customer"]');
     if(!card) return;
     e.preventDefault();

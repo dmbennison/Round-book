@@ -1316,6 +1316,8 @@ function render(){
   } else if(currentTab === 'marketing'){
     renderMarketing(main);
   }
+  // iPad / desktop extras (08d-desktop.js): the right-pane summary and the keyboard-selected card follow every redraw.
+  if(typeof desktopAfterRender === 'function') desktopAfterRender();
 }
 
 // Compact "avg price by property type" row, shown under the Customers/Round
@@ -1490,7 +1492,7 @@ function renderRoundsList(main){
       grandValue += activeValue;
       grandOwed += activeOwed;
       const daysUsed = roundDaysUsed(all);
-      html += `<div class="round-card" onclick="openRound('${escapeAttr(rn)}')">
+      html += `<div class="round-card" data-ctx-kind="round" data-ctx-id="${escapeAttr(rn)}" onclick="openRound('${escapeAttr(rn)}')">
         <div>
           <div class="rname">${escapeHtml(rn)}</div>
           <div class="rcount">${activeAll.length} customer${activeAll.length===1?'':'s'} · ${roundValueOwedHtml(activeValue, activeOwed)}${daysUsed.length>1?` · ${daysUsed.length} days`:''}</div>
@@ -1521,7 +1523,7 @@ function renderRoundsList(main){
       dueGrandCount += dueCusts.length;
       dueGrandValue += dueCusts.reduce((s,c)=>s+Number(c.price||0),0);
       const anyPhone = dueCusts.some(c=>isMobileNumber(c.phone));
-      html += `<div class="round-group-header" style="display:flex; align-items:center; justify-content:space-between; margin:18px 2px 8px;">
+      html += `<div class="round-group-header" data-ctx-kind="round" data-ctx-id="${escapeAttr(rn)}" style="display:flex; align-items:center; justify-content:space-between; margin:18px 2px 8px;">
         <div class="section-label" style="margin:0; cursor:pointer;" onclick="goToRoundDue('${escapeAttr(rn)}')">${escapeHtml(rn)} <span style="font-weight:600; color:var(--ink-muted); text-transform:none; letter-spacing:0;">(${dueCusts.length})</span></div>
         ${anyPhone ? `<button onclick="openBulkReminders('due','${escapeAttr(rn)}')" style="background:none; border:none; color:var(--blue); font-size:0.75rem; font-weight:800;">✉️ Remind all</button>` : ''}
       </div>`;
@@ -1551,7 +1553,7 @@ function renderRoundsList(main){
       </div>`;
       }
       Object.keys(byRound).forEach(rn=>{
-        html += `<div class="section-label" style="margin:14px 2px 8px;">${escapeHtml(rn)} <span style="font-weight:600; color:var(--ink-muted); text-transform:none; letter-spacing:0;">(${byRound[rn].length})</span></div>`;
+        html += `<div class="section-label" data-ctx-kind="round" data-ctx-id="${escapeAttr(rn)}" style="margin:14px 2px 8px;">${escapeHtml(rn)} <span style="font-weight:600; color:var(--ink-muted); text-transform:none; letter-spacing:0;">(${byRound[rn].length})</span></div>`;
         html += byRound[rn].map(c=>custCardHtml(c)).join('');
       });
       html += listTotalHtml(unsent.length === all.length ? `${all.length} to text` : `${unsent.length} to text · ${all.length - unsent.length} texted`);
@@ -1575,7 +1577,7 @@ function renderRoundsList(main){
       const roundTotal = owedCusts.reduce((s,c)=>s+custStatus(c).balance,0);
       grandTotal += roundTotal;
       const anyPhone = owedCusts.some(c=>isMobileNumber(c.phone));
-      html += `<div class="round-group-header" style="display:flex; align-items:center; justify-content:space-between; margin:18px 2px 8px;">
+      html += `<div class="round-group-header" data-ctx-kind="round" data-ctx-id="${escapeAttr(rn)}" style="display:flex; align-items:center; justify-content:space-between; margin:18px 2px 8px;">
         <div class="section-label" style="margin:0;">${escapeHtml(rn)} <span style="font-weight:600; color:var(--ink-muted); text-transform:none; letter-spacing:0;">(owing ${money(roundTotal)})</span></div>
         ${anyPhone ? `<button onclick="openBulkReminders('owed','${escapeAttr(rn)}')" style="background:none; border:none; color:var(--blue); font-size:0.75rem; font-weight:800;">✉️ Remind all</button>` : ''}
       </div>`;
@@ -1705,7 +1707,7 @@ function renderRoundDetail(main, rn){
     </div>
     <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:8px; margin-bottom:12px;">
       <div style="flex:1; min-width:0;">
-        <div style="min-height:38px; display:flex; align-items:center;"><h2 style="font-size:1.25rem;">${escapeHtml(rn)}</h2></div>
+        <div data-ctx-kind="round" data-ctx-id="${escapeAttr(rn)}" style="min-height:38px; display:flex; align-items:center;"><h2 style="font-size:1.25rem;">${escapeHtml(rn)}</h2></div>
         ${getRoundNote(rn) ? `<div onclick="openRoundNoteSheet('${escapeAttr(rn)}')" style="margin-top:-2px; font-size:0.8125rem; font-weight:600; color:var(--ink-muted); line-height:1.4; white-space:pre-wrap; overflow-wrap:anywhere;">${escapeHtml(getRoundNote(rn))}</div>` : ''}
       </div>
       <div style="display:flex; align-items:center; flex-shrink:0;">
