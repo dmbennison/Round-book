@@ -47,18 +47,38 @@ function fitTopSheetToViewport(){
   ov.style.height = vv.height + 'px';
   ov.style.bottom = 'auto';
 }
+// Pop-ups that aren't sheets — the app's own prompt box (appConfirm, for example editing a history amount) and the
+// Schedule editor's dialogs — also open at the top when they have a field to type in, and register here so they are
+// sized to the visible area exactly like a top sheet. Without that the keyboard slid up over the bottom of them.
+const keyboardFitEls = new Set();
+function fitKeyboardPopups(){
+  const vv = window.visualViewport;
+  if(!vv) return;
+  keyboardFitEls.forEach((el) => {
+    if(!el.isConnected){ keyboardFitEls.delete(el); return; }
+    // A fixed pop-up measures from the screen's top; one inside another box (the Schedule editor) from that box's.
+    const hostTop = (getComputedStyle(el).position === 'fixed' || !el.parentElement) ? 0 : el.parentElement.getBoundingClientRect().top;
+    const top = Math.max(0, vv.offsetTop - hostTop);
+    el.style.top = top + 'px';
+    el.style.height = Math.max(0, vv.offsetTop + vv.height - hostTop - top) + 'px';
+    el.style.bottom = 'auto';
+  });
+}
+function trackKeyboardFit(el){ keyboardFitEls.add(el); fitKeyboardPopups(); }
+function untrackKeyboardFit(el){ keyboardFitEls.delete(el); el.style.top = ''; el.style.height = ''; el.style.bottom = ''; }
 if(window.visualViewport){
   window.visualViewport.addEventListener('resize', () => {
     fitTopSheetToViewport();
+    fitKeyboardPopups();
     // Keep the field being typed in on screen once the keyboard has shrunk the space.
     setTimeout(() => {
       const a = document.activeElement;
       if(a && a.closest && a.closest('#sheet') && a.scrollIntoView) a.scrollIntoView({block:'nearest'});
     }, 50);
   });
-  window.visualViewport.addEventListener('scroll', fitTopSheetToViewport);
+  window.visualViewport.addEventListener('scroll', () => { fitTopSheetToViewport(); fitKeyboardPopups(); });
 }
-window.addEventListener('resize', fitTopSheetToViewport);
+window.addEventListener('resize', () => { fitTopSheetToViewport(); fitKeyboardPopups(); });
 // A field added to an open sheet after it opened (e.g. tapping "Add a note") still moves the sheet up.
 document.addEventListener('focusin', (e) => {
   const t = e.target, ov = document.getElementById('overlay');
@@ -1021,15 +1041,17 @@ function renderPhotoViewer(){
       ${hasPrev ? navBtn(-1,'‹') : ''}
       ${hasNext ? navBtn(1,'›') : ''}
     </div>
-    <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 16px;">Added ${fmtDate(entry.date)}</p>
-    <div class="row2" style="margin-bottom:8px;">
-      <button class="btn btn-clean" onclick="openPhotoAnnotator()">✏️ Annotate</button>
-      <button class="btn btn-clean" onclick="sharePhotoViewerEntry()">📤 Share</button>
-      <button class="btn" style="background:var(--red-dim); color:var(--red);" onclick="deletePhotoViewerEntry()">Delete</button>
+    <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 12px;">Added ${fmtDate(entry.date)}</p>
+    <p style="color:var(--ink-muted); font-size:0.7188rem; margin:0 2px 14px; text-align:center;">Pinch or double-tap the photo to zoom, then drag to move around. ${photoViewerList.length>1?'Swipe left or right to browse, or ':''}Press and hold the photo to save or share it directly.</p>
+    <div class="pv-actions">
+      <div class="row2" style="margin-bottom:8px;">
+        <button class="btn btn-clean" onclick="openPhotoAnnotator()">✏️ Annotate</button>
+        <button class="btn btn-clean" onclick="sharePhotoViewerEntry()">📤 Share</button>
+        <button class="btn" style="background:var(--red-dim); color:var(--red);" onclick="deletePhotoViewerEntry()">Delete</button>
+      </div>
+      <button class="btn" style="width:100%; background:var(--blue-dim); color:var(--blue-deep); margin-bottom:8px;" onclick="openPhotoUpsell()">💬 Send with an offer (gutters, conservatory…)</button>
+      <button class="btn" style="width:100%; background:var(--blue-dim); color:var(--blue-deep);" onclick="openBeforeAfter()">↔ Make a before &amp; after photo</button>
     </div>
-    <button class="btn" style="width:100%; background:var(--blue-dim); color:var(--blue-deep); margin-bottom:10px;" onclick="openPhotoUpsell()">💬 Send with an offer (gutters, conservatory…)</button>
-    <button class="btn" style="width:100%; background:var(--blue-dim); color:var(--blue-deep); margin-bottom:10px;" onclick="openBeforeAfter()">↔ Make a before &amp; after photo</button>
-    <p style="color:var(--ink-muted); font-size:0.7188rem; margin:0 2px; text-align:center;">Pinch or double-tap the photo to zoom, then drag to move around. ${photoViewerList.length>1?'Swipe left or right to browse, or ':''}Press and hold the photo to save or share it directly.</p>
   `, () => { if(photoViewerOnClose) photoViewerOnClose(); });
   attachPhotoViewerSwipe();
 }

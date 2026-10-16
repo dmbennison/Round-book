@@ -6,13 +6,14 @@ const STORE_KEY = 'roundBookData_v1';
 // APP_VERSION is a plain decimal number (e.g. 1.01, 1.02 ... 1.99, 2.00) —
 // bump by 0.01 for every change. formatVersion always renders it to exactly
 // two decimal places, so it's never shown as "1.1" or "1.100".
-const APP_VERSION = 2.88;
+const APP_VERSION = 2.89;
 function formatVersion(v){ return Number(v).toFixed(2); }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
 // entry (newest first) with ONE very short plain-English summary, then delete
 // entries so only the latest ten remain.
 const VERSION_HISTORY = [
+  {version: 2.89, changes: ['Pop-ups with a box to type in (such as editing an amount in a history, or the Schedule\'s dialogs) now open at the top so the keyboard can\'t cover them; a photo\'s buttons stay pinned at the bottom while the photo scrolls underneath']},
   {version: 2.88, changes: ['iPad and computer: the empty right-hand pane now shows a summary for the tab you\'re on; reports preview inside it; drag the divider to resize it; right-click menus on cards; hover highlights; and keyboard moves through the list (j / k, Enter, C, P)']},
   {version: 2.87, changes: ['User guide updated: it now explains the ✓ Cleaned today badge shown on customers cleaned today who have no mobile number']},
   {version: 2.86, changes: ['Swiping all the way across (cleaned and paid) no longer opens a text; a halfway swipe still does. Customers cleaned today who have no mobile number now show a ✓ Cleaned today badge on their card too']},
@@ -22,7 +23,6 @@ const VERSION_HISTORY = [
   {version: 2.82, changes: ['Colour schemes: Ocean, Rust, Forest and Plum now have calmer, near-neutral backgrounds and a contrasting accent colour (coral, cobalt, ochre and teal), the same approach as Slate. Slate and High contrast are unchanged']},
   {version: 2.81, changes: ['Live sync now uses your Round Book sync service automatically — there is no address to type in']},
   {version: 2.80, changes: ['Photo gallery moved from About into the ⋯ menu, next to Reports and Backup, and About is tidier']},
-  {version: 2.79, changes: ['Schedule: iPad and desktop now open with 5 weeks too, the same as on a phone']},
 ];
 /* ---------- on-demand libraries ----------
    Excel (xlsx), Word (docx), PDF (jsPDF + html2canvas) and the map (Leaflet) are only needed when you
@@ -1305,7 +1305,9 @@ function appConfirm(message, opts){
   removeAppConfirm();
   const el = document.createElement('div');
   el.id = 'appConfirmPrompt';
-  el.style.cssText = 'position:fixed; inset:0; z-index:9999; display:flex; align-items:flex-end; justify-content:center;';
+  // A prompt with a box to type in opens at the TOP and is sized to the visible area (see trackKeyboardFit in 03),
+  // so the on-screen keyboard can't cover it. A plain yes/no has no keyboard and stays at the bottom.
+  el.style.cssText = `position:fixed; inset:0; z-index:9999; display:flex; align-items:${opts.input ? 'flex-start' : 'flex-end'}; justify-content:center;`;
   const danger = opts.danger !== false;
   const inputHtml = opts.input
     ? `<input id="appConfirmInput" type="${opts.input.type === 'number' ? 'number' : opts.input.type === 'password' ? 'password' : 'text'}" ${opts.input.type === 'number' ? 'inputmode="decimal" step="any" min="0"' : opts.input.type === 'password' ? 'autocomplete="new-password" autocapitalize="none" autocorrect="off" spellcheck="false"' : ''} value="${escapeAttr(opts.input.value == null ? '' : opts.input.value)}" placeholder="${escapeAttr(opts.input.placeholder || '')}" style="width:100%; box-sizing:border-box; margin:0 0 18px;">`
@@ -1318,7 +1320,7 @@ function appConfirm(message, opts){
     : `<button class="btn btn-clean" style="width:100%; border:none;" onclick="appConfirmCancel()">${escapeHtml(opts.cancelLabel || 'Cancel')}</button>`;
   el.innerHTML = `
     <div style="position:absolute; inset:0; background:rgba(0,0,0,0.4);" onclick="appConfirmCancel()"></div>
-    <div style="position:relative; background:var(--bg); width:100%; max-width:480px; border-radius:16px 16px 0 0; padding:20px; padding-bottom:calc(20px + env(safe-area-inset-bottom)); box-shadow:0 -4px 24px rgba(0,0,0,0.25);">
+    <div style="position:relative; background:var(--bg); width:100%; max-width:480px; ${opts.input ? 'border-radius:16px; margin-top:calc(env(safe-area-inset-top, 0px) + 8px); max-height:calc(100% - env(safe-area-inset-top, 0px) - 16px); overflow-y:auto;' : 'border-radius:16px 16px 0 0;'} padding:20px; padding-bottom:calc(20px + env(safe-area-inset-bottom)); box-shadow:0 -4px 24px rgba(0,0,0,0.25);">
       <h3 style="margin:0 0 8px; font-size:1.0625rem; font-weight:800; color:var(--ink);">${escapeHtml(opts.title || 'Are you sure?')}</h3>
       <p style="color:var(--ink-muted); font-size:0.875rem; margin:0 0 ${opts.input ? '12px' : '18px'}; line-height:1.5;">${escapeHtml(message)}</p>
       ${inputHtml}
@@ -1328,6 +1330,7 @@ function appConfirm(message, opts){
     </div>
   `;
   document.body.appendChild(el);
+  if(opts.input && typeof trackKeyboardFit === 'function') trackKeyboardFit(el);
   appConfirmState = {onConfirm: opts.onConfirm || null, onCancel: opts.onCancel || null, onAlt: opts.onAlt || null, hasInput: !!opts.input};
   if(opts.input){ const inp = document.getElementById('appConfirmInput'); if(inp){ inp.focus(); inp.select(); } }
 }

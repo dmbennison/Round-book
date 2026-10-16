@@ -502,8 +502,21 @@ function seBind(){
 }
 
 /* ---------- dialogs ---------- */
-function seModal(html){ const { modal, card } = seEls(); card.innerHTML = html; card.scrollTop = 0; modal.classList.add('show'); }
-function seCloseModal(){ const { modal, card } = seEls(); if(modal) modal.classList.remove('show'); if(card) card.innerHTML = ''; }
+function seModal(html){
+  const { modal, card } = seEls();
+  card.innerHTML = html; card.scrollTop = 0;
+  // A dialog with a box to type in (or a date picker) opens at the top and tracks the visible area, so the
+  // keyboard can't cover it — the same rule the sheets follow (see trackKeyboardFit in 03-customers.js).
+  const typing = !!card.querySelector(SHEET_TEXT_ENTRY);
+  modal.classList.toggle('top', typing);
+  if(typing) trackKeyboardFit(modal); else untrackKeyboardFit(modal);
+  modal.classList.add('show');
+}
+function seCloseModal(){
+  const { modal, card } = seEls();
+  if(modal){ modal.classList.remove('show', 'top'); untrackKeyboardFit(modal); }
+  if(card) card.innerHTML = '';
+}
 // The ? in the corner: the Schedule help, shown in the editor's own dialog (the normal help pop-up would open
 // underneath the full-screen editor and be hidden).
 function seHelpOpen(){

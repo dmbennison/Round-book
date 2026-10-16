@@ -329,7 +329,7 @@ const FOCUSED_HELP = {
   photos: {
     title: 'Photos',
     body: () => [
-      helpP('Add photos from a customer’s Photos section. Tap one to open it; pinch or double-tap to zoom, and swipe left or right for the next. Every photo is also in the <b>Photo gallery</b> (⋯ → Photo gallery).'),
+      helpP('Add photos from a customer’s Photos section. Tap one to open it; pinch or double-tap to zoom, and swipe left or right for the next. The buttons (Annotate, Share, Delete and the rest) stay pinned along the bottom while the photo scrolls underneath them. Every photo is also in the <b>Photo gallery</b> (⋯ → Photo gallery).'),
       helpP('<b>Annotate</b> to circle, draw an arrow, draw freehand or add text – the annotated photo is saved as a new one and the original is kept. <b>Make a before & after photo</b> (needs two photos of the customer): pick the Before and After, choose landscape or portrait, then <b>Save to photos</b> or <b>Share</b>. <b>Send with an offer</b> adds an offer message to a photo; change its wording in Settings → Message templates.')
     ]
   },
