@@ -289,10 +289,10 @@ const FOCUSED_HELP = {
       helpP('If a round is split over several days, its customers are grouped under <b>Day 1</b>, <b>Day 2</b>… – tap a Day button to see just that day.'),
       helpP('<b>Swipe a customer’s card</b>:'),
       helpList([
-        '<b>Halfway right</b> – cleaned.',
-        '<b>All the way right</b> – cleaned and paid.',
+        '<b>Halfway right</b> – cleaned. A “Windows cleaned today” text opens ready to send (you can turn this off in Settings).',
+        '<b>All the way right</b> – cleaned and paid. No text is sent.',
         '<b>Left</b> – paid.',
-        'An <b>Undo</b> button appears for a few seconds. After a clean, a “Windows cleaned today” text opens ready to send (you can turn this off in Settings).'
+        'An <b>Undo</b> button appears for a few seconds.'
       ]),
       helpP('<b>Press and hold</b> a card for a quick info box – price, last cleaned, next due, last paid, Bank or Cash, and any note. Tap the <b>pencil</b> in it to add or edit a note. The green phone button calls and the blue compass button gives directions.'),
       helpP('Badges you may see: <b>Couldn’t clean</b> (you couldn’t get to them last time), <b>Chase</b> (payment reminders unanswered), <b>Low by £X</b> (priced well below average for their property type) and <b>📈 Review</b> (12+ months since their last price rise).'),
@@ -391,7 +391,7 @@ const FOCUSED_HELP = {
       helpList([
         '<b>Appearance</b> – text size, light, dark or automatic, and colour scheme.',
         '<b>Messaging app</b> – your default: Messages or WhatsApp. Any customer can have their own under <b>Message by</b> when you edit them. If a WhatsApp message turns out to be for someone who isn\'t on it, tap <b>Not on WhatsApp?</b> on the message screen and that customer switches to text for good.',
-        '<b>Swipe to text</b> – turns the “Windows cleaned today” text after a clean on or off.',
+        '<b>Swipe to text</b> – turns the “Windows cleaned today” text after a halfway-swipe clean on or off (a clean-and-paid swipe never sends one).',
         '<b>Business details</b> – your name, company and bank details, used on invoices and texts.',
         '<b>Message templates</b> – the wording of every text. <b>{name}</b>, <b>{amount}</b>, <b>{company}</b> and <b>{yourname}</b> fill in automatically.',
         '<b>Mileage rates</b> – the allowance rates for a tax year.'

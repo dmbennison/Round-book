@@ -1919,14 +1919,16 @@ function custCardHtml(c, mode){
             ? `<button onclick="event.stopPropagation(); sendTemplate('${c.id}','cleanedToday')" title="Sent — tap to send again" style="display:inline-flex; align-items:center; gap:4px; background:var(--green-dim); color:var(--green); border:none; border-radius:20px; padding:5px 10px; font-size:0.7188rem; font-weight:800; line-height:1;">✓ Text sent</button>`
             : `<button onclick="event.stopPropagation(); sendTemplate('${c.id}','cleanedToday')" style="display:inline-flex; align-items:center; gap:4px; background:var(--green-dim); color:var(--green); border:none; border-radius:20px; padding:5px 10px; font-size:0.7188rem; font-weight:800; line-height:1;">💬 Cleaned today</button>`
         ) : ''}
+        ${(showClean && s.lastClean===todayISO() && !isMobileNumber(c.phone)) ? `<span class="badge ok">✓ Cleaned today</span>` : ''}
       </div>
     </div>
   </div>`;
 }
 
-// fromSwipe: true when this came from swiping a card. A swipe-clean then jumps straight
+// fromSwipe: true when this came from swiping a card. A halfway swipe (clean) then jumps straight
 // to the messaging app with the "windows cleaned today" text ready to send (see
 // prepareCleanedTodayText) — one tap in Messages instead of opening a preview first.
+// Swiping all the way (clean and paid) does NOT send a text: it only moves the list on to the next customer.
 // After a customer is swiped cleaned, the list moves on: remember who is next, then scroll them to the top.
 function nextCustomerIdInList(id){
   const cards = Array.from(document.querySelectorAll('#main .cust-card[data-kind="customer"]'));
@@ -1988,7 +1990,6 @@ function quickCleanAndPaid(id, fromSwipe){
   c.paymentReminderSent = false;
   c.paymentReminderSentDate = null;
   c.paymentReminderCount = 0;
-  const text = fromSwipe ? prepareCleanedTodayText(c) : null;
   const nextId = fromSwipe ? nextCustomerIdInList(id) : null;
   saveData(); render();
   if(nextId) scrollToCustomerCard(nextId);
@@ -1996,10 +1997,8 @@ function quickCleanAndPaid(id, fromSwipe){
     c.cleanHistory.pop();
     c.paymentHistory.pop();
     Object.assign(c, prev);
-    if(text) text.undo();
     saveData(); render();
   });
-  if(text) sendPhoneMessage(c.phone, text.msg);
 }
 
 function useCurrentLocation(){
