@@ -290,6 +290,17 @@
   }
   @keyframes slideup{from{transform:translateY(20px); opacity:0.4;} to{transform:translateY(0); opacity:1;}}
   .sheet-handle{width:38px; height:4px; background:var(--line); border-radius:3px; margin:8px auto 6px;}
+  /* The photo viewer's buttons stay pinned to the bottom of the sheet while the photo scrolls underneath them. The
+     sheet's own bottom padding moves into the bar so it reaches the very bottom edge; the frosted backing lets
+     the photo show faintly through as it passes. */
+  .sheet:has(.pv-actions){padding-bottom:0;}
+  .pv-actions{
+    position:sticky; bottom:0; z-index:3; margin:0 -16px; padding:10px 16px calc(env(safe-area-inset-bottom, 0px) + 14px);
+    background:var(--bg); border-top:1px solid var(--line);
+  }
+  @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)){
+    .pv-actions{ background:color-mix(in srgb, var(--bg) 82%, transparent); -webkit-backdrop-filter:blur(14px); backdrop-filter:blur(14px); }
+  }
   .sheet-head{display:flex; align-items:center; justify-content:space-between; padding:6px 2px 14px;}
   .sheet-head h2{font-size:1.125rem; font-weight:800; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
   .sheet-close{width:32px;height:32px;border-radius:50%; border:none; background:var(--surface); color:var(--ink-muted); display:flex; align-items:center; justify-content:center;}
@@ -415,6 +426,8 @@
   .se-more{display:block; width:calc(100% - 20px); margin:12px 10px 16px; padding:11px; border:1px dashed var(--line); border-radius:12px; background:transparent; color:var(--ink-muted); font-size:0.8125rem; font-weight:800;}
   .se-modal{position:absolute; inset:0; z-index:5; display:none; align-items:flex-end; justify-content:center; background:rgba(11,36,56,0.45);}
   .se-modal.show{display:flex;}
+  .se-modal.top{align-items:flex-start;} /* has a field to type in: see seModal */
+  .se-modal.top .se-modal-card{border-radius:20px; margin-top:calc(env(safe-area-inset-top, 0px) + 8px); max-height:calc(100% - env(safe-area-inset-top, 0px) - 16px);}
   .se-modal-card{width:100%; max-width:520px; max-height:88%; overflow-y:auto; box-sizing:border-box; padding:16px 16px calc(env(safe-area-inset-bottom, 0px) + 16px); border-radius:20px 20px 0 0; background:var(--bg); color:var(--ink);}
   .se-modal-card h3{margin:0 0 8px; font-size:1.0625rem; font-weight:800;}
   .se-modal-card label{display:block; margin:12px 2px 5px; font-size:0.75rem; font-weight:800; color:var(--ink-muted);}
@@ -860,6 +873,7 @@
       padding:18px 28px calc(env(safe-area-inset-bottom, 0px) + 28px);
       box-shadow:none;
     }
+    .pv-actions{ margin:0 -28px; padding-left:28px; padding-right:28px; }
     .sheet-handle{ display:none; }
     .overlay.top-sheet{ align-items:stretch; }
     .overlay.top-sheet .sheet{ margin:0; max-height:none; animation:none; }
