@@ -949,6 +949,11 @@ function printSchedule(){
     jobsByDate[j.date].push(j);
   });
 
+  // Notes left on days in the Schedule tab (settings.dayNotes). Short ones print in the day's box; a long one is cut
+  // short there and given in full under the calendar, so nothing is lost or makes a box balloon.
+  const dayNotes = (data.settings && data.settings.dayNotes) || {};
+  const NOTE_IN_CELL = 60;
+  const longNotes = [];
   let bodyRows = '';
   for(let w=0; w<5; w++){
     bodyRows += '<tr>';
@@ -961,8 +966,11 @@ function printSchedule(){
       const jobsDue = jobsByDate[iso] || [];
       const dayNum = cellDate.getDate();
       const monthLabel = (dayNum === 1) ? cellDate.toLocaleDateString('en-GB',{month:'short'}) + ' ' : '';
+      const note = dayNotes[iso] || '';
+      if(note.length > NOTE_IN_CELL) longNotes.push({ iso, note });
       bodyRows += `<td class="${outside?'outside':''}">
         <div class="daynum">${monthLabel}${dayNum}</div>
+        ${note ? `<div class="day-note">📝 ${escapeHtml(note.length > NOTE_IN_CELL ? note.slice(0, NOTE_IN_CELL - 1).trimEnd() + '…' : note)}</div>` : ''}
         ${roundsDue.map(rn=>`<span class="round-chip">${escapeHtml(rn)}</span>`).join('')}
         ${jobsDue.map(j=>`<span class="round-chip job-chip">🔧 ${escapeHtml(j.address||j.name||'Job')}</span>`).join('')}
       </td>`;
@@ -975,7 +983,7 @@ function printSchedule(){
       <thead><tr><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th></tr></thead>
       <tbody>${bodyRows}</tbody>
     </table>
-
+    ${longNotes.length ? `<div class="rpt-notes"><b>Notes in full</b>${longNotes.map(n => `<div>📝 <b>${escapeHtml(fmtDate(n.iso))}</b> — ${escapeHtml(n.note)}</div>`).join('')}</div>` : ''}
   `;
   runPrint('Monthly Schedule', body, false, false, () => openReports());
 }

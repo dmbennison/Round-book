@@ -608,6 +608,13 @@ function rememberScreen(){
 // tab: a screen name, or 'work' / 'sales' (the bar's own buttons). restore: when moving to a screen, resume where it
 // was left (the sub tabs and the bar do; a direct jump such as Today's "Owed" tile starts that screen from its top).
 function setTab(tab, restore){
+  // On the wide split view the right-hand pane may still hold a sheet or report from the tab you're leaving. The Schedule
+  // uses the whole width, so put those away first (a form with unsaved changes still asks before closing).
+  if(tab === 'schedule' && typeof isWideSplitView === 'function' && isWideSplitView()){
+    if(typeof rpDismissForSheet === 'function') rpDismissForSheet();
+    const ov = document.getElementById('overlay');
+    if(ov && ov.classList.contains('show')) closeSheet();
+  }
   if(tab === 'work' || tab === 'sales'){
     if(tabGroupOf(currentTab) === tab){ tab = currentTab; restore = false; } // tapping the tab you're in: back to its top
     else { tab = lastScreenIn[tab]; restore = true; }                       // arriving from elsewhere: where you left off
