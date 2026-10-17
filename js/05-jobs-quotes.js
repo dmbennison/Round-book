@@ -5,10 +5,7 @@
 function renderJobs(main){
   let html = '';
   const today = todayISO();
-  html += `<div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px;">
-    <button class="btn-open icon-plain" style="width:auto; padding:8px 14px; display:inline-flex; gap:6px; align-items:center;" onclick="setTab('work')">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 6l-6 6 6 6"/></svg> Work
-    </button>
+  html += `<div style="display:flex; align-items:center; justify-content:flex-end; gap:8px; margin-bottom:8px;">
     <div style="display:flex; align-items:center; gap:8px;">
       ${mainScreenHelpBtn('jobs', "()=>setTab('jobs')")}
       <button class="btn-open icon-plain" style="width:38px; height:38px; padding:0;" onclick="printAllJobs()" aria-label="Print report">

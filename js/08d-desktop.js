@@ -24,7 +24,7 @@ function hasFinePointer(){
    which has its own full-width dashboard, never shows it.
    ===================================================================== */
 function paneDashKind(){
-  if(currentTab === 'work' || currentTab === 'rounds') return 'rounds';
+  if(currentTab === 'rounds') return 'rounds';
   if(currentTab === 'jobs' || currentTab === 'quotes' || currentTab === 'marketing') return currentTab;
   return null;
 }

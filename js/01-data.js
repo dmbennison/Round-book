@@ -6,13 +6,14 @@ const STORE_KEY = 'roundBookData_v1';
 // APP_VERSION is a plain decimal number (e.g. 1.01, 1.02 ... 1.99, 2.00) —
 // bump by 0.01 for every change. formatVersion always renders it to exactly
 // two decimal places, so it's never shown as "1.1" or "1.100".
-const APP_VERSION = 2.90;
+const APP_VERSION = 2.91;
 function formatVersion(v){ return Number(v).toFixed(2); }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
 // entry (newest first) with ONE very short plain-English summary, then delete
 // entries so only the latest ten remain.
 const VERSION_HISTORY = [
+  {version: 2.91, changes: ['New tab layout: Today, Schedule, Work (Rounds / Jobs) and Sales (Quotes / Marketing), with the sub tabs pinned under the top and remembering where you were. The Schedule is now its own tab and keeps your unsaved changes while you look at other tabs; Reject / Commit are smaller; you can leave a note on any day; and a new round can be given a day before its first clean']},
   {version: 2.90, changes: ['Live sync: opening the app no longer asks for end-of-day mileage before your other device\'s answer has arrived, and a screen being open can no longer hold sync back while the top says Synced. The top now says Update waiting in that case and catches up the moment the screen closes']},
   {version: 2.89, changes: ['Pop-ups with a box to type in (such as editing an amount in a history, or the Schedule\'s dialogs) now open at the top so the keyboard can\'t cover them; a photo\'s buttons stay pinned at the bottom while the photo scrolls underneath']},
   {version: 2.88, changes: ['iPad and computer: the empty right-hand pane now shows a summary for the tab you\'re on; reports preview inside it; drag the divider to resize it; right-click menus on cards; hover highlights; and keyboard moves through the list (j / k, Enter, C, P)']},
@@ -22,7 +23,6 @@ const VERSION_HISTORY = [
   {version: 2.84, changes: ['Behind the scenes: adding ?test to the end of the web address now runs 50 automatic self-checks on the due-date, owing, quote and sync calculations and shows how many passed. Normal use is unchanged']},
   {version: 2.83, changes: ['Each customer can now have their own Message by choice (default, text or WhatsApp). If someone isn\'t on WhatsApp, tap Not on WhatsApp? on the message screen and they switch to text for good']},
   {version: 2.82, changes: ['Colour schemes: Ocean, Rust, Forest and Plum now have calmer, near-neutral backgrounds and a contrasting accent colour (coral, cobalt, ochre and teal), the same approach as Slate. Slate and High contrast are unchanged']},
-  {version: 2.81, changes: ['Live sync now uses your Round Book sync service automatically — there is no address to type in']},
 ];
 /* ---------- on-demand libraries ----------
    Excel (xlsx), Word (docx), PDF (jsPDF + html2canvas) and the map (Leaflet) are only needed when you
@@ -967,7 +967,16 @@ function custStatus(c){
       cleanBadge = {type:'due', text: daysPast===0 ? 'Due today' : `Due +${daysPast}`};
     }
   } else {
-    cleanBadge = {type:'due', text:'Never cleaned'};
+    // Never cleaned. If a first clean has been booked in the Schedule editor, they aren't due until that day.
+    const od = dueOverrideISO(c);
+    if(od && od > todayISO()){
+      cleanBadge = {type:'scheduled', text:`First clean ${fmtDate(od)}`};
+    } else if(od){
+      const daysPast = daysBetween(od, todayISO());
+      cleanBadge = {type:'due', text: daysPast===0 ? 'Due today' : `Due +${daysPast}`};
+    } else {
+      cleanBadge = {type:'due', text:'Never cleaned'};
+    }
   }
   const totalCharged = (c.cleanHistory||[]).reduce((s,e)=>s+Number(e.amount||0), 0);
   const totalPaid = (c.paymentHistory||[]).reduce((s,p)=>s+Number(p.amount||0), 0);

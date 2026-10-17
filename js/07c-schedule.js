@@ -1,4 +1,4 @@
-/* 07c-schedule.js -- The Schedule editor (Work tab → Schedule).
+/* 07c-schedule.js -- The Schedule tab (its own tab, between Today and Work).
    A full-screen calendar like the Monthly Schedule report, except each chip (a round on a day,
    or a one-off job) can be moved to another day — by dragging it, or by tapping it and then
    tapping a day. Nothing is saved until Commit; Reject throws every change away.
@@ -6,7 +6,10 @@
    01-data.js) and changes a moved job's date.
    Extras: ☔ push-back (rain-off), 👥 move part of a round, ☑ multi-select, ↶ undo, a load summary
    (customers and value) on every day, 🚫 days off, ＋ jobs added straight onto a day, a
-   review step before committing, and a "+4 weeks" button to look further ahead.
+   review step before committing, a "+4 weeks" button to look further ahead, a note on any day, and first cleans:
+   a new customer or round that hasn't been cleaned yet can be given a day before its first clean.
+   The calendar is a draft that lives on in the background: switching to another tab hides it and coming back
+   shows it just as it was, changes and all, until it is committed or rejected.
    Part of Round Book's split JS bundle; loaded in numeric order from index.html. */
 
 const SE_WEEKS = 5;           // weeks shown when the editor opens, starting with the Monday of this week
@@ -17,6 +20,16 @@ const SE_ZOOM_KEY = 'roundBookScheduleZoom';
 const SE_ZOOM_MIN = 0.45, SE_ZOOM_MAX = 2.6, SE_ZOOM_DEFAULT = 1.4;
 let se = null;      // editor state while open (see openScheduleEditor)
 let seBound = false;
+
+// Which version of the data this draft was built from, so a draft with no changes of its own can be refreshed when
+// the data underneath it has moved (a sync, a clean logged, a new day) while one with changes is never touched.
+function seDataVersion(){ return (typeof liveDataVersion === 'number') ? liveDataVersion : 0; }
+function seVisible(){ const r = document.getElementById('schedEditor'); return !!r && r.classList.contains('show'); }
+// True while a draft with real changes exists, on screen or not. Live sync holds off merging under it (liveUiBusy).
+function seDraftPending(){ return !!se && seChangeSummary().total > 0; }
+// An item that is a first clean nobody has booked yet. It waits on today, unmoved, and doesn't count towards
+// today's load or get swept up by Push back / Days off until it is given a day of its own.
+function seIsParked(it){ return !!(it && it.parked && it.date === it.dispDate); }
 
 function seEls(){
   return { root: document.getElementById('schedEditor'), scroll: document.getElementById('seScroll'),
@@ -68,14 +81,18 @@ function openScheduleEditor(){
   data.customers.forEach(c => {
     if(c.paused) return;
     let due = nextDueISO(c);
-    if(!due) return;
+    // A customer who has never been cleaned has no due date until one is booked here, so they wait on today (green,
+    // "first clean") and can be given a day before that first clean happens.
+    const first = !lastDateOf(c.cleanHistory);
+    const parked = first && !due;
+    if(!due){ if(!first) return; due = todayStr; }
     if(c.deferUntil && c.deferUntil > due) due = c.deferUntil;
-    const overdue = due < todayStr;
+    const overdue = !parked && due < todayStr;
     const disp = overdue ? todayStr : due;
     if(disp > capISO) return;
     const rn = c.round || 'Unassigned';
     const label = multi.has(rn) ? `${rn} (Day ${c.visitDay || 1})` : rn;
-    items.push({ kind:'c', key:c.id, label, dispDate:disp, date:disp, overdue, due, price:Number(c.price || 0) });
+    items.push({ kind:'c', key:c.id, label, dispDate:disp, date:disp, overdue, due, price:Number(c.price || 0), first, parked });
   });
   (data.oneOffJobs || []).forEach(j => {
     if(j.done || !j.date) return;
@@ -91,18 +108,52 @@ function openScheduleEditor(){
 
   let zoom = SE_ZOOM_DEFAULT;
   try{ const z = parseFloat(localStorage.getItem(SE_ZOOM_KEY)); if(z >= SE_ZOOM_MIN && z <= SE_ZOOM_MAX) zoom = z; }catch(e){}
+  const notes = Object.assign({}, st.dayNotes || {});
   se = { zoom, items, sel:[], multi:false, selDay:null, startISO, capISO, todayStr, weeks:seStartWeeks(),
          offWeekdays, blocked, origOff:offWeekdays.slice(), origBlocked:blocked.slice(),
+         notes, origNotes:Object.assign({}, notes),
+         builtVersion:seDataVersion(), builtDay:todayStr,
          history:[], drag:null, chipIndex:{}, ignoreClickUntil:0, pendingRender:false, offPending:null };
-  const { root, scroll } = seEls();
+  const { scroll } = seEls();
   seSetMoreTools(false); // Push back / Multi / Split / Job start tucked away behind ⋯ More…
   seBind();
   seCloseModal();
-  pageScrollLock('schedule', true);
-  root.classList.add('show');
-  renderScheduleEditor();
+  seShow();
   scroll.scrollTop = 0; scroll.scrollLeft = 0;
 }
+// Putting the calendar on screen / taking it off, without touching the draft. The page behind it is locked from
+// scrolling only while it's showing.
+function seShow(){
+  const { root } = seEls();
+  if(!se || !root) return;
+  root.classList.add('show');
+  pageScrollLock('schedule', true);
+  renderScheduleEditor();
+}
+function seHide(){
+  const { root } = seEls();
+  if(!root) return;
+  seEndDrag();
+  seCloseModal();
+  root.classList.remove('show');
+  pageScrollLock('schedule', false);
+  if(typeof liveUiFreed === 'function') liveUiFreed(); // a draft with no changes no longer holds sync back
+}
+// The tab was opened (setTab) or the app redrew while it's open (render): make sure there's a calendar and that it is
+// current. A draft with changes is left exactly as it is; an untouched one is rebuilt if the data or the day has
+// moved on, keeping the scroll position.
+function scheduleTabRender(){
+  const stale = !se || (!seChangeSummary().total && (se.builtVersion !== seDataVersion() || se.builtDay !== todayISO()));
+  if(stale){
+    const { scroll } = seEls();
+    const top = scroll ? scroll.scrollTop : 0, left = scroll ? scroll.scrollLeft : 0;
+    const keep = !!se;
+    openScheduleEditor();
+    if(keep && scroll){ scroll.scrollTop = top; scroll.scrollLeft = left; }
+  } else if(!seVisible()) seShow();
+}
+function scheduleTabShown(){ scheduleTabRender(); }
+function scheduleTabHidden(){ seHide(); }
 
 /* ---------- chips, day totals, change summary ---------- */
 // One round chip per (round, day, original day, overdue) so a moved group stays distinguishable
@@ -114,8 +165,8 @@ function seBuildChips(){
       out.push({ id:'j|' + it.key, kind:'job', label:it.label, date:it.date, dispDate:it.dispDate, overdue:!!it.overdue, isNew:!!it.isNew, items:[it] });
       return;
     }
-    const k = `r|${it.label}|${it.date}|${it.dispDate}|${it.overdue ? 1 : 0}`;
-    if(!map[k]){ map[k] = { id:k, kind:'round', label:it.label, date:it.date, dispDate:it.dispDate, overdue:!!it.overdue, isNew:false, items:[] }; out.push(map[k]); }
+    const k = `r|${it.label}|${it.date}|${it.dispDate}|${it.overdue ? 1 : 0}|${it.first ? 1 : 0}`;
+    if(!map[k]){ map[k] = { id:k, kind:'round', label:(it.first ? '🆕 ' : '') + it.label, date:it.date, dispDate:it.dispDate, overdue:!!it.overdue, first:!!it.first, parked:!!it.parked, isNew:false, items:[] }; out.push(map[k]); }
     map[k].items.push(it);
   });
   se.chipIndex = {};
@@ -132,6 +183,7 @@ function seDayStats(chips){
   chips.forEach(ch => {
     const s = st[ch.date] = st[ch.date] || { cust:0, jobs:0, value:0 };
     ch.items.forEach(it => {
+      if(seIsParked(it)) return; // waiting for a day: not today's work yet
       if(it.kind === 'c') s.cust++; else s.jobs++;
       s.value += it.price || 0;
     });
@@ -146,8 +198,9 @@ function seChangeSummary(){
   const offAdded = se.blocked.filter(d => !se.origBlocked.includes(d));
   const offRemoved = se.origBlocked.filter(d => !se.blocked.includes(d));
   const wdChanged = se.offWeekdays.slice().sort().join() !== se.origOff.slice().sort().join();
-  return { movedC, movedJ, newJ, offAdded, offRemoved, wdChanged,
-           total: movedC + movedJ + newJ + offAdded.length + offRemoved.length + (wdChanged ? 1 : 0) };
+  const noteDays = Array.from(new Set(Object.keys(se.notes).concat(Object.keys(se.origNotes)))).filter(d => (se.notes[d] || '') !== (se.origNotes[d] || '')).sort();
+  return { movedC, movedJ, newJ, offAdded, offRemoved, wdChanged, noteDays,
+           total: movedC + movedJ + newJ + offAdded.length + offRemoved.length + (wdChanged ? 1 : 0) + noteDays.length };
 }
 
 /* ---------- rendering ---------- */
@@ -187,11 +240,11 @@ function renderScheduleEditor(){
     const meta = (s && !past) ? `${s.cust + s.jobs}${s.value > 0 ? ' · ' + money(s.value) : ''}` : '';
     html += `<div class="se-cell${past ? ' past' : ''}${iso === se.todayStr ? ' today' : ''}${off ? ' off' : ''}${se.selDay === iso ? ' selday' : ''}${cls}" data-date="${iso}">
       <div class="se-cellhead"><div class="se-daynum">${monthLabel}${dayNum}</div></div>
-      ${off ? '<div class="se-off">🚫 Off</div>' : ''}${meta ? `<div class="se-meta"><span>${meta}</span></div>` : ''}
+      ${off ? '<div class="se-off">🚫 Off</div>' : ''}${meta ? `<div class="se-meta"><span>${meta}</span></div>` : ''}${se.notes[iso] ? `<div class="se-daynote" data-note="${iso}" title="Tap to edit this note">📝 ${escapeHtml(se.notes[iso])}</div>` : ''}
       ${here.map(ch => {
         const n = ch.kind === 'round' ? ch.items.length : '';
-        const tip = ch.label + (ch.moved ? ' — moved from ' + fmtDate(ch.dispDate) : '') + (ch.isNew ? ' — new job' : '') + (ch.overdue ? ' — overdue since ' + fmtDate(ch.minDue) : '');
-        return `<div class="se-chip ${ch.kind}${ch.moved ? ' moved' : ''}${ch.isNew ? ' new' : ''}${ch.overdue ? ' overdue' : ''}${se.sel.includes(ch.id) ? ' sel' : ''}" data-id="${escapeAttr(ch.id)}" title="${escapeAttr(tip)}"><span class="se-chip-label">${ch.overdue ? '⚠ ' : ''}${escapeHtml(ch.label)}</span>${n !== '' ? `<span class="se-chip-n">${n}</span>` : ''}</div>`;
+        const tip = ch.label + (ch.moved ? ' — moved from ' + fmtDate(ch.dispDate) : '') + (ch.isNew ? ' — new job' : '') + (ch.overdue ? ' — overdue since ' + fmtDate(ch.minDue) : '') + (ch.parked && !ch.moved ? ' — first clean, not booked yet: move it to a day' : '');
+        return `<div class="se-chip ${ch.kind}${ch.moved ? ' moved' : ''}${ch.isNew ? ' new' : ''}${ch.overdue ? ' overdue' : ''}${ch.first ? ' first' : ''}${se.sel.includes(ch.id) ? ' sel' : ''}" data-id="${escapeAttr(ch.id)}" title="${escapeAttr(tip)}"><span class="se-chip-label">${ch.overdue ? '⚠ ' : ''}${escapeHtml(ch.label)}</span>${n !== '' ? `<span class="se-chip-n">${n}</span>` : ''}</div>`;
       }).join('')}
     </div>`;
   }
@@ -203,10 +256,12 @@ function renderScheduleEditor(){
   if(sum.movedJ) parts.push(sePlural(sum.movedJ, 'job') + ' moved');
   if(sum.newJ) parts.push(sePlural(sum.newJ, 'new job'));
   if(sum.offAdded.length || sum.offRemoved.length || sum.wdChanged) parts.push('days off changed');
+  if(sum.noteDays.length) parts.push(sum.noteDays.length === 1 ? 'note changed' : sum.noteDays.length + ' notes changed');
   let state = '';
   if(se.sel.length) state = se.multi ? `${se.sel.length} selected — tap a day to move` : 'Now tap a day';
   else if(se.selDay) state = seFmtDay(se.selDay) + ' selected';
-  count.textContent = [state, parts.join(' · ')].filter(Boolean).join(' · ') || 'No changes yet';
+  const parkedN = se.items.filter(seIsParked).length;
+  count.textContent = [state, parts.join(' · ')].filter(Boolean).join(' · ') || (parkedN ? `No changes yet · ${sePlural(parkedN, 'first clean')} to book` : 'No changes yet');
   commit.style.opacity = sum.total ? '1' : '0.45';
 
   undo.disabled = !se.history.length;
@@ -219,13 +274,13 @@ function renderScheduleEditor(){
 
 /* ---------- history (undo) ---------- */
 function sePush(){
-  se.history.push(JSON.stringify({ items:se.items, blocked:se.blocked, offWeekdays:se.offWeekdays }));
+  se.history.push(JSON.stringify({ items:se.items, blocked:se.blocked, offWeekdays:se.offWeekdays, notes:se.notes }));
   if(se.history.length > 60) se.history.shift();
 }
 function seUndo(){
   if(!se || !se.history.length){ return; }
   const s = JSON.parse(se.history.pop());
-  se.items = s.items; se.blocked = s.blocked; se.offWeekdays = s.offWeekdays;
+  se.items = s.items; se.blocked = s.blocked; se.offWeekdays = s.offWeekdays; se.notes = s.notes || {};
   se.sel = []; se.selDay = null;
   renderScheduleEditor();
   toast('Undid the last change');
@@ -433,6 +488,8 @@ function seBind(){
   // (used by Push back and Add job).
   grid.addEventListener('click', (e) => {
     if(!se || Date.now() < se.ignoreClickUntil || e.target.closest('.se-chip')) return;
+    const noteEl = e.target.closest('.se-daynote');
+    if(noteEl){ seNoteOpen(noteEl.dataset.note); return; }
     const cell = e.target.closest('.se-cell');
     if(!cell) return;
     const iso = cell.dataset.date;
@@ -478,7 +535,7 @@ function seBind(){
   document.addEventListener('keydown', (e) => {
     if(!se || !seEls().root.classList.contains('show')) return;
     if(e.key === 'Escape'){
-      if(seModalOpen()) seCloseModal(); else seRequestReject();
+      if(seModalOpen()) seCloseModal(); else if(seChangeSummary().total) seRequestReject(); // nothing to discard: Escape does nothing
       return;
     }
     // Everything below is for the calendar itself: not while a dialog is up, someone is typing in a field,
@@ -558,7 +615,7 @@ function sePushBackPlan(){
   const scope = scopeEl ? scopeEl.value : 'day';
   const by = Number(document.getElementById('sePbBy').value) || 1;
   if(!day || day < se.todayStr) return { error:'Choose today or a later day' };
-  const hit = se.items.filter(it => scope === 'after' ? it.date >= day : it.date === day);
+  const hit = se.items.filter(it => !seIsParked(it) && (scope === 'after' ? it.date >= day : it.date === day));
   return { day, scope, by, moves: hit.map(it => ({ it, to: seNextWorking(it.date, by) })) };
 }
 function sePushBackPreview(){
@@ -682,6 +739,35 @@ function seAddJobApply(){
   toast('Job added to ' + seFmtDay(date) + ' — Commit to keep it');
 }
 
+/* --- 📝 A note on a day --- */
+// iso: the day (tapping an existing note passes it); with none given, the day currently selected. Notes are part of the
+// draft like days off: nothing is kept until Commit.
+function seNoteOpen(iso){
+  if(!se) return;
+  iso = (typeof iso === 'string' && iso) ? iso : se.selDay;
+  if(!iso){ toast('Tap a day first, then 📝 Note'); return; }
+  const cur = se.notes[iso] || '';
+  seModal(`
+    <h3>📝 ${seFmtDay(iso)}</h3>
+    <p class="se-note">A reminder for the day — it shows on the calendar and on Today once you Commit.</p>
+    <textarea id="seNoteText" maxlength="300" placeholder="e.g. Dentist at 2 — finish by 1pm">${escapeHtml(cur)}</textarea>
+    <div class="se-btn-row">
+      ${cur ? `<button class="se-btn danger" onclick="seNoteApply('${iso}', true)">Delete</button>` : `<button class="se-btn" onclick="seCloseModal()">Cancel</button>`}
+      <button class="se-btn primary" onclick="seNoteApply('${iso}', false)">Save note</button>
+    </div>
+  `);
+}
+function seNoteApply(iso, remove){
+  if(!se) return;
+  const text = remove ? '' : document.getElementById('seNoteText').value.trim().replace(/\s+/g, ' ');
+  if((se.notes[iso] || '') === text){ seCloseModal(); return; }
+  sePush();
+  if(text) se.notes[iso] = text; else delete se.notes[iso];
+  se.sel = [];
+  seCloseModal();
+  renderScheduleEditor();
+}
+
 /* --- 🚫 Days off --- */
 const SE_DAY_ORDER = [1,2,3,4,5,6,0];
 const SE_DAY_NAMES = {0:'Sun',1:'Mon',2:'Tue',3:'Wed',4:'Thu',5:'Fri',6:'Sat'};
@@ -730,7 +816,7 @@ function seUnblock(iso){
 }
 // After days off change: if anything is now sitting on a day off, offer to move it.
 function seAfterOffChange(pred){
-  const stuck = pred ? se.items.filter(it => it.date >= se.todayStr && pred(it.date) && seIsOff(it.date)) : [];
+  const stuck = pred ? se.items.filter(it => !seIsParked(it) && it.date >= se.todayStr && pred(it.date) && seIsOff(it.date)) : [];
   renderScheduleEditor();
   if(!stuck.length){ seModal(seDaysOffHtml()); return; }
   se.offPending = stuck;
@@ -756,18 +842,19 @@ function seReviewOpen(){
   if(!sum.total){ toast('Nothing has been changed yet'); return; }
   const groups = {};
   se.items.filter(i => !i.isNew && i.kind === 'c' && i.date !== i.dispDate).forEach(i => {
-    const k = i.label + '|' + i.dispDate + '|' + i.date;
-    (groups[k] = groups[k] || { label:i.label, from:i.dispDate, to:i.date, n:0 }).n++;
+    const k = i.label + '|' + i.dispDate + '|' + i.date + '|' + (i.parked ? 1 : 0);
+    (groups[k] = groups[k] || { label:(i.first ? '🆕 ' : '') + i.label, from:i.dispDate, to:i.date, n:0, parked:!!i.parked }).n++;
   });
   const lines = [];
   Object.values(groups).sort((a, b) => a.from.localeCompare(b.from) || a.label.localeCompare(b.label)).forEach(g =>
-    lines.push(`<li><b>${escapeHtml(g.label)}</b> — ${sePlural(g.n, 'customer')}<br><span class="se-from">${seFmtDay(g.from)}</span> → <b>${seFmtDay(g.to)}</b></li>`));
+    lines.push(`<li><b>${escapeHtml(g.label)}</b> — ${sePlural(g.n, 'customer')}<br><span class="se-from">${g.parked ? 'first clean, not booked' : seFmtDay(g.from)}</span> → <b>${seFmtDay(g.to)}</b></li>`));
   se.items.filter(i => !i.isNew && i.kind === 'j' && i.date !== i.dispDate).forEach(i =>
     lines.push(`<li><b>${escapeHtml(i.label)}</b><br><span class="se-from">${seFmtDay(i.dispDate)}</span> → <b>${seFmtDay(i.date)}</b></li>`));
   se.items.filter(i => i.isNew).forEach(i =>
     lines.push(`<li><b>New:</b> ${escapeHtml(i.label)}<br>on <b>${seFmtDay(i.date)}</b></li>`));
   if(sum.offAdded.length) lines.push(`<li>🚫 Marked off: ${sum.offAdded.map(seFmtDay).join(', ')}</li>`);
   if(sum.offRemoved.length) lines.push(`<li>✅ Working again: ${sum.offRemoved.map(seFmtDay).join(', ')}</li>`);
+  sum.noteDays.forEach(d => lines.push(se.notes[d] ? `<li>📝 ${seFmtDay(d)}: ${escapeHtml(se.notes[d])}</li>` : `<li>📝 Note removed from ${seFmtDay(d)}</li>`));
   if(sum.wdChanged) lines.push(`<li>Regular days off: ${se.offWeekdays.length ? SE_DAY_ORDER.filter(d => se.offWeekdays.includes(d)).map(d => SE_DAY_NAMES[d]).join(', ') : 'none'}</li>`);
   seModal(`
     <h3>Review changes</h3>
@@ -777,13 +864,15 @@ function seReviewOpen(){
 }
 
 /* ---------- commit / reject ---------- */
+// Ends the draft (Commit or Reject). The tab stays open, so a fresh calendar — built from the data as it now stands —
+// takes its place straight away; if the tab isn't the one showing, the next visit builds it.
 function closeScheduleEditor(){
   seEndDrag();
   seCloseModal();
-  seEls().root.classList.remove('show');
-  pageScrollLock('schedule', false);
   se = null;
-  if(typeof liveUiFreed === 'function') liveUiFreed(); // live sync may have been waiting for the editor to close
+  if(currentTab === 'schedule') openScheduleEditor();
+  else seHide();
+  if(typeof liveUiFreed === 'function') liveUiFreed(); // live sync may have been waiting on the draft
 }
 // Reject button / Escape: asks first if anything has been changed.
 function seRequestReject(){
@@ -806,7 +895,7 @@ function commitSchedule(){
   const sum = seChangeSummary();
   if(!sum.total){ toast('Nothing has been changed yet'); return; }
   let customers = 0, jobs = 0, added = 0;
-  const snap = { cust:[], jobs:[], addedJobs:[], settings:null }; // how things were, so the commit can be undone
+  const snap = { cust:[], jobs:[], addedJobs:[], settings:null, notes:null }; // how things were, so the commit can be undone
   se.items.forEach(it => {
     if(it.isNew){
       it.job.date = it.date;
@@ -837,6 +926,14 @@ function commitSchedule(){
   }
   if(sum.offAdded.length || sum.offRemoved.length) data.settings.blockedDays = se.blocked.slice();
   if(sum.wdChanged) data.settings.scheduleOffWeekdays = se.offWeekdays.slice();
+  if(sum.noteDays.length){
+    snap.notes = { had: data.settings.dayNotes !== undefined, value: JSON.parse(JSON.stringify(data.settings.dayNotes === undefined ? null : data.settings.dayNotes)) };
+    // Keep only notes from the last few months on; an old one has nothing left to say.
+    const keepFrom = seAddDays(se.todayStr, -120);
+    const kept = {};
+    Object.keys(se.notes).forEach(d => { if(d >= keepFrom && se.notes[d]) kept[d] = se.notes[d]; });
+    data.settings.dayNotes = kept;
+  }
   closeScheduleEditor();
   saveData();
   render();
@@ -861,6 +958,10 @@ function seUndoCommit(snap){
     data.settings = data.settings || {};
     if(snap.settings.hadBlocked) data.settings.blockedDays = snap.settings.blockedDays; else delete data.settings.blockedDays;
     if(snap.settings.hadOff) data.settings.scheduleOffWeekdays = snap.settings.off; else delete data.settings.scheduleOffWeekdays;
+  }
+  if(snap.notes){
+    data.settings = data.settings || {};
+    if(snap.notes.had) data.settings.dayNotes = snap.notes.value; else delete data.settings.dayNotes;
   }
   saveData();
   render();

@@ -49,7 +49,10 @@ function liveUiBusy(){
   // The "Missing end mileage" question looks at the live data when it saves and closes itself if the other device
   // has already answered it (refreshMissingMileagePrompt), so it must not hold up the very sync that would answer it.
   const sheetBusy = !!(ov && ov.classList.contains('show')) && !(typeof missingMileageSheetDate !== 'undefined' && missingMileageSheetDate);
-  return !!(sheetBusy || (rp && rp.classList.contains('show')) || (sc && sc.classList.contains('show')));
+  // The Schedule tab's draft counts as busy for as long as it has changes in it, even while another tab is showing:
+  // merging new data underneath a half-made schedule could put it out of step with the customers it moves.
+  const draft = typeof seDraftPending === 'function' && seDraftPending();
+  return !!(sheetBusy || draft || (rp && rp.classList.contains('show')) || (sc && sc.classList.contains('show') && draft));
 }
 // A screen that was holding sync back has closed: catch up now rather than waiting for the next minute's check.
 function liveUiFreed(){

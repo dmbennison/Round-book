@@ -157,13 +157,15 @@ function renderTodayHome(main){
     else if(days < 30) owed1430 += bal;
     else owed30plus += bal;
   });
+  // A note left on today in the Schedule tab (Commit keeps it in settings.dayNotes).
+  const todayNote = (data.settings && data.settings.dayNotes && data.settings.dayNotes[today]) || '';
   const mEntry = todayMileageEntry();
   const mStartText = (mEntry && mEntry.start!=null) ? mEntry.start : 'Tap to log';
   const mFinishText = (mEntry && mEntry.start!=null) ? ((mEntry.end!=null) ? mEntry.end : 'Tap to log') : '—';
   const mTotalText = (mEntry && mEntry.start!=null && mEntry.end!=null) ? (mEntry.end - mEntry.start).toFixed(1) : '—';
 
   main.innerHTML = `
-    <div class="section-label" style="margin-top:0;">${fmtDate(today)}</div>
+    <div class="section-label" style="margin-top:0;">${fmtDate(today)}${todayNote ? `<div style="margin-top:6px; padding:8px 10px; border-radius:10px; background:var(--amber-dim); color:var(--ink); font-size:0.8125rem; font-weight:700; line-height:1.4; text-transform:none; letter-spacing:0;">📝 ${escapeHtml(todayNote)}</div>` : ''}</div>
     ${renderGettingStartedCard()}
     <div class="today-hero">
       <div onclick="${todaySelectedRound ? `goToRoundDue('${escapeAttr(todaySelectedRound)}')` : `setTab('rounds'); setRoundsView('due');`}" style="cursor:pointer; display:flex; align-items:flex-start; justify-content:space-between; gap:14px;">
@@ -583,49 +585,69 @@ function cycleVisitDay(id){
 }
 function setRoundDayFilter(day){ roundDayFilter = day; render(); }
 
-// Remembers where you were inside Work (which round, which Due/Text/Owed
-// view, which day) AND how far down the list you had scrolled, whenever you step
-// away to another tab — e.g. to check Today or quote a walk-up customer — so
-// tapping back into Work resumes exactly there instead of dumping you back on
-// the hub (or the top of the list) every time. Other tabs remember their scroll
-// position too (tabScroll). Tapping the tab you're already on goes to its top.
-let lastWorkView = null;
-const tabScroll = {};
-function setTab(tab){
-  const keyOf = t => (t === 'rounds' || t === 'jobs') ? 'work' : t;
-  const fromKey = keyOf(currentTab), toKey = keyOf(tab);
-  const switching = fromKey !== toKey;
-  let restoreY = 0;
-  if(tab === 'work'){
-    if(currentTab === 'rounds' || currentTab === 'jobs'){
-      // Already inside Work — tapping Work again means "take me to the hub",
-      // the same way tapping an already-active tab elsewhere goes to its root.
-      lastWorkView = null;
-      currentTab = 'work'; currentRound = null; reorderMode = false; roundFilterMode = 'all'; roundDayFilter = 'all';
-    } else if(lastWorkView){
-      currentTab = lastWorkView.screen;
-      currentRound = lastWorkView.round;
-      roundsViewMode = lastWorkView.roundsViewMode;
-      roundDayFilter = lastWorkView.roundDayFilter;
-      reorderMode = false; roundFilterMode = lastWorkView.roundFilterMode || 'all';
-      restoreY = lastWorkView.scrollY || 0;
-    } else {
-      if(switching) restoreY = tabScroll.work || 0;
-      currentTab = 'work'; currentRound = null; reorderMode = false; roundFilterMode = 'all'; roundDayFilter = 'all';
-    }
-  } else {
-    if(currentTab === 'rounds' || currentTab === 'jobs'){
-      lastWorkView = { screen: currentTab, round: currentRound, roundsViewMode, roundDayFilter, roundFilterMode, scrollY: pageScrollY() };
-    } else if(switching){
-      tabScroll[fromKey] = pageScrollY();
-    }
-    if(switching) restoreY = tabScroll[toKey] || 0;
-    currentTab = tab; currentRound = null; reorderMode = false; roundFilterMode = 'all'; roundDayFilter = 'all';
+/* ---------- tabs and sub tabs ----------
+   Four tabs along the bar: Today, Schedule, Work (sub tabs Rounds / Jobs) and Sales (sub tabs Quotes / Marketing).
+   The screens themselves keep their old names — currentTab is one of today, schedule, rounds, jobs, quotes, marketing —
+   and tabGroupOf says which bar tab a screen belongs under. The sub tabs are a fixed bar under the header (see
+   renderSubTabs); switching between them, or to another tab and back, puts you back where you were: which round, which
+   Due / Text first / Owed view, which day, and how far down the list you had scrolled (screenView).
+   Tapping the tab you're already on goes to the top of that screen. */
+const SCREEN_GROUP = { today:'today', schedule:'schedule', rounds:'work', jobs:'work', quotes:'sales', marketing:'sales' };
+function tabGroupOf(screen){ return SCREEN_GROUP[screen] || screen; }
+const SUB_TABS = {
+  work:  [['rounds', 'Rounds'], ['jobs', 'Jobs']],
+  sales: [['quotes', 'Quotes'], ['marketing', 'Marketing']]
+};
+let lastScreenIn = { work: 'rounds', sales: 'quotes' }; // the sub tab each of those was last on
+const screenView = {};                                  // per screen: where you were when you left it
+function rememberScreen(){
+  screenView[currentTab] = { round: currentRound, roundsViewMode, roundDayFilter, roundFilterMode, scrollY: pageScrollY() };
+  const g = tabGroupOf(currentTab);
+  if(lastScreenIn[g]) lastScreenIn[g] = currentTab;
+}
+// tab: a screen name, or 'work' / 'sales' (the bar's own buttons). restore: when moving to a screen, resume where it
+// was left (the sub tabs and the bar do; a direct jump such as Today's "Owed" tile starts that screen from its top).
+function setTab(tab, restore){
+  if(tab === 'work' || tab === 'sales'){
+    if(tabGroupOf(currentTab) === tab){ tab = currentTab; restore = false; } // tapping the tab you're in: back to its top
+    else { tab = lastScreenIn[tab]; restore = true; }                       // arriving from elsewhere: where you left off
   }
-  const activeTabKey = (currentTab === 'rounds' || currentTab === 'jobs') ? 'work' : currentTab;
-  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===activeTabKey));
+  const leaving = currentTab;
+  const same = tab === leaving;
+  if(!same) rememberScreen();
+  const saved = (!same && restore) ? screenView[tab] : null;
+  // Every screen but Rounds picks its scroll position back up when you switch to it; Rounds does so only when resuming (below).
+  let restoreY = (!same && tab !== 'rounds') ? ((screenView[tab] && screenView[tab].scrollY) || 0) : 0;
+  currentTab = tab; currentRound = null; reorderMode = false; roundFilterMode = 'all'; roundDayFilter = 'all';
+  if(saved && tab === 'rounds'){
+    // Only step back inside a round that still exists.
+    if(saved.round && groupByRound(data.customers)[saved.round]) currentRound = saved.round;
+    roundsViewMode = saved.roundsViewMode;
+    roundDayFilter = saved.roundDayFilter || 'all';
+    roundFilterMode = saved.roundFilterMode || 'all';
+    restoreY = saved.scrollY || 0;
+  } else if(tab === 'rounds' && !same){
+    restoreY = 0; // a direct jump to Rounds starts from the top of its list
+  }
+  if(tab === 'schedule') scheduleTabShown();
+  else if(leaving === 'schedule') scheduleTabHidden();
   render();
-  pageScrollTo(restoreY);
+  pageScrollTo(tab === 'schedule' ? 0 : restoreY);
+}
+// The sub tab bar under the header: two fixed, always-visible buttons for the group you're in; hidden on Today and
+// Schedule. Redrawn by render(), so it always follows the screen. Re-measured straight away so the page doesn't jump.
+function renderSubTabs(){
+  const bar = document.getElementById('subTabBar');
+  if(!bar) return;
+  const defs = SUB_TABS[tabGroupOf(currentTab)];
+  const wasHidden = bar.hidden;
+  if(!defs){ bar.hidden = true; bar.innerHTML = ''; }
+  else {
+    bar.hidden = false;
+    bar.innerHTML = defs.map(([id, label]) =>
+      `<button class="subtab${currentTab === id ? ' active' : ''}" onclick="setTab('${id}', true)">${label}</button>`).join('');
+  }
+  if(wasHidden !== bar.hidden && typeof window.syncHeaderHeights === 'function') window.syncHeaderHeights();
 }
 // The page itself scrolls (the header and tab bar are fixed), so these are simply the window scroll —
 // kept as named helpers so the scrolling area can be changed in one place.
@@ -1311,11 +1333,14 @@ function render(){
   const main = document.getElementById('main');
   main.innerHTML = '';
   document.body.setAttribute('data-tab', currentTab); // lets the landscape CSS lay Today out differently
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tabGroupOf(currentTab)));
+  renderSubTabs();
 
   if(currentTab === 'today'){
     renderTodayHome(main);
-  } else if(currentTab === 'work'){
-    renderWorkHub(main);
+  } else if(currentTab === 'schedule'){
+    // The editor is this tab's whole page (07c-schedule.js); main stays empty and is hidden by CSS.
+    if(typeof scheduleTabRender === 'function') scheduleTabRender();
   } else if(currentTab === 'rounds' && !currentRound){
     renderRoundsList(main);
   } else if(currentTab === 'rounds' && currentRound){
@@ -1415,56 +1440,28 @@ function statisticsDropdownHtml(innerHtml){
   </details>`;
 }
 
-/* ---------- Work hub ----------
-   Landing page for the Work tab: two square buttons for Rounds and One-off
-   jobs (previously their own tabs), with the overall money info that used to
-   sit at the top of the Rounds screen moved to sit underneath them. */
-function renderWorkHub(main){
+/* The old Work landing page (Rounds / Jobs / Schedule buttons) is gone — those are now the Work sub tabs and the
+   Schedule tab. Its Statistics box now sits at the top of the Rounds overview (see renderRoundsList). */
+function workStatisticsHtml(){
   const activeCustomers = data.customers.filter(c=>!c.paused);
   const totalCustomers = activeCustomers.length;
   const totalValue = activeCustomers.reduce((sum,c)=>sum+Number(c.price||0),0);
   const totalOwed = activeCustomers.reduce((sum,c)=>{ const s=custStatus(c); return sum + (s.owed ? s.balance : 0); },0);
   const overallAvg = totalCustomers ? totalValue/totalCustomers : 0;
-
-  const openJobsCount = (data.oneOffJobs||[]).filter(j=>!j.done).length;
-
-  let html = `<div class="today-grid" style="margin-bottom:16px;">
-    <button class="today-tile" style="text-align:center; cursor:pointer;" onclick="setTab('rounds')">
-      <div class="num" style="font-size:1.375rem;">🧹</div>
-      <div class="lbl" style="font-size:0.875rem; margin-top:8px; color:var(--ink);">Rounds</div>
-    </button>
-    <button class="today-tile" style="text-align:center; cursor:pointer;" onclick="setTab('jobs')">
-      <div class="num" style="font-size:1.375rem;">🧰</div>
-      <div class="lbl" style="font-size:0.875rem; margin-top:8px; color:var(--ink);">One-off jobs${openJobsCount ? ` (${openJobsCount})` : ''}</div>
-    </button>
-    <button class="today-tile" style="text-align:center; cursor:pointer; grid-column:1 / -1;" onclick="openScheduleEditor()">
-      <div class="num" style="font-size:1.375rem;">📅</div>
-      <div class="lbl" style="font-size:0.875rem; margin-top:8px; color:var(--ink);">Schedule</div>
-    </button>
-  </div>`;
-
-  if(data.customers.length){
-    html += statisticsDropdownHtml(`<div class="summary-overall">
+  return statisticsDropdownHtml(`<div class="summary-overall">
       <div class="stat"><div class="num">${totalCustomers}</div><div class="lbl">Customers</div></div>
       <div class="stat"><div class="num">${roundValueOwedHtml(totalValue, totalOwed)}</div><div class="lbl">Round value</div></div>
       <div class="stat"><div class="num">${money(overallAvg)}</div><div class="lbl">Avg / customer</div></div>
     </div>
     ${propertyTypeAvgSummaryHtml(activeCustomers)}
     ${paymentMethodSummaryHtml(activeCustomers)}`);
-  } else {
-    html += emptyState('rounds');
-  }
-  main.innerHTML = html;
 }
 
 function renderRoundsList(main){
   const rounds = groupByRound(data.customers);
   const roundNames = Object.keys(rounds).sort((a,b)=>a.localeCompare(b));
 
-  let html = `<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; gap:8px;">
-    <button class="btn-open icon-plain" style="width:auto; padding:8px 14px; display:inline-flex; gap:6px; align-items:center;" onclick="setTab('work')">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 6l-6 6 6 6"/></svg> Work
-    </button>
+  let html = `<div style="display:flex; align-items:center; justify-content:flex-end; margin-bottom:12px; gap:8px;">
     <div style="display:flex; align-items:center; gap:8px;">
       ${mainScreenHelpBtn('rounds', "()=>setTab('rounds')")}
       <button class="btn-open icon-plain" style="width:38px; height:38px; padding:0;" onclick="openRoundReports()" aria-label="Print reports">
@@ -1485,6 +1482,7 @@ function renderRoundsList(main){
   }
 
   if(roundsViewMode === 'overview'){
+    html += workStatisticsHtml();
     html += `<div class="section-label">Your rounds</div>`;
     let grandCustomers = 0, grandValue = 0, grandOwed = 0;
     roundNames.forEach(rn=>{
@@ -1616,12 +1614,13 @@ function openRound(rn){ currentRound = rn; reorderMode = false; roundFilterMode 
 // there (see selectTodayRound), so this has to switch tabs itself rather
 // than assume it's already on the Rounds tab.
 function goToRoundDue(rn){
+  if(currentTab === 'schedule') scheduleTabHidden();
+  rememberScreen();
   currentTab = 'rounds';
   currentRound = rn;
   reorderMode = false;
   roundFilterMode = 'due';
   roundDayFilter = 'all';
-  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab==='work'));
   render();
   pageScrollTo(0);
 }

@@ -147,7 +147,7 @@ document.addEventListener('keydown', (e) => {
   const t = e.target, tag = t && t.tagName;
   if(tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (t && t.isContentEditable)) return;
   const shown = (id) => { const el = document.getElementById(id); return !!el && el.classList.contains('show'); };
-  if(shown('schedEditor') || shown('reportPreview') || document.getElementById('appConfirmPrompt') || document.getElementById('backupPopup')) return;
+  if(shown('reportPreview') || document.getElementById('appConfirmPrompt') || document.getElementById('backupPopup')) return;
   const sheet = document.getElementById('sheet');
   if(shown('overlay') && sheet && sheet.querySelector(SHEET_TEXT_ENTRY)) return;
   e.preventDefault();
@@ -380,17 +380,23 @@ function onSwipeCancel(){
   // where to start. Phones get exactly the values they always did.
   const bar = document.getElementById('tabBar');
   const tabsOnTop = () => !!(window.matchMedia && window.matchMedia('screen and (min-width: 700px) and (min-height: 600px)').matches);
+  // The Work / Sales sub tab bar is pinned just under whatever is at the top (the header, or the header plus the
+  // tab bar on an iPad / desktop), and its height is added to --header-h so the page starts below it.
+  const sub = document.getElementById('subTabBar');
   const sync = () => {
     const root = document.documentElement.style;
     const h = header.offsetHeight, b = bar ? bar.offsetHeight : 0, top = tabsOnTop();
+    const sh = (sub && !sub.hidden) ? sub.offsetHeight : 0;
     root.setProperty('--header-only-h', h + 'px');
-    root.setProperty('--header-h', (h + (top ? b : 0)) + 'px');
+    root.setProperty('--sub-top', (h + (top ? b : 0)) + 'px');
+    root.setProperty('--header-h', (h + (top ? b : 0) + sh) + 'px');
     root.setProperty('--tabbar-h', (top ? 0 : b) + 'px');
   };
+  window.syncHeaderHeights = sync; // renderSubTabs calls this the moment it shows or hides the sub tabs
   sync();
   window.addEventListener('resize', sync);
   window.addEventListener('orientationchange', sync);
-  if(window.ResizeObserver){ const ro = new ResizeObserver(sync); ro.observe(header); if(bar) ro.observe(bar); }
+  if(window.ResizeObserver){ const ro = new ResizeObserver(sync); ro.observe(header); if(bar) ro.observe(bar); if(sub) ro.observe(sub); }
 })();
 document.getElementById('dateNow').textContent = new Date().toLocaleDateString('en-GB',{weekday:'long', day:'numeric', month:'long'});
 

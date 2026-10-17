@@ -257,26 +257,28 @@ const FOCUSED_HELP = {
         '<b>Jobs</b> – appears on days when a one-off job is booked.',
         '<b>Customers owing</b> – how much is outstanding, and for how long.'
       ]),
-      helpP('A yellow number on the <b>Quotes</b> tab means quotes need following up.')
+      helpP('A yellow number on the <b>Sales</b> tab means quotes need following up. If you’ve left a 📝 note on today in the Schedule, it shows at the top of this screen.')
     ]
   },
   work: {
     title: 'Work',
     body: () => [
-      helpP('Work has three buttons: <b>Rounds</b>, <b>One-off jobs</b> and <b>Schedule</b>. <b>Statistics</b> shows your customer count and round value.')
+      helpP('<b>Work</b> has two sub tabs pinned under the top of the screen: <b>Rounds</b> and <b>Jobs</b> (one-off jobs). Tap one to switch; each remembers where you were, so you can jump to Jobs and back without losing your place in a round. <b>Statistics</b> – your customer count and round value – is at the top of the Rounds list. The calendar is its own <b>Schedule</b> tab, and quotes and marketing are under <b>Sales</b>.')
     ]
   },
   schedule: {
     title: 'Schedule',
     body: () => [
-      helpP('<b>Work → Schedule</b> is a calendar of the coming weeks. Each blue tile is a round on the day it’s due, with the number of customers in it; amber 🔧 tiles are one-off jobs, and anyone overdue shows on today in red. <b>Nothing changes until you tap Commit.</b>'),
+      helpP('The <b>Schedule</b> tab is a calendar of the coming weeks. Each blue tile is a round on the day it’s due, with the number of customers in it; amber 🔧 tiles are one-off jobs, and anyone overdue shows on today in red. <b>Nothing changes until you tap Commit.</b> You can leave the Schedule at any time to check Today, Work or Sales – your unsaved changes are still there when you come back.'),
       helpList([
         '<b>Move a tile</b> – press and hold it until it lifts, then drag it to another day. Or tap the tile, then tap the day. (With a mouse, just drag.) Swiping across the calendar only scrolls. You can’t move work to a day that’s past or marked off.',
         '<b>📍 Today</b> jumps to today. <b>🔍−</b> and <b>🔍＋</b> (or pinching) zoom the calendar. <b>↶ Undo</b> takes back your last change.',
         '<b>⋯ More…</b> shows or hides the next four tools (the calendar opens with them tucked away, and shows 5 weeks – tap <b>＋ Show 4 more weeks</b> at the bottom to look further ahead). <b>☔ Push back</b> – for a rained-off day: choose the day and how many working days to push it, for just that day or every day after it.',
         '<b>☑ Multi</b> – tap several tiles, then a day, to move them together. <b>👥 Split</b> – tap a round’s tile first, then choose which customers to move.',
         '<b>＋ Job</b> adds a one-off job to a day (tap the day first). <b>🚫 Days off</b> sets your regular days off and any holidays.',
-        '<b>✓ Commit</b> shows what will change first; confirm and the new dates apply (an Undo button appears for about 15 seconds). <b>✕ Reject</b> throws away every change.',
+        '<b>📝 Note</b> – tap a day, then 📝 Note, to leave a reminder on it (“Dentist at 2”). The note shows on that day in the calendar – tap it to edit or delete – and at the top of Today when the day comes. Notes are kept when you Commit.',
+        '<b>🆕 First cleans</b> – a customer or whole round you’ve just added, who hasn’t been cleaned yet, waits on today in <b>green</b>. Move it to the day you’ll do the first clean and Commit; the customer then shows “First clean” with that date and isn’t counted as due until then. (They don’t add to today’s totals, and Push back leaves them alone, until they have a day.)',
+        '<b>Commit</b> (top right) shows what will change first; confirm and the new dates apply (an Undo button appears for about 15 seconds). <b>Reject</b> throws away every change.',
         'A moved date lasts until that customer’s next clean, then their normal cycle carries on.',
         '<b>On an iPad or computer:</b> with a tile selected, <b>← →</b> move it a working day and <b>↑ ↓</b> move it a week. Ctrl/Cmd + Z undoes, Enter reviews your changes, Escape rejects, and Ctrl/Cmd + scroll zooms. <b>＋ Weeks</b> shows more weeks.'
       ])
@@ -285,7 +287,7 @@ const FOCUSED_HELP = {
   rounds: {
     title: 'Rounds',
     body: () => [
-      helpP('Open <b>Rounds</b> from the Work tab. The switch at the top – <b>Rounds / Due / Text first / Owed</b> – changes the list; tap a round to see its customers.'),
+      helpP('Open <b>Rounds</b> from the Work tab (its first sub tab). The switch at the top – <b>Rounds / Due / Text first / Owed</b> – changes the list; tap a round to see its customers.'),
       helpP('If a round is split over several days, its customers are grouped under <b>Day 1</b>, <b>Day 2</b>… – tap a Day button to see just that day.'),
       helpP('<b>Swipe a customer’s card</b>:'),
       helpList([
@@ -340,7 +342,7 @@ const FOCUSED_HELP = {
       helpList([
         '<b>Open a quote</b> to send it, print it or share it as a PDF, follow it up, or turn it into a customer or one-off job. The pencil edits it.',
         '<b>Swipe right</b> to accept, <b>left</b> to decline.',
-        'A quote still pending after 7 days counts in the <b>yellow number</b> on the Quotes tab.'
+        'A quote still pending after 7 days counts in the <b>yellow number</b> on the Sales tab.'
       ])
     ]
   },
@@ -455,7 +457,7 @@ function openHelp(returnTo){
 
     ${helpH('Getting around')}
     ${helpList([
-      'Round Book works best installed as an app (in Safari: Share → Add to Home Screen). The four tabs are <b>Today</b>, <b>Work</b> (Rounds, One-off jobs and Schedule), <b>Quotes</b> and <b>Marketing</b> – along the bottom on a phone, along the top on an iPad or computer. Tap the tab you’re on to go back to its top.',
+      'Round Book works best installed as an app (in Safari: Share → Add to Home Screen). The four tabs are <b>Today</b>, <b>Schedule</b>, <b>Work</b> (sub tabs <b>Rounds</b> and <b>Jobs</b>) and <b>Sales</b> (sub tabs <b>Quotes</b> and <b>Marketing</b>) – along the bottom on a phone, along the top on an iPad or computer. The sub tabs stay pinned under the top of the screen so you can switch between them at any time. Tap the tab you’re on to go back to its top.',
       'The blue <b>+</b> button adds whatever suits the screen you’re on. On <b>Today</b> it asks whether you want to add a customer, a job or a quote.',
       'Top bar: <b>Search</b>, <b>⋯</b> (opens <b>Reports</b>, <b>Photo gallery</b>, <b>Backup</b> and <b>About</b> – which holds this guide) and <b>Settings</b>.',
       'Tap the <b>🎤</b> inside any text box to speak instead of typing; tap it again to stop.',
