@@ -530,6 +530,9 @@
   .rpt-calendar td.outside .daynum{color:#B7C2CA;}
   .rpt-calendar .round-chip{display:block; background:#DCEFFA; color:#1c6fa3; border-radius:5px; padding:1px 4px; margin-bottom:2px; font-weight:700; font-size:9px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
   .rpt-calendar .round-chip.job-chip{background:#FBEBD2; color:#8A5A15;}
+  .rpt-calendar .day-note{background:#FFF3D6; color:#10344C; border-radius:4px; padding:1px 4px; margin-bottom:3px; font-size:8px; line-height:1.3; font-weight:700; overflow-wrap:anywhere;}
+  .rpt-notes{margin-top:12px; font-size:10px; line-height:1.5; color:#1C2B36;}
+  .rpt-notes b:first-child{display:block; margin-bottom:3px; font-size:11px;}
 
   .inv-meta-table td{padding:4px 8px;}
   .inv-billto{background:#F5F7F8; border-radius:8px; padding:12px 14px; margin-bottom:18px; font-size:13px; line-height:1.7; color:#1C2B36;}
@@ -872,6 +875,11 @@
     body[data-tab="today"]:not(:has(#overlay.show)) .report-preview.in-pane{ left:0; border-left:none; } /* Today is full width until something opens */
 
     /* The draggable boundary between the list and the pane (08d-desktop.js). Hidden when there's no pane to resize. */
+    /* The Schedule tab is a full-width workspace: neither column is used, so the right-hand pane (placeholder, summary
+       or whatever was last open) and the list behind it are switched off instead of showing through. A pop-up opened
+       from the header still appears, since that is deliberate. */
+    body[data-tab="schedule"]:not(:has(#overlay.show)) .overlay{ display:none; }
+    body[data-tab="schedule"] #appScroll{ display:none; }
     .pane-divider{ display:block; position:fixed; z-index:18; top:var(--header-h, 170px); bottom:var(--tabbar-h, 64px); left:calc(var(--list-w) - 6px); width:12px; cursor:col-resize; touch-action:none; outline:none; }
     body[data-tab="today"]:not(:has(#overlay.show)) .pane-divider, body:has(#schedEditor.show) .pane-divider, body[data-tab="schedule"] .pane-divider{ display:none; }
     .sheet{
