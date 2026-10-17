@@ -783,6 +783,7 @@ function closeScheduleEditor(){
   seEls().root.classList.remove('show');
   pageScrollLock('schedule', false);
   se = null;
+  if(typeof liveUiFreed === 'function') liveUiFreed(); // live sync may have been waiting for the editor to close
 }
 // Reject button / Escape: asks first if anything has been changed.
 function seRequestReject(){

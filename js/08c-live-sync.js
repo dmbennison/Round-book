@@ -29,6 +29,9 @@ let liveChain = Promise.resolve(), liveQueued = false;
 let livePushTimer = null, liveFirstDirtyAt = 0, liveLastPushAt = 0;
 let livePushTimes = [];
 let liveApplying = false;
+// True when the last check found the other device's changes but held them back because a screen was open (see
+// liveUiBusy). It is NOT "in sync" — the chip says so, and closing the screen triggers an immediate retry.
+let liveDeferred = false;
 const liveMem = { key: null };
 const liveNotYet = new Map();              // photo id -> when the cloud last said "not there yet"
 let liveStatus = { state: 'off', text: '', okAt: 0 };
@@ -43,7 +46,15 @@ function liveRun(fn){
 }
 function liveUiBusy(){
   const ov = document.getElementById('overlay'), rp = document.getElementById('reportPreview'), sc = document.getElementById('schedEditor');
-  return !!((ov && ov.classList.contains('show')) || (rp && rp.classList.contains('show')) || (sc && sc.classList.contains('show')));
+  // The "Missing end mileage" question looks at the live data when it saves and closes itself if the other device
+  // has already answered it (refreshMissingMileagePrompt), so it must not hold up the very sync that would answer it.
+  const sheetBusy = !!(ov && ov.classList.contains('show')) && !(typeof missingMileageSheetDate !== 'undefined' && missingMileageSheetDate);
+  return !!(sheetBusy || (rp && rp.classList.contains('show')) || (sc && sc.classList.contains('show')));
+}
+// A screen that was holding sync back has closed: catch up now rather than waiting for the next minute's check.
+function liveUiFreed(){
+  if(!liveActive || !liveDeferred) return;
+  setTimeout(() => { if(liveDeferred && !liveUiBusy()) liveSyncNow(); }, 400);
 }
 async function liveHashState(state){
   const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(syncStable(state)));
@@ -92,6 +103,7 @@ function liveChipText(){
     case 'locked': return '🔒 Unlock sync';
     case 'attention': return '⚠ Needs attention';
     case 'waiting': return '☁️ Live sync on';
+    case 'deferred': return '☁️ Update waiting';
     default: return s.okAt ? `☁️ Synced ${liveAgo(s.okAt)}` : '☁️ Live sync on';
   }
 }
@@ -308,7 +320,8 @@ async function livePullInner(opts){
       return { ok:true };
     }
     const r = await liveMergeIn(live, payload, headAt, opts);
-    if(r === 'deferred') return { ok:true };
+    // deferred only counts as "held back by an open screen" when one really is open (a clash waiting for an answer is different)
+    if(r === 'deferred') return { ok:true, deferred: liveUiBusy() && !opts.force };
     live = await liveMeta();
   }
   const pp = await livePullPhotos(live, key);
@@ -392,6 +405,7 @@ async function liveMergeIn(live, payload, headAt, opts){
     summary = parts.join(' · ');
     toast('Synced from your other device' + (parts.length ? ': ' + parts[0] : '') + (parts.length > 1 ? ' (+' + (parts.length - 1) + ' more)' : ''));
     render();
+    if(typeof refreshMissingMileagePrompt === 'function') refreshMissingMileagePrompt();
   } else if(chosen){
     summary = `${chosen} clash${chosen === 1 ? '' : 'es'} resolved as you chose`;
     toast(`Clash resolved — your choice will be sent to your other device`);
@@ -534,11 +548,12 @@ function liveSyncNow(opts){
     if(!liveActive) return;
     const prev = { state: liveStatus.state, text: liveStatus.text };
     liveSetStatus('syncing');
-    let more = false, allOk = false, waiting = false;
+    let more = false, allOk = false, waiting = false, deferred = false;
     try{
       const pull = await livePullInner(opts);
       if(pull.ok){
         waiting = !!pull.waiting;
+        deferred = !!pull.deferred;
         const push = await livePushInner(opts);
         if(push.ok){ allOk = true; more = !!(pull.more || push.more); }
       }
@@ -548,11 +563,14 @@ function liveSyncNow(opts){
     if(liveStatus.state === 'syncing'){
       // Nothing reported a problem this time round. If nothing succeeded either (for example
       // while paused), put back whatever was showing before rather than claiming success.
-      if(allOk) liveSetStatus(waiting ? 'waiting' : 'ok');
+      // Held back by an open screen is not "synced": say so, rather than the old "Synced just now" while out of date.
+      if(allOk) liveSetStatus(deferred ? 'deferred' : waiting ? 'waiting' : 'ok');
       else if(prev.state !== 'ok' && prev.state !== 'syncing' && prev.state !== 'waiting') liveSetStatus(prev.state, prev.text);
       else liveSetStatus('ok');
     }
+    liveDeferred = deferred;
     if(more) setTimeout(() => liveSyncNow(), 3000);
+    else if(deferred && !liveUiBusy()) liveUiFreed(); // the screen closed while we were checking
   });
 }
 // Called after every save (see the saveData wrapper below).
@@ -600,7 +618,8 @@ async function liveSyncInit(){
   if(live.key) liveMem.key = live.key;
   liveActive = true;
   liveSetStatus(liveMem.key ? 'syncing' : 'locked');
-  if(liveMem.key) liveSyncNow();
+  // Resolves once the first check has finished, so startup can hold its questions back until this device is up to date.
+  if(liveMem.key){ try{ await liveSyncNow(); }catch(e){} }
 }
 // Called by the AirDrop sync code when a backup is restored: this device's data has jumped
 // in time, so merging against the old shared copy could undo or delete things on the other device.

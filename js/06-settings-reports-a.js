@@ -1293,6 +1293,7 @@ function closeReportPreview(quiet){
   paper.innerHTML = '';
   const back = pendingReportReturnTo;
   pendingReportReturnTo = null;
+  if(typeof liveUiFreed === 'function') liveUiFreed();
   if(quiet === true) return;
   // If whatever the report was opened from is still showing underneath, we're
   // already back there; otherwise take the person back to where they came from.

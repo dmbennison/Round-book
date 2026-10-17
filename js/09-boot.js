@@ -407,10 +407,17 @@ try{ localStorage.removeItem('roundBookWeatherCache'); localStorage.removeItem('
 initStorage().catch(()=>{}).finally(()=>{
   render();
   initSwipeHandlers();
-  if(!maybeShowFirstRun()) maybeShowMissingMileagePrompt();
   requestPersistentStorage();
   maybeAutoSafetyCopy();
-  if(typeof liveSyncInit === 'function') liveSyncInit();
+  // Live sync gets the first go, and the start-up questions wait for it (at most 6 seconds). Asking "what was your
+  // end mileage?" before the other device's answer had arrived was the nag you'd already dealt with — and the
+  // question itself kept the sync from finishing. With live sync off this carries straight on.
+  const firstSync = (typeof liveSyncInit === 'function') ? Promise.resolve().then(liveSyncInit).catch(() => {}) : Promise.resolve();
+  Promise.race([firstSync, new Promise(r => setTimeout(r, 6000))]).then(() => {
+    const ov = document.getElementById('overlay');
+    if(ov && ov.classList.contains('show')) return; // they've already opened something: don't replace it
+    if(!maybeShowFirstRun()) maybeShowMissingMileagePrompt();
+  });
 });
 // A home-screen app can stay open for days, so also check each time it comes
 // back to the foreground whether a daily safety copy is due.

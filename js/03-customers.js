@@ -20,6 +20,7 @@ function openSheet(html, onClose){
   // On the wide split view a report preview can be showing in the pane this sheet is about to use (see 06).
   if(typeof rpDismissForSheet === 'function') rpDismissForSheet();
   sheetOnClose = onClose || null;
+  if(typeof missingMileageSheetDate !== 'undefined') missingMileageSheetDate = null; // set again by that prompt, after this
   sheetCloseGuard = null; // each new sheet starts unguarded; set one after opening if needed
   document.getElementById('sheet').innerHTML = `<div class="sheet-handle"></div>` + html;
   pageScrollLock('sheet', true);
@@ -93,6 +94,7 @@ function closeSheet(){
   pageScrollLock('sheet', false);
   // Wide screens: the pane falls back to its summary panel, so bring it up to date with whatever the sheet changed.
   if(typeof renderPaneDash === 'function') renderPaneDash();
+  if(typeof liveUiFreed === 'function') liveUiFreed(); // live sync may have been waiting for this screen to close
   if(sheetOnClose){
     const cb = sheetOnClose;
     sheetOnClose = null;

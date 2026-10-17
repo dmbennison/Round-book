@@ -335,6 +335,16 @@ function maybeShowMissingMileagePrompt(){
   openMissingMileagePrompt(openEntry);
   return true;
 }
+// The date of the entry the "Missing end mileage" sheet is asking about, while it's open (else null). Lets live sync
+// merge underneath it and lets it close itself if the other device has already supplied the reading.
+let missingMileageSheetDate = null;
+function refreshMissingMileagePrompt(){
+  if(!missingMileageSheetDate) return;
+  const e = (data.mileageLog || []).find(x => x.date === missingMileageSheetDate);
+  if(e && e.start != null && e.end == null) return; // still genuinely missing
+  closeSheet();
+  toast('End mileage was already logged on your other device');
+}
 function openMissingMileagePrompt(entry){
   openSheet(`
     <div class="sheet-head">
@@ -348,7 +358,8 @@ function openMissingMileagePrompt(entry){
       <button class="btn-primary" onclick="saveMissingMileageEntry('${entry.date}')">Save</button>
     </div>
     <button class="btn-danger-text" onclick="closeSheet()">I'll do it later</button>
-  `);
+  `, () => { missingMileageSheetDate = null; });
+  missingMileageSheetDate = entry.date; // after openSheet, which clears any earlier sheet's callbacks
 }
 function saveMissingMileageEntry(date){
   const raw = document.getElementById('missing_mileage_input').value;
