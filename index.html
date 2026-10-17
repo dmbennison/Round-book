@@ -181,7 +181,7 @@
   .badge.escalate{background:var(--red); color:#fff;}
   .badge.ok{background:var(--green-dim); color:var(--green);}
   .badge.paused{background:var(--line); color:var(--ink-muted);}
-  .badge.deferred{background:var(--blue-dim); color:var(--blue-deep);}
+  .badge.deferred, .badge.scheduled{background:var(--blue-dim); color:var(--blue-deep);}
   .badge.anniversary{background:var(--blue-dim); color:var(--blue-deep);}
   .chev{opacity:0.35;}
 
@@ -382,13 +382,16 @@
   .print-area{display:none;}
 
   /* Schedule editor: a full-screen calendar whose chips can be moved, then committed or rejected */
-  .sched-editor{position:fixed; inset:0; z-index:56; display:none; flex-direction:column; background:var(--bg); color:var(--ink);}
+  /* The Schedule tab. It sits between the header (and sub tabs) and the tab bar, below pop-ups (z 40), so every other
+     tab can be reached — and a pop-up opened from the header shown — while a schedule is still being worked on. */
+  .sched-editor{position:fixed; top:var(--header-h, 170px); bottom:var(--tabbar-h, 64px); left:0; right:0; z-index:12; display:none; flex-direction:column; background:var(--bg); color:var(--ink);}
+  body[data-tab="schedule"] main, body[data-tab="schedule"] .fab{display:none;} /* the editor is this tab's page */
   .sched-editor.show{display:flex;}
-  .se-bar{flex:none; display:flex; align-items:center; gap:10px; padding:calc(env(safe-area-inset-top, 0px) + 12px) 14px 8px; border-bottom:1px solid var(--line);}
+  .se-bar{flex:none; display:flex; align-items:center; gap:8px; padding:8px 14px; border-bottom:1px solid var(--line);}
   .se-bar-text{flex:1; min-width:0;}
   .se-bar .sheet-close{flex-shrink:0;}
-  .se-title{font-size:1.125rem; font-weight:800;}
-  .se-count{font-size:0.8125rem; font-weight:700; color:var(--ink-muted); margin-top:2px;}
+  .se-title{font-size:0.9375rem; font-weight:800;}
+  .se-count{font-size:0.75rem; font-weight:700; color:var(--ink-muted); margin-top:1px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
   .se-scroll{flex:1; min-height:0; overflow:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; touch-action:pan-x pan-y;}
   .se-grid{--z:1.4; display:grid; grid-template-columns:repeat(7, minmax(calc(112px * var(--z)), 1fr)); min-width:calc(784px * var(--z));}
   .se-dayname{position:sticky; top:0; z-index:2; background:var(--bg); padding:6px 4px; text-align:center; font-size:max(0.5625rem, calc(0.6875rem * var(--z,1.4))); font-weight:800; color:var(--ink-muted); border-bottom:1px solid var(--line);}
@@ -407,6 +410,8 @@
   .se-chip-n{flex:none; min-width:calc(18px * var(--z)); padding:0 calc(5px * var(--z)); border-radius:calc(9px * var(--z)); background:rgba(255,255,255,0.28); text-align:center; font-weight:800;}
   .se-ghost{position:fixed; z-index:70; pointer-events:none; padding:6px 10px; border-radius:10px; background:var(--navy, #0B2438); color:#fff; font-size:0.75rem; font-weight:800; box-shadow:0 6px 18px rgba(0,0,0,0.35); max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
   .se-chip.overdue{background:var(--red); color:#fff;}
+  .se-chip.first{background:var(--green); color:#fff;} /* a first clean — a new customer or round that hasn't been cleaned yet */
+  .se-daynote{margin:0 1px 3px; padding:2px 5px; border-radius:6px; background:var(--amber-dim); color:var(--ink); font-size:max(0.5625rem, calc(0.625rem * var(--z,1.4))); font-weight:700; line-height:1.3; overflow-wrap:anywhere; cursor:pointer;}
   .se-chip.new{border:2px dashed #fff;}
   .se-chip.moved.new{box-shadow:0 0 0 2px var(--green), 0 1px 3px rgba(0,0,0,0.25);}
   .se-cell.off{background:repeating-linear-gradient(135deg, transparent 0 6px, var(--line) 6px 7px);}
@@ -431,6 +436,7 @@
   .se-modal-card{width:100%; max-width:520px; max-height:88%; overflow-y:auto; box-sizing:border-box; padding:16px 16px calc(env(safe-area-inset-bottom, 0px) + 16px); border-radius:20px 20px 0 0; background:var(--bg); color:var(--ink);}
   .se-modal-card h3{margin:0 0 8px; font-size:1.0625rem; font-weight:800;}
   .se-modal-card label{display:block; margin:12px 2px 5px; font-size:0.75rem; font-weight:800; color:var(--ink-muted);}
+  .se-modal-card textarea{width:100%; box-sizing:border-box; min-height:96px; padding:11px 12px; border:1px solid var(--line); border-radius:10px; background:var(--surface); color:var(--ink); font:inherit; font-size:0.9375rem; resize:vertical;}
   .se-modal-card input[type="text"], .se-modal-card input[type="number"], .se-modal-card input[type="date"], .se-modal-card select{width:100%; box-sizing:border-box; padding:11px 12px; border:1px solid var(--line); border-radius:10px; background:var(--surface); color:var(--ink); font-size:1rem;}
   .se-note{margin:0 2px 6px; font-size:0.8125rem; line-height:1.5; color:var(--ink-muted);}
   .se-opt{font-weight:500; opacity:0.75;}
@@ -474,8 +480,9 @@
   .lc-later{background:var(--surface); color:var(--ink); border:1px solid var(--line);}
   .lc-apply{background:var(--green); color:#fff;}
   .lc-apply:disabled{opacity:0.4;}
-  .se-actions{flex:none; display:flex; gap:10px; padding:10px 14px calc(env(safe-area-inset-bottom, 0px) + 10px); border-top:1px solid var(--line); background:var(--bg);}
-  .se-actions button{flex:1; padding:14px 8px; border:none; border-radius:14px; font-size:0.9375rem; font-weight:800;}
+  /* Reject / Commit: small pills in the top bar, the same shape as the app's other small buttons, rather than a
+     full-width bar across the bottom. */
+  .se-mini{flex:none; padding:7px 12px; border:none; border-radius:999px; font-size:0.75rem; font-weight:800; white-space:nowrap;}
   .se-reject{background:var(--red-dim); color:var(--red);}
   .se-commit{background:var(--green); color:#fff;}
 
@@ -866,7 +873,7 @@
 
     /* The draggable boundary between the list and the pane (08d-desktop.js). Hidden when there's no pane to resize. */
     .pane-divider{ display:block; position:fixed; z-index:18; top:var(--header-h, 170px); bottom:var(--tabbar-h, 64px); left:calc(var(--list-w) - 6px); width:12px; cursor:col-resize; touch-action:none; outline:none; }
-    body[data-tab="today"]:not(:has(#overlay.show)) .pane-divider, body:has(#schedEditor.show) .pane-divider{ display:none; }
+    body[data-tab="today"]:not(:has(#overlay.show)) .pane-divider, body:has(#schedEditor.show) .pane-divider, body[data-tab="schedule"] .pane-divider{ display:none; }
     .sheet{
       width:100%; max-width:none; height:100%; max-height:none; margin:0;
       border-radius:0; border:none; animation:none;
@@ -908,20 +915,16 @@
        tab bar. The tools stack in a rail down the left (so the calendar gets the full height) and the title,
        calendar and Commit / Reject bar fill the column beside it. Phones and portrait keep the full-screen
        editor with the toolbar across the top. */
-    .sched-editor{ top:var(--header-h, 170px); bottom:var(--tabbar-h, 64px); }
-    .sched-editor.show{ display:grid; grid-template-columns:88px minmax(0, 1fr); grid-template-rows:auto minmax(0, 1fr) auto; }
+    .sched-editor.show{ display:grid; grid-template-columns:88px minmax(0, 1fr); grid-template-rows:auto minmax(0, 1fr); }
     .se-tools{ grid-column:1; grid-row:1 / -1; flex-direction:column; gap:6px; padding:10px 8px; overflow-x:hidden; overflow-y:auto; border-bottom:none; border-right:1px solid var(--line); }
     .se-tool{ width:100%; padding:10px 4px; white-space:normal; text-align:center; line-height:1.25; }
     .se-tool.se-tool-weeks{ display:block; }
     .se-bar{ grid-column:2; grid-row:1; padding-top:12px; }
     .se-scroll{ grid-column:2; grid-row:2; }
-    .se-actions{ grid-column:2; grid-row:3; padding-bottom:10px; }
     .se-more{ display:none; } /* replaced by ＋ Weeks in the rail */
     .se-chip{ scroll-margin-top:40px; } /* keeps a chip moved with the arrow keys clear of the sticky day names */
     .se-modal{ align-items:center; }
     .se-modal-card{ border-radius:20px; padding-bottom:16px; }
-    /* The header and tab bar stay visible around the workspace but can't be used until you Commit or Reject, as on a phone. */
-    body:has(#schedEditor.show) header, body:has(#schedEditor.show) .tabs{ pointer-events:none; }
   }
 
   @media print{
@@ -968,6 +971,14 @@
   @keyframes youPulse{0%{transform:scale(0.5); opacity:0.9;} 100%{transform:scale(1.5); opacity:0;}}
   .you-key{display:inline-block; width:10px; height:10px; border-radius:50%; background:#1A73E8; border:2px solid #fff; box-shadow:0 0 0 1px rgba(0,0,0,0.25); margin-right:5px; vertical-align:-1px; box-sizing:border-box;}
   .locate-btn{width:34px; height:34px; border:none; border-radius:8px; background:#fff; color:#1A73E8; font-size:1.25rem; line-height:34px; padding:0; box-shadow:0 1px 5px rgba(0,0,0,0.4);}
+
+  /* ---------- Work / Sales sub tabs ---------- */
+  .subtabs{position:fixed; left:0; right:0; top:var(--sub-top, 64px); z-index:19; display:flex; padding:0 max(14px, env(safe-area-inset-right)) 0 max(14px, env(safe-area-inset-left)); background:var(--bg); border-bottom:1px solid var(--line);}
+  .subtabs[hidden]{display:none;}
+  .subtab{position:relative; flex:1 1 0; min-width:0; padding:12px 6px 10px; border:none; background:transparent; color:var(--ink-muted); font-size:0.9375rem; font-weight:800; transition:color .15s ease;}
+  .subtab.active{color:var(--blue-deep);}
+  .subtab.active::after{content:""; position:absolute; left:20%; right:20%; bottom:0; height:3px; border-radius:3px 3px 0 0; background:var(--blue);}
+  .subtab .tab-badge{position:static; display:inline-block; margin-left:6px; vertical-align:1px;}
 
   /* ---------- iPad / desktop extras (08d-desktop.js) ---------- */
   /* Right-pane summary panel and divider: only ever shown by the wide split-view block above. */
@@ -1023,6 +1034,9 @@
     .btn-primary:hover, .fab:hover{ filter:brightness(1.08); }
     .call-btn:hover, .dir-btn:hover{ filter:brightness(0.9); }
     .tab:not(.active):hover{ background:rgba(255,255,255,0.08); color:#fff; }
+    .subtab, .se-mini, .se-tool{ cursor:pointer; }
+    .subtab:not(.active):hover{ color:var(--ink); }
+    .se-mini:hover{ filter:brightness(0.95); }
     .rp-btn:hover, .rp-action:hover{ background:rgba(255,255,255,0.28); }
     /* After the "little icon buttons have no box" rule above, which is !important */
     .icon-btn:hover, .sheet-close:hover, .icon-plain:hover{ background:rgba(128,140,155,0.20) !important; }
@@ -1056,10 +1070,13 @@
 
 <nav class="tabs" id="tabBar" aria-label="Main sections">
     <button class="tab active" data-tab="today" onclick="setTab('today')">Today</button>
+    <button class="tab" data-tab="schedule" onclick="setTab('schedule')">Schedule</button>
     <button class="tab" data-tab="work" onclick="setTab('work')">Work</button>
-    <button class="tab" data-tab="quotes" onclick="setTab('quotes')">Quotes<span class="tab-badge" id="quotesBadge" hidden></span></button>
-    <button class="tab" data-tab="marketing" onclick="setTab('marketing')">Marketing</button>
+    <button class="tab" data-tab="sales" onclick="setTab('sales')">Sales<span class="tab-badge" id="quotesBadge" hidden></span></button>
 </nav>
+<!-- Work and Sales each have two fixed sub tabs (Rounds / Jobs, Quotes / Marketing). Pinned under the header (under the
+     tab bar on iPad / desktop); 09-boot.js measures it into --header-h, and renderSubTabs (02-today-rounds.js) fills it. -->
+<nav class="subtabs" id="subTabBar" aria-label="Sections" hidden></nav>
 
 <div id="appScroll">
 <div id="lastActionBanner"></div>
@@ -1088,6 +1105,8 @@
       <div class="se-title">📅 Schedule</div>
       <div class="se-count" id="seCount">No changes yet</div>
     </div>
+    <button class="se-mini se-reject" onclick="seRequestReject()">Reject</button>
+    <button class="se-mini se-commit" id="seCommit" onclick="seReviewOpen()">Commit</button>
     <button class="sheet-close" onclick="seHelpOpen()" aria-label="Help">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
     </button>
@@ -1102,14 +1121,11 @@
     <button class="se-tool se-extra" id="seMultiBtn" onclick="seToggleMulti()">☑ Multi</button>
     <button class="se-tool se-extra" id="seSplitBtn" onclick="seSplitOpen()">👥 Split</button>
     <button class="se-tool se-extra" onclick="seAddJobOpen()">＋ Job</button>
+    <button class="se-tool" onclick="seNoteOpen()">📝 Note</button>
     <button class="se-tool" onclick="seDaysOffOpen()">🚫 Days off</button>
     <button class="se-tool se-tool-weeks" id="seWeeksBtn" onclick="seShowMoreWeeks()">＋ Weeks</button>
   </div>
   <div class="se-scroll" id="seScroll"><div class="se-grid" id="seGrid"></div><button class="se-more" id="seMore" onclick="seShowMoreWeeks()">＋ Show 4 more weeks</button></div>
-  <div class="se-actions">
-    <button class="se-reject" onclick="seRequestReject()">✕ Reject</button>
-    <button class="se-commit" id="seCommit" onclick="seReviewOpen()">✓ Commit</button>
-  </div>
   <div class="se-modal" id="seModal"><div class="se-modal-card" id="seModalCard"></div></div>
 </div>
 <div class="report-preview" id="reportPreview">
