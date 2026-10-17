@@ -1,4 +1,4 @@
-const CACHE_NAME = 'round-book-v2.89';
+const CACHE_NAME = 'round-book-v2.90';
 
 // The app itself. These are all-or-nothing: a new version only takes over once EVERY one of
 // these has downloaded fresh. If any fails (a dropped connection, a half-finished deploy) the
