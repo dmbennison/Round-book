@@ -905,7 +905,9 @@
       padding-bottom:40px; min-height:0;
     }
     body[data-tab="today"]:not(:has(#overlay.show)) main > *{ grid-column:1 / -1; }
-    body[data-tab="today"]:not(:has(#overlay.show)) main > .today-hero{ grid-column:1; grid-row:2; margin-bottom:0; }
+    body[data-tab="today"]:not(:has(#overlay.show)) main > .today-top{ grid-column:1; grid-row:2; }
+    body[data-tab="today"]:not(:has(#overlay.show)) main > .today-top.running{ top:calc(var(--header-h, 170px) + 14px); }
+    body[data-tab="today"]:not(:has(#overlay.show)) main > .today-run-list{ grid-column:2; grid-row:2; }
     body[data-tab="today"]:not(:has(#overlay.show)) main > .today-grid{
       grid-column:2; grid-row:2; grid-template-columns:repeat(3, 1fr); margin-bottom:0;
     }
@@ -980,7 +982,23 @@
   .you-key{display:inline-block; width:10px; height:10px; border-radius:50%; background:#1A73E8; border:2px solid #fff; box-shadow:0 0 0 1px rgba(0,0,0,0.25); margin-right:5px; vertical-align:-1px; box-sizing:border-box;}
   .locate-btn{width:34px; height:34px; border:none; border-radius:8px; background:#fff; color:#1A73E8; font-size:1.25rem; line-height:34px; padding:0; box-shadow:0 1px 5px rgba(0,0,0,0.4);}
 
-  /* ---------- Work / Sales sub tabs ---------- */
+  /* ---------- Today: Start / Stop, the day's list and the progress bar (02b-today-run.js) ---------- */
+  .today-top .today-hero{margin-bottom:8px;}
+  .today-run-bar{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px;}
+  .run-btn{padding:6px 14px; border:none; border-radius:999px; font-size:0.75rem; font-weight:800; white-space:nowrap;}
+  .run-btn.start{background:var(--green); color:#fff;}
+  .run-btn.stop{background:var(--red-dim); color:var(--red);}
+  .run-btn.all{background:var(--blue-dim); color:var(--blue-deep);}
+  .run-btn:disabled{opacity:0.4;}
+  /* While running, the hero and its buttons are pinned under the header and the list scrolls beneath them. The hero is
+     normally a little see-through; here it is made solid so the cards passing under it don't show. */
+  .today-top.running{position:sticky; top:var(--header-h, 170px); z-index:6; background:var(--bg); padding-top:4px;}
+  .today-top.running .today-hero{background:linear-gradient(155deg, rgba(255,255,255,0.20), rgba(255,255,255,0) 45%), var(--navy); -webkit-backdrop-filter:none; backdrop-filter:none;}
+  .hero-progress{height:7px; margin-top:14px; border-radius:999px; background:rgba(255,255,255,0.18); overflow:hidden;}
+  .hero-progress-fill{height:100%; border-radius:999px; background:#6FD3A1; transition:width .35s ease;}
+  .hero-progress-lbl{display:flex; justify-content:space-between; margin-top:5px; font-size:0.6875rem; font-weight:700; color:#B9D2E2;}
+  .today-done .swipe-wrap, .swipe-wrap.today-done{opacity:0.6;}
+  .today-run-list > .round-group-header:first-child{margin-top:4px !important;}
   .subtabs{position:fixed; left:0; right:0; top:var(--sub-top, 64px); z-index:19; display:flex; padding:0 max(14px, env(safe-area-inset-right)) 0 max(14px, env(safe-area-inset-left)); background:var(--bg); border-bottom:1px solid var(--line);}
   .subtabs[hidden]{display:none;}
   .subtab{position:relative; flex:1 1 0; min-width:0; padding:12px 6px 10px; border:none; background:transparent; color:var(--ink-muted); font-size:0.9375rem; font-weight:800; transition:color .15s ease;}
@@ -1015,7 +1033,7 @@
 
   /* The card the keyboard (or a right-click menu) is on. Drawn as an inside outline because the swipe wrapper
      clips anything that sticks out; scroll-margin keeps a card moved with j / k clear of the fixed header. */
-  .kb-selected, .ctx-target{ outline:2px solid var(--blue); outline-offset:-2px; scroll-margin-top:calc(var(--header-h, 170px) + 12px); scroll-margin-bottom:28px; }
+  .kb-selected, .ctx-target{ outline:2px solid var(--blue); outline-offset:-2px; scroll-margin-top:calc(var(--header-h, 170px) + 12px + var(--today-lock, 0px)); scroll-margin-bottom:28px; }
   .cust-card.kb-selected::before, .round-card.kb-selected::before{ width:9px; }
 
   /* Right-click menu */
@@ -1154,6 +1172,7 @@
 
 <script src="./js/01-data.js" defer></script>
 <script src="./js/02-today-rounds.js" defer></script>
+<script src="./js/02b-today-run.js" defer></script>
 <script src="./js/03-customers.js" defer></script>
 <script src="./js/04-photos-messaging.js" defer></script>
 <script src="./js/05-jobs-quotes.js" defer></script>
