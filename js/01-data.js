@@ -6,13 +6,14 @@ const STORE_KEY = 'roundBookData_v1';
 // APP_VERSION is a plain decimal number (e.g. 1.01, 1.02 ... 1.99, 2.00) —
 // bump by 0.01 for every change. formatVersion always renders it to exactly
 // two decimal places, so it's never shown as "1.1" or "1.100".
-const APP_VERSION = 2.92;
+const APP_VERSION = 2.93;
 function formatVersion(v){ return Number(v).toFixed(2); }
 // User-facing changelog shown in the About screen's "Version history".
 // MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
 // entry (newest first) with ONE very short plain-English summary, then delete
 // entries so only the latest ten remain.
 const VERSION_HISTORY = [
+  {version: 2.93, changes: ['Today: Start and Stop buttons under the big card. Start swaps the tiles for today\'s to-do list (same cards as Rounds > Due, plus today\'s jobs) with the big card pinned above it and the list scrolling underneath; finished customers stay in view and the list moves up from the second one on. A 0–100% progress bar sits at the bottom of the big card, and the date above it has gone (it is in the header)']},
   {version: 2.92, changes: ['Day notes from the Schedule now print on the Monthly Schedule report (a long note is given in full under the calendar). On iPad and computer the two columns are switched off while the Schedule tab is showing, so nothing from the right-hand pane shows through']},
   {version: 2.91, changes: ['New tab layout: Today, Schedule, Work (Rounds / Jobs) and Sales (Quotes / Marketing), with the sub tabs pinned under the top and remembering where you were. The Schedule is now its own tab and keeps your unsaved changes while you look at other tabs; Reject / Commit are smaller; you can leave a note on any day; and a new round can be given a day before its first clean']},
   {version: 2.90, changes: ['Live sync: opening the app no longer asks for end-of-day mileage before your other device\'s answer has arrived, and a screen being open can no longer hold sync back while the top says Synced. The top now says Update waiting in that case and catches up the moment the screen closes']},
@@ -22,7 +23,6 @@ const VERSION_HISTORY = [
   {version: 2.86, changes: ['Swiping all the way across (cleaned and paid) no longer opens a text; a halfway swipe still does. Customers cleaned today who have no mobile number now show a ✓ Cleaned today badge on their card too']},
   {version: 2.85, changes: ['Under the hood: app updates now install all-or-nothing so the app can never end up half-updated; live sync and saving are much lighter on the phone with a big customer list; the photo gallery loads a page at a time; email links are made safer; plus 16 more automatic self-checks (add ?test to the web address)']},
   {version: 2.84, changes: ['Behind the scenes: adding ?test to the end of the web address now runs 50 automatic self-checks on the due-date, owing, quote and sync calculations and shows how many passed. Normal use is unchanged']},
-  {version: 2.83, changes: ['Each customer can now have their own Message by choice (default, text or WhatsApp). If someone isn\'t on WhatsApp, tap Not on WhatsApp? on the message screen and they switch to text for good']},
 ];
 /* ---------- on-demand libraries ----------
    Excel (xlsx), Word (docx), PDF (jsPDF + html2canvas) and the map (Leaflet) are only needed when you

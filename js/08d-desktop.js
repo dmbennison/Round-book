@@ -579,7 +579,8 @@ document.addEventListener('keydown', (e) => {
     const r = el.getBoundingClientRect();
     showContextMenuFor({el, kind, id}, r.left + 28, r.top + 28, true);
   } else if(lower === 'c'){
-    if(kind === 'customer') quickClean(id, false); // no text: a desktop usually has no messaging app (the menu has "and send text")
+    if(kind === 'customer' && el.dataset.cleaned === '1') toast('Already cleaned today'); // a finished card on the Today list
+    else if(kind === 'customer') quickClean(id, false); // no text: a desktop usually has no messaging app (the menu has "and send text")
     else if(kind === 'job') toggleJobDone(id);
     else if(kind === 'quote'){ const q = (data.quotes || []).find(x => x.id === id); if(q && q.status !== 'converted') markQuoteAccepted(id); }
     else handled = false;
@@ -588,7 +589,8 @@ document.addEventListener('keydown', (e) => {
     else if(kind === 'job') toggleJobPaid(id);
     else handled = false;
   } else if(lower === 'b'){
-    if(kind === 'customer') quickCleanAndPaid(id, false); else handled = false;
+    if(kind === 'customer' && el.dataset.cleaned === '1') quickPaid(id);
+    else if(kind === 'customer') quickCleanAndPaid(id, false); else handled = false;
   } else if(lower === 'x'){
     if(kind === 'quote'){ const q = (data.quotes || []).find(x => x.id === id); if(q && q.status !== 'converted') markQuoteDeclined(id); } else handled = false;
   } else handled = false;

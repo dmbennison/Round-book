@@ -1,0 +1,205 @@
+/* 02b-today-run.js -- the Today tab's Start / Stop run, the day's to-do list and the progress bar.
+   Part of Round Book's split JS bundle; loaded in numeric order from index.html, straight after 02-today-rounds.js,
+   whose renderTodayHome() uses everything here.
+
+   Pressing Start swaps the tiles under the hero for the day's to-do list: everyone due today (the same people, in the
+   same order and as the same swipeable cards as Rounds > Due), plus today's one-off jobs. The hero and its Start / Stop
+   buttons stay locked in place while the list scrolls underneath. Anyone you finish stays in the list (dimmed, so you
+   can see what's done) rather than vanishing, and from the second one onwards the list moves up after each so the
+   previous one is always still showing at the top. Stop puts the tiles back.
+   The progress bar at the bottom of the hero is done / (done + still to do) — it's there whether or not a run is going. */
+
+/* ---------- the run itself ----------
+   {date, scope, order:[keys], done:[keys], seq:[keys]}
+   keys are 'c:<customer id>' or 'j:<job id>'. order is fixed at Start (so a finished card stays where it was), done is
+   who was finished at the last redraw, and seq is the order things were finished in since Start. Remembered on this device
+   only (localStorage, like the schedule zoom) so a reload mid-round carries on; it lapses at the end of the day. */
+const TODAY_RUN_KEY = 'roundBookTodayRun';
+let todayRunMem = null, todayRunLoaded = false;
+function todayRunState(){
+  if(!todayRunLoaded){
+    todayRunLoaded = true;
+    try{ todayRunMem = JSON.parse(localStorage.getItem(TODAY_RUN_KEY) || 'null'); }catch(e){ todayRunMem = null; }
+  }
+  if(todayRunMem && todayRunMem.date !== todayISO()){ todayRunMem = null; todayRunSave(); } // yesterday's run is over
+  return todayRunMem;
+}
+function todayRunSave(){
+  try{ if(todayRunMem) localStorage.setItem(TODAY_RUN_KEY, JSON.stringify(todayRunMem)); else localStorage.removeItem(TODAY_RUN_KEY); }catch(e){}
+}
+function todayRunActive(){ return !!todayRunState() && currentTab === 'today'; }
+
+/* ---------- who is on the list ---------- */
+// Everyone due now (the Due list's own test), anyone already cleaned today, and — when no single round is picked —
+// today's one-off jobs. Jobs belong to no round, so picking a round leaves them out of the list and the progress alike.
+function todayEligibleRows(scope){
+  const today = todayISO();
+  const rows = [];
+  data.customers.forEach(c => {
+    const rn = c.round || 'Unassigned';
+    if(scope && rn !== scope) return;
+    const done = lastDateOf(c.cleanHistory) === today;
+    const s = custStatus(c);
+    const due = !c.paused && s.cleanBadge && s.cleanBadge.type === 'due';
+    if(done || due) rows.push({ key:'c:' + c.id, type:'c', round:rn, obj:c, done });
+  });
+  if(!scope){
+    (data.oneOffJobs || []).forEach(j => {
+      if(j.date === today) rows.push({ key:'j:' + j.id, type:'j', round:'Jobs', obj:j, done:!!j.done });
+    });
+  }
+  return rows;
+}
+// Still-to-do first, customers before jobs, and the most overdue customer first — the same order as the Due list.
+function todayOrderRows(rows){
+  const today = todayISO();
+  const overdueDays = c => { const lc = lastDateOf(c.cleanHistory); return lc ? daysBetween(lc, today) : 0; };
+  return rows.slice().sort((a, b) => {
+    if(a.done !== b.done) return a.done ? 1 : -1;
+    if(a.type !== b.type) return a.type === 'c' ? -1 : 1;
+    if(a.type === 'c') return overdueDays(b.obj) - overdueDays(a.obj);
+    return (a.obj.address || '').localeCompare(b.obj.address || '');
+  });
+}
+// The list as it should be drawn now, with the counts the progress bar uses. During a run the order is the one fixed
+// at Start (anything newly due is added at the end; anything no longer due or scheduled drops off), and a change of
+// round starts the list over for that round.
+function todayListModel(){
+  const scope = todaySelectedRound || null;
+  const rows = todayEligibleRows(scope);
+  const byKey = new Map(rows.map(r => [r.key, r]));
+  const run = todayRunState();
+  let order;
+  if(run){
+    if((run.scope || null) !== scope){
+      run.scope = scope;
+      run.order = todayOrderRows(rows).map(r => r.key);
+      run.done = rows.filter(r => r.done).map(r => r.key);
+      run.seq = [];
+      todayRunSave();
+    }
+    const known = new Set(run.order);
+    const added = todayOrderRows(rows.filter(r => !known.has(r.key))).map(r => r.key);
+    if(added.length){ run.order = run.order.concat(added); todayRunSave(); }
+    order = run.order.filter(k => byKey.has(k));
+  } else {
+    order = todayOrderRows(rows).map(r => r.key);
+  }
+  const ordered = order.map(k => byKey.get(k));
+  const done = ordered.filter(r => r.done).length;
+  const total = ordered.length;
+  return { rows: ordered, done, total, pct: total ? Math.round(done / total * 100) : 0, scope };
+}
+
+/* ---------- pieces the Today screen draws ---------- */
+function todayNoteHtml(note){
+  return `<div style="margin:0 0 10px; padding:8px 10px; border-radius:10px; background:var(--amber-dim); color:var(--ink); font-size:0.8125rem; font-weight:700; line-height:1.4;">📝 ${escapeHtml(note)}</div>`;
+}
+// Bottom of the hero: 0% to 100% of today's list finished.
+function todayProgressHtml(model){
+  if(!model.total) return '';
+  return `<div class="hero-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${model.pct}" aria-label="Jobs completed today">
+      <div class="hero-progress-fill" style="width:${model.pct}%;"></div>
+    </div>
+    <div class="hero-progress-lbl"><span>${model.done} of ${model.total} done</span><span>${model.pct}%</span></div>`;
+}
+// The two small buttons under the hero (and, when one round is picked, a way back to all of them — the hero's round
+// chips only ever pick a round, so without this a list narrowed to one round couldn't be widened again).
+function todayRunBarHtml(running){
+  return `<div class="today-run-bar">
+      <button class="run-btn start" onclick="startTodayRun()"${running ? ' disabled' : ''}>▶ Start</button>
+      <button class="run-btn stop" onclick="stopTodayRun()"${running ? '' : ' disabled'}>■ Stop</button>
+      ${todaySelectedRound ? `<button class="run-btn all" onclick="clearTodayRound()" title="Show every round again">${escapeHtml(todaySelectedRound)} ✕</button>` : ''}
+    </div>`;
+}
+// The list itself: grouped by round like Rounds > Due, with the very same cards, so swiping, tapping, the call and
+// directions buttons and the right-click menu all behave identically. A finished customer is marked (dimmed, and told
+// not to be cleaned a second time).
+function todayRunListHtml(model, note){
+  const today = todayISO();
+  if(!model.total){
+    return `<div class="today-run-list">${note ? todayNoteHtml(note) : ''}<div class="empty"><b>Nothing to do today</b><p>Nobody is due and there are no jobs booked for today.</p></div></div>`;
+  }
+  const groups = {};
+  model.rows.forEach(r => (groups[r.round] = groups[r.round] || []).push(r));
+  const names = Object.keys(groups).sort((a, b) => (a === 'Jobs') - (b === 'Jobs') || a.localeCompare(b));
+  let html = `<div class="today-run-list">${note ? todayNoteHtml(note) : ''}`;
+  names.forEach(rn => {
+    const rows = groups[rn];
+    const doneN = rows.filter(r => r.done).length;
+    const head = `<span style="font-weight:600; color:var(--ink-muted); text-transform:none; letter-spacing:0;">(${doneN} of ${rows.length} done)</span>`;
+    html += rn === 'Jobs'
+      ? `<div class="round-group-header" style="display:flex; align-items:center; margin:18px 2px 8px;"><div class="section-label" style="margin:0;">One-off jobs ${head}</div></div>`
+      : `<div class="round-group-header" data-ctx-kind="round" data-ctx-id="${escapeAttr(rn)}" style="display:flex; align-items:center; margin:18px 2px 8px;"><div class="section-label" style="margin:0; cursor:pointer;" onclick="goToRoundDue('${escapeAttr(rn)}')">${escapeHtml(rn)} ${head}</div></div>`;
+    html += rows.map(r => {
+      if(r.type === 'j') return jobCardHtml(r.obj, today);
+      let card = custCardHtml(r.obj, 'due');
+      if(r.done){
+        card = card.replace('<div class="swipe-wrap">', '<div class="swipe-wrap today-done">').replace('data-kind="customer"', 'data-kind="customer" data-cleaned="1"');
+      }
+      return card;
+    }).join('');
+  });
+  return html + '</div>';
+}
+
+/* ---------- Start / Stop ---------- */
+function startTodayRun(){
+  const scope = todaySelectedRound || null;
+  const rows = todayEligibleRows(scope);
+  if(!rows.length){ toast('Nothing due today to start on'); return; }
+  todayRunMem = {
+    date: todayISO(), scope,
+    order: todayOrderRows(rows).map(r => r.key),
+    done: rows.filter(r => r.done).map(r => r.key), // finished before Start: not counted as a clean made during the run
+    seq: []
+  };
+  todayRunSave();
+  render();
+  pageScrollTo(0);
+}
+function stopTodayRun(){
+  todayRunMem = null;
+  todayRunSave();
+  render();
+  pageScrollTo(0);
+}
+function clearTodayRound(){
+  todaySelectedRound = null;
+  render();
+}
+
+/* ---------- keeping the list moving ----------
+   Runs after every redraw (render() in 02-today-rounds.js). It notices who has just been finished — whichever way it
+   happened: a swipe, a button, the customer's own screen, an Undo — keeps seq up to date, and after the second
+   finish scrolls the list so the one finished before the latest is at the top, just under the hero. After the first
+   there is nothing above it to keep in view, so it doesn't move. */
+function todayRunAfterRender(){
+  const root = document.documentElement.style;
+  const run = (currentTab === 'today') ? todayRunState() : null;
+  const topEl = document.querySelector('#main .today-top.running');
+  if(!run || !topEl){ root.setProperty('--today-lock', '0px'); return; }
+  // On a wide screen the hero sits beside the list rather than over it, so nothing of the list is covered.
+  const listEl = document.querySelector('#main .today-run-list');
+  const sideBySide = !!listEl && listEl.getBoundingClientRect().left >= topEl.getBoundingClientRect().right - 4;
+  root.setProperty('--today-lock', sideBySide ? '0px' : topEl.offsetHeight + 'px'); // lets keyboard / jump scrolling clear the hero too
+
+  const doneNow = todayListModel().rows.filter(r => r.done).map(r => r.key);
+  const newly = doneNow.filter(k => run.done.indexOf(k) < 0);
+  const changed = newly.length || run.done.some(k => doneNow.indexOf(k) < 0);
+  if(!changed) return;
+  run.done = doneNow;
+  run.seq = run.seq.filter(k => doneNow.indexOf(k) >= 0).concat(newly);
+  todayRunSave();
+  if(!newly.length || run.seq.length < 2) return;
+  const prevKey = run.seq[run.seq.length - 2];
+  const kind = prevKey.charAt(0) === 'j' ? 'job' : 'customer';
+  const card = document.querySelector(`#main .cust-card[data-kind="${kind}"][data-id="${CSS.escape(prevKey.slice(2))}"]`);
+  if(!card) return;
+  // Where the top of the list sits once the hero is pinned: just under the header, plus the hero's own height when it
+  // is over the list (the hero may not be pinned yet if the page is at the top, so don't read its position now).
+  const headerH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--header-h')) || 0;
+  const covered = sideBySide ? headerH + 14 : headerH + topEl.offsetHeight;
+  const y = card.getBoundingClientRect().top + window.scrollY - covered - 10;
+  window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
+}

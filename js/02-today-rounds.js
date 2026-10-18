@@ -159,14 +159,18 @@ function renderTodayHome(main){
   });
   // A note left on today in the Schedule tab (Commit keeps it in settings.dayNotes).
   const todayNote = (data.settings && data.settings.dayNotes && data.settings.dayNotes[today]) || '';
+  // Start / Stop and the progress bar (02b-today-run.js): while a run is going the tiles are replaced by the day's list.
+  const todayRunOn = !!todayRunState();
+  const todayModel = todayListModel();
   const mEntry = todayMileageEntry();
   const mStartText = (mEntry && mEntry.start!=null) ? mEntry.start : 'Tap to log';
   const mFinishText = (mEntry && mEntry.start!=null) ? ((mEntry.end!=null) ? mEntry.end : 'Tap to log') : '—';
   const mTotalText = (mEntry && mEntry.start!=null && mEntry.end!=null) ? (mEntry.end - mEntry.start).toFixed(1) : '—';
 
   main.innerHTML = `
-    <div class="section-label" style="margin-top:0;">${fmtDate(today)}${todayNote ? `<div style="margin-top:6px; padding:8px 10px; border-radius:10px; background:var(--amber-dim); color:var(--ink); font-size:0.8125rem; font-weight:700; line-height:1.4; text-transform:none; letter-spacing:0;">📝 ${escapeHtml(todayNote)}</div>` : ''}</div>
+    ${(!todayRunOn && todayNote) ? todayNoteHtml(todayNote) : ''}
     ${renderGettingStartedCard()}
+    <div class="today-top${todayRunOn ? ' running' : ''}">
     <div class="today-hero">
       <div onclick="${todaySelectedRound ? `goToRoundDue('${escapeAttr(todaySelectedRound)}')` : `setTab('rounds'); setRoundsView('due');`}" style="cursor:pointer; display:flex; align-items:flex-start; justify-content:space-between; gap:14px;">
         <div>
@@ -189,8 +193,11 @@ function renderTodayHome(main){
           ${roundsWithDue.map(rn=>`<span onclick="event.stopPropagation(); selectTodayRound('${escapeAttr(rn)}')" style="cursor:pointer; padding:6px 12px; border-radius:20px; font-size:0.75rem; font-weight:800; white-space:nowrap; ${rn===todaySelectedRound ? 'background:#fff; color:var(--navy);' : 'background:rgba(255,255,255,0.15); color:#fff;'}">${escapeHtml(rn)} · ${dueByRound[rn].length}</span>`).join('')}
         </div>
       ` : ''}
+      ${todayProgressHtml(todayModel)}
     </div>
-    <div class="today-grid">
+    ${todayRunBarHtml(todayRunOn)}
+    </div>
+    ${todayRunOn ? todayRunListHtml(todayModel, todayNote) : `<div class="today-grid">
       <div class="today-tile" onclick="setTab('rounds'); setRoundsView('text');">
         <div class="num">${textBefore.unsent.length}</div>
         <div class="lbl">Text before visit${textBeforeOverdue ? ` · ${textBeforeOverdue} overdue` : ''}</div>
@@ -232,7 +239,7 @@ function renderTodayHome(main){
           </div>
         </div>` : ''}
       </div>
-    </div>
+    </div>`}
   `;
 }
 
@@ -1361,6 +1368,7 @@ function render(){
   }
   // iPad / desktop extras (08d-desktop.js): the right-pane summary and the keyboard-selected card follow every redraw.
   if(typeof desktopAfterRender === 'function') desktopAfterRender();
+  if(typeof todayRunAfterRender === 'function') todayRunAfterRender();
 }
 
 // Compact "avg price by property type" row, shown under the Customers/Round
@@ -1950,6 +1958,7 @@ function custCardHtml(c, mode){
 // Swiping all the way (clean and paid) does NOT send a text: it only moves the list on to the next customer.
 // After a customer is swiped cleaned, the list moves on: remember who is next, then scroll them to the top.
 function nextCustomerIdInList(id){
+  if(typeof todayRunActive === 'function' && todayRunActive()) return null; // the Today list moves itself (02b-today-run.js)
   const cards = Array.from(document.querySelectorAll('#main .cust-card[data-kind="customer"]'));
   const i = cards.findIndex(c => c.dataset.id === id);
   return (i >= 0 && i < cards.length - 1) ? cards[i + 1].dataset.id : null;

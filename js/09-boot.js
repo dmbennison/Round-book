@@ -346,6 +346,10 @@ function onSwipeEnd(){
       haptic([18, 50, 18]); // the action has happened
       if(kind === 'job') toggleJobDone(id);
       else if(kind === 'quote') markQuoteAccepted(id);
+      else if(kind === 'customer' && card.dataset.cleaned === '1'){
+        // On the Today list a finished customer stays put: a second swipe must not log a second clean.
+        if(currentX >= SWIPE_FULL_THRESHOLD) quickPaid(id); else toast('Already cleaned today');
+      }
       else if(kind === 'customer' && currentX >= SWIPE_FULL_THRESHOLD) quickCleanAndPaid(id, true);
       else quickClean(id, true);
     } else if(currentX <= -SWIPE_HALF_THRESHOLD){

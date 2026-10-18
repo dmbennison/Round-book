@@ -251,6 +251,8 @@ const FOCUSED_HELP = {
     title: 'Today',
     body: () => [
       helpP('Today is your home screen. The big card shows who’s due today and how much you’ve cleaned and been paid so far. If more than one round is due, tap a round’s chip to see just that round. Tap any tile to open its full list.'),
+      helpP('<b>▶ Start / ■ Stop</b> – the two small buttons under the big card. Press <b>Start</b> when you set off and the tiles are replaced by today’s to-do list: everyone due (the same cards, in the same order, as <b>Work → Rounds → Due</b>, so swiping and tapping work exactly the same) followed by any one-off jobs for the day. The big card stays pinned at the top while the list scrolls underneath it. Customers you finish stay in the list, dimmed, instead of disappearing, and from your second one onwards the list moves up after each so the last one you did is always still showing at the top. <b>Stop</b> brings the tiles back. If you’ve tapped a round’s chip, the list shows just that round – tap the round’s name beside Start / Stop to see them all again. The run is remembered on this device until the end of the day.'),
+      helpP('The <b>progress bar</b> at the bottom of the big card goes from 0% to 100% as you finish today’s list (cleans and jobs done out of everything due today).'),
       helpList([
         '<b>Text before visit</b> – customers who like a heads-up text.',
         '<b>Mileage</b> – tap to log your start reading in the morning, tap again for your end reading in the evening.',
