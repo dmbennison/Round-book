@@ -665,9 +665,22 @@ function renderSubTabs(){
 }
 // The page itself scrolls (the header and tab bar are fixed), so these are simply the window scroll —
 // kept as named helpers so the scrolling area can be changed in one place.
-function pageScrollY(){ return window.scrollY; }
-function pageScrollTo(y){ if(pageLockY !== null) pageLockY = y; window.scrollTo(0, y); }
-function pageScrollBy(dy){ if(pageLockY !== null) pageLockY += dy; window.scrollBy(0, dy); }
+// On the wide split view the list is its own scrolling column (#appScroll, so its scrollbar sits at the column's own
+// edge beside the divider rather than at the far side of the window beside the right-hand pane) and the window itself
+// never scrolls; everywhere else the window scrolls as it always did. pageScroller() says which: the column, or null.
+function pageScroller(){ return (typeof isWideSplitView === 'function' && isWideSplitView()) ? document.getElementById('appScroll') : null; }
+function pageScrollY(){ const sc = pageScroller(); return sc ? sc.scrollTop : window.scrollY; }
+function pageScrollTo(y){ const sc = pageScroller(); if(sc){ sc.scrollTop = y; return; } if(pageLockY !== null) pageLockY = y; window.scrollTo(0, y); }
+function pageScrollBy(dy){ const sc = pageScroller(); if(sc){ sc.scrollTop += dy; return; } if(pageLockY !== null) pageLockY += dy; window.scrollBy(0, dy); }
+// Smoothly scrolls the list so `el` sits `gap` px below the top of the visible list area, past `pinned` px of anything
+// held over the top of it (the Today hero while a run is going). The visible area starts under the fixed header, or, in
+// the scrolling column, at the column's own top.
+function pageScrollToEl(el, pinned, gap){
+  const sc = pageScroller();
+  const viewTop = sc ? sc.getBoundingClientRect().top : (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--header-h')) || 0);
+  const y = el.getBoundingClientRect().top - viewTop - (pinned || 0) - (gap || 0) + pageScrollY();
+  (sc || window).scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
+}
 function setRoundsView(v){ roundsViewMode = v; render(); }
 function toggleReorder(){ reorderMode = !reorderMode; render(); }
 function moveInRound(id, direction){
@@ -1967,11 +1980,7 @@ function scrollToCustomerCard(id){
   if(!id) return;
   const el = document.querySelector(`#main .cust-card[data-kind="customer"][data-id="${CSS.escape(id)}"]`);
   if(!el) return;
-  const header = document.querySelector('header');
-  // the fixed bar across the top: the header, plus the tabs where they sit underneath it (iPad / desktop)
-  const covered = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--header-h')) || (header ? header.offsetHeight : 0);
-  const top = el.getBoundingClientRect().top + window.scrollY - covered - 14;
-  window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+  pageScrollToEl(el, 0, 14);
 }
 function quickClean(id, fromSwipe){
   const c = data.customers.find(x=>x.id===id);

@@ -425,7 +425,7 @@ function ensurePaneDivider(){
   el.setAttribute('title', 'Drag to resize · double-click to reset');
   el.tabIndex = 0;
   document.body.appendChild(el);
-  let dragging = false, lastW = null;
+  let dragging = false, lastW = null, grabDX = 0;
   const finish = () => {
     if(!dragging) return;
     dragging = false;
@@ -436,6 +436,7 @@ function ensurePaneDivider(){
   el.addEventListener('pointerdown', (e) => {
     if(e.pointerType === 'mouse' && e.button !== 0) return;
     dragging = true; lastW = null;
+    grabDX = e.clientX - el.getBoundingClientRect().left; // where on the divider it was grabbed, so it doesn't jump
     el.classList.add('dragging');
     document.body.classList.add('pane-resizing');
     try{ el.setPointerCapture(e.pointerId); }catch(err){}
@@ -443,7 +444,7 @@ function ensurePaneDivider(){
   });
   el.addEventListener('pointermove', (e) => {
     if(!dragging) return;
-    const used = applyPaneWidth(e.clientX); // the list starts at the left edge, so the pointer's x is the width
+    const used = applyPaneWidth(e.clientX - grabDX); // the list starts at the left edge, so the divider's left edge x is the width
     if(used != null) lastW = used;
   });
   el.addEventListener('pointerup', finish);
@@ -456,7 +457,7 @@ function ensurePaneDivider(){
     if(e.key === 'Enter'){ e.preventDefault(); reset(); return; }
     if(e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
     e.preventDefault();
-    const cur = el.getBoundingClientRect().left + el.offsetWidth / 2; // the boundary's current x
+    const cur = el.getBoundingClientRect().left; // the boundary's current x (the divider starts right where the list ends)
     const used = applyPaneWidth(cur + (e.key === 'ArrowRight' ? 1 : -1) * (e.shiftKey ? 96 : 24));
     if(used != null){ savePaneWidth(used); paneWidthChanged(); }
   });

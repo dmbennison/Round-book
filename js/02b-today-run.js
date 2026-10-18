@@ -196,10 +196,7 @@ function todayRunAfterRender(){
   const kind = prevKey.charAt(0) === 'j' ? 'job' : 'customer';
   const card = document.querySelector(`#main .cust-card[data-kind="${kind}"][data-id="${CSS.escape(prevKey.slice(2))}"]`);
   if(!card) return;
-  // Where the top of the list sits once the hero is pinned: just under the header, plus the hero's own height when it
-  // is over the list (the hero may not be pinned yet if the page is at the top, so don't read its position now).
-  const headerH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--header-h')) || 0;
-  const covered = sideBySide ? headerH + 14 : headerH + topEl.offsetHeight;
-  const y = card.getBoundingClientRect().top + window.scrollY - covered - 10;
-  window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
+  // Stacked, the pinned hero covers the top of the list, so leave room for its height (read from its size, not its
+  // position: it may not be pinned yet if the page is at the top). Side by side it covers nothing.
+  pageScrollToEl(card, sideBySide ? 0 : topEl.offsetHeight, 10);
 }
