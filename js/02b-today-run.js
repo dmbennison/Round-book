@@ -3,23 +3,24 @@
    whose renderTodayHome() uses everything here.
 
    Pressing Start swaps the tiles under the hero for the day's to-do list: everyone due today (the same people, in the
-   same order and as the same swipeable cards as Rounds > Due), plus today's one-off jobs. The hero and its Start / Stop
+   order a round's own Due list uses — your visiting route — and as the same swipeable cards), plus today's one-off jobs. The hero and its Start / Stop
    buttons stay locked in place while the list scrolls underneath. Anyone you finish stays in the list (dimmed, so you
    can see what's done) rather than vanishing, and from the second one onwards the list moves up after each so the
    previous one is always still showing at the top. Stop puts the tiles back.
    The progress bar at the bottom of the hero is done / (done + still to do) — it's there whether or not a run is going. */
 
 /* ---------- the run itself ----------
-   {date, scope, order:[keys], done:[keys], seq:[keys]}
-   keys are 'c:<customer id>' or 'j:<job id>'. order is fixed at Start (so a finished card stays where it was), done is
-   who was finished at the last redraw, and seq is the order things were finished in since Start. Remembered on this device
+   {date, scope, done:[keys], seq:[keys]}
+   keys are 'c:<customer id>' or 'j:<job id>'. done is who was finished at the last redraw, and seq is the order
+   things were finished in since Start. (The order of the list itself isn't stored: it is always the visiting route, which
+   finishing someone doesn't change, so a finished card simply stays where it is.) Remembered on this device
    only (localStorage, like the schedule zoom) so a reload mid-round carries on; it lapses at the end of the day. */
 const TODAY_RUN_KEY = 'roundBookTodayRun';
 let todayRunMem = null, todayRunLoaded = false;
-// Start / Stop is a phone feature: on an iPad or a computer (the same size test as the larger-screen type and keyboard
-// features, see isTabletOrDesktop in 08d-desktop.js) the buttons are not shown and no run can be active, so Today keeps its
-// tiles. A phone, even on its side, is under 600px tall and is unaffected.
-function todayRunAvailable(){ return !(typeof isTabletOrDesktop === 'function' && isTabletOrDesktop()); }
+// Start / Stop is off on the wide split view — an iPad held sideways, or a computer — where Today is laid out in two columns
+// (isWideSplitView, 03-customers.js): the buttons are not shown and no run can be active, so Today keeps its tiles. A phone
+// (even on its side), an iPad held upright and a tablet-sized phone all have the single-column Today and keep the feature.
+function todayRunAvailable(){ return !(typeof isWideSplitView === 'function' && isWideSplitView()); }
 function todayRunState(){
   if(!todayRunAvailable()) return null; // a run left over from before (it's kept on the device) stays dormant here
   if(!todayRunLoaded){
@@ -55,42 +56,30 @@ function todayEligibleRows(scope){
   }
   return rows;
 }
-// Still-to-do first, customers before jobs, and the most overdue customer first — the same order as the Due list.
+// Customers in your visiting route — visit day, then the order set under Reorder — exactly as a round's own Due list
+// shows them (sortByRoute, 02-today-rounds.js), then one-off jobs by address. Finished customers keep their place in the
+// route rather than dropping to the bottom, so the list reads like the round does. The list draws each round as its own
+// group (rounds A to Z), so only the order within a round matters here.
 function todayOrderRows(rows){
-  const today = todayISO();
-  const overdueDays = c => { const lc = lastDateOf(c.cleanHistory); return lc ? daysBetween(lc, today) : 0; };
-  return rows.slice().sort((a, b) => {
-    if(a.done !== b.done) return a.done ? 1 : -1;
-    if(a.type !== b.type) return a.type === 'c' ? -1 : 1;
-    if(a.type === 'c') return overdueDays(b.obj) - overdueDays(a.obj);
-    return (a.obj.address || '').localeCompare(b.obj.address || '');
-  });
+  const custRows = rows.filter(r => r.type === 'c');
+  const byId = new Map(custRows.map(r => [r.obj.id, r]));
+  const routed = sortByRoute(custRows.map(r => r.obj)).map(c => byId.get(c.id));
+  const jobs = rows.filter(r => r.type === 'j').sort((a, b) => (a.obj.address || '').localeCompare(b.obj.address || ''));
+  return routed.concat(jobs);
 }
-// The list as it should be drawn now, with the counts the progress bar uses. During a run the order is the one fixed
-// at Start (anything newly due is added at the end; anything no longer due or scheduled drops off), and a change of
-// round starts the list over for that round.
+// The list as it should be drawn now, with the counts the progress bar uses. Anyone newly due appears in their place in
+// the route; anyone no longer due or scheduled drops off; and a change of round starts the run's tally over.
 function todayListModel(){
   const scope = todaySelectedRound || null;
   const rows = todayEligibleRows(scope);
-  const byKey = new Map(rows.map(r => [r.key, r]));
   const run = todayRunState();
-  let order;
-  if(run){
-    if((run.scope || null) !== scope){
-      run.scope = scope;
-      run.order = todayOrderRows(rows).map(r => r.key);
-      run.done = rows.filter(r => r.done).map(r => r.key);
-      run.seq = [];
-      todayRunSave();
-    }
-    const known = new Set(run.order);
-    const added = todayOrderRows(rows.filter(r => !known.has(r.key))).map(r => r.key);
-    if(added.length){ run.order = run.order.concat(added); todayRunSave(); }
-    order = run.order.filter(k => byKey.has(k));
-  } else {
-    order = todayOrderRows(rows).map(r => r.key);
+  if(run && (run.scope || null) !== scope){
+    run.scope = scope;
+    run.done = rows.filter(r => r.done).map(r => r.key);
+    run.seq = [];
+    todayRunSave();
   }
-  const ordered = order.map(k => byKey.get(k));
+  const ordered = todayOrderRows(rows);
   const done = ordered.filter(r => r.done).length;
   const total = ordered.length;
   return { rows: ordered, done, total, pct: total ? Math.round(done / total * 100) : 0, scope };
@@ -157,7 +146,6 @@ function startTodayRun(){
   if(!rows.length){ toast('Nothing due today to start on'); return; }
   todayRunMem = {
     date: todayISO(), scope,
-    order: todayOrderRows(rows).map(r => r.key),
     done: rows.filter(r => r.done).map(r => r.key), // finished before Start: not counted as a clean made during the run
     seq: []
   };

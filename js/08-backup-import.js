@@ -228,7 +228,7 @@ const FOCUSED_HELP = {
     title: 'Today',
     body: () => [
       helpP('Your home screen. The big card shows who is due today and how much you have cleaned and been paid so far. Tap a tile to see its list.'),
-      helpP('On a phone, press <b>▶ Start</b> (under the big card) to swap the tiles for today’s to-do list. Swipe the cards just like on the Rounds screen. The bar at the bottom of the big card shows how much of today is done. <b>■ Stop</b> brings the tiles back.'),
+      helpP('On a phone (or an iPad held upright), press <b>▶ Start</b> under the big card to swap the tiles for today’s to-do list, in the order you visit them. Swipe the cards just like on the Rounds screen. The bar at the bottom of the big card shows how much of today is done. <b>■ Stop</b> brings the tiles back.'),
       helpList([
         '<b>Mileage</b> – tap in the morning to log your start reading, and again in the evening for your end reading.',
         'A 📝 note you left on today in the Schedule shows at the top.'
