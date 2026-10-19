@@ -398,7 +398,11 @@
   .se-grid{--z:1.4; display:grid; grid-template-columns:repeat(7, minmax(calc(112px * var(--z)), 1fr)); min-width:calc(784px * var(--z));}
   .se-dayname{position:sticky; top:0; z-index:2; background:var(--bg); padding:6px 4px; text-align:center; font-size:max(0.5625rem, calc(0.6875rem * var(--z,1.4))); font-weight:var(--fw-black); color:var(--ink-muted); border-bottom:1px solid var(--line);}
   .se-cell{position:relative; min-height:calc(92px * var(--z)); padding:calc(3px * var(--z)); border-right:1px solid var(--line); border-bottom:1px solid var(--line); box-sizing:border-box;}
-  .se-cell.past{opacity:0.4;}
+  .se-cell.past{background:var(--bg);}
+  .se-cell.past .se-daynum, .se-cell.past .se-meta{opacity:0.7;}
+  .se-hist{display:flex; align-items:flex-start; justify-content:space-between; gap:calc(4px * var(--z)); margin-bottom:calc(4px * var(--z)); padding:calc(5px * var(--z)) calc(7px * var(--z)); border-radius:calc(9px * var(--z)); font-size:max(0.5rem, calc(0.6875rem * var(--z,1.4))); font-weight:var(--fw-black); line-height:1.2; cursor:pointer; background:var(--green-dim); color:var(--green); border:1px solid var(--green); min-height:calc(30px * var(--z));} /* a clean that has already happened: read-only, tap for the list */
+  .se-hist.job{border-style:dashed;}
+  .se-hist .se-chip-n{background:var(--green); color:#fff;}
   .se-cell.today{background:var(--blue-dim);}
   .se-cell.drop{background:var(--amber-dim); outline:2px solid var(--amber); outline-offset:-2px;}
   .se-daynum{font-size:max(0.5625rem, calc(0.8125rem * var(--z,1.4))); font-weight:var(--fw-black); color:var(--ink-muted);}
@@ -430,6 +434,7 @@
   .se-tool:disabled{opacity:0.4;}
   .se-tools:not(.more-open) .se-extra:not(.active){display:none;} /* tucked behind ⋯ More… (Multi stays visible while it's switched on) */
   .se-tool.se-tool-weeks{display:none;} /* only shown in the wide-screen tool rail (see the landscape block below) */
+  .se-more.se-earlier{margin:10px 10px 4px;}
   .se-more{display:block; width:calc(100% - 20px); margin:12px 10px 16px; padding:11px; border:1px dashed var(--line); border-radius:12px; background:transparent; color:var(--ink-muted); font-size:0.8125rem; font-weight:var(--fw-black);}
   .se-modal{position:absolute; inset:0; z-index:5; display:none; align-items:flex-end; justify-content:center; background:rgba(11,36,56,0.45);}
   .se-modal.show{display:flex;}
@@ -1169,9 +1174,10 @@
     <button class="se-tool se-extra" onclick="seAddJobOpen()">＋ Job</button>
     <button class="se-tool" onclick="seNoteOpen()">📝 Note</button>
     <button class="se-tool" onclick="seDaysOffOpen()">🚫 Days off</button>
+    <button class="se-tool se-tool-weeks" id="seEarlierBtn" onclick="seShowEarlierWeeks()">◀ Earlier</button>
     <button class="se-tool se-tool-weeks" id="seWeeksBtn" onclick="seShowMoreWeeks()">＋ Weeks</button>
   </div>
-  <div class="se-scroll" id="seScroll"><div class="se-grid" id="seGrid"></div><button class="se-more" id="seMore" onclick="seShowMoreWeeks()">＋ Show 4 more weeks</button></div>
+  <div class="se-scroll" id="seScroll"><button class="se-more se-earlier" id="seEarlier" onclick="seShowEarlierWeeks()">◀ Show 4 earlier weeks</button><div class="se-grid" id="seGrid"></div><button class="se-more" id="seMore" onclick="seShowMoreWeeks()">＋ Show 4 more weeks</button></div>
   <div class="se-modal" id="seModal"><div class="se-modal-card" id="seModalCard"></div></div>
 </div>
 <div class="report-preview" id="reportPreview">

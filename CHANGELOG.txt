@@ -4,6 +4,12 @@ ROUND BOOK - RELEASE NOTES
 Newest first. This file is not part of the app and is not loaded by it; it ships alongside the code files.
 To add a release: raise APP_VERSION in js/01-data.js and CACHE_NAME in sw.js to the same number, then put a new entry at the top of this list.
 
+Version 2.99
+  - Schedule: you can now look back at what was cleaned. Tap ◀ Show 4 earlier weeks above the calendar (◀ Earlier in
+    the side panel on iPad and computer) as often as you like, up to two years. Past days show green ✓ tiles for each
+    round cleaned and any one-off jobs done, with the number of customers and the money for the day; tap a tile for the
+    list of who was cleaned and what they paid. They are a record only and can't be moved
+
 Version 2.98
   - Today: the Start list now follows your visiting route (visit day, then the order set under Reorder), the same
     order a round's own Due list uses, instead of most-overdue-first
