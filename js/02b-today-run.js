@@ -16,7 +16,12 @@
    only (localStorage, like the schedule zoom) so a reload mid-round carries on; it lapses at the end of the day. */
 const TODAY_RUN_KEY = 'roundBookTodayRun';
 let todayRunMem = null, todayRunLoaded = false;
+// Start / Stop is a phone feature: on an iPad or a computer (the same size test as the larger-screen type and keyboard
+// features, see isTabletOrDesktop in 08d-desktop.js) the buttons are not shown and no run can be active, so Today keeps its
+// tiles. A phone, even on its side, is under 600px tall and is unaffected.
+function todayRunAvailable(){ return !(typeof isTabletOrDesktop === 'function' && isTabletOrDesktop()); }
 function todayRunState(){
+  if(!todayRunAvailable()) return null; // a run left over from before (it's kept on the device) stays dormant here
   if(!todayRunLoaded){
     todayRunLoaded = true;
     try{ todayRunMem = JSON.parse(localStorage.getItem(TODAY_RUN_KEY) || 'null'); }catch(e){ todayRunMem = null; }
@@ -106,6 +111,7 @@ function todayProgressHtml(model){
 // The two small buttons under the hero (and, when one round is picked, a way back to all of them — the hero's round
 // chips only ever pick a round, so without this a list narrowed to one round couldn't be widened again).
 function todayRunBarHtml(running){
+  if(!todayRunAvailable()) return '';
   return `<div class="today-run-bar">
       <button class="run-btn start" onclick="startTodayRun()"${running ? ' disabled' : ''}>▶ Start</button>
       <button class="run-btn stop" onclick="stopTodayRun()"${running ? '' : ' disabled'}>■ Stop</button>
@@ -145,6 +151,7 @@ function todayRunListHtml(model, note){
 
 /* ---------- Start / Stop ---------- */
 function startTodayRun(){
+  if(!todayRunAvailable()) return;
   const scope = todaySelectedRound || null;
   const rows = todayEligibleRows(scope);
   if(!rows.length){ toast('Nothing due today to start on'); return; }
