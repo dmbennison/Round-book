@@ -1004,6 +1004,7 @@
   /* ---------- Today: Start / Stop, the day's list and the progress bar (02b-today-run.js) ---------- */
   .today-top .today-hero{margin-bottom:8px;}
   .today-run-bar{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px;}
+  .today-top:not(:has(.today-run-bar)) .today-hero{margin-bottom:12px;} /* no Start / Stop here (iPad, desktop): the hero's usual gap */
   .run-btn{padding:6px 14px; border:none; border-radius:999px; font-size:0.75rem; font-weight:var(--fw-black); white-space:nowrap;}
   .run-btn.start{background:var(--green); color:#fff;}
   .run-btn.stop{background:var(--red-dim); color:var(--red);}
