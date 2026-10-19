@@ -6,7 +6,8 @@
    01-data.js) and changes a moved job's date.
    Extras: ☔ push-back (rain-off), 👥 move part of a round, ☑ multi-select, ↶ undo, a load summary
    (customers and value) on every day, 🚫 days off, ＋ jobs added straight onto a day, a
-   review step before committing, a "+4 weeks" button to look further ahead, a note on any day, and first cleans:
+   review step before committing, a "+4 weeks" button to look further ahead, a "4 earlier weeks" button to look back at
+   what was cleaned on past days (read-only green tiles; tap one for the list), a note on any day, and first cleans:
    a new customer or round that hasn't been cleaned yet can be given a day before its first clean.
    The calendar is a draft that lives on in the background: switching to another tab hides it and coming back
    shows it just as it was, changes and all, until it is committed or rejected.
@@ -16,6 +17,8 @@ const SE_WEEKS = 5;           // weeks shown when the editor opens, starting wit
 const SE_MORE_WEEKS = 4;      // weeks added by the "+ more weeks" button
 const SE_HOLD_MS = 350;       // touchscreens: how long to press and hold a tile before it lifts
 const SE_MAX_WEEKS = 52;      // furthest the calendar can be extended
+const SE_BACK_WEEKS = 4;      // weeks added by the "earlier weeks" button
+const SE_MAX_BACK_WEEKS = 104; // furthest back the calendar can be extended (two years)
 const SE_ZOOM_KEY = 'roundBookScheduleZoom';
 const SE_ZOOM_MIN = 0.45, SE_ZOOM_MAX = 2.6, SE_ZOOM_DEFAULT = 1.4;
 let se = null;      // editor state while open (see openScheduleEditor)
@@ -37,7 +40,8 @@ function seEls(){
            commit: document.getElementById('seCommit'), modal: document.getElementById('seModal'),
            card: document.getElementById('seModalCard'), undo: document.getElementById('seUndo'),
            multi: document.getElementById('seMultiBtn'), split: document.getElementById('seSplitBtn'),
-           more: document.getElementById('seMore'), weeksBtn: document.getElementById('seWeeksBtn') };
+           more: document.getElementById('seMore'), weeksBtn: document.getElementById('seWeeksBtn'),
+           earlier: document.getElementById('seEarlier'), earlierBtn: document.getElementById('seEarlierBtn') };
 }
 
 /* ---------- small date helpers (isoToDays / daysToISO live in 01-data.js) ---------- */
@@ -63,6 +67,7 @@ function seStartWeeks(){ return SE_WEEKS; }
 function sePlural(n, w){ return n + ' ' + w + (n === 1 ? '' : 's'); }
 
 function openScheduleEditor(){
+  const keepBack = se ? (se.weeksBack || 0) : 0; // a rebuilt calendar stays as far back as it was
   const today = new Date(); today.setHours(0,0,0,0);
   const todayStr = localISO(today);
   const dow = today.getDay();
@@ -109,7 +114,7 @@ function openScheduleEditor(){
   let zoom = SE_ZOOM_DEFAULT;
   try{ const z = parseFloat(localStorage.getItem(SE_ZOOM_KEY)); if(z >= SE_ZOOM_MIN && z <= SE_ZOOM_MAX) zoom = z; }catch(e){}
   const notes = Object.assign({}, st.dayNotes || {});
-  se = { zoom, items, sel:[], multi:false, selDay:null, startISO, capISO, todayStr, weeks:seStartWeeks(),
+  se = { zoom, items, sel:[], multi:false, selDay:null, startISO, capISO, todayStr, weeks:seStartWeeks(), weeksBack:keepBack, multiRounds:multi,
          offWeekdays, blocked, origOff:offWeekdays.slice(), origBlocked:blocked.slice(),
          notes, origNotes:Object.assign({}, notes),
          builtVersion:seDataVersion(), builtDay:todayStr,
@@ -203,11 +208,56 @@ function seChangeSummary(){
            total: movedC + movedJ + newJ + offAdded.length + offRemoved.length + (wdChanged ? 1 : 0) + noteDays.length };
 }
 
+/* ---------- history: what was actually cleaned on past days ----------
+   Read-only. Built from each customer's clean history and from one-off jobs marked done (a job's own date is the
+   day it was done). Nothing here can be moved or committed. */
+function seHistoryByDay(fromISO, toISO){
+  const out = {};
+  const day = iso => out[iso] || (out[iso] = { rounds:{}, jobs:[], count:0, value:0 });
+  data.customers.forEach(c => {
+    const hist = c.cleanHistory || [];
+    if(!hist.length) return;
+    const rn = c.round || 'Unassigned';
+    const label = (se.multiRounds && se.multiRounds.has(rn)) ? `${rn} (Day ${c.visitDay || 1})` : rn;
+    hist.forEach(e => {
+      const d = e && e.date;
+      if(!d || d < fromISO || d > toISO) return;
+      const amt = Number(e.amount || 0);
+      const dd = day(d);
+      const r = dd.rounds[label] || (dd.rounds[label] = { label, rows:[], value:0 });
+      r.rows.push({ name: c.address || c.name || 'Customer', amount: amt });
+      r.value += amt; dd.count++; dd.value += amt;
+    });
+  });
+  (data.oneOffJobs || []).forEach(j => {
+    if(!j.done || !j.date || j.date < fromISO || j.date > toISO) return;
+    const amt = Number(j.price || 0);
+    const dd = day(j.date);
+    dd.jobs.push({ name: j.address || j.name || 'Job', amount: amt });
+    dd.count++; dd.value += amt;
+  });
+  return out;
+}
+function seHistOpen(iso){
+  if(!se) return;
+  const dd = seHistoryByDay(iso, iso)[iso];
+  if(!dd){ return; }
+  const row = r => `<li>${escapeHtml(r.name)}${r.amount > 0 ? ' · ' + money(r.amount) : ''}</li>`;
+  const names = Object.keys(dd.rounds).sort((a, b) => a.localeCompare(b));
+  seModal(`
+    <h3>✓ Cleaned ${seFmtDay(iso)}</h3>
+    <p class="se-note">${sePlural(dd.count, 'clean')}${dd.value > 0 ? ' · ' + money(dd.value) : ''}. This is a record of what was done, so it can’t be moved.</p>
+    ${names.map(n => `<label>${escapeHtml(n)} (${dd.rounds[n].rows.length})</label><ul class="se-review">${dd.rounds[n].rows.map(row).join('')}</ul>`).join('')}
+    ${dd.jobs.length ? `<label>🔧 One-off jobs (${dd.jobs.length})</label><ul class="se-review">${dd.jobs.map(row).join('')}</ul>` : ''}
+    <div class="se-btn-row"><button class="se-btn primary" onclick="seCloseModal()">Done</button></div>
+  `);
+}
+
 /* ---------- rendering ---------- */
 function renderScheduleEditor(){
   if(!se) return;
   se.pendingRender = false;
-  const { grid, count, commit, undo, multi, split, more, weeksBtn } = seEls();
+  const { grid, count, commit, undo, multi, split, more, weeksBtn, earlier, earlierBtn } = seEls();
   grid.style.setProperty('--z', se.zoom);
   const chips = seBuildChips();
   se.sel = se.sel.filter(id => se.chipIndex[id]);
@@ -222,8 +272,10 @@ function renderScheduleEditor(){
 
   const dayNames = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
   let html = dayNames.map(d => `<div class="se-dayname">${d}</div>`).join('');
-  const start = isoToDate(se.startISO);
-  for(let i = 0; i < se.weeks * 7; i++){
+  const back = se.weeksBack || 0;
+  const start = isoToDate(se.startISO); start.setDate(start.getDate() - back * 7);
+  const hist = back ? seHistoryByDay(localISO(start), se.todayStr) : seHistoryByDay(se.startISO, se.todayStr);
+  for(let i = 0; i < (back + se.weeks) * 7; i++){
     const d = new Date(start); d.setDate(d.getDate() + i);
     const iso = localISO(d);
     const past = iso < se.todayStr;
@@ -237,11 +289,15 @@ function renderScheduleEditor(){
       const l = loadOf(s);
       if(l >= median * 1.75) cls = ' load-vhi'; else if(l >= median * 1.35) cls = ' load-hi';
     }
-    const meta = (s && !past) ? `${s.cust + s.jobs}${s.value > 0 ? ' · ' + money(s.value) : ''}` : '';
+    const h = iso <= se.todayStr ? hist[iso] : null;
+    let meta = (s && !past) ? `${s.cust + s.jobs}${s.value > 0 ? ' · ' + money(s.value) : ''}` : '';
+    if(h && past) meta = `✓ ${h.count}${h.value > 0 ? ' · ' + money(h.value) : ''}`;
+    const histHtml = h ? Object.keys(h.rounds).sort((a, b) => a.localeCompare(b)).map(n => `<div class="se-hist" data-hist="${iso}" title="${escapeAttr('Cleaned: ' + n)}"><span class="se-chip-label">✓ ${escapeHtml(n)}</span><span class="se-chip-n">${h.rounds[n].rows.length}</span></div>`).join('')
+      + (h.jobs.length ? `<div class="se-hist job" data-hist="${iso}" title="Jobs done"><span class="se-chip-label">✓ 🔧 Jobs</span><span class="se-chip-n">${h.jobs.length}</span></div>` : '') : '';
     html += `<div class="se-cell${past ? ' past' : ''}${iso === se.todayStr ? ' today' : ''}${off ? ' off' : ''}${se.selDay === iso ? ' selday' : ''}${cls}" data-date="${iso}">
       <div class="se-cellhead"><div class="se-daynum">${monthLabel}${dayNum}</div></div>
       ${off ? '<div class="se-off">🚫 Off</div>' : ''}${meta ? `<div class="se-meta"><span>${meta}</span></div>` : ''}${se.notes[iso] ? `<div class="se-daynote" data-note="${iso}" title="Tap to edit this note">📝 ${escapeHtml(se.notes[iso])}</div>` : ''}
-      ${here.map(ch => {
+      ${histHtml}${here.map(ch => {
         const n = ch.kind === 'round' ? ch.items.length : '';
         const tip = ch.label + (ch.moved ? ' — moved from ' + fmtDate(ch.dispDate) : '') + (ch.isNew ? ' — new job' : '') + (ch.overdue ? ' — overdue since ' + fmtDate(ch.minDue) : '') + (ch.parked && !ch.moved ? ' — first clean, not booked yet: move it to a day' : '');
         return `<div class="se-chip ${ch.kind}${ch.moved ? ' moved' : ''}${ch.isNew ? ' new' : ''}${ch.overdue ? ' overdue' : ''}${ch.first ? ' first' : ''}${se.sel.includes(ch.id) ? ' sel' : ''}" data-id="${escapeAttr(ch.id)}" title="${escapeAttr(tip)}"><span class="se-chip-label">${ch.overdue ? '⚠ ' : ''}${escapeHtml(ch.label)}</span>${n !== '' ? `<span class="se-chip-n">${n}</span>` : ''}</div>`;
@@ -270,6 +326,8 @@ function renderScheduleEditor(){
   split.disabled = !(one && one.kind === 'round');
   more.style.display = se.weeks >= SE_MAX_WEEKS ? 'none' : '';
   if(weeksBtn) weeksBtn.style.display = se.weeks >= SE_MAX_WEEKS ? 'none' : ''; // the wide-screen rail's version of the same button
+  if(earlier) earlier.style.display = back >= SE_MAX_BACK_WEEKS ? 'none' : '';
+  if(earlierBtn) earlierBtn.style.display = back >= SE_MAX_BACK_WEEKS ? 'none' : ''; // and the rail's version of the earlier-weeks button
 }
 
 /* ---------- history (undo) ---------- */
@@ -348,6 +406,18 @@ function seShowMoreWeeks(){
   se.weeks = Math.min(SE_MAX_WEEKS, se.weeks + SE_MORE_WEEKS);
   renderScheduleEditor();
   toast(`Showing ${se.weeks} weeks`);
+}
+
+// Adds SE_BACK_WEEKS weeks above the calendar to look back at what was cleaned. The rows are added above what is on
+// screen, so the scroll position is moved down by the height added and the view doesn't jump.
+function seShowEarlierWeeks(){
+  if(!se) return;
+  const { scroll, grid } = seEls();
+  const before = grid.offsetHeight, top = scroll.scrollTop;
+  se.weeksBack = Math.min(SE_MAX_BACK_WEEKS, (se.weeksBack || 0) + SE_BACK_WEEKS);
+  renderScheduleEditor();
+  scroll.scrollTop = top + (grid.offsetHeight - before);
+  toast(`Showing ${se.weeksBack} earlier week${se.weeksBack === 1 ? '' : 's'}`);
 }
 
 /* ---------- touch / mouse handling ---------- */
@@ -488,6 +558,8 @@ function seBind(){
   // (used by Push back and Add job).
   grid.addEventListener('click', (e) => {
     if(!se || Date.now() < se.ignoreClickUntil || e.target.closest('.se-chip')) return;
+    const histEl = e.target.closest('.se-hist');
+    if(histEl && !se.sel.length){ seHistOpen(histEl.dataset.hist); return; }
     const noteEl = e.target.closest('.se-daynote');
     if(noteEl){ seNoteOpen(noteEl.dataset.note); return; }
     const cell = e.target.closest('.se-cell');
