@@ -6,24 +6,10 @@ const STORE_KEY = 'roundBookData_v1';
 // APP_VERSION is a plain decimal number (e.g. 1.01, 1.02 ... 1.99, 2.00) —
 // bump by 0.01 for every change. formatVersion always renders it to exactly
 // two decimal places, so it's never shown as "1.1" or "1.100".
-const APP_VERSION = 2.95;
+const APP_VERSION = 2.96;
 function formatVersion(v){ return Number(v).toFixed(2); }
-// User-facing changelog shown in the About screen's "Version history".
-// MAINTENANCE: every time APP_VERSION is bumped, PREPEND a new {version, changes}
-// entry (newest first) with ONE very short plain-English summary, then delete
-// entries so only the latest ten remain.
-const VERSION_HISTORY = [
-  {version: 2.95, changes: ['iPad and desktop: lighter, easier-to-read text. Bold weights step down one notch, text uses grayscale smoothing (the default on a Mac made it look thick), small grey labels have more contrast and the base size is a touch larger. Phones are unchanged']},
-  {version: 2.94, changes: ['iPad and desktop: the list on the left now scrolls in its own column with its own scrollbar at the column edge (it used to use the window scrollbar at the far side of the screen, beside the right-hand pane), and the list stays scrollable while something is open on the right']},
-  {version: 2.93, changes: ['Today: Start and Stop buttons under the big card. Start swaps the tiles for today\'s to-do list (same cards as Rounds > Due, plus today\'s jobs) with the big card pinned above it and the list scrolling underneath; finished customers stay in view and the list moves up from the second one on. A 0–100% progress bar sits at the bottom of the big card, and the date above it has gone (it is in the header)']},
-  {version: 2.92, changes: ['Day notes from the Schedule now print on the Monthly Schedule report (a long note is given in full under the calendar). On iPad and computer the two columns are switched off while the Schedule tab is showing, so nothing from the right-hand pane shows through']},
-  {version: 2.91, changes: ['New tab layout: Today, Schedule, Work (Rounds / Jobs) and Sales (Quotes / Marketing), with the sub tabs pinned under the top and remembering where you were. The Schedule is now its own tab and keeps your unsaved changes while you look at other tabs; Reject / Commit are smaller; you can leave a note on any day; and a new round can be given a day before its first clean']},
-  {version: 2.90, changes: ['Live sync: opening the app no longer asks for end-of-day mileage before your other device\'s answer has arrived, and a screen being open can no longer hold sync back while the top says Synced. The top now says Update waiting in that case and catches up the moment the screen closes']},
-  {version: 2.89, changes: ['Pop-ups with a box to type in (such as editing an amount in a history, or the Schedule\'s dialogs) now open at the top so the keyboard can\'t cover them; a photo\'s buttons stay pinned at the bottom while the photo scrolls underneath']},
-  {version: 2.88, changes: ['iPad and computer: the empty right-hand pane now shows a summary for the tab you\'re on; reports preview inside it; drag the divider to resize it; right-click menus on cards; hover highlights; and keyboard moves through the list (j / k, Enter, C, P)']},
-  {version: 2.87, changes: ['User guide updated: it now explains the ✓ Cleaned today badge shown on customers cleaned today who have no mobile number']},
-  {version: 2.86, changes: ['Swiping all the way across (cleaned and paid) no longer opens a text; a halfway swipe still does. Customers cleaned today who have no mobile number now show a ✓ Cleaned today badge on their card too']},
-];
+// Release notes are NOT kept in the app: they live in CHANGELOG.txt, shipped alongside these files.
+// MAINTENANCE: every time APP_VERSION is bumped, add the new version to the top of CHANGELOG.txt.
 /* ---------- on-demand libraries ----------
    Excel (xlsx), Word (docx), PDF (jsPDF + html2canvas) and the map (Leaflet) are only needed when you
    use those features, so they are no longer loaded at start-up. loadLib('xlsx') etc. loads one the first
