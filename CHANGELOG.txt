@@ -4,6 +4,12 @@ ROUND BOOK - RELEASE NOTES
 Newest first. This file is not part of the app and is not loaded by it; it ships alongside the code files.
 To add a release: raise APP_VERSION in js/01-data.js and CACHE_NAME in sw.js to the same number, then put a new entry at the top of this list.
 
+Version 2.98
+  - Today: the Start list now follows your visiting route (visit day, then the order set under Reorder), the same
+    order a round's own Due list uses, instead of most-overdue-first
+  - Today: Start and Stop are now switched off only on the wide two-column layout (a landscape iPad or a computer);
+    an iPad held upright keeps them, as do phones
+
 Version 2.97
   - Today: the Start and Stop buttons are switched off on iPad and desktop-sized screens (they remain on phones);
     the progress bar stays
