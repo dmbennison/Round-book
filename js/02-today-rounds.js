@@ -1909,7 +1909,10 @@ function payMethodBadgeHtml(c){
 // mode: 'due' shows only clean-related info (clean status, text-first, day, fronts
 // only, the "cleaned today" text button); 'owed' shows only payment info (what's
 // owed, chase / reminder badges and the Chase button); anything else shows the lot.
-function custCardHtml(c, mode){
+// opts.balance: show what the customer owes or has in credit even on a 'due' card (the Today list does; a settled
+// account shows nothing there, rather than a Paid up badge on every card).
+function custCardHtml(c, mode, opts){
+  const showBal = !!(opts && opts.balance);
   const showClean = mode !== 'owed';
   const showPay = mode !== 'due';
   const showExtras = !mode; // photos, price review, price-low
@@ -1943,7 +1946,7 @@ function custCardHtml(c, mode){
       </div>
       <div class="cust-meta">
         ${showClean ? (s.cleanBadge ? `<span class="badge ${s.cleanBadge.type}"${c.paused&&c.pauseDate?` title="Paused since ${fmtDate(c.pauseDate)}"`:''}>${s.cleanBadge.text}</span>` : '') : ''}
-        ${showPay ? (s.owed ? `<span class="badge owed">Owes ${money(s.balance)}${daysSinceLastPayment(c) ? ` · ${daysSinceLastPayment(c)}d` : ''}</span>` : s.credit ? `<span class="badge ok">Credit ${money(Math.abs(s.balance))}</span>` : `<span class="badge ok">Paid up</span>`) : ''}
+        ${(showPay || showBal) ? (s.owed ? `<span class="badge owed">Owes ${money(s.balance)}${daysSinceLastPayment(c) ? ` · ${daysSinceLastPayment(c)}d` : ''}</span>` : s.credit ? `<span class="badge ok">Credit ${money(Math.abs(s.balance))}</span>` : showPay ? `<span class="badge ok">Paid up</span>` : '') : ''}
         ${(showPay && s.owed && (c.paymentReminderCount||0) >= 2) ? `<span class="badge escalate" title="${c.paymentReminderCount} payment reminders sent, still unpaid">⚠ Chase</span>` : ''}
         ${(showPay && s.owed && c.paymentReminderSent) ? `<span class="badge paused">🔔 ${fmtDate(c.paymentReminderSentDate).split(' ').slice(0,2).join(' ')}</span>` : ''}
         ${(showExtras && c.photos && c.photos.length) ? `<span class="badge paused">📷 ${c.photos.length}</span>` : ''}

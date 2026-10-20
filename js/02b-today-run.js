@@ -128,7 +128,7 @@ function todayRunListHtml(model, note){
       : `<div class="round-group-header" data-ctx-kind="round" data-ctx-id="${escapeAttr(rn)}" style="display:flex; align-items:center; margin:18px 2px 8px;"><div class="section-label" style="margin:0; cursor:pointer;" onclick="goToRoundDue('${escapeAttr(rn)}')">${escapeHtml(rn)} ${head}</div></div>`;
     html += rows.map(r => {
       if(r.type === 'j') return jobCardHtml(r.obj, today);
-      let card = custCardHtml(r.obj, 'due');
+      let card = custCardHtml(r.obj, 'due', { balance:true });
       if(r.done){
         card = card.replace('<div class="swipe-wrap">', '<div class="swipe-wrap today-done">').replace('data-kind="customer"', 'data-kind="customer" data-cleaned="1"');
       }
