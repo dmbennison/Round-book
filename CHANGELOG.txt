@@ -4,6 +4,10 @@ ROUND BOOK - RELEASE NOTES
 Newest first. This file is not part of the app and is not loaded by it; it ships alongside the code files.
 To add a release: raise APP_VERSION in js/01-data.js and CACHE_NAME in sw.js to the same number, then put a new entry at the top of this list.
 
+Version 3.02
+  - Today: on the Start list, each customer's card now shows how much they owe (red Owes badge) or have in credit
+    (green Credit badge). Customers who are paid up show nothing extra
+
 Version 3.01
   - Printed schedules (the Schedule tab's print and the Monthly Schedule report): long round names now wrap onto
     extra lines instead of being cut short
