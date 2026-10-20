@@ -4,6 +4,15 @@ ROUND BOOK - RELEASE NOTES
 Newest first. This file is not part of the app and is not loaded by it; it ships alongside the code files.
 To add a release: raise APP_VERSION in js/01-data.js and CACHE_NAME in sw.js to the same number, then put a new entry at the top of this list.
 
+Version 3.00
+  - Today: after you finish a customer on a Start run, the list now moves up half a tile further, so the one you
+    just finished is half tucked under the big card and the next one has more room
+  - Schedule: a print icon next to the help icon at the top right prints the calendar as you are viewing it (all the
+    weeks shown, earlier weeks included, with any changes not yet committed, days off, notes, and cleans already done
+    in green)
+  - Customer cards: the call button now offers Call or Text when the number is a mobile (Text opens the usual message
+    screen, text or WhatsApp as set for that customer). A landline still just calls
+
 Version 2.99
   - Schedule: you can now look back at what was cleaned. Tap ◀ Show 4 earlier weeks above the calendar (◀ Earlier in
     the side panel on iPad and computer) as often as you like, up to two years. Past days show green ✓ tiles for each
