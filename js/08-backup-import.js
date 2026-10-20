@@ -231,7 +231,8 @@ const FOCUSED_HELP = {
       helpP('On a phone (or an iPad held upright), press <b>▶ Start</b> under the big card to swap the tiles for today’s to-do list, in the order you visit them. Swipe the cards just like on the Rounds screen. The bar at the bottom of the big card shows how much of today is done. <b>■ Stop</b> brings the tiles back.'),
       helpList([
         '<b>Mileage</b> – tap in the morning to log your start reading, and again in the evening for your end reading.',
-        'A 📝 note you left on today in the Schedule shows at the top.'
+        'A 📝 note you left on today in the Schedule shows at the top.',
+        'The green <b>call button</b> on a customer’s card asks whether to <b>Call</b> or <b>Text</b> (a landline just calls).'
       ])
     ]
   },
@@ -245,7 +246,8 @@ const FOCUSED_HELP = {
         '<b>＋ Job</b> adds a one-off job to a day. <b>📝 Note</b> leaves a reminder on a day. <b>🚫 Days off</b> sets your days off and holidays. (Tap the day first for Job and Note.)',
         '<b>⋯ More…</b> has <b>☔ Push back</b> (for a rained-off day), <b>☑ Multi</b> (move several tiles at once) and <b>👥 Split</b> (move some of a round’s customers).',
         'A new customer who has not been cleaned yet waits on today in <b>green</b> 🆕. Move them to the day of their first clean, then Commit.',
-        '<b>Looking back</b> – tap <b>◀ Show 4 earlier weeks</b> above the calendar (<b>◀ Earlier</b> on iPad and computer) to see past days. Each green ✓ tile is a round that was cleaned, or the one-off jobs done, that day. Tap one to see who was cleaned and what they paid. They can’t be moved.'
+        '<b>Looking back</b> – tap <b>◀ Show 4 earlier weeks</b> above the calendar (<b>◀ Earlier</b> on iPad and computer) to see past days. Each green ✓ tile is a round that was cleaned, or the one-off jobs done, that day. Tap one to see who was cleaned and what they paid. They can’t be moved.',
+        'The <b>printer icon</b> next to the help icon (top right) prints the calendar as you are looking at it, including any weeks you have looked back at.'
       ])
     ]
   },

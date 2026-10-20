@@ -167,7 +167,7 @@ function clearTodayRound(){
 /* ---------- keeping the list moving ----------
    Runs after every redraw (render() in 02-today-rounds.js). It notices who has just been finished — whichever way it
    happened: a swipe, a button, the customer's own screen, an Undo — keeps seq up to date, and after the second
-   finish scrolls the list so the one finished before the latest is at the top, just under the hero. After the first
+   finish scrolls the list so the one finished before the latest is at the top, just under the hero (and half a tile further, so it is half tucked away). After the first
    there is nothing above it to keep in view, so it doesn't move. */
 function todayRunAfterRender(){
   const root = document.documentElement.style;
@@ -193,5 +193,6 @@ function todayRunAfterRender(){
   if(!card) return;
   // Stacked, the pinned hero covers the top of the list, so leave room for its height (read from its size, not its
   // position: it may not be pinned yet if the page is at the top). Side by side it covers nothing.
-  pageScrollToEl(card, sideBySide ? 0 : topEl.offsetHeight, 10);
+  // Scrolls on by about half a tile more, so the finished card is half tucked under the hero and the next one has room.
+  pageScrollToEl(card, sideBySide ? 0 : topEl.offsetHeight, 10 - Math.round(card.offsetHeight / 2));
 }

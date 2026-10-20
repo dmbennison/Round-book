@@ -420,6 +420,58 @@ function seShowEarlierWeeks(){
   toast(`Showing ${se.weeksBack} earlier week${se.weeksBack === 1 ? '' : 's'}`);
 }
 
+/* ---------- print ----------
+   Prints the calendar as it is being viewed: every week on screen (earlier weeks included), with any changes not yet
+   committed, days off and notes. Cleans already done are green. Uses the same paper layout as the Monthly Schedule report. */
+function sePrint(){
+  if(!se){ toast('The schedule isn\u2019t ready yet'); return; }
+  const chips = seBuildChips();
+  const back = se.weeksBack || 0;
+  const start = isoToDate(se.startISO); start.setDate(start.getDate() - back * 7);
+  const startISO = localISO(start);
+  const weeks = back + se.weeks;
+  const hist = seHistoryByDay(startISO, se.todayStr);
+  const NOTE_IN_CELL = 60;
+  const longNotes = [];
+  let rows = '';
+  for(let w = 0; w < weeks; w++){
+    rows += '<tr>';
+    for(let d = 0; d < 7; d++){
+      const cell = new Date(start); cell.setDate(cell.getDate() + w * 7 + d);
+      const iso = localISO(cell);
+      const past = iso < se.todayStr;
+      const off = !past && seIsOff(iso);
+      const dayNum = cell.getDate();
+      const monthLabel = (dayNum === 1 || (w === 0 && d === 0)) ? cell.toLocaleDateString('en-GB', {month:'short'}) + ' ' : '';
+      const note = se.notes[iso] || '';
+      if(note.length > NOTE_IN_CELL) longNotes.push({ iso, note });
+      const h = iso <= se.todayStr ? hist[iso] : null;
+      const done = h ? Object.keys(h.rounds).sort((a, b) => a.localeCompare(b)).map(n => `<span class="round-chip done-chip">\u2713 ${escapeHtml(n)} (${h.rounds[n].rows.length})</span>`).join('')
+        + (h.jobs.length ? `<span class="round-chip done-chip">\u2713 \ud83d\udd27 Jobs (${h.jobs.length})</span>` : '') : '';
+      const here = chips.filter(ch => ch.date === iso).sort((a, b) => a.label.localeCompare(b.label))
+        .map(ch => `<span class="round-chip${ch.kind === 'job' ? ' job-chip' : ''}">${escapeHtml(ch.label)}${ch.kind === 'round' ? ' (' + ch.items.length + ')' : ''}</span>`).join('');
+      rows += `<td class="${past ? 'outside' : ''}">
+        <div class="daynum">${monthLabel}${dayNum}</div>
+        ${off ? '<div class="day-off">\ud83d\udeab Off</div>' : ''}
+        ${note ? `<div class="day-note">\ud83d\udcdd ${escapeHtml(note.length > NOTE_IN_CELL ? note.slice(0, NOTE_IN_CELL - 1).trimEnd() + '\u2026' : note)}</div>` : ''}
+        ${done}${here}
+      </td>`;
+    }
+    rows += '</tr>';
+  }
+  const endISO = seAddDays(startISO, weeks * 7 - 1);
+  const pending = seChangeSummary().total > 0;
+  const body = `
+    <div class="rpt-empty-note">${escapeHtml(fmtDate(startISO))} to ${escapeHtml(fmtDate(endISO))}${pending ? ' \u00b7 includes changes not yet committed' : ''}. Green ticks are cleans already done.</div>
+    <table class="rpt-calendar">
+      <thead><tr><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    ${longNotes.length ? `<div class="rpt-notes"><b>Notes in full</b>${longNotes.map(n => `<div>\ud83d\udcdd <b>${escapeHtml(fmtDate(n.iso))}</b> \u2014 ${escapeHtml(n.note)}</div>`).join('')}</div>` : ''}
+  `;
+  runPrint('Schedule', body, false, false, null);
+}
+
 /* ---------- touch / mouse handling ---------- */
 function seCellAt(x, y){
   const el = document.elementFromPoint(x, y);

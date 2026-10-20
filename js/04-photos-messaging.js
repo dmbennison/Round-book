@@ -1331,12 +1331,41 @@ function startRoundDirections(rn){
 // Dials a customer/job's saved number via the device's phone app. Unlike the
 // messaging functions this isn't restricted to mobile numbers — landlines can be
 // called even though they can't receive texts.
+// A mobile number is offered the choice of a call or a text; a landline (which can't take texts) just dials.
 function callCustomer(kind, id){
   const item = kind === 'job'
     ? data.oneOffJobs.find(x=>x.id===id)
     : data.customers.find(x=>x.id===id);
   if(!item || !item.phone){ toast('No phone number set'); return; }
+  if(!isMobileNumber(item.phone)){ placeCall(kind, id); return; }
+  const who = item.name || item.address || 'this number';
+  openSheet(`
+    <div class="sheet-head">
+      <h2 style="flex:1; min-width:0;">${escapeHtml(who)}</h2>
+      <button class="sheet-close" onclick="closeSheet()">✕</button>
+    </div>
+    <div style="color:var(--ink-muted); font-size:0.8125rem; font-weight:700; margin:-4px 0 14px;">${escapeHtml(item.phone)}</div>
+    <div style="display:flex; gap:10px;">
+      <button class="btn-primary" style="flex:1;" onclick="closeSheet(); placeCall('${kind}','${id}')">📞 Call</button>
+      <button class="btn" style="flex:1; background:var(--blue-dim); color:var(--blue-deep);" onclick="textFromCallChoice('${kind}','${id}')">💬 Text</button>
+    </div>
+  `);
+}
+function placeCall(kind, id){
+  const item = kind === 'job'
+    ? data.oneOffJobs.find(x=>x.id===id)
+    : data.customers.find(x=>x.id===id);
+  if(!item || !item.phone){ toast('No phone number set'); return; }
   window.location.href = `tel:${item.phone.replace(/\s+/g,'')}`;
+}
+// The Text side of the choice: the usual message screen (text or WhatsApp, as set for this person), with nothing written yet.
+function textFromCallChoice(kind, id){
+  const item = kind === 'job'
+    ? data.oneOffJobs.find(x=>x.id===id)
+    : data.customers.find(x=>x.id===id);
+  if(!item || !item.phone){ toast('No phone number set'); return; }
+  const first = ((item.name || '').trim().split(' ')[0]) || '';
+  openMessagePreview(first ? 'Text ' + first : 'Text', item.phone, '', null, null, null);
 }
 
 // Recognizes UK mobile numbers (07..., +447..., 00447...) as distinct from
