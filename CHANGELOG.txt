@@ -4,6 +4,11 @@ ROUND BOOK - RELEASE NOTES
 Newest first. This file is not part of the app and is not loaded by it; it ships alongside the code files.
 To add a release: raise APP_VERSION in js/01-data.js and CACHE_NAME in sw.js to the same number, then put a new entry at the top of this list.
 
+Version 3.05
+  - More > Check for updates: looks for a newer version on demand and offers it with the usual Update banner. If you
+    are already up to date it says so, and offers to clear the app's stored program files and download them fresh
+    (your customers and data are not touched) for the rare time the app seems stuck on an old version
+
 Version 3.04
   - Today: while a Start run is going, the day's note now stays pinned above the big card as you scroll down the
     list (a very long note scrolls inside its own box)
