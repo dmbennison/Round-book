@@ -462,6 +462,58 @@ if ('serviceWorker' in navigator) {
   });
 }
 
+/* ---------- manual update ----------
+   The app already checks by itself (on opening, on coming back to the foreground, every 30 minutes). This is the
+   same check on demand, from More > Check for updates. If a newer version exists it downloads it and the usual
+   "A new version is ready" banner appears; if not, it says so. */
+let updateCheckBusy = false;
+async function checkForUpdates(){
+  if(!('serviceWorker' in navigator)){ toast('Updates aren\u2019t available in this browser'); return; }
+  if(document.getElementById('updatePopup')){ closeSheet(); toast('A new version is already waiting \u2014 tap Update'); return; }
+  if(navigator.onLine === false){ toast('You\u2019re offline \u2014 connect to the internet and try again'); return; }
+  if(updateCheckBusy) return;
+  updateCheckBusy = true;
+  toast('Checking for updates\u2026');
+  let found = false;
+  const onFound = () => { found = true; };
+  let reg = null;
+  try{
+    reg = await navigator.serviceWorker.getRegistration();
+    if(!reg){ toast('Not installed as an app yet \u2014 reload the page to get the latest'); return; }
+    reg.addEventListener('updatefound', onFound);
+    await reg.update();
+    const t0 = Date.now();
+    while(Date.now() - t0 < 25000){ // a new version takes a few seconds to download and take over
+      if(updateBannerShown) break;
+      if(!found && !reg.installing && !reg.waiting) break;
+      await new Promise(r => setTimeout(r, 400));
+    }
+    if(updateBannerShown || document.getElementById('updatePopup')){ closeSheet(); toast('New version ready \u2014 tap Update'); }
+    else if(found){ toast('The update didn\u2019t finish downloading \u2014 try again on a stronger connection'); }
+    else {
+      appConfirm(`You\u2019re on the latest version (${formatVersion(APP_VERSION)}). If the app still seems out of date, you can clear its stored program files and download them fresh. Your customers and data are not touched.`,
+        { title:'Up to date', confirmLabel:'Download fresh copy', cancelLabel:'Close', danger:false, onConfirm: forceFreshInstall });
+    }
+  }catch(e){
+    toast('Couldn\u2019t check for updates \u2014 try again');
+  }finally{
+    if(reg) reg.removeEventListener('updatefound', onFound);
+    updateCheckBusy = false;
+  }
+}
+// Throws away the app's stored program files (the offline copy) and fetches them again. Customers, jobs, photos and
+// settings live in the phone's own storage, not in these files, so they stay as they are.
+async function forceFreshInstall(){
+  if(navigator.onLine === false){ toast('You need an internet connection to do this'); return; }
+  try{
+    const regs = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(regs.map(r => r.unregister()));
+    const keys = await caches.keys();
+    await Promise.all(keys.map(k => caches.delete(k)));
+  }catch(e){}
+  window.location.reload();
+}
+
 /* ---------- built-in self-tests ----------
    Only run when the address has ?test (or #test) on the end, e.g. https://yoursite/?test
    The result counts appear as a toast and the details go to the browser console. They work on

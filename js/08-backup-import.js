@@ -158,9 +158,13 @@ function openMoreMenu(){
       ${ico('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/>')}
       <div><div class="t1">Backup</div><div class="t2">Save a copy of your data, restore, and sync between devices</div></div>
     </button>
+    <button class="backup-btn" onclick="checkForUpdates()">
+      ${ico('<path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/>')}
+      <div><div class="t1">Check for updates</div><div class="t2">Version ${formatVersion(APP_VERSION)} · look for a newer version now</div></div>
+    </button>
     <button class="backup-btn" onclick="openInfo()">
       ${ico('<circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>')}
-      <div><div class="t1">About</div><div class="t2">User guide, version history and getting started</div></div>
+      <div><div class="t1">About</div><div class="t2">User guide and getting started</div></div>
     </button>
   `);
 }
@@ -403,7 +407,7 @@ function openHelp(returnTo){
       'Install it as an app: in Safari tap Share → <b>Add to Home Screen</b>.',
       'The four tabs are <b>Today</b>, <b>Schedule</b>, <b>Work</b> (with <b>Rounds</b> and <b>Jobs</b> underneath) and <b>Sales</b> (with <b>Quotes</b> and <b>Marketing</b> underneath).',
       'The blue <b>+</b> button adds a customer, job or quote, depending on the screen you are on.',
-      'The top bar has <b>Search</b>, the <b>⋯</b> menu (Reports, Photo gallery, Backup and About) and <b>Settings</b>.',
+      'The top bar has <b>Search</b>, the <b>⋯</b> menu (Reports, Photo gallery, Backup, <b>Check for updates</b> and About) and <b>Settings</b>.',
       'Tap the <b>🎤</b> in any text box to speak instead of typing.',
       'A <b>?</b> button next to a screen’s title opens help for just that screen.',
       'On an iPad or computer you can also right-click a card for its actions, and use the keyboard: <b>J</b> / <b>K</b> to move down and up the list, <b>Enter</b> to open, <b>C</b> for cleaned and <b>P</b> for paid.'
