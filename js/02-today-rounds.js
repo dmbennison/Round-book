@@ -171,6 +171,7 @@ function renderTodayHome(main){
     ${(!todayRunOn && todayNote) ? todayNoteHtml(todayNote) : ''}
     ${renderGettingStartedCard()}
     <div class="today-top${todayRunOn ? ' running' : ''}">
+    ${(todayRunOn && todayNote) ? todayNoteHtml(todayNote, true) : ''}
     <div class="today-hero">
       <div onclick="${todaySelectedRound ? `goToRoundDue('${escapeAttr(todaySelectedRound)}')` : `setTab('rounds'); setRoundsView('due');`}" style="cursor:pointer; display:flex; align-items:flex-start; justify-content:space-between; gap:14px;">
         <div>
@@ -197,7 +198,7 @@ function renderTodayHome(main){
     </div>
     ${todayRunBarHtml(todayRunOn)}
     </div>
-    ${todayRunOn ? todayRunListHtml(todayModel, todayNote) : `<div class="today-grid">
+    ${todayRunOn ? todayRunListHtml(todayModel) : `<div class="today-grid">
       <div class="today-tile" onclick="setTab('rounds'); setRoundsView('text');">
         <div class="num">${textBefore.unsent.length}</div>
         <div class="lbl">Text before visit${textBeforeOverdue ? ` · ${textBeforeOverdue} overdue` : ''}</div>

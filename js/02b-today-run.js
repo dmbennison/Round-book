@@ -86,8 +86,10 @@ function todayListModel(){
 }
 
 /* ---------- pieces the Today screen draws ---------- */
-function todayNoteHtml(note){
-  return `<div style="margin:0 0 10px; padding:8px 10px; border-radius:10px; background:var(--amber-dim); color:var(--ink); font-size:0.8125rem; font-weight:700; line-height:1.4;">📝 ${escapeHtml(note)}</div>`;
+// pinned: the note sits inside the pinned top block during a run, so it stays in view above the big card while the
+// list scrolls; a very long note scrolls inside its own box rather than taking over the screen.
+function todayNoteHtml(note, pinned){
+  return `<div style="margin:0 0 ${pinned ? '8px' : '10px'}; padding:8px 10px; border-radius:10px; background:var(--amber-dim); color:var(--ink); font-size:0.8125rem; font-weight:700; line-height:1.4;${pinned ? ' max-height:5.6em; overflow-y:auto;' : ''}">📝 ${escapeHtml(note)}</div>`;
 }
 // Bottom of the hero: 0% to 100% of today's list finished.
 function todayProgressHtml(model){

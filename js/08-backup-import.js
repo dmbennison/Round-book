@@ -231,7 +231,7 @@ const FOCUSED_HELP = {
       helpP('On a phone (or an iPad held upright), press <b>▶ Start</b> under the big card to swap the tiles for today’s to-do list, in the order you visit them. Swipe the cards just like on the Rounds screen. A card also shows what the customer <b>owes</b> (red) or has in <b>credit</b> (green). The bar at the bottom of the big card shows how much of today is done. <b>■ Stop</b> brings the tiles back.'),
       helpList([
         '<b>Mileage</b> – tap in the morning to log your start reading, and again in the evening for your end reading.',
-        'A 📝 note you left on today in the Schedule shows at the top.',
+        'A 📝 note you left on today in the Schedule shows above the big card and stays there as you scroll the list.',
         'The green <b>call button</b> on a customer’s card asks whether to <b>Call</b> or <b>Text</b> (a landline just calls).'
       ])
     ]
