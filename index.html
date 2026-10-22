@@ -1030,6 +1030,11 @@
      normally a little see-through; here it is made solid so the cards passing under it don't show. */
   .today-top.running{position:sticky; top:var(--header-h, 170px); z-index:6; background:var(--bg); padding-top:4px;}
   .today-top.running .today-hero{background:linear-gradient(155deg, rgba(255,255,255,0.20), rgba(255,255,255,0) 45%), var(--navy); -webkit-backdrop-filter:none; backdrop-filter:none;}
+  .today-hero.compact{padding:12px 14px;} /* during a Start run the hero shrinks to the totals and the progress bar (no round chips) */
+  .today-hero.compact .num{font-size:1.75rem;}
+  .today-hero.compact .num[style]{font-size:1.25rem !important;}
+  .today-hero.compact .value{margin-top:6px; font-size:0.8125rem;}
+  .today-hero.compact .hero-progress{margin-top:10px;}
   .hero-progress{height:7px; margin-top:14px; border-radius:999px; background:rgba(255,255,255,0.18); overflow:hidden;}
   .hero-progress-fill{height:100%; border-radius:999px; background:#6FD3A1; transition:width .35s ease;}
   .hero-progress-lbl{display:flex; justify-content:space-between; margin-top:5px; font-size:0.6875rem; font-weight:var(--fw-bold); color:#B9D2E2;}

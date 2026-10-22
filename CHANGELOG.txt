@@ -4,6 +4,12 @@ ROUND BOOK - RELEASE NOTES
 Newest first. This file is not part of the app and is not loaded by it; it ships alongside the code files.
 To add a release: raise APP_VERSION in js/01-data.js and CACHE_NAME in sw.js to the same number, then put a new entry at the top of this list.
 
+Version 3.06
+  - Today: pressing Start now shrinks the big card to just the totals and the progress bar (the round buttons are
+    hidden while the list is running; Stop brings them back)
+  - A customer can now only be marked cleaned once a day. Marking them cleaned again the same day (swipe, button or
+    adding a date by hand in their history) is refused with a message
+
 Version 3.05
   - More > Check for updates: looks for a newer version on demand and offers it with the usual Update banner. If you
     are already up to date it says so, and offers to clear the app's stored program files and download them fresh
