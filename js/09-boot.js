@@ -298,7 +298,7 @@ function onSwipeMove(e){
   const clamped = Math.max(-96, Math.min(maxDragRight, dx));
   swipeState.currentX = clamped;
   // A tick as the swipe becomes "armed" (and a lighter one if it's pulled back out), stronger for clean + paid.
-  const level = (isCustomer && clamped >= SWIPE_FULL_THRESHOLD) ? 2 : (clamped >= SWIPE_HALF_THRESHOLD || clamped <= -SWIPE_HALF_THRESHOLD) ? 1 : 0;
+  const level = (isCustomer && clamped >= SWIPE_FULL_THRESHOLD && swipeState.card.dataset.cleaned !== '1') ? 2 : (clamped >= SWIPE_HALF_THRESHOLD || clamped <= -SWIPE_HALF_THRESHOLD) ? 1 : 0;
   if(level !== swipeState.level){ haptic(level === 2 ? 24 : level === 1 ? 14 : 8); swipeState.level = level; }
   swipeState.card.style.transition = 'none';
   swipeState.card.style.transform = `translateX(${clamped}px)`;
@@ -322,8 +322,9 @@ function onSwipeMove(e){
   // the way" territory, so it's clear before releasing which action will fire.
   if(isCustomer && clamped > 0){
     if(bgLeft){
-      const full = clamped >= SWIPE_FULL_THRESHOLD;
-      bgLeft.textContent = full ? '✓ Cleaned + 💷 Paid' : '✓ Cleaned';
+      const done = swipeState.card.dataset.cleaned === '1'; // already cleaned today: nothing to do on a right swipe
+      const full = !done && clamped >= SWIPE_FULL_THRESHOLD;
+      bgLeft.textContent = done ? '✓ Already cleaned' : full ? '✓ Cleaned + 💷 Paid' : '✓ Cleaned';
       bgLeft.style.background = full ? 'var(--navy)' : '';
     }
   }
@@ -347,8 +348,9 @@ function onSwipeEnd(){
       if(kind === 'job') toggleJobDone(id);
       else if(kind === 'quote') markQuoteAccepted(id);
       else if(kind === 'customer' && card.dataset.cleaned === '1'){
-        // On the Today list a finished customer stays put: a second swipe must not log a second clean.
-        if(currentX >= SWIPE_FULL_THRESHOLD) quickPaid(id); else toast('Already cleaned today');
+        // On the Today list a finished customer stays put: a right swipe (half or all the way) does nothing, so it can
+        // never log a second clean or a payment by accident. Payment is a left swipe or the Mark paid button.
+        toast('Already cleaned today \u2014 swipe left to mark paid');
       }
       else if(kind === 'customer' && currentX >= SWIPE_FULL_THRESHOLD) quickCleanAndPaid(id, true);
       else quickClean(id, true);

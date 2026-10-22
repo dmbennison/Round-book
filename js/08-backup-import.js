@@ -232,7 +232,7 @@ const FOCUSED_HELP = {
     title: 'Today',
     body: () => [
       helpP('Your home screen. The big card shows who is due today and how much you have cleaned and been paid so far. Tap a tile to see its list.'),
-      helpP('On a phone (or an iPad held upright), press <b>▶ Start</b> under the big card to swap the tiles for today’s to-do list, in the order you visit them. Swipe the cards just like on the Rounds screen. The big card shrinks to the totals and progress bar while the list is running. A customer can only be marked cleaned once a day. A card also shows what the customer <b>owes</b> (red) or has in <b>credit</b> (green). The bar at the bottom of the big card shows how much of today is done. <b>■ Stop</b> brings the tiles back.'),
+      helpP('On a phone (or an iPad held upright), press <b>▶ Start</b> under the big card to swap the tiles for today’s to-do list, in the order you visit them. Swipe the cards just like on the Rounds screen. The big card shrinks to the totals and progress bar while the list is running. A customer can only be marked cleaned once a day, so swiping right on a finished card does nothing: swipe left, or use Mark paid, to record the payment. A card also shows what the customer <b>owes</b> (red) or has in <b>credit</b> (green). The bar at the bottom of the big card shows how much of today is done. <b>■ Stop</b> brings the tiles back.'),
       helpList([
         '<b>Mileage</b> – tap in the morning to log your start reading, and again in the evening for your end reading.',
         'A 📝 note you left on today in the Schedule shows above the big card and stays there as you scroll the list.',
