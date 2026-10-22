@@ -565,8 +565,8 @@
      ===================================================================== */
   :root{
     --radius:22px;
-    --glass-fill:rgba(255,255,255,0.58);
-    --glass-fill-strong:rgba(255,255,255,0.80);
+    --glass-fill:rgba(255,255,255,0.46);
+    --glass-fill-strong:rgba(255,255,255,0.66);
     --glass-edge:rgba(255,255,255,0.80);
     --glass-edge-soft:rgba(255,255,255,0.50);
     --glass-hi:inset 0 1px 0 rgba(255,255,255,0.95), inset 0 -1px 0 rgba(255,255,255,0.30), inset 0 0 0 1px rgba(255,255,255,0.40);
@@ -579,8 +579,8 @@
     --orb-a:34%; --orb-b:22%; --orb-c:16%;
   }
   body.dark{
-    --glass-fill:rgba(44,60,78,0.44);
-    --glass-fill-strong:rgba(30,42,56,0.72);
+    --glass-fill:rgba(44,60,78,0.34);
+    --glass-fill-strong:rgba(30,42,56,0.60);
     --glass-edge:rgba(255,255,255,0.22);
     --glass-edge-soft:rgba(255,255,255,0.12);
     --glass-hi:inset 0 1px 0 rgba(255,255,255,0.24), inset 0 -1px 0 rgba(255,255,255,0.04), inset 0 0 0 1px rgba(255,255,255,0.08);
@@ -596,17 +596,17 @@
      panels pick up its own warm or cool surface colour. Declared on body so they can see those inline values. */
   body{
     --glass-base:255,255,255; --glass-strong-base:255,255,255; --sheet-base:245,247,248;
-    --glass-fill:rgba(var(--glass-base),0.58);
-    --glass-fill-strong:rgba(var(--glass-strong-base),0.80);
-    --field-fill:rgba(var(--glass-base),0.62);
-    --sheet-fill:rgba(var(--sheet-base),0.74);
+    --glass-fill:rgba(var(--glass-base),0.46);
+    --glass-fill-strong:rgba(var(--glass-strong-base),0.66);
+    --field-fill:rgba(var(--glass-base),0.52);
+    --sheet-fill:rgba(var(--sheet-base),0.64);
   }
   body.dark{
     --glass-base:44,60,78; --glass-strong-base:30,42,56; --sheet-base:20,30,42;
-    --glass-fill:rgba(var(--glass-base),0.44);
-    --glass-fill-strong:rgba(var(--glass-strong-base),0.72);
-    --field-fill:rgba(255,255,255,0.07);
-    --sheet-fill:rgba(var(--sheet-base),0.72);
+    --glass-fill:rgba(var(--glass-base),0.34);
+    --glass-fill-strong:rgba(var(--glass-strong-base),0.60);
+    --field-fill:rgba(255,255,255,0.06);
+    --sheet-fill:rgba(var(--sheet-base),0.62);
   }
 
   /* Something colourful behind the glass for it to refract. */
@@ -1028,8 +1028,8 @@
   .run-btn:disabled{opacity:0.4;}
   /* While running, the hero and its buttons are pinned under the header and the list scrolls beneath them. The hero is
      normally a little see-through; here it is made solid so the cards passing under it don't show. */
-  .today-top.running{position:sticky; top:var(--header-h, 170px); z-index:6; background:var(--bg); padding-top:4px;}
-  .today-top.running .today-hero{background:linear-gradient(155deg, rgba(255,255,255,0.20), rgba(255,255,255,0) 45%), var(--navy); -webkit-backdrop-filter:none; backdrop-filter:none;}
+  .today-top.running{position:sticky; top:var(--header-h, 170px); z-index:6; background:transparent; padding-top:4px;} /* no solid backing, so the customers scroll up underneath the glass hero */
+  .today-top.running .today-hero{background:linear-gradient(155deg, rgba(255,255,255,0.16), rgba(255,255,255,0) 45%), color-mix(in srgb, var(--navy) 68%, transparent); -webkit-backdrop-filter:var(--glass-blur); backdrop-filter:var(--glass-blur);}
   .today-hero.compact{padding:12px 14px;} /* during a Start run the hero shrinks to the totals and the progress bar (no round chips) */
   .today-hero.compact .num{font-size:1.75rem;}
   .today-hero.compact .num[style]{font-size:1.25rem !important;}

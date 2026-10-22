@@ -4,6 +4,11 @@ ROUND BOOK - RELEASE NOTES
 Newest first. This file is not part of the app and is not loaded by it; it ships alongside the code files.
 To add a release: raise APP_VERSION in js/01-data.js and CACHE_NAME in sw.js to the same number, then put a new entry at the top of this list.
 
+Version 3.09
+  - The glass effect is slightly more see-through in every colour scheme, light and dark
+  - Today: while a Start run is going, the big card no longer has a solid background. It is now see-through navy
+    glass with the list scrolling underneath it, and the strip behind it is clear
+
 Version 3.08
   - Message other device (⋯ menu): type a short note and it appears as a card at the top of Today on your other
     device (and stays pinned above the big card during a Start run) until you tap Got it. Dismissing it tells the
