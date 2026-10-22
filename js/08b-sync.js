@@ -282,7 +282,9 @@ function syncMergeStates(base, local, remote, ctx){
   const campBucket = syncNewBucket();
   ctx.coll = 'campaigns';
   settings.marketingCampaigns = syncMergeCollection(sb.camps, sl.camps, sr.camps, x => x.id, x => x.name || x.id, ctx, campBucket);
-  stats.settingsChanged = !syncEq(settings, local.settings || {});
+  // Notes between the devices (08e-messages.js) travel inside settings but aren't a settings change.
+  const noMsgs = s => { const o = Object.assign({}, s || {}); delete o.deviceMessages; return o; };
+  stats.settingsChanged = !syncEq(noMsgs(settings), noMsgs(local.settings));
   syncFixAccountNumbers(customers, base.customers, settings, ctx);
   return {merged:{customers, oneOffJobs:jobs, quotes, mileageLog:mileage, settings}, stats, clashes:ctx.clashes, renumbered:ctx.renumbered};
 }

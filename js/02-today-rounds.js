@@ -168,9 +168,11 @@ function renderTodayHome(main){
   const mTotalText = (mEntry && mEntry.start!=null && mEntry.end!=null) ? (mEntry.end - mEntry.start).toFixed(1) : '—';
 
   main.innerHTML = `
+    ${(!todayRunOn && typeof msgBannerHtml === 'function') ? msgBannerHtml(false) : ''}
     ${(!todayRunOn && todayNote) ? todayNoteHtml(todayNote) : ''}
     ${renderGettingStartedCard()}
     <div class="today-top${todayRunOn ? ' running' : ''}">
+    ${(todayRunOn && typeof msgBannerHtml === 'function') ? msgBannerHtml(true) : ''}
     ${(todayRunOn && todayNote) ? todayNoteHtml(todayNote, true) : ''}
     <div class="today-hero${todayRunOn ? ' compact' : ''}">
       <div onclick="${todaySelectedRound ? `goToRoundDue('${escapeAttr(todaySelectedRound)}')` : `setTab('rounds'); setRoundsView('due');`}" style="cursor:pointer; display:flex; align-items:flex-start; justify-content:space-between; gap:14px;">
@@ -1383,6 +1385,7 @@ function render(){
   // iPad / desktop extras (08d-desktop.js): the right-pane summary and the keyboard-selected card follow every redraw.
   if(typeof desktopAfterRender === 'function') desktopAfterRender();
   if(typeof todayRunAfterRender === 'function') todayRunAfterRender();
+  if(typeof msgAfterRender === 'function') msgAfterRender(); // notes between your two devices (08e-messages.js)
 }
 
 // Compact "avg price by property type" row, shown under the Customers/Round

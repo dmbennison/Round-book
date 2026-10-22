@@ -158,6 +158,10 @@ function openMoreMenu(){
       ${ico('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/>')}
       <div><div class="t1">Backup</div><div class="t2">Save a copy of your data, restore, and sync between devices</div></div>
     </button>
+    <button class="backup-btn" onclick="openMessageDevice()">
+      ${ico('<rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 7l-10 7L2 7"/>')}
+      <div><div class="t1">Message other device</div><div class="t2">Send a note that pops up on Today on your other device</div></div>
+    </button>
     <button class="backup-btn" onclick="checkForUpdates()">
       ${ico('<path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/>')}
       <div><div class="t1">Check for updates</div><div class="t2">Version ${formatVersion(APP_VERSION)} · look for a newer version now</div></div>
@@ -232,7 +236,7 @@ const FOCUSED_HELP = {
     title: 'Today',
     body: () => [
       helpP('Your home screen. The big card shows who is due today and how much you have cleaned and been paid so far. Tap a tile to see its list.'),
-      helpP('On a phone (or an iPad held upright), press <b>▶ Start</b> under the big card to swap the tiles for today’s to-do list, in the order you visit them. Swipe the cards just like on the Rounds screen. The big card shrinks to the totals and progress bar while the list is running. A customer can only be marked cleaned once a day, so swiping right on a finished card does nothing: swipe left, or use Mark paid, to record the payment. A card also shows what the customer <b>owes</b> (red) or has in <b>credit</b> (green). The bar at the bottom of the big card shows how much of today is done. <b>■ Stop</b> brings the tiles back.'),
+      helpP('On a phone (or an iPad held upright), press <b>▶ Start</b> under the big card to swap the tiles for today’s to-do list, in the order you visit them. Swipe the cards just like on the Rounds screen. A note sent from your other device (⋯ menu > <b>Message other device</b>) shows as a card at the top until you tap <b>Got it</b>. The big card shrinks to the totals and progress bar while the list is running. A customer can only be marked cleaned once a day, so swiping right on a finished card does nothing: swipe left, or use Mark paid, to record the payment. A card also shows what the customer <b>owes</b> (red) or has in <b>credit</b> (green). The bar at the bottom of the big card shows how much of today is done. <b>■ Stop</b> brings the tiles back.'),
       helpList([
         '<b>Mileage</b> – tap in the morning to log your start reading, and again in the evening for your end reading.',
         'A 📝 note you left on today in the Schedule shows above the big card and stays there as you scroll the list.',
@@ -407,7 +411,7 @@ function openHelp(returnTo){
       'Install it as an app: in Safari tap Share → <b>Add to Home Screen</b>.',
       'The four tabs are <b>Today</b>, <b>Schedule</b>, <b>Work</b> (with <b>Rounds</b> and <b>Jobs</b> underneath) and <b>Sales</b> (with <b>Quotes</b> and <b>Marketing</b> underneath).',
       'The blue <b>+</b> button adds a customer, job or quote, depending on the screen you are on.',
-      'The top bar has <b>Search</b>, the <b>⋯</b> menu (Reports, Photo gallery, Backup, <b>Check for updates</b> and About) and <b>Settings</b>.',
+      'The top bar has <b>Search</b>, the <b>⋯</b> menu (Reports, Photo gallery, Backup, <b>Message other device</b>, <b>Check for updates</b> and About) and <b>Settings</b>.',
       'Tap the <b>🎤</b> in any text box to speak instead of typing.',
       'A <b>?</b> button next to a screen’s title opens help for just that screen.',
       'On an iPad or computer you can also right-click a card for its actions, and use the keyboard: <b>J</b> / <b>K</b> to move down and up the list, <b>Enter</b> to open, <b>C</b> for cleaned and <b>P</b> for paid.'
