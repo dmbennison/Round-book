@@ -7,7 +7,8 @@
    buttons stay locked in place while the list scrolls underneath. Anyone you finish stays in the list (dimmed, so you
    can see what's done) rather than vanishing, and from the second one onwards the list moves up after each so the
    previous one is always still showing at the top. Stop puts the tiles back.
-   The progress bar at the bottom of the hero is done / (done + still to do) — it's there whether or not a run is going. */
+   While a run is going the hero shrinks to the totals and the progress bar (the round chips are hidden; the round picked when
+   Start was pressed stays). The progress bar at the bottom of the hero is done / (done + still to do) — it's there whether or not a run is going. */
 
 /* ---------- the run itself ----------
    {date, scope, done:[keys], seq:[keys]}

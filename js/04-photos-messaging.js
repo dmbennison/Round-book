@@ -2118,6 +2118,7 @@ function addHistDate(id, kind){
     if(!v) return;
     const amtRaw = document.getElementById('d_clean_amount').value;
     const amt = amtRaw!=='' ? parseFloat(amtRaw) : (c.price||0);
+    if(cleanedOn(c, v)){ toast('Already marked cleaned on that date'); return; }
     c.cleanHistory = c.cleanHistory||[]; c.cleanHistory.push({date:v, amount: isNaN(amt)?0:amt});
     c.deferUntil = null;
   } else {

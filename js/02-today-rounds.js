@@ -172,7 +172,7 @@ function renderTodayHome(main){
     ${renderGettingStartedCard()}
     <div class="today-top${todayRunOn ? ' running' : ''}">
     ${(todayRunOn && todayNote) ? todayNoteHtml(todayNote, true) : ''}
-    <div class="today-hero">
+    <div class="today-hero${todayRunOn ? ' compact' : ''}">
       <div onclick="${todaySelectedRound ? `goToRoundDue('${escapeAttr(todaySelectedRound)}')` : `setTab('rounds'); setRoundsView('due');`}" style="cursor:pointer; display:flex; align-items:flex-start; justify-content:space-between; gap:14px;">
         <div>
           <div style="display:flex; align-items:baseline; gap:16px;">
@@ -189,7 +189,7 @@ function renderTodayHome(main){
           <div class="lbl">Paid total</div>
         </div>
       </div>
-      ${roundsWithDue.length ? `
+      ${(roundsWithDue.length && !todayRunOn) ? `
         <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:16px; padding-top:14px; border-top:1px solid rgba(255,255,255,0.15);">
           ${roundsWithDue.map(rn=>`<span onclick="event.stopPropagation(); selectTodayRound('${escapeAttr(rn)}')" style="cursor:pointer; padding:6px 12px; border-radius:20px; font-size:0.75rem; font-weight:800; white-space:nowrap; ${rn===todaySelectedRound ? 'background:#fff; color:var(--navy);' : 'background:rgba(255,255,255,0.15); color:#fff;'}">${escapeHtml(rn)} · ${dueByRound[rn].length}</span>`).join('')}
         </div>
@@ -1986,8 +1986,11 @@ function scrollToCustomerCard(id){
   if(!el) return;
   pageScrollToEl(el, 0, 14);
 }
+// A customer can only be cleaned once a day: a second clean on the same date is refused.
+function cleanedOn(c, iso){ return (c.cleanHistory || []).some(e => e.date === iso); }
 function quickClean(id, fromSwipe){
   const c = data.customers.find(x=>x.id===id);
+  if(cleanedOn(c, todayISO())){ toast(`${c.name||c.address||'This customer'} is already marked cleaned today`); return; }
   const prevDeferUntil = c.deferUntil;
   c.cleanHistory = c.cleanHistory || [];
   c.cleanHistory.push({date: todayISO(), amount: c.price||0});
@@ -2022,6 +2025,7 @@ function quickPaid(id){
 function quickCleanAndPaid(id, fromSwipe){
   const c = data.customers.find(x=>x.id===id);
   const today = todayISO();
+  if(cleanedOn(c, today)){ toast(`${c.name||c.address||'This customer'} is already marked cleaned today`); return; }
   const prev = { deferUntil: c.deferUntil, paymentReminderSent: c.paymentReminderSent, paymentReminderSentDate: c.paymentReminderSentDate, paymentReminderCount: c.paymentReminderCount };
   c.cleanHistory = c.cleanHistory || [];
   c.cleanHistory.push({date: today, amount: c.price||0});
