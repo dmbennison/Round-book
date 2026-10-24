@@ -4,6 +4,14 @@ ROUND BOOK - RELEASE NOTES
 Newest first. This file is not part of the app and is not loaded by it; it ships alongside the code files.
 To add a release: raise APP_VERSION in js/01-data.js and CACHE_NAME in sw.js to the same number, then put a new entry at the top of this list.
 
+Version 3.12
+  - The Work (Rounds / Jobs) and Sales (Quotes / Marketing) sub tabs now use the same see-through glass bar as the
+    main tabs, with the active one as a lifted glass pill
+  - The Schedule now has the same glass look: translucent panes for the title bar, the tool buttons (now rounded
+    capsules), the day names and the day boxes, and a glass pop-up
+  - The Glass transparency slider now also changes the header, the main tab bar and the sub tabs (before, those
+    stayed at one fixed strength)
+
 Version 3.11
   - Search is now forgiving. A misspelled customer, address or round name still finds results (one slip in a
     short word, two in a long one: swapped, missing, extra or wrong letters), and the closest matches are listed

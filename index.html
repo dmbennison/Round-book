@@ -386,19 +386,19 @@
   /* Schedule editor: a full-screen calendar whose chips can be moved, then committed or rejected */
   /* The Schedule tab. It sits between the header (and sub tabs) and the tab bar, below pop-ups (z 40), so every other
      tab can be reached — and a pop-up opened from the header shown — while a schedule is still being worked on. */
-  .sched-editor{position:fixed; top:var(--header-h, 170px); bottom:var(--tabbar-h, 64px); left:0; right:0; z-index:12; display:none; flex-direction:column; background:var(--bg); color:var(--ink);}
+  .sched-editor{position:fixed; top:var(--header-h, 170px); bottom:var(--tabbar-h, 64px); left:0; right:0; z-index:12; display:none; flex-direction:column; background:transparent; color:var(--ink);} /* glass: the page shows through the panes below */
   body[data-tab="schedule"] main, body[data-tab="schedule"] .fab{display:none;} /* the editor is this tab's page */
   .sched-editor.show{display:flex;}
-  .se-bar{flex:none; display:flex; align-items:center; gap:8px; padding:8px 14px; border-bottom:1px solid var(--line);}
+  .se-bar{flex:none; display:flex; align-items:center; gap:8px; padding:8px 14px; background:var(--glass-fill-strong); border-bottom:1px solid var(--glass-edge-soft); box-shadow:inset 0 1px 0 var(--glass-edge); -webkit-backdrop-filter:var(--glass-blur); backdrop-filter:var(--glass-blur);}
   .se-bar-text{flex:1; min-width:0;}
   .se-bar .sheet-close{flex-shrink:0;}
   .se-title{font-size:0.9375rem; font-weight:var(--fw-black);}
   .se-count{font-size:0.75rem; font-weight:var(--fw-bold); color:var(--ink-muted); margin-top:1px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
   .se-scroll{flex:1; min-height:0; overflow:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; touch-action:pan-x pan-y;}
   .se-grid{--z:1.4; display:grid; grid-template-columns:repeat(7, minmax(calc(112px * var(--z)), 1fr)); min-width:calc(784px * var(--z));}
-  .se-dayname{position:sticky; top:0; z-index:2; background:var(--bg); padding:6px 4px; text-align:center; font-size:max(0.5625rem, calc(0.6875rem * var(--z,1.4))); font-weight:var(--fw-black); color:var(--ink-muted); border-bottom:1px solid var(--line);}
-  .se-cell{position:relative; min-height:calc(92px * var(--z)); padding:calc(3px * var(--z)); border-right:1px solid var(--line); border-bottom:1px solid var(--line); box-sizing:border-box;}
-  .se-cell.past{background:var(--bg);}
+  .se-dayname{position:sticky; top:0; z-index:2; background:var(--glass-fill-strong); -webkit-backdrop-filter:var(--glass-blur); backdrop-filter:var(--glass-blur); padding:6px 4px; text-align:center; font-size:max(0.5625rem, calc(0.6875rem * var(--z,1.4))); font-weight:var(--fw-black); color:var(--ink-muted); border-bottom:1px solid var(--line);}
+  .se-cell{position:relative; min-height:calc(92px * var(--z)); padding:calc(3px * var(--z)); border-right:1px solid var(--glass-edge-soft); border-bottom:1px solid var(--glass-edge-soft); box-sizing:border-box; background:var(--glass-fill);}
+  .se-cell.past{background:transparent;}
   .se-cell.past .se-daynum, .se-cell.past .se-meta{opacity:0.7;}
   .se-hist{display:flex; align-items:flex-start; justify-content:space-between; gap:calc(4px * var(--z)); margin-bottom:calc(4px * var(--z)); padding:calc(5px * var(--z)) calc(7px * var(--z)); border-radius:calc(9px * var(--z)); font-size:max(0.5rem, calc(0.6875rem * var(--z,1.4))); font-weight:var(--fw-black); line-height:1.2; cursor:pointer; background:var(--green-dim); color:var(--green); border:1px solid var(--green); min-height:calc(30px * var(--z));} /* a clean that has already happened: read-only, tap for the list */
   .se-hist.job{border-style:dashed;}
@@ -427,9 +427,9 @@
   .se-cellhead{display:flex; align-items:center; justify-content:space-between; gap:2px; margin:0 1px 2px;}
   .se-meta{display:flex; flex-wrap:wrap; gap:0 6px; margin:0 1px 3px; font-size:max(0.5rem, calc(0.5625rem * var(--z,1.4))); font-weight:var(--fw-bold); color:var(--ink-muted);}
   .se-off{margin:0 1px 3px; font-size:max(0.5rem, calc(0.5625rem * var(--z,1.4))); font-weight:var(--fw-black); color:var(--ink-muted);}
-  .se-tools{flex:none; display:flex; gap:6px; padding:6px 10px; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; border-bottom:1px solid var(--line);}
+  .se-tools{flex:none; display:flex; gap:6px; padding:6px 10px; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; background:var(--glass-fill-strong); border-bottom:1px solid var(--glass-edge-soft); box-shadow:inset 0 1px 0 var(--glass-edge); -webkit-backdrop-filter:var(--glass-blur); backdrop-filter:var(--glass-blur);}
   .se-tools::-webkit-scrollbar{display:none;}
-  .se-tool{flex:none; padding:7px 11px; border:1px solid var(--line); border-radius:10px; background:var(--surface); color:var(--ink); font-size:0.75rem; font-weight:var(--fw-black); white-space:nowrap;}
+  .se-tool{flex:none; padding:7px 11px; border:none; border-radius:999px; background:var(--glass-fill); box-shadow:var(--glass-hi); color:var(--ink); font-size:0.75rem; font-weight:var(--fw-black); white-space:nowrap;}
   .se-tool.active{background:var(--blue); border-color:var(--blue); color:var(--on-accent, #fff);}
   .se-tool:disabled{opacity:0.4;}
   .se-tools:not(.more-open) .se-extra:not(.active){display:none;} /* tucked behind ⋯ More… (Multi stays visible while it's switched on) */
@@ -440,7 +440,7 @@
   .se-modal.show{display:flex;}
   .se-modal.top{align-items:flex-start;} /* has a field to type in: see seModal */
   .se-modal.top .se-modal-card{border-radius:20px; margin-top:calc(env(safe-area-inset-top, 0px) + 8px); max-height:calc(100% - env(safe-area-inset-top, 0px) - 16px);}
-  .se-modal-card{width:100%; max-width:520px; max-height:88%; overflow-y:auto; box-sizing:border-box; padding:16px 16px calc(env(safe-area-inset-bottom, 0px) + 16px); border-radius:20px 20px 0 0; background:var(--bg); color:var(--ink);}
+  .se-modal-card{width:100%; max-width:520px; max-height:88%; overflow-y:auto; box-sizing:border-box; padding:16px 16px calc(env(safe-area-inset-bottom, 0px) + 16px); border-radius:20px 20px 0 0; background:var(--sheet-fill); -webkit-backdrop-filter:var(--glass-blur); backdrop-filter:var(--glass-blur); box-shadow:var(--glass-hi); color:var(--ink);}
   .se-modal-card h3{margin:0 0 8px; font-size:1.0625rem; font-weight:var(--fw-black);}
   .se-modal-card label{display:block; margin:12px 2px 5px; font-size:0.75rem; font-weight:var(--fw-black); color:var(--ink-muted);}
   .se-modal-card textarea{width:100%; box-sizing:border-box; min-height:96px; padding:11px 12px; border:1px solid var(--line); border-radius:10px; background:var(--surface); color:var(--ink); font:inherit; font-size:0.9375rem; resize:vertical;}
@@ -596,6 +596,7 @@
      panels pick up its own warm or cool surface colour. Declared on body so they can see those inline values. */
   body{
     --glass-k:1; /* Settings > Glass transparency: 1 is the standard look, below 1 clearer, above 1 more solid */
+    --navy-glass:clamp(20%, calc(78% * var(--glass-k)), 100%); /* how much navy the header, tab bars and sub tabs keep (78% at the standard setting) */
     --glass-base:255,255,255; --glass-strong-base:255,255,255; --sheet-base:245,247,248;
     --glass-fill:rgba(var(--glass-base), clamp(0.04, calc(0.46 * var(--glass-k)), 0.98));
     --glass-fill-strong:rgba(var(--glass-strong-base), clamp(0.06, calc(0.66 * var(--glass-k)), 0.98));
@@ -628,7 +629,7 @@
   }
   @supports (background:color-mix(in srgb, red, blue)){
     header{
-      background:linear-gradient(180deg, rgba(255,255,255,0.16), rgba(255,255,255,0.02)), color-mix(in srgb, var(--navy) 78%, transparent);
+      background:linear-gradient(180deg, rgba(255,255,255,0.16), rgba(255,255,255,0.02)), color-mix(in srgb, var(--navy) var(--navy-glass), transparent);
     }
   }
   .icon-btn{
@@ -652,7 +653,7 @@
     box-shadow:inset 0 1px 0 rgba(255,255,255,0.18), 0 -10px 30px rgba(0,0,0,0.20);
     -webkit-backdrop-filter:var(--glass-blur); backdrop-filter:var(--glass-blur);}
   @supports (background:color-mix(in srgb, red, blue)){
-    .tabs{background:linear-gradient(0deg, rgba(255,255,255,0.16), rgba(255,255,255,0.02)), color-mix(in srgb, var(--navy) 78%, transparent);}
+    .tabs{background:linear-gradient(0deg, rgba(255,255,255,0.16), rgba(255,255,255,0.02)), color-mix(in srgb, var(--navy) var(--navy-glass), transparent);}
   }
   .tab{flex:1 1 0; min-width:0; border-radius:999px; padding:14px 4px; font-size:0.875rem; transition:background .2s ease, color .2s ease;}
   .tab.active{
@@ -962,7 +963,7 @@
        calendar and Commit / Reject bar fill the column beside it. Phones and portrait keep the full-screen
        editor with the toolbar across the top. */
     .sched-editor.show{ display:grid; grid-template-columns:88px minmax(0, 1fr); grid-template-rows:auto minmax(0, 1fr); }
-    .se-tools{ grid-column:1; grid-row:1 / -1; flex-direction:column; gap:6px; padding:10px 8px; overflow-x:hidden; overflow-y:auto; border-bottom:none; border-right:1px solid var(--line); }
+    .se-tools{ grid-column:1; grid-row:1 / -1; flex-direction:column; gap:6px; padding:10px 8px; overflow-x:hidden; overflow-y:auto; border-bottom:none; border-right:1px solid var(--glass-edge-soft); }
     .se-tool{ width:100%; padding:10px 4px; white-space:normal; text-align:center; line-height:1.25; }
     .se-tool.se-tool-weeks{ display:block; }
     .se-bar{ grid-column:2; grid-row:1; padding-top:12px; }
@@ -1041,11 +1042,14 @@
   .hero-progress-lbl{display:flex; justify-content:space-between; margin-top:5px; font-size:0.6875rem; font-weight:var(--fw-bold); color:#B9D2E2;}
   .today-done .swipe-wrap, .swipe-wrap.today-done{opacity:0.6;}
   .today-run-list > .round-group-header:first-child{margin-top:4px !important;}
-  .subtabs{position:fixed; left:0; right:0; top:var(--sub-top, 64px); z-index:19; display:flex; padding:0 max(14px, env(safe-area-inset-right)) 0 max(14px, env(safe-area-inset-left)); background:var(--bg); border-bottom:1px solid var(--line);}
+  .subtabs{position:fixed; left:0; right:0; top:var(--sub-top, 64px); z-index:19; display:flex; gap:4px; padding:6px max(14px, env(safe-area-inset-right)) 8px max(14px, env(safe-area-inset-left)); background:var(--navy); border-radius:0 0 22px 22px;
+    box-shadow:inset 0 -1px 0 rgba(255,255,255,0.18), 0 8px 24px rgba(0,0,0,0.18); -webkit-backdrop-filter:var(--glass-blur); backdrop-filter:var(--glass-blur);} /* the same glass as the main tabs */
+  @supports (background:color-mix(in srgb, red, blue)){
+    .subtabs{background:linear-gradient(180deg, rgba(255,255,255,0.14), rgba(255,255,255,0.02)), color-mix(in srgb, var(--navy) var(--navy-glass), transparent);}
+  }
   .subtabs[hidden]{display:none;}
-  .subtab{position:relative; flex:1 1 0; min-width:0; padding:12px 6px 10px; border:none; background:transparent; color:var(--ink-muted); font-size:0.9375rem; font-weight:var(--fw-black); transition:color .15s ease;}
-  .subtab.active{color:var(--blue-deep);}
-  .subtab.active::after{content:""; position:absolute; left:20%; right:20%; bottom:0; height:3px; border-radius:3px 3px 0 0; background:var(--blue);}
+  .subtab{position:relative; flex:1 1 0; min-width:0; padding:10px 6px; border:none; border-radius:999px; background:transparent; color:rgba(255,255,255,0.78); font-size:0.9375rem; font-weight:var(--fw-black); transition:background .2s ease, color .2s ease;}
+  .subtab.active{background:rgba(255,255,255,0.24); color:#fff; box-shadow:inset 0 1px 0 rgba(255,255,255,0.50), inset 0 0 0 1px rgba(255,255,255,0.18), 0 2px 8px rgba(0,0,0,0.18);}
   .subtab .tab-badge{position:static; display:inline-block; margin-left:6px; vertical-align:1px;}
 
   /* ---------- iPad / desktop extras (08d-desktop.js) ---------- */
@@ -1103,7 +1107,7 @@
     .call-btn:hover, .dir-btn:hover{ filter:brightness(0.9); }
     .tab:not(.active):hover{ background:rgba(255,255,255,0.08); color:#fff; }
     .subtab, .se-mini, .se-tool{ cursor:pointer; }
-    .subtab:not(.active):hover{ color:var(--ink); }
+    .subtab:not(.active):hover{ color:#fff; background:rgba(255,255,255,0.12); }
     .se-mini:hover{ filter:brightness(0.95); }
     .rp-btn:hover, .rp-action:hover{ background:rgba(255,255,255,0.28); }
     /* After the "little icon buttons have no box" rule above, which is !important */
