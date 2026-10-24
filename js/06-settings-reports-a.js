@@ -726,21 +726,103 @@ function openUniversalSearch(){
   renderUniversalSearchResults();
   setTimeout(() => { const el = document.getElementById('search_input'); if(el) el.focus(); }, 60);
 }
-// Wraps the first matching occurrence of the search term in a highlight span —
-// makes the live, as-you-type results feel properly predictive rather than just a
-// plain filtered list.
+/* ---------- forgiving search ----------
+   A search finds what you meant, not just what you typed. Every word you type must be found somewhere in the record,
+   in any order, and:
+     - capitals, accents, apostrophes and punctuation don't matter ("St Mary's" = "st marys");
+     - road-type shorthand is treated as the same word (Rd = Road, St = Street, Ave = Avenue, Cres = Crescent ...);
+     - a name or address word with a typo still matches when it is close: one slip in a word of 4 to 7 letters, two in a
+       longer one (swapped, missing, extra or wrong letters: "Fenwik" finds Fenwick, "Patal" finds Patel);
+     - phone numbers can be typed with or without spaces.
+   Typo-matching only applies to names, addresses and round names. Phone numbers, emails and notes must match exactly,
+   so a long note can't throw up random look-alikes. Closer matches are listed first. */
+const SRCH_SYN = { rd:'road', st:'street', saint:'street', ave:'avenue', av:'avenue', cres:'crescent', dr:'drive', ln:'lane',
+  cl:'close', ct:'court', pl:'place', gdns:'gardens', gdn:'gardens', grn:'green', ter:'terrace', terr:'terrace', pk:'park',
+  sq:'square', mt:'mount', nth:'north', sth:'south' };
+function srchNorm(s){
+  return String(s == null ? '' : s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/['\u2019`]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+}
+function srchTokens(s){ return srchNorm(s).split(' ').filter(Boolean).map(t => SRCH_SYN[t] || t); }
+// Edit distance counting a swap of two neighbouring letters as one slip; gives up (returns max+1) past max.
+function srchDist(a, b, max){
+  if(Math.abs(a.length - b.length) > max) return max + 1;
+  let prev2 = null, prev = [], cur = [];
+  for(let j = 0; j <= b.length; j++) prev[j] = j;
+  for(let i = 1; i <= a.length; i++){
+    cur = [i];
+    let rowMin = i;
+    for(let j = 1; j <= b.length; j++){
+      const cost = a[i-1] === b[j-1] ? 0 : 1;
+      let v = Math.min(prev[j] + 1, cur[j-1] + 1, prev[j-1] + cost);
+      if(prev2 && i > 1 && j > 1 && a[i-1] === b[j-2] && a[i-2] === b[j-1]) v = Math.min(v, prev2[j-2] + 1);
+      cur[j] = v;
+      if(v < rowMin) rowMin = v;
+    }
+    if(rowMin > max) return max + 1;
+    prev2 = prev; prev = cur;
+  }
+  return prev[b.length];
+}
+// How well one typed word matches a record: 0 = a word starts with it, 0.4 = found inside a word, 1+ = a close spelling, null = no match.
+function srchWordCost(qt, tokens, joined, allowTypos){
+  if(joined.indexOf(qt) !== -1) return tokens.some(t => t.startsWith(qt)) ? 0 : 0.4;
+  if(!allowTypos || qt.length < 4) return null;
+  const maxD = qt.length >= 8 ? 2 : 1;
+  let best = null;
+  for(const t of tokens){
+    let d = srchDist(qt, t, maxD);
+    if(d > maxD && t.length > qt.length) d = srchDist(qt, t.slice(0, qt.length), maxD) + 0.5; // a typo'd start of a longer word, as you type
+    if(d <= maxD + 0.5 && (best === null || d + 1 < best)) best = d + 1;
+  }
+  return best;
+}
+// typoFields: names, addresses, rounds. plainFields: phone, email, notes, account numbers (exact only).
+// Returns a total cost (lower is closer), or null if any typed word isn't found.
+function srchScore(qTokens, typoFields, plainFields){
+  const typoTokens = typoFields.flatMap(srchTokens);
+  const typoJoined = typoTokens.join(' ');
+  const plainText = plainFields.map(srchNorm).filter(Boolean);
+  const plainTokens = plainText.flatMap(t => t.split(' '));
+  const plainJoined = plainText.join(' ') + ' ' + plainText.map(t => t.replace(/ /g, '')).join(' '); // phone numbers also without their spaces
+  let total = 0;
+  for(const qt of qTokens){
+    const a = srchWordCost(qt, typoTokens, typoJoined, true);
+    const b = srchWordCost(qt, plainTokens, plainJoined, false);
+    const c = (a === null) ? b : (b === null ? a : Math.min(a, b));
+    if(c === null) return null;
+    total += c;
+  }
+  return total;
+}
+function srchRank(list, fieldsOf, qTokens, tieSort){
+  const out = [];
+  list.forEach(item => {
+    const f = fieldsOf(item);
+    const score = srchScore(qTokens, f[0], f[1]);
+    if(score !== null) out.push({ item, score });
+  });
+  out.sort((x, y) => (x.score - y.score) || tieSort(x.item, y.item));
+  return out;
+}
+// Wraps each typed word, wherever it is found exactly, in a highlight span (so results look properly predictive).
 function highlightMatch(text, rawQuery){
   if(!text) return '';
-  const escaped = escapeHtml(text);
-  const escapedQuery = escapeHtml(rawQuery);
-  if(!escapedQuery) return escaped;
-  const idx = escaped.toLowerCase().indexOf(escapedQuery.toLowerCase());
-  if(idx === -1) return escaped;
-  return escaped.slice(0,idx)
-    + '<mark style="background:var(--amber-dim); color:var(--ink); border-radius:3px; padding:0 1px;">'
-    + escaped.slice(idx, idx+escapedQuery.length)
-    + '</mark>'
-    + escaped.slice(idx+escapedQuery.length);
+  const lower = String(text).toLowerCase();
+  const words = String(rawQuery || '').toLowerCase().split(/\s+/).filter(w => w.length >= 2);
+  const ranges = [];
+  words.forEach(w => { const i = lower.indexOf(w); if(i !== -1) ranges.push([i, i + w.length]); });
+  if(!ranges.length) return escapeHtml(text);
+  ranges.sort((a, b) => a[0] - b[0]);
+  const merged = [];
+  ranges.forEach(r => { const last = merged[merged.length - 1]; if(last && r[0] <= last[1]) last[1] = Math.max(last[1], r[1]); else merged.push(r.slice()); });
+  let out = '', pos = 0;
+  merged.forEach(([s, e]) => {
+    out += escapeHtml(String(text).slice(pos, s))
+      + '<mark style="background:var(--amber-dim); color:var(--ink); border-radius:3px; padding:0 1px;">' + escapeHtml(String(text).slice(s, e)) + '</mark>';
+    pos = e;
+  });
+  return out + escapeHtml(String(text).slice(pos));
 }
 function universalSearchSectionLabel(text, first){
   return `<div class="section-label" style="margin-top:${first?'0':'16px'};">${text}</div>`;
@@ -756,31 +838,34 @@ function renderUniversalSearchResults(){
     return;
   }
 
-  const roundNames = [...new Set(data.customers.map(c=>c.round||'Unassigned'))].sort((a,b)=>a.localeCompare(b));
-  const roundMatches = roundNames.filter(rn=>rn.toLowerCase().includes(q));
-
-  const custMatches = data.customers.filter(c=>{
-    const haystack = [c.name, c.address, c.phone, c.email, c.notes, c.round, c.accountNumber].filter(Boolean).join(' ').toLowerCase();
-    return haystack.includes(q);
-  }).sort((a,b)=>(a.address||'').localeCompare(b.address||''));
-
-  const jobMatches = (data.oneOffJobs||[]).filter(j=>{
-    const haystack = [j.name, j.address, j.phone, j.notes].filter(Boolean).join(' ').toLowerCase();
-    return haystack.includes(q);
-  }).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
-
-  const quoteMatches = (data.quotes||[]).filter(qt=>{
-    const haystack = [qt.name, qt.address, qt.phone, qt.notes].filter(Boolean).join(' ').toLowerCase();
-    return haystack.includes(q);
-  }).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  const qTokens = srchTokens(raw);
+  if(!qTokens.length){
+    resultsEl.innerHTML = `<p style="color:var(--ink-muted); font-size:0.8438rem; text-align:center; margin-top:24px;">Nothing matches "${escapeHtml(raw)}".</p>`;
+    return;
+  }
+  const byAddr = (a, b) => (a.address||'').localeCompare(b.address||'');
+  const newest = (a, b) => (b.date||'').localeCompare(a.date||'');
+  const roundNames = [...new Set(data.customers.map(c=>c.round||'Unassigned'))];
+  const roundRanked = srchRank(roundNames, rn => [[rn], []], qTokens, (a, b) => a.localeCompare(b));
+  const custRanked = srchRank(data.customers, c => [[c.name, c.address, c.round], [c.phone, c.email, c.notes, c.accountNumber]], qTokens, byAddr);
+  const jobRanked = srchRank(data.oneOffJobs||[], j => [[j.name, j.address], [j.phone, j.notes]], qTokens, newest);
+  const quoteRanked = srchRank(data.quotes||[], qt => [[qt.name, qt.address], [qt.phone, qt.notes]], qTokens, newest);
+  const roundMatches = roundRanked.map(r => r.item);
+  const custMatches = custRanked.map(r => r.item);
+  const jobMatches = jobRanked.map(r => r.item);
+  const quoteMatches = quoteRanked.map(r => r.item);
+  // When nothing matches exactly, say so, so a close spelling isn't mistaken for the real thing.
+  const best = Math.min(...[roundRanked, custRanked, jobRanked, quoteRanked].map(l => l.length ? l[0].score : Infinity));
+  const approxNote = (best >= 1 && best !== Infinity)
+    ? `<p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 12px;">No exact match for "${escapeHtml(raw)}". Showing the closest.</p>` : '';
 
   if(!roundMatches.length && !custMatches.length && !jobMatches.length && !quoteMatches.length){
     resultsEl.innerHTML = `<p style="color:var(--ink-muted); font-size:0.8438rem; text-align:center; margin-top:24px;">Nothing matches "${escapeHtml(raw)}".</p>`;
     return;
   }
 
-  let html = '';
-  let firstSection = true;
+  let html = approxNote;
+  let firstSection = !approxNote;
   if(roundMatches.length){
     html += universalSearchSectionLabel('Rounds', firstSection); firstSection = false;
     html += roundMatches.map(rn=>`<button class="backup-btn" onclick="openRoundFromSearch('${escapeAttr(rn)}')" style="margin-bottom:8px;">
