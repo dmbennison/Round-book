@@ -356,7 +356,7 @@ function seMoveChips(ids, iso){
   se.sel = []; se.selDay = null;
   renderScheduleEditor();
 }
-// The ⋯ More… button shows or hides Push back, Multi, Split and ＋ Job (the .se-extra buttons).
+// The ⋯ More… button shows or hides Push back, Multi, Split, ＋ Job, Note and Days off (the .se-extra buttons).
 function seSetMoreTools(open){
   const tools = document.getElementById('seTools'), btn = document.getElementById('seMoreToolsBtn');
   if(tools) tools.classList.toggle('more-open', !!open);
