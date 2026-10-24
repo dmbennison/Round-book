@@ -4,6 +4,14 @@ ROUND BOOK - RELEASE NOTES
 Newest first. This file is not part of the app and is not loaded by it; it ships alongside the code files.
 To add a release: raise APP_VERSION in js/01-data.js and CACHE_NAME in sw.js to the same number, then put a new entry at the top of this list.
 
+Version 3.11
+  - Search is now forgiving. A misspelled customer, address or round name still finds results (one slip in a
+    short word, two in a long one: swapped, missing, extra or wrong letters), and the closest matches are listed
+    first. Road shorthand is understood both ways (Rd and Road, St and Street, Ave, Cres, Dr, Ln and so on), capitals,
+    accents and apostrophes are ignored, and several words can be typed in any order. Phone numbers can be typed
+    with or without spaces. When nothing matches exactly, a line says so and shows the closest. Phone numbers,
+    emails and notes still need to match exactly
+
 Version 3.10
   - Today: the Start, Stop and round buttons are now solid colours (Stop is solid red, and a switched-off button is
     solid grey instead of faded)
