@@ -632,6 +632,8 @@
       background:linear-gradient(180deg, rgba(255,255,255,0.16), rgba(255,255,255,0.02)), color-mix(in srgb, var(--navy) var(--navy-glass), transparent);
     }
   }
+  /* Work and Sales have the sub tab bar fixed straight under the header, so the header's rounded lower corners come off there */
+  body:is([data-tab="rounds"], [data-tab="jobs"], [data-tab="quotes"], [data-tab="marketing"]) header{border-radius:0;}
   .icon-btn{
     width:36px; height:36px; border-radius:50%;
     background:rgba(255,255,255,0.16);
@@ -1196,8 +1198,8 @@
     <button class="se-tool se-extra" id="seMultiBtn" onclick="seToggleMulti()">☑ Multi</button>
     <button class="se-tool se-extra" id="seSplitBtn" onclick="seSplitOpen()">👥 Split</button>
     <button class="se-tool se-extra" onclick="seAddJobOpen()">＋ Job</button>
-    <button class="se-tool" onclick="seNoteOpen()">📝 Note</button>
-    <button class="se-tool" onclick="seDaysOffOpen()">🚫 Days off</button>
+    <button class="se-tool se-extra" onclick="seNoteOpen()">📝 Note</button>
+    <button class="se-tool se-extra" onclick="seDaysOffOpen()">🚫 Days off</button>
     <button class="se-tool se-tool-weeks" id="seEarlierBtn" onclick="seShowEarlierWeeks()">◀ Earlier</button>
     <button class="se-tool se-tool-weeks" id="seWeeksBtn" onclick="seShowMoreWeeks()">＋ Weeks</button>
   </div>
