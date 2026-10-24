@@ -4,6 +4,13 @@ ROUND BOOK - RELEASE NOTES
 Newest first. This file is not part of the app and is not loaded by it; it ships alongside the code files.
 To add a release: raise APP_VERSION in js/01-data.js and CACHE_NAME in sw.js to the same number, then put a new entry at the top of this list.
 
+Version 3.10
+  - Today: the Start, Stop and round buttons are now solid colours (Stop is solid red, and a switched-off button is
+    solid grey instead of faded)
+  - Settings: a new Glass transparency slider, from Clear to Solid with Standard in the middle, that changes how
+    see-through the header, panels, cards, tiles, pop-ups and the Today big card are, as you drag it. Reset to
+    standard puts it back. It is kept on each device. (The High contrast scheme has no glass, so it is unaffected)
+
 Version 3.09
   - The glass effect is slightly more see-through in every colour scheme, light and dark
   - Today: while a Start run is going, the big card no longer has a solid background. It is now see-through navy

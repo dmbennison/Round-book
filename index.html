@@ -595,18 +595,19 @@
   /* The glass colours are built from per-scheme RGB triplets (set in applyTheme), so each colour scheme's
      panels pick up its own warm or cool surface colour. Declared on body so they can see those inline values. */
   body{
+    --glass-k:1; /* Settings > Glass transparency: 1 is the standard look, below 1 clearer, above 1 more solid */
     --glass-base:255,255,255; --glass-strong-base:255,255,255; --sheet-base:245,247,248;
-    --glass-fill:rgba(var(--glass-base),0.46);
-    --glass-fill-strong:rgba(var(--glass-strong-base),0.66);
-    --field-fill:rgba(var(--glass-base),0.52);
-    --sheet-fill:rgba(var(--sheet-base),0.64);
+    --glass-fill:rgba(var(--glass-base), clamp(0.04, calc(0.46 * var(--glass-k)), 0.98));
+    --glass-fill-strong:rgba(var(--glass-strong-base), clamp(0.06, calc(0.66 * var(--glass-k)), 0.98));
+    --field-fill:rgba(var(--glass-base), clamp(0.04, calc(0.52 * var(--glass-k)), 0.98));
+    --sheet-fill:rgba(var(--sheet-base), clamp(0.06, calc(0.64 * var(--glass-k)), 0.98));
   }
   body.dark{
     --glass-base:44,60,78; --glass-strong-base:30,42,56; --sheet-base:20,30,42;
-    --glass-fill:rgba(var(--glass-base),0.34);
-    --glass-fill-strong:rgba(var(--glass-strong-base),0.60);
-    --field-fill:rgba(255,255,255,0.06);
-    --sheet-fill:rgba(var(--sheet-base),0.62);
+    --glass-fill:rgba(var(--glass-base), clamp(0.04, calc(0.34 * var(--glass-k)), 0.98));
+    --glass-fill-strong:rgba(var(--glass-strong-base), clamp(0.06, calc(0.60 * var(--glass-k)), 0.98));
+    --field-fill:rgba(255,255,255, clamp(0.02, calc(0.06 * var(--glass-k)), 0.5));
+    --sheet-fill:rgba(var(--sheet-base), clamp(0.06, calc(0.62 * var(--glass-k)), 0.98));
   }
 
   /* Something colourful behind the glass for it to refract. */
@@ -1023,13 +1024,13 @@
   .today-top:not(:has(.today-run-bar)) .today-hero{margin-bottom:12px;} /* no Start / Stop here (iPad, desktop): the hero's usual gap */
   .run-btn{padding:6px 14px; border:none; border-radius:999px; font-size:0.75rem; font-weight:var(--fw-black); white-space:nowrap;}
   .run-btn.start{background:var(--green); color:#fff;}
-  .run-btn.stop{background:var(--red-dim); color:var(--red);}
-  .run-btn.all{background:var(--blue-dim); color:var(--blue-deep);}
-  .run-btn:disabled{opacity:0.4;}
+  .run-btn.stop{background:var(--red); color:#fff;}
+  .run-btn.all{background:var(--blue); color:var(--on-accent);}
+  .run-btn:disabled, .run-btn.start:disabled, .run-btn.stop:disabled{opacity:1; background:#7b8794; color:#fff;} /* solid, not see-through, when switched off */
   /* While running, the hero and its buttons are pinned under the header and the list scrolls beneath them. The hero is
      normally a little see-through; here it is made solid so the cards passing under it don't show. */
   .today-top.running{position:sticky; top:var(--header-h, 170px); z-index:6; background:transparent; padding-top:4px;} /* no solid backing, so the customers scroll up underneath the glass hero */
-  .today-top.running .today-hero{background:linear-gradient(155deg, rgba(255,255,255,0.16), rgba(255,255,255,0) 45%), color-mix(in srgb, var(--navy) 68%, transparent); -webkit-backdrop-filter:var(--glass-blur); backdrop-filter:var(--glass-blur);}
+  .today-top.running .today-hero{background:linear-gradient(155deg, rgba(255,255,255,0.16), rgba(255,255,255,0) 45%), color-mix(in srgb, var(--navy) clamp(20%, calc(68% * var(--glass-k)), 100%), transparent); -webkit-backdrop-filter:var(--glass-blur); backdrop-filter:var(--glass-blur);}
   .today-hero.compact{padding:12px 14px;} /* during a Start run the hero shrinks to the totals and the progress bar (no round chips) */
   .today-hero.compact .num{font-size:1.75rem;}
   .today-hero.compact .num[style]{font-size:1.25rem !important;}
