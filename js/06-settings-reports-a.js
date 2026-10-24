@@ -105,6 +105,8 @@ function contrastRatio(a, b){
   const la = relLum(a), lb = relLum(b);
   return (Math.max(la,lb)+0.05) / (Math.min(la,lb)+0.05);
 }
+// The glass slider's 0-100 as a multiplier on every glass opacity: 50 = 1 (the standard look), 0 = 0.2 (very clear), 100 = 2.1 (almost solid).
+function glassMultiplier(){ return glassLevel <= 50 ? 0.2 + 0.8 * (glassLevel / 50) : 1 + 1.1 * ((glassLevel - 50) / 50); }
 function applyTheme(){
   const t = THEMES[themeName] || THEMES.ocean;
   const p = darkMode ? t.dark : t.light; // this scheme's page / card / text colours for the current mode
@@ -148,7 +150,10 @@ function applyTheme(){
     : `0 10px 30px ${hexToRgba(t.navy, 0.16)}, 0 2px 6px ${hexToRgba(t.navy, 0.08)}`);
   // Cards (cust-card, round-card, backup-btn, cust-section): a translucent fill of the scheme's surface colour
   // (nudged toward the accent in dark mode so schemes stay distinct), a faint accent wash, and a soft shadow.
-  root.setProperty('--card-surface', flat ? p.surface : (darkMode ? hexToRgba(mixHex(p.surface, acc, 0.12 * tint), 0.58) : hexToRgba(p.surface, 0.66)));
+  const gk = flat ? 1 : glassMultiplier(); // the flat High contrast scheme has no glass to adjust
+  const ga = a => Math.max(0.04, Math.min(0.98, a * gk));
+  root.setProperty('--glass-k', String(gk));
+  root.setProperty('--card-surface', flat ? p.surface : (darkMode ? hexToRgba(mixHex(p.surface, acc, 0.12 * tint), ga(0.58)) : hexToRgba(p.surface, ga(0.66))));
   root.setProperty('--card-tint', flat ? 'transparent' : (darkMode ? hexToRgba(acc, 0.10 * tint) : hexToRgba(acc, 0.07 * tint)));
   root.setProperty('--card-border', flat ? p.line : (darkMode ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.85)'));
   root.setProperty('--card-shadow', flat ? 'none' : (darkMode
@@ -176,6 +181,18 @@ function setTheme(name){
   applyTheme();
   openSettings();
 }
+function glassLabel(v){ v = Number(v); return v === 50 ? 'Standard' : (v < 50 ? 'Clearer' : 'More solid'); }
+function previewGlass(v){
+  glassLevel = Math.max(0, Math.min(100, parseInt(v,10) || 0));
+  applyTheme();
+  const label = document.getElementById('glassLabel');
+  if(label) label.textContent = glassLabel(glassLevel);
+}
+function setGlass(v){
+  previewGlass(v);
+  localStorage.setItem('roundBookGlass', String(glassLevel));
+}
+function resetGlass(){ setGlass(50); openSettings(); }
 function openSettings(){
   openSheet(`
     <div class="sheet-head">
@@ -196,6 +213,14 @@ function openSettings(){
       <span style="font-size:1.375rem; color:var(--ink-muted); flex-shrink:0; line-height:1;">A</span>
       <span id="textSizeLabel" style="font-size:0.75rem; font-weight:800; color:var(--ink); min-width:34px; text-align:right; flex-shrink:0;">${textSize}px</span>
     </div>
+    <div class="section-label">Glass transparency</div>
+    <div style="display:flex; align-items:center; gap:10px; margin:4px 2px 4px;">
+      <span style="font-size:0.75rem; color:var(--ink-muted); flex-shrink:0;">Clear</span>
+      <input type="range" min="0" max="100" step="5" value="${glassLevel}" oninput="previewGlass(this.value)" onchange="setGlass(this.value)" style="flex:1; accent-color:var(--blue);" aria-label="Glass transparency">
+      <span style="font-size:0.75rem; color:var(--ink-muted); flex-shrink:0;">Solid</span>
+      <span id="glassLabel" style="font-size:0.75rem; font-weight:800; color:var(--ink); min-width:70px; text-align:right; flex-shrink:0;">${glassLabel(glassLevel)}</span>
+    </div>
+    <div style="margin:0 2px 16px;"><button onclick="resetGlass()" style="background:none; border:none; padding:2px 0; color:var(--blue-deep); font-weight:700; font-size:0.75rem; cursor:pointer;">Reset to standard</button></div>
     <div class="section-label">Colour scheme</div>
     <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:16px;">
       ${Object.keys(THEMES).map(key=>{
