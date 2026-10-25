@@ -843,6 +843,8 @@
       border-radius:0 0 26px 26px;
       box-shadow:inset 0 -1px 0 rgba(255,255,255,0.18), 0 10px 30px rgba(0,0,0,0.20);
     }
+    /* On Work and Sales the sub tab bar sits straight under this bar, so the bar's rounded lower corners (and the shadow it casts down onto the sub tabs) come off */
+    body:is([data-tab="rounds"], [data-tab="jobs"], [data-tab="quotes"], [data-tab="marketing"]) .tabs{ border-radius:0; box-shadow:inset 0 -1px 0 rgba(255,255,255,0.18); }
     .tab{ flex:0 1 190px; padding:10px 4px; }
     body{ padding-bottom:calc(var(--tabbar-h, 0px) + 8px + env(safe-area-inset-bottom, 0px)); }
     main{ max-width:720px; margin-left:auto; margin-right:auto; }

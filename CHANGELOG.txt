@@ -4,6 +4,10 @@ ROUND BOOK - RELEASE NOTES
 Newest first. This file is not part of the app and is not loaded by it; it ships alongside the code files.
 To add a release: raise APP_VERSION in js/01-data.js and CACHE_NAME in sw.js to the same number, then put a new entry at the top of this list.
 
+Version 3.14
+  - iPad and computer: on the Work and Sales tabs the main tab bar (which sits at the top there) no longer has
+    rounded lower corners, so it joins the sub tab bar cleanly. (3.13 had only squared the phone header)
+
 Version 3.13
   - Schedule: Note and Days off now sit behind the ⋯ More… button with Push back, Multi, Split and ＋ Job, leaving
     the top row for Today, zoom and Undo
