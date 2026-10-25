@@ -157,6 +157,12 @@ function renderTodayHome(main){
     else if(days < 30) owed1430 += bal;
     else owed30plus += bal;
   });
+  // On the wide iPad / computer layout the owing customers are listed under the Owing tile (right-hand column), most
+  // overdue first, as the same cards as Rounds > Owed. Phones don't draw it (the tile opens the full Owed list).
+  const owedListHtml = (typeof isWideSplitView === 'function' && isWideSplitView() && owedCustomers.length)
+    ? `<div class="today-owed-list"><div class="section-label" style="margin:16px 2px 8px;">Owing (${owedCustomers.length})</div>${
+        owedCustomers.slice().sort((a,b)=> (daysSinceLastPayment(b)-daysSinceLastPayment(a)) || (custStatus(b).balance-custStatus(a).balance))
+          .map(c=>custCardHtml(c,'owed')).join('')}</div>` : '';
   // A note left on today in the Schedule tab (Commit keeps it in settings.dayNotes).
   const todayNote = (data.settings && data.settings.dayNotes && data.settings.dayNotes[today]) || '';
   // Start / Stop and the progress bar (02b-today-run.js): while a run is going the tiles are replaced by the day's list.
@@ -171,7 +177,7 @@ function renderTodayHome(main){
     ${(!todayRunOn && typeof msgBannerHtml === 'function') ? msgBannerHtml(false) : ''}
     ${(!todayRunOn && todayNote) ? todayNoteHtml(todayNote) : ''}
     ${renderGettingStartedCard()}
-    <div class="today-top${todayRunOn ? ' running' : ''}">
+    ${todayRunOn ? '' : '<div class="today-cols"><div class="today-left">'}<div class="today-top${todayRunOn ? ' running' : ''}">
     ${(todayRunOn && typeof msgBannerHtml === 'function') ? msgBannerHtml(true) : ''}
     ${(todayRunOn && todayNote) ? todayNoteHtml(todayNote, true) : ''}
     <div class="today-hero${todayRunOn ? ' compact' : ''}">
@@ -219,11 +225,13 @@ function renderTodayHome(main){
           <div class="lbl" style="margin-top:2px;">miles</div>
         </div>` : ''}
       </div>
-      ${todaysJobs.length ? `<div class="today-tile" onclick="setTab('jobs');">
+      ${todaysJobs.length ? `<div class="today-tile jobs-tile" onclick="setTab('jobs');">
         <div class="num">${todaysJobs.length}</div>
         <div class="lbl">Job${todaysJobs.length===1?'':'s'} today</div>
       </div>` : ''}
-      <div class="today-tile" onclick="setTab('rounds'); setRoundsView('owed');" style="grid-column:1 / -1;">
+    </div>
+    </div><div class="today-right"><div class="today-owed">
+      <div class="today-tile" onclick="setTab('rounds'); setRoundsView('owed');">
         <div class="num">${owedCustomers.length}</div>
         <div class="lbl">Customer${owedCustomers.length===1?'':'s'} owing</div>
         ${owedCustomers.length ? `
@@ -242,7 +250,8 @@ function renderTodayHome(main){
           </div>
         </div>` : ''}
       </div>
-    </div>`}
+      ${owedListHtml}
+    </div></div></div>`}
   `;
 }
 
@@ -400,7 +409,7 @@ function quotesNeedingFollowUp(){
   const today = todayISO();
   return (data.quotes||[]).filter(q => quoteNeedsFollowUp(q, today));
 }
-// Yellow number on the Quotes tab in the header: how many quotes need attention.
+// Yellow number on the Quotes sub tab (Sales > Quotes): how many quotes need attention.
 // Called from render(), so it stays current after anything that changes a quote.
 function updateQuotesBadge(){
   const el = document.getElementById('quotesBadge');
@@ -662,8 +671,9 @@ function renderSubTabs(){
   else {
     bar.hidden = false;
     bar.innerHTML = defs.map(([id, label]) =>
-      `<button class="subtab${currentTab === id ? ' active' : ''}" onclick="setTab('${id}', true)">${label}</button>`).join('');
+      `<button class="subtab${currentTab === id ? ' active' : ''}" onclick="setTab('${id}', true)">${label}${id === 'quotes' ? '<span class="tab-badge" id="quotesBadge" hidden></span>' : ''}</button>`).join('');
   }
+  updateQuotesBadge(); // the yellow quotes-needing-attention number lives on the Quotes sub tab, which was just redrawn
   if(wasHidden !== bar.hidden && typeof window.syncHeaderHeights === 'function') window.syncHeaderHeights();
 }
 // The page itself scrolls (the header and tab bar are fixed), so these are simply the window scroll —
