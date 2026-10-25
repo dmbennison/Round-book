@@ -411,7 +411,7 @@ function openHelp(returnTo){
       'Install it as an app: in Safari tap Share → <b>Add to Home Screen</b>.',
       'The four tabs are <b>Today</b>, <b>Schedule</b>, <b>Work</b> (with <b>Rounds</b> and <b>Jobs</b> underneath) and <b>Sales</b> (with <b>Quotes</b> and <b>Marketing</b> underneath).',
       'The blue <b>+</b> button adds a customer, job or quote, depending on the screen you are on.',
-      'The top bar has <b>Search</b> (it forgives typos, treats Rd as Road and so on, and lists the closest matches first), the <b>⋯</b> menu (Reports, Photo gallery, Backup, <b>Message other device</b>, <b>Check for updates</b> and About) and <b>Settings</b>.',
+      'The top bar has <b>Search</b> (it forgives typos, treats Rd as Road and so on, and lists the closest matches first; tap <b>📅</b> beside the box, or type a date like 14/10, to see everything recorded on that day), the <b>⋯</b> menu (Reports, Photo gallery, Backup, <b>Message other device</b>, <b>Check for updates</b> and About) and <b>Settings</b>.',
       'Tap the <b>🎤</b> in any text box to speak instead of typing.',
       'A <b>?</b> button next to a screen’s title opens help for just that screen.',
       'On an iPad or computer you can also right-click a card for its actions, and use the keyboard: <b>J</b> / <b>K</b> to move down and up the list, <b>Enter</b> to open, <b>C</b> for cleaned and <b>P</b> for paid.'

@@ -714,15 +714,22 @@ function toggleMarketingActionDone(id){
   render();
 }
 
+let searchDay = null; // a date picked from the calendar button: shows everything recorded on that day (see dayActivityHtml)
 function openUniversalSearch(){
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">Search</h2>
       <button class="sheet-close" onclick="closeSheet()">✕</button>
     </div>
-    <input type="text" id="search_input" placeholder="Customers, jobs, quotes, rounds..." oninput="renderUniversalSearchResults()" style="margin-top:0; margin-bottom:14px;">
+    <div style="display:flex; gap:8px; align-items:center; margin-bottom:14px;">
+      <input type="text" id="search_input" placeholder="Customers, jobs, quotes, rounds, or a date..." oninput="searchTyped()" style="margin:0; flex:1; min-width:0;">
+      <label class="day-pick" title="Pick a date to see everything that happened on it" aria-label="Search by date">
+        📅<input type="date" id="search_date" onchange="searchPickDate(this.value)" style="position:absolute; inset:0; width:100%; height:100%; opacity:0; margin:0; padding:0; cursor:pointer;">
+      </label>
+    </div>
     <div id="search_results"></div>
   `, () => render());
+  searchDay = null;
   renderUniversalSearchResults();
   setTimeout(() => { const el = document.getElementById('search_input'); if(el) el.focus(); }, 60);
 }
@@ -833,8 +840,10 @@ function renderUniversalSearchResults(){
   if(!inputEl || !resultsEl) return;
   const raw = inputEl.value.trim();
   const q = raw.toLowerCase();
+  const dayISO = searchDay || (raw ? parseTypedDate(raw) : null);
+  if(dayISO){ resultsEl.innerHTML = dayActivityHtml(dayISO, !!searchDay); return; }
   if(!q){
-    resultsEl.innerHTML = '<p style="color:var(--ink-muted); font-size:0.8438rem; text-align:center; margin-top:24px;">Start typing to search customers, jobs, quotes, and rounds.</p>';
+    resultsEl.innerHTML = '<p style="color:var(--ink-muted); font-size:0.8438rem; text-align:center; margin-top:24px;">Start typing to search customers, jobs, quotes and rounds, or tap 📅 to pick a date and see everything that happened on it.</p>';
     return;
   }
 
@@ -907,6 +916,110 @@ function renderUniversalSearchResults(){
     </button>`).join('');
   }
   resultsEl.innerHTML = html;
+}
+/* ---------- search by date ----------
+   Tap 📅 in the search box to pick a day from the calendar, or type one (14/10, 14/10/26, 14 oct, today, yesterday). The
+   results are everything the app has recorded on that day: cleans and what they were worth, payments, one-off jobs,
+   messages sent, quotes (dated or changed that day), photos added, mileage, price changes and the day's note. */
+function searchTyped(){
+  const el = document.getElementById('search_input');
+  if(el && el.value.trim()) searchDay = null; // typing takes over from a picked date
+  renderUniversalSearchResults();
+}
+function searchPickDate(iso){
+  searchDay = iso || null;
+  const el = document.getElementById('search_input');
+  if(el) el.value = '';
+  renderUniversalSearchResults();
+}
+function searchClearDay(){
+  searchDay = null;
+  const d = document.getElementById('search_date'); if(d) d.value = '';
+  renderUniversalSearchResults();
+}
+// What someone typed as a date, as YYYY-MM-DD, or null if it isn't clearly one. Day first (UK). With no year it means the
+// most recent one that isn't in the future.
+function parseTypedDate(raw){
+  const s = String(raw || '').trim().toLowerCase().replace(/,/g, '');
+  if(!s) return null;
+  const today = todayISO();
+  if(s === 'today') return today;
+  if(s === 'yesterday'){ const d = isoToDate(today); d.setDate(d.getDate() - 1); return localISO(d); }
+  const MONTHS = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+  let day, month, year, m;
+  if((m = s.match(/^(\d{1,2})[\/.\-](\d{1,2})(?:[\/.\-](\d{2}|\d{4}))?$/))){ day = +m[1]; month = +m[2]; year = m[3] ? +m[3] : null; }
+  else if((m = s.match(/^(\d{1,2})(?:st|nd|rd|th)?\s+([a-z]{3,9})(?:\s+(\d{4}))?$/)) && MONTHS.indexOf(m[2].slice(0,3)) !== -1 && /^[a-z]+$/.test(m[2])){ day = +m[1]; month = MONTHS.indexOf(m[2].slice(0,3)) + 1; year = m[3] ? +m[3] : null; }
+  else if((m = s.match(/^([a-z]{3,9})\s+(\d{1,2})(?:st|nd|rd|th)?(?:\s+(\d{4}))?$/)) && MONTHS.indexOf(m[1].slice(0,3)) !== -1){ day = +m[2]; month = MONTHS.indexOf(m[1].slice(0,3)) + 1; year = m[3] ? +m[3] : null; }
+  else return null;
+  if(year !== null && year < 100) year += 2000;
+  const nowY = +today.slice(0, 4);
+  const build = y => { const d = new Date(y, month - 1, day); return (d.getFullYear() === y && d.getMonth() === month - 1 && d.getDate() === day) ? localISO(d) : null; };
+  if(year !== null) return build(year);
+  let iso = build(nowY);
+  if(iso && iso > today) iso = build(nowY - 1);
+  return iso;
+}
+function dayRowHtml(title, sub, right, onclick){
+  return `<button class="day-row" ${onclick ? `onclick="${onclick}"` : 'style="cursor:default;"'}>
+      <div class="dr-main"><div class="dr-t">${title}</div>${sub ? `<div class="dr-s">${sub}</div>` : ''}</div>
+      ${right ? `<div class="dr-r">${right}</div>` : ''}
+    </button>`;
+}
+function dayActivityHtml(iso, canClear){
+  const cLabel = c => escapeHtml(c.address || c.name || 'Customer');
+  const cSub = c => escapeHtml(c.address ? (c.name || c.round || '') : (c.round || ''));
+  const cleans = [], pays = [], jobs = [], msgs = [], photos = [], quotes = [], prices = [];
+  data.customers.forEach(c => {
+    (c.cleanHistory || []).forEach(e => { if(e.date === iso) cleans.push({ c, amount: Number(e.amount || 0) }); });
+    (c.paymentHistory || []).forEach(p => { if(p.date === iso) pays.push({ c, amount: Number(p.amount || 0) }); });
+    (c.priceHistory || []).forEach(p => { if(p.date === iso) prices.push({ c, price: p.price }); });
+    (c.messageLog || []).forEach(m => { if(m.date === iso) msgs.push({ label: cLabel(c), sub: MESSAGE_LOG_LABELS[m.kind] || m.kind, time: m.time, onclick: `searchResultTap('${c.id}')` }); });
+    const n = (c.photos || []).filter(p => p.date === iso).length;
+    if(n) photos.push({ label: cLabel(c), n, onclick: `searchResultTap('${c.id}')` });
+  });
+  (data.oneOffJobs || []).forEach(j => {
+    const name = escapeHtml(j.address || j.name || 'Job');
+    if(j.date === iso) jobs.push(j);
+    (j.messageLog || []).forEach(m => { if(m.date === iso) msgs.push({ label: name, sub: MESSAGE_LOG_LABELS[m.kind] || m.kind, time: m.time, onclick: `openJobFromSearch('${j.id}')` }); });
+    const n = (j.photos || []).filter(p => p.date === iso).length;
+    if(n) photos.push({ label: name, n, onclick: `openJobFromSearch('${j.id}')` });
+  });
+  (data.quotes || []).forEach(qt => {
+    const events = [];
+    if(qt.date === iso) events.push('Quote dated this day (' + (QUOTE_STATUS_LABELS[qt.status] || qt.status || 'pending') + ')');
+    (qt.statusLog || []).forEach(e => { if(e.date === iso) events.push('Marked ' + (QUOTE_STATUS_LABELS[e.to] || e.to).toLowerCase()); });
+    if(events.length) quotes.push({ qt, events });
+    (qt.messageLog || []).forEach(m => { if(m.date === iso) msgs.push({ label: escapeHtml(qt.address || qt.name || 'Quote'), sub: 'Quote ' + (MESSAGE_LOG_LABELS[m.kind] || m.kind), time: m.time, onclick: `openQuoteFromSearch('${qt.id}')` }); });
+  });
+  const mile = (data.mileageLog || []).find(e => e.date === iso);
+  const note = (data.settings && data.settings.dayNotes && data.settings.dayNotes[iso]) || '';
+
+  const charged = cleans.reduce((s, x) => s + x.amount, 0);
+  const received = pays.reduce((s, x) => s + x.amount, 0);
+  const any = cleans.length || pays.length || jobs.length || msgs.length || photos.length || quotes.length || prices.length || mile || note;
+  let html = `<div style="display:flex; align-items:center; gap:10px; margin:0 2px 6px;">
+      <div style="flex:1; min-width:0; font-weight:800; font-size:1.0625rem;">\ud83d\udcc5 ${escapeHtml(isoToDate(iso).toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long', year:'numeric' }))}</div>
+      ${canClear ? '<button class="btn btn-clean" style="flex:none; padding:6px 12px; font-size:0.8125rem;" onclick="searchClearDay()">Clear</button>' : ''}
+    </div>`;
+  if(!any) return html + `<p style="color:var(--ink-muted); font-size:0.8438rem; margin:14px 2px;">${iso > todayISO() ? 'This date is in the future, so nothing has been recorded yet.' : 'Nothing was recorded on this date.'}</p>`;
+  html += `<div style="color:var(--ink-muted); font-size:0.8125rem; font-weight:700; margin:0 2px 10px;">${cleans.length} cleaned${charged ? ' \u00b7 ' + money(charged) + ' charged' : ''}${received ? ' \u00b7 ' + money(received) + ' received' : ''}</div>`;
+  let first = true;
+  const section = (label, rows) => { if(!rows.length) return; html += universalSearchSectionLabel(label, first) + rows.join(''); first = false; };
+  const byLabel = (a, b) => (a.c.address || a.c.name || '').localeCompare(b.c.address || b.c.name || '');
+  section('\u2713 Cleaned (' + cleans.length + ')', cleans.sort(byLabel).map(x => dayRowHtml(cLabel(x.c), cSub(x.c), x.amount ? money(x.amount) : '', `searchResultTap('${x.c.id}')`)));
+  section('\ud83d\udcb7 Payments (' + pays.length + ')', pays.sort(byLabel).map(x => dayRowHtml(cLabel(x.c), cSub(x.c), money(x.amount), `searchResultTap('${x.c.id}')`)));
+  section('\ud83d\udd27 One-off jobs (' + jobs.length + ')', jobs.map(j => dayRowHtml(escapeHtml(j.address || j.name || 'Job'), escapeHtml((j.done ? 'Done' : 'Not done yet') + (j.paid ? ' \u00b7 paid' : '')), j.price ? money(j.price) : '', `openJobFromSearch('${j.id}')`)));
+  section('\ud83d\udccb Quotes (' + quotes.length + ')', quotes.map(x => dayRowHtml(escapeHtml(x.qt.address || x.qt.name || 'Quote'), escapeHtml(x.events.join(' \u00b7 ')), '', `openQuoteFromSearch('${x.qt.id}')`)));
+  const clock = t => t ? new Date(t).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' }) : '';
+  section('\ud83d\udcac Messages sent (' + msgs.length + ')', msgs.sort((a, b) => (a.time || 0) - (b.time || 0)).map(m => dayRowHtml(m.label, escapeHtml(m.sub), clock(m.time), m.onclick)));
+  section('\ud83d\udcf7 Photos added (' + photos.length + ')', photos.map(p => dayRowHtml(p.label, p.n + (p.n === 1 ? ' photo' : ' photos'), '', p.onclick)));
+  section('\ud83d\udcb7 Price set or changed (' + prices.length + ')', prices.sort(byLabel).map(x => dayRowHtml(cLabel(x.c), cSub(x.c), x.price != null ? money(x.price) : '', `searchResultTap('${x.c.id}')`)));
+  if(mile){
+    const miles = (mile.end != null && mile.start != null) ? Math.max(0, Number(mile.end) - Number(mile.start)) : null;
+    section('\ud83d\ude97 Mileage', [dayRowHtml('Start ' + (mile.start != null ? escapeHtml(String(mile.start)) : '\u2014') + ' \u00b7 End ' + (mile.end != null ? escapeHtml(String(mile.end)) : '\u2014'), '', miles != null ? miles + ' miles' : '', '')]);
+  }
+  if(note) section('\ud83d\udcdd Day note', [dayRowHtml(escapeHtml(note), '', '', '')]);
+  return html;
 }
 function searchResultTap(id){
   closeSheet();
