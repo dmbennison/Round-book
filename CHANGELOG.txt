@@ -4,6 +4,12 @@ ROUND BOOK - RELEASE NOTES
 Newest first. This file is not part of the app and is not loaded by it; it ships alongside the code files.
 To add a release: raise APP_VERSION in js/01-data.js and CACHE_NAME in sw.js to the same number, then put a new entry at the top of this list.
 
+Version 3.15
+  - Search by date: a 📅 button beside the search box opens the calendar. Pick a day and Search lists everything the
+    app has recorded on it: customers cleaned (and what was charged), payments received, one-off jobs, messages
+    sent, quotes dated or changed, photos added, price changes, mileage and the day's note, with a total at the top.
+    Tap any row to open it. You can also type a date (14/10, 14/10/26, 14 oct, today, yesterday)
+
 Version 3.14
   - iPad and computer: on the Work and Sales tabs the main tab bar (which sits at the top there) no longer has
     rounded lower corners, so it joins the sub tab bar cleanly. (3.13 had only squared the phone header)
