@@ -580,6 +580,10 @@ function openCustomerInfoBox(id){
         ${c.notes ? `<div onclick="openCustomerNoteSheet('${c.id}')" style="margin-top:6px; font-size:0.8125rem; font-weight:600; color:var(--ink); line-height:1.4; white-space:pre-wrap; overflow-wrap:anywhere; background:var(--card-tint); border-radius:8px; padding:6px 9px;">${escapeHtml(c.notes)}</div>` : ''}
         <div style="font-size:0.75rem; font-weight:600; color:var(--ink-muted); margin-top:4px; line-height:1.4;">${quickLine}</div>
       </div>
+      <button class="sheet-close" style="flex-shrink:0; margin-right:6px;" onclick="document.getElementById('ibPhotoInput').click()" aria-label="Take a photo of this customer's property">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+      </button>
+      <input type="file" accept="image/*" capture="environment" id="ibPhotoInput" style="display:none;" onchange="handlePhotoSelected('${c.id}', this, true)">
       <button class="sheet-close" style="flex-shrink:0; margin-right:6px;" onclick="openCustomerNoteSheet('${c.id}')" aria-label="${c.notes ? 'Edit note' : 'Add note'}">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
       </button>
@@ -937,7 +941,8 @@ function removeLogo(){
   }});
 }
 
-async function handlePhotoSelected(id, inputEl){
+// fromInfoBox: the photo came from the camera button in the press-and-hold info box, so go back to that box afterwards.
+async function handlePhotoSelected(id, inputEl, fromInfoBox){
   const file = inputEl.files[0];
   if(!file) return;
   toast('Adding photo…');
@@ -962,7 +967,7 @@ async function handlePhotoSelected(id, inputEl){
       c.photos.push({id: photoId, dataUrl, date: todayISO()});
     }
     if(await saveData()){
-      openCustomerDetail(id);
+      if(fromInfoBox) openCustomerInfoBox(id); else openCustomerDetail(id);
       render();
       toast('Photo added');
     }

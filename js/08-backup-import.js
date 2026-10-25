@@ -271,7 +271,7 @@ const FOCUSED_HELP = {
         'An <b>Undo</b> button appears for a few seconds.'
       ]),
       helpList([
-        '<b>Press and hold</b> a card for a quick info box. The green button calls the customer and the blue button gives directions.',
+        '<b>Press and hold</b> a card for a quick info box. The green button calls the customer and the blue button gives directions. At the top of the box, the <b>camera</b> button takes a photo straight into that customer.',
         '<b>Owed</b> – tap <b>✉️ Chase</b> on a card to send a reminder text, or <b>Remind all</b>. <b>Text first</b> – tap a customer’s badge to text them, or <b>Text all</b>.',
         'A round’s <b>⋯</b> menu has <b>Show map</b>, <b>Start round</b> (directions to every stop), <b>Print</b>, <b>Defer</b> and <b>Apply price uplift</b>. <b>Reorder</b> sets your visiting order.',
         'The <b>pencil</b> next to a round’s name adds a note to the round.'
