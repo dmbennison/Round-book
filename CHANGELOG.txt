@@ -4,6 +4,13 @@ ROUND BOOK - RELEASE NOTES
 Newest first. This file is not part of the app and is not loaded by it; it ships alongside the code files.
 To add a release: raise APP_VERSION in js/01-data.js and CACHE_NAME in sw.js to the same number, then put a new entry at the top of this list.
 
+Version 3.16
+  - The yellow number for quotes needing attention now sits on the Quotes sub tab (Sales > Quotes) instead of on the
+    Sales tab
+  - Today on iPad and computer: the big card is on the left with the Text before visit and Mileage tiles (and Jobs
+    today) underneath it. The right-hand column is the Owing tile with the list of customers who owe underneath,
+    most overdue first, as the same swipeable cards as Rounds > Owed. Phones are unchanged
+
 Version 3.15
   - Search by date: a 📅 button beside the search box opens the calendar. Pick a day and Search lists everything the
     app has recorded on it: customers cleaned (and what was charged), payments received, one-off jobs, messages

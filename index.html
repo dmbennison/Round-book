@@ -259,6 +259,10 @@
   .today-hero .lbl{font-size:0.8125rem; font-weight:var(--fw-bold); color:#B9D2E2; margin-top:4px;}
   .today-hero .value{font-size:0.9375rem; font-weight:var(--fw-bold); margin-top:10px; color:#fff;}
   .today-grid{display:grid; grid-template-columns:repeat(2, 1fr); gap:10px; margin-bottom:8px;}
+  .today-grid > .jobs-tile{grid-column:1 / -1;}
+  .today-owed{margin-top:2px; margin-bottom:8px;}
+  .today-owed-list{display:none;} /* shown only on the wide Today layout */
+  .today-cols, .today-left, .today-right{display:contents;} /* invisible wrappers; the wide Today layout turns them into two columns */
   .today-tile{
     background:var(--card-surface); border-radius:14px;
     padding:14px; text-align:left; cursor:pointer; display:block;
@@ -941,18 +945,14 @@
     }
     body[data-tab="today"]:not(:has(#overlay.show)) .overlay{ display:none; }
     body[data-tab="today"]:not(:has(#overlay.show)) .fab{ right:18px; left:auto; }
-    body[data-tab="today"]:not(:has(#overlay.show)) main{
-      display:grid; grid-template-columns:minmax(300px, 34%) 1fr; column-gap:16px; align-items:start;
-      padding-bottom:40px; min-height:0;
-    }
-    body[data-tab="today"]:not(:has(#overlay.show)) main > *{ grid-column:1 / -1; }
-    body[data-tab="today"]:not(:has(#overlay.show)) main > .today-top{ grid-column:1; grid-row:2; }
-    body[data-tab="today"]:not(:has(#overlay.show)) main > .today-top.running{ top:14px; }
-    body[data-tab="today"]:not(:has(#overlay.show)) main > .today-run-list{ grid-column:2; grid-row:2; }
-    body[data-tab="today"]:not(:has(#overlay.show)) main > .today-grid{
-      grid-column:2; grid-row:2; grid-template-columns:repeat(3, 1fr); margin-bottom:0;
-    }
-    body[data-tab="today"]:not(:has(#overlay.show)) main > .today-grid > .today-tile:last-child{ grid-column:1 / -1; }
+    body[data-tab="today"]:not(:has(#overlay.show)) main{ padding-bottom:40px; min-height:0; }
+    /* Left column: the big card, then the Text before visit and Mileage tiles (and Jobs today) under it.
+       Right column: the Owing tile, with the list of those owing under it. */
+    body[data-tab="today"]:not(:has(#overlay.show)) .today-cols{ display:grid; grid-template-columns:minmax(300px, 34%) 1fr; column-gap:16px; align-items:start; }
+    body[data-tab="today"]:not(:has(#overlay.show)) .today-left, body[data-tab="today"]:not(:has(#overlay.show)) .today-right{ display:block; min-width:0; }
+    body[data-tab="today"]:not(:has(#overlay.show)) .today-left .today-grid{ margin-top:12px; margin-bottom:0; }
+    body[data-tab="today"]:not(:has(#overlay.show)) .today-owed{ margin:0; }
+    body[data-tab="today"]:not(:has(#overlay.show)) .today-owed-list{ display:block; }
 
     /* Today in the split (something open): compact so it fits without scrolling */
     body[data-tab="today"]:has(#overlay.show) .today-hero{ padding:12px 14px; margin-bottom:8px; }
@@ -1155,7 +1155,7 @@
     <button class="tab active" data-tab="today" onclick="setTab('today')">Today</button>
     <button class="tab" data-tab="schedule" onclick="setTab('schedule')">Schedule</button>
     <button class="tab" data-tab="work" onclick="setTab('work')">Work</button>
-    <button class="tab" data-tab="sales" onclick="setTab('sales')">Sales<span class="tab-badge" id="quotesBadge" hidden></span></button>
+    <button class="tab" data-tab="sales" onclick="setTab('sales')">Sales</button>
 </nav>
 <!-- Work and Sales each have two fixed sub tabs (Rounds / Jobs, Quotes / Marketing). Pinned under the header (under the
      tab bar on iPad / desktop); 09-boot.js measures it into --header-h, and renderSubTabs (02-today-rounds.js) fills it. -->
