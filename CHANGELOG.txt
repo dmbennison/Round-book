@@ -4,6 +4,14 @@ ROUND BOOK - RELEASE NOTES
 Newest first. This file is not part of the app and is not loaded by it; it ships alongside the code files.
 To add a release: raise APP_VERSION in js/01-data.js and CACHE_NAME in sw.js to the same number, then put a new entry at the top of this list.
 
+Version 3.19
+  - Camera button in the customer info box: after taking the photo you go straight into the photo screen
+    (Annotate, Share, Send with an offer); closing it returns to the info box
+  - Send with an offer (photo + message): from a customer it now jumps straight to Messages or WhatsApp (as set for that
+    customer) with their number and the message filled in. The photo is copied to the clipboard, so tap the message box
+    and choose Paste (a web page can't attach it itself). From the Photo gallery, or for a landline, it still opens the
+    share sheet, as does the plain Share button everywhere
+
 Version 3.18
   - Today on iPad and computer: the left column (big card and tiles) and the right column (Owing and the list of
     those owing) now scroll separately, each pinned under the header
