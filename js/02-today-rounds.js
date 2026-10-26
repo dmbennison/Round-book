@@ -207,11 +207,11 @@ function renderTodayHome(main){
     ${todayRunBarHtml(todayRunOn)}
     </div>
     ${todayRunOn ? todayRunListHtml(todayModel) : `<div class="today-grid">
-      <div class="today-tile" onclick="setTab('rounds'); setRoundsView('text');">
+      <div class="today-tile text-tile" onclick="setTab('rounds'); setRoundsView('text');">
         <div class="num">${textBefore.unsent.length}</div>
         <div class="lbl">Text before visit${textBeforeOverdue ? ` · ${textBeforeOverdue} overdue` : ''}</div>
       </div>
-      <div class="today-tile" onclick="openMileageEntry();" style="display:flex; align-items:flex-start; justify-content:space-between; gap:10px;">
+      <div class="today-tile mileage-tile" onclick="openMileageEntry();" style="display:flex; align-items:flex-start; justify-content:space-between; gap:10px;">
         <div style="min-width:0;">
           <div style="font-size:0.8125rem; font-weight:800; color:var(--ink);">Mileage</div>
           <div style="display:flex; gap:18px; margin-top:6px;">
