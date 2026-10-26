@@ -951,6 +951,18 @@
     body[data-tab="today"]:not(:has(#overlay.show)) .today-cols{ display:grid; grid-template-columns:minmax(300px, 34%) 1fr; column-gap:16px; align-items:start; }
     body[data-tab="today"]:not(:has(#overlay.show)) .today-left, body[data-tab="today"]:not(:has(#overlay.show)) .today-right{ display:block; min-width:0; }
     body[data-tab="today"]:not(:has(#overlay.show)) .today-left .today-grid{ margin-top:12px; margin-bottom:0; }
+    /* Each column scrolls on its own, pinned just under the header: the left (big card and tiles) and the right (Owing tile
+       and the list of those owing) no longer move together. */
+    body[data-tab="today"]:not(:has(#overlay.show)) .today-left, body[data-tab="today"]:not(:has(#overlay.show)) .today-right{
+      position:sticky; top:calc(var(--header-h, 120px) + 8px); max-height:calc(100dvh - var(--header-h, 120px) - 24px);
+      overflow-y:auto; overflow-x:hidden; overscroll-behavior:contain; padding-bottom:16px; scrollbar-width:thin;
+    }
+    /* Text before visit and Jobs today share a row; the Mileage tile gets the full width of the left column, so its numbers never spill into the right-hand column */
+    body[data-tab="today"]:not(:has(#overlay.show)) .today-left .today-grid > .today-tile{ min-width:0; }
+    body[data-tab="today"]:not(:has(#overlay.show)) .today-left .today-grid > .text-tile{ order:1; }
+    body[data-tab="today"]:not(:has(#overlay.show)) .today-left .today-grid > .jobs-tile{ order:2; grid-column:auto; }
+    body[data-tab="today"]:not(:has(#overlay.show)) .today-left .today-grid > .mileage-tile{ order:3; grid-column:1 / -1; }
+    body[data-tab="today"]:not(:has(#overlay.show)) .today-left .today-grid:not(:has(.jobs-tile)) > .text-tile{ grid-column:1 / -1; }
     body[data-tab="today"]:not(:has(#overlay.show)) .today-owed{ margin:0; }
     body[data-tab="today"]:not(:has(#overlay.show)) .today-owed-list{ display:block; }
 
