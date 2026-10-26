@@ -967,7 +967,13 @@ async function handlePhotoSelected(id, inputEl, fromInfoBox){
       c.photos.push({id: photoId, dataUrl, date: todayISO()});
     }
     if(await saveData()){
-      if(fromInfoBox) openCustomerInfoBox(id); else openCustomerDetail(id);
+      if(fromInfoBox){
+        // Straight into the photo screen (Annotate / Share / Send with an offer); closing it returns to the info box.
+        const list = buildCustomerPhotoList(id);
+        const idx = list.findIndex(e => e.photoId === photoId);
+        if(idx !== -1) openPhotoViewerAt(list, idx, () => openCustomerInfoBox(id));
+        else openCustomerInfoBox(id);
+      } else openCustomerDetail(id);
       render();
       toast('Photo added');
     }
@@ -1016,14 +1022,16 @@ function photoEntrySrc(entry){
 let photoViewerList = [];
 let photoViewerIndex = 0;
 let photoViewerOnClose = null;
+let photoViewerSource = null; // 'gallery' when opened from the Photo gallery (sharing there always uses the share sheet)
 let photoViewerTouchStartX = null;
 let photoViewerTouchStartY = null;
 
-function openPhotoViewerAt(list, index, onClose){
+function openPhotoViewerAt(list, index, onClose, source){
   if(!list.length || index < 0 || index >= list.length) return;
   photoViewerList = list;
   photoViewerIndex = index;
   photoViewerOnClose = onClose || null;
+  photoViewerSource = source || null;
   renderPhotoViewer();
 }
 function renderPhotoViewer(){

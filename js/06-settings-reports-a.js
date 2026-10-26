@@ -1096,8 +1096,8 @@ function renderPhotoGallery(){
       <div class="t1" style="margin-bottom:8px;">${escapeHtml(address||name||'Customer')}${name && address ? `<span style="font-weight:500; color:var(--ink-muted);"> · ${escapeHtml(name)}</span>` : ''}${kind==='job' ? `<span style="font-weight:600; color:var(--ink-muted); font-size:0.6875rem; text-transform:uppercase; letter-spacing:0.02em;"> · One-off job</span>` : ''}</div>
       <div style="display:flex; flex-wrap:wrap; gap:8px;">
         ${kind==='customer'
-          ? list.map((entry,i) => `<img loading="lazy" decoding="async" src="${photoEntrySrc(entry)}" onclick="openPhotoViewerAt(buildCustomerPhotoList('${id}'), ${i}, () => openPhotoGalleryReturn())" style="width:72px; height:72px; object-fit:cover; border-radius:10px; border:1px solid var(--line); cursor:pointer;">`).join('')
-          : list.map((entry,i) => `<img loading="lazy" decoding="async" src="${photoEntrySrc(entry)}" onclick="openPhotoViewerAt(buildJobPhotoList('${id}'), ${i}, () => openPhotoGalleryReturn())" style="width:72px; height:72px; object-fit:cover; border-radius:10px; border:1px solid var(--line); cursor:pointer;">`).join('')}
+          ? list.map((entry,i) => `<img loading="lazy" decoding="async" src="${photoEntrySrc(entry)}" onclick="openPhotoViewerAt(buildCustomerPhotoList('${id}'), ${i}, () => openPhotoGalleryReturn(), 'gallery')" style="width:72px; height:72px; object-fit:cover; border-radius:10px; border:1px solid var(--line); cursor:pointer;">`).join('')
+          : list.map((entry,i) => `<img loading="lazy" decoding="async" src="${photoEntrySrc(entry)}" onclick="openPhotoViewerAt(buildJobPhotoList('${id}'), ${i}, () => openPhotoGalleryReturn(), 'gallery')" style="width:72px; height:72px; object-fit:cover; border-radius:10px; border:1px solid var(--line); cursor:pointer;">`).join('')}
       </div>
     </div>
   `).join('') + (totalEntries > entries.length ? `<button class="btn" style="width:100%; margin-bottom:12px;" onclick="galleryLimit += GALLERY_PAGE; renderPhotoGallery()">Show more (${totalEntries - entries.length} more with photos)</button>` : '');

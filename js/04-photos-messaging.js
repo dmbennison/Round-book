@@ -395,7 +395,7 @@ async function savePhotoAnnotation(){
       annotateSelected = null; annotateHistory = []; annotateMoveDrag = null;
       const list = entry.kind === 'customer' ? buildCustomerPhotoList(entry.ownerId) : buildJobPhotoList(entry.ownerId);
       const idx = list.findIndex(e=>e.photoId===photoId);
-      openPhotoViewerAt(list, idx===-1 ? list.length-1 : idx, photoViewerOnClose);
+      openPhotoViewerAt(list, idx===-1 ? list.length-1 : idx, photoViewerOnClose, photoViewerSource);
     }
   }, 'image/jpeg', 0.9);
 }
@@ -607,7 +607,7 @@ async function saveBeforeAfter(){
     baState = null; baImgs = {}; baBlob = null;
     const list = entry.kind === 'customer' ? buildCustomerPhotoList(entry.ownerId) : buildJobPhotoList(entry.ownerId);
     const idx = list.findIndex(e => e.photoId === photoId);
-    openPhotoViewerAt(list, idx === -1 ? list.length - 1 : idx, photoViewerOnClose);
+    openPhotoViewerAt(list, idx === -1 ? list.length - 1 : idx, photoViewerOnClose, photoViewerSource);
   }
 }
 async function shareBeforeAfter(){
@@ -688,7 +688,9 @@ function renderUpsellSheet(){
     <div class="form-actions">
       <button class="btn-primary" onclick="sendPhotoUpsell()">📤 Send photo + message</button>
     </div>
-    <p style="color:var(--ink-muted); font-size:0.7188rem; margin:10px 2px 0; text-align:center; line-height:1.5;">Opens your share sheet — pick Messages or WhatsApp and the customer. The message is also copied, so paste it if your app leaves it out. Wording for each offer can be changed under Settings → Message templates.</p>
+    <p style="color:var(--ink-muted); font-size:0.7188rem; margin:10px 2px 0; text-align:center; line-height:1.5;">${(photoViewerSource !== 'gallery' && (upsellOwner(entry)||{}).phone && isMobileNumber(upsellOwner(entry).phone))
+      ? 'Opens Messages or WhatsApp straight to the customer with this message filled in. The photo is copied for you: tap the message box and choose Paste.'
+      : 'Opens your share sheet — pick Messages or WhatsApp and the customer. The message is also copied, so paste it if your app leaves it out.'} Wording for each offer can be changed under Settings → Message templates.</p>
   `, () => renderPhotoViewer());
 }
 function setUpsellOffer(k){
@@ -704,17 +706,42 @@ function onUpsellPrice(v){
   const entry = photoViewerList[photoViewerIndex];
   if(ta && entry) ta.value = buildUpsellMessage(entry);
 }
+// The photo as a PNG (the only image type the clipboard accepts on an iPhone), at most 2000px wide.
+async function photoAsPngBlob(entry, owner, p){
+  const blob = photoStorageAvailable ? await idbGetPhoto(entry.photoId) : await (await fetch(p.dataUrl)).blob();
+  if(!blob) throw new Error('photo not found');
+  const bmp = await createImageBitmap(blob);
+  const scale = Math.min(1, 2000 / bmp.width);
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(bmp.width * scale); canvas.height = Math.round(bmp.height * scale);
+  canvas.getContext('2d').drawImage(bmp, 0, 0, canvas.width, canvas.height);
+  return await new Promise((res, rej) => canvas.toBlob(b => b ? res(b) : rej(new Error('png failed')), 'image/png'));
+}
 async function sendPhotoUpsell(){
   const entry = photoViewerList[photoViewerIndex];
   const ta = document.getElementById('upsell_msg');
   if(!entry || !ta) return;
   const msg = ta.value.trim();
   if(!msg){ toast('The message is empty'); return; }
-  // Copy first, while still inside the tap — a safety net for apps that discard the text.
-  try{ if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(msg).catch(()=>{}); }catch(e){}
   const owner = upsellOwner(entry);
   const p = owner && (owner.photos||[]).find(x=>x.id===entry.photoId);
   if(!p){ toast('Could not find that photo'); return; }
+  // Straight to Messages / WhatsApp with the customer's number and the message filled in. A web page can't attach a photo to
+  // a text, so the photo is copied to the clipboard first (started right here, inside the tap) and just needs pasting into
+  // the message. From the Photo gallery, or without a mobile number or clipboard support, the share sheet is used instead.
+  if(photoViewerSource !== 'gallery' && owner.phone && isMobileNumber(owner.phone) && navigator.clipboard && navigator.clipboard.write && window.ClipboardItem){
+    try{
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': photoAsPngBlob(entry, owner, p) })]);
+      logMessage(owner, 'upsell');
+      saveData();
+      toast('Photo copied \u2014 tap the message box and choose Paste');
+      closeSheet();
+      sendPhoneMessage(owner.phone, msg);
+      return;
+    }catch(e){ /* couldn't copy the photo: fall back to the share sheet below */ }
+  }
+  // Copy the text first, while still inside the tap — a safety net for apps that discard it.
+  try{ if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(msg).catch(()=>{}); }catch(e){}
   try{
     const blob = photoStorageAvailable ? await idbGetPhoto(entry.photoId) : await (await fetch(p.dataUrl)).blob();
     if(!blob) throw new Error('photo not found');
