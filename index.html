@@ -94,6 +94,14 @@
      classes below can still opt back into a border if they ever need one. */
   button{border:none; background:none; font:inherit; color:inherit; -webkit-appearance:none; appearance:none;}
 
+  /* The colour of the status-bar area (clock and battery) in the installed iPhone / iPad app: iOS takes it from a fixed box at the
+     very top edge (at least 6px tall, at least 80% wide, within 4px of the top). This one is the header's own colour, so the
+     status bar matches the header instead of showing the page's plain background. It only exists in the Home Screen app. */
+  #statusStrip{display:none;}
+  @supports (-webkit-touch-callout:none){
+    html:not(.in-browser) #statusStrip{display:block; position:fixed; top:0; left:0; width:100%; height:max(env(safe-area-inset-top, 0px), 8px); z-index:2147483000;
+      background-color:color-mix(in srgb, var(--navy) var(--navy-glass, 78%), var(--bg));}
+  }
   header{
     background:var(--navy);
     color:#fff;
@@ -1141,6 +1149,7 @@
 </style>
 </head>
 <body>
+<div id="statusStrip" aria-hidden="true"></div>
 
 <header>
   <div class="header-row">
