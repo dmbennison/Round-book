@@ -100,7 +100,9 @@
   #statusStrip{display:none;}
   @supports (-webkit-touch-callout:none){
     html:not(.in-browser) #statusStrip{display:block; position:fixed; top:0; left:0; width:100%; height:max(env(safe-area-inset-top, 0px), 8px); z-index:2147483000;
-      background-color:color-mix(in srgb, var(--navy) var(--navy-glass, 78%), var(--bg));}
+      background-color:color-mix(in srgb, var(--navy) var(--navy-glass, 78%), var(--bg));
+      /* the header's own light sheen, so the strip carries on into the header with no visible join (the header's runs .14 at the top to .02 at its bottom) */
+      background-image:linear-gradient(180deg, rgba(255,255,255,0.14), rgba(255,255,255,0.085));}
   }
   header{
     background:var(--navy);
