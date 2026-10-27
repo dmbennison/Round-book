@@ -76,6 +76,7 @@ function setThemeMode(mode){
   themeMode = mode;
   localStorage.setItem('roundBookThemeMode', mode);
   applyDarkMode();
+  refreshStatusStrip();
   openSettings();
 }
 function applyTextSize(){
@@ -107,6 +108,15 @@ function contrastRatio(a, b){
 }
 // The glass slider's 0-100 as a multiplier on every glass opacity: 50 = 1 (the standard look), 0 = 0.2 (very clear), 100 = 2.1 (almost solid).
 function glassMultiplier(){ return glassLevel <= 50 ? 0.2 + 0.8 * (glassLevel / 50) : 1 + 1.1 * ((glassLevel - 50) / 50); }
+// iOS reads the status-bar colour from the strip when it is drawn and doesn't always notice a later colour change, so after a
+// change of colour scheme the strip is taken out and put back, which makes it look again (see #statusStrip in index.html).
+function refreshStatusStrip(){
+  const el = document.getElementById('statusStrip');
+  if(!el || getComputedStyle(el).display === 'none') return;
+  const parent = el.parentNode, clone = el.cloneNode(false);
+  el.remove();
+  requestAnimationFrame(() => { parent.insertBefore(clone, parent.firstChild); });
+}
 function applyTheme(){
   const t = THEMES[themeName] || THEMES.ocean;
   const p = darkMode ? t.dark : t.light; // this scheme's page / card / text colours for the current mode
@@ -179,6 +189,7 @@ function setTheme(name){
   themeName = name;
   localStorage.setItem('roundBookTheme', name);
   applyTheme();
+  refreshStatusStrip();
   openSettings();
 }
 function glassLabel(v){ v = Number(v); return v === 50 ? 'Standard' : (v < 50 ? 'Clearer' : 'More solid'); }
@@ -191,6 +202,7 @@ function previewGlass(v){
 function setGlass(v){
   previewGlass(v);
   localStorage.setItem('roundBookGlass', String(glassLevel));
+  refreshStatusStrip();
 }
 function resetGlass(){ setGlass(50); openSettings(); }
 function openSettings(){
