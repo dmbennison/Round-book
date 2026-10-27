@@ -172,6 +172,15 @@ function openMoreMenu(){
     </button>
   `);
 }
+// The height of the status-bar area the phone reports (0 in an ordinary browser). Shown in About, for troubleshooting.
+function topInsetPx(){
+  const probe = document.createElement('div');
+  probe.style.cssText = 'position:fixed; top:0; left:0; visibility:hidden; padding-top:env(safe-area-inset-top, 0px);';
+  document.body.appendChild(probe);
+  const px = Math.round(parseFloat(getComputedStyle(probe).paddingTop) || 0);
+  probe.remove();
+  return px;
+}
 function openInfo(){
   openSheet(`
     <div class="sheet-head">
@@ -198,6 +207,9 @@ function openInfo(){
     </button>
     <p style="color:var(--ink-muted); font-size:0.75rem; line-height:1.6; margin:0 2px 6px;">
       Version ${formatVersion(APP_VERSION)}
+    </p>
+    <p style="color:var(--ink-muted); font-size:0.6875rem; line-height:1.6; margin:0 2px 6px; opacity:0.8;">
+      ${document.documentElement.classList.contains('in-browser') ? 'Opened in a browser tab' : 'Opened as a Home Screen app'} · top inset ${topInsetPx()}px
     </p>
   `);
 }
