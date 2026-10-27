@@ -94,6 +94,17 @@
      classes below can still opt back into a border if they ever need one. */
   button{border:none; background:none; font:inherit; color:inherit; -webkit-appearance:none; appearance:none;}
 
+  /* iOS 27 frosts the top of an installed web app with a system blur, unless WebKit finds a fixed, solid box at the very top
+     edge to take its colour from. This strip (just the height of the status bar, in the header's own colour) is that box.
+     It only exists in an iPhone / iPad Home Screen app. */
+  #statusStrip{display:none;}
+  @supports (-webkit-touch-callout:none){
+    @media (display-mode:standalone){
+      #statusStrip{display:block; position:fixed; top:0; left:0; right:0; height:max(env(safe-area-inset-top, 0px), 6px); z-index:5000;
+        background-color:color-mix(in srgb, var(--navy) var(--navy-glass, 78%), var(--bg));
+        background-image:linear-gradient(180deg, rgba(255,255,255,0.14), rgba(255,255,255,0.02));}
+    }
+  }
   header{
     background:var(--navy);
     color:#fff;
@@ -1141,6 +1152,7 @@
 </style>
 </head>
 <body>
+<div id="statusStrip" aria-hidden="true"></div>
 
 <header>
   <div class="header-row">

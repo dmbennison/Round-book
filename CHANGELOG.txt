@@ -4,6 +4,11 @@ ROUND BOOK - RELEASE NOTES
 Newest first. This file is not part of the app and is not loaded by it; it ships alongside the code files.
 To add a release: raise APP_VERSION in js/01-data.js and CACHE_NAME in sw.js to the same number, then put a new entry at the top of this list.
 
+Version 3.21
+  - iOS 27: stops the system blur that frosted the top of the screen behind the clock and battery and bled into the
+    header. A thin solid strip in the header's colour now sits at the very top edge of the app, which tells iOS not to
+    draw the blur (it only exists in the installed Home Screen app on iPhone and iPad)
+
 Version 3.20
   - Today on iPad and computer: a day note, a message from your other device and the Getting started card now show
     only above the left column, so the Owing column on the right starts at the top. The big card sits only a very
