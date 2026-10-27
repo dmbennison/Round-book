@@ -96,14 +96,12 @@
 
   /* iOS 27 frosts the top of an installed web app with a system blur, unless WebKit finds a fixed, solid box at the very top
      edge to take its colour from. This strip (just the height of the status bar, in the header's own colour) is that box.
-     It only exists in an iPhone / iPad Home Screen app. */
+     It only exists in an iPhone / iPad Home Screen app. WebKit wants it fixed, at least 6px tall, at least 80% wide, within 4px of
+     the top edge, and a solid colour. */
   #statusStrip{display:none;}
   @supports (-webkit-touch-callout:none){
-    @media (display-mode:standalone){
-      #statusStrip{display:block; position:fixed; top:0; left:0; right:0; height:max(env(safe-area-inset-top, 0px), 6px); z-index:5000;
-        background-color:color-mix(in srgb, var(--navy) var(--navy-glass, 78%), var(--bg));
-        background-image:linear-gradient(180deg, rgba(255,255,255,0.14), rgba(255,255,255,0.02));}
-    }
+    /* html:not(.in-browser) = the installed Home Screen app (see the script at the top of this file) */
+    html:not(.in-browser) #statusStrip{display:block; position:fixed; top:0; left:0; width:100%; height:max(env(safe-area-inset-top, 0px), 8px); z-index:2147483000; background:var(--navy);}
   }
   header{
     background:var(--navy);

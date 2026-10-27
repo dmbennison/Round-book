@@ -4,6 +4,11 @@ ROUND BOOK - RELEASE NOTES
 Newest first. This file is not part of the app and is not loaded by it; it ships alongside the code files.
 To add a release: raise APP_VERSION in js/01-data.js and CACHE_NAME in sw.js to the same number, then put a new entry at the top of this list.
 
+Version 3.22
+  - iOS 27 top-of-screen blur, second attempt: the thin strip at the top edge is now a plain solid colour and is switched
+    on by the same Home Screen app check the rest of the app uses (3.21 depended on a different check that may not
+    have matched). About now also says whether it opened as a Home Screen app and the top inset the phone reports
+
 Version 3.21
   - iOS 27: stops the system blur that frosted the top of the screen behind the clock and battery and bled into the
     header. A thin solid strip in the header's colour now sits at the very top edge of the app, which tells iOS not to
