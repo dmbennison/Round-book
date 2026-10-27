@@ -4,6 +4,10 @@ ROUND BOOK - RELEASE NOTES
 Newest first. This file is not part of the app and is not loaded by it; it ships alongside the code files.
 To add a release: raise APP_VERSION in js/01-data.js and CACHE_NAME in sw.js to the same number, then put a new entry at the top of this list.
 
+Version 3.26
+  - The strip behind the clock and battery is now refreshed as the app opens (straight away, then again after a
+    moment) and every time the app comes back to the front, so it starts in your chosen colour scheme instead of blue
+
 Version 3.25
   - iPhone and iPad Home Screen app: the strip behind the clock and battery now carries the header's own light sheen,
     so it joins the header without a visible bar, and it is refreshed whenever you change the colour scheme, light or
