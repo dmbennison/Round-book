@@ -4,6 +4,12 @@ ROUND BOOK - RELEASE NOTES
 Newest first. This file is not part of the app and is not loaded by it; it ships alongside the code files.
 To add a release: raise APP_VERSION in js/01-data.js and CACHE_NAME in sw.js to the same number, then put a new entry at the top of this list.
 
+Version 3.20
+  - Today on iPad and computer: a day note, a message from your other device and the Getting started card now show
+    only above the left column, so the Owing column on the right starts at the top. The big card sits only a very
+    small gap under the four main tabs unless one of those is showing, and the right column has the same small gap
+  - The left column is a little wider (40%), giving a clearer gap between the two columns
+
 Version 3.19
   - Camera button in the customer info box: after taking the photo you go straight into the photo screen
     (Annotate, Share, Send with an offer); closing it returns to the info box
