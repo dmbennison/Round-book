@@ -158,11 +158,18 @@ document.addEventListener('keydown', (e) => {
 applyDarkMode();
 applyTheme();
 applyTextSize();
+// iOS reads the status-bar colour from the strip at the top (see #statusStrip) the first time it is drawn, which is before the
+// saved colour scheme is applied, so it would start blue. Nudge it to look again straight after, once the page has settled,
+// and whenever the app comes back to the front (the phone may have switched between light and dark meanwhile).
+refreshStatusStrip();
+setTimeout(refreshStatusStrip, 400);
+setTimeout(refreshStatusStrip, 1500);
+document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible') setTimeout(refreshStatusStrip, 150); });
 // While in auto mode, follow the device's system setting live rather than only
 // picking it up next time the app is opened.
 if(window.matchMedia){
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-    if(themeMode === 'auto') applyDarkMode();
+    if(themeMode === 'auto'){ applyDarkMode(); refreshStatusStrip(); }
   });
 }
 // Swiping on the dimmed area behind a pop-up shouldn't scroll the page underneath.
