@@ -174,10 +174,11 @@ function renderTodayHome(main){
   const mTotalText = (mEntry && mEntry.start!=null && mEntry.end!=null) ? (mEntry.end - mEntry.start).toFixed(1) : '—';
 
   main.innerHTML = `
+    ${todayRunOn ? '' : '<div class="today-cols"><div class="today-left">'}
     ${(!todayRunOn && typeof msgBannerHtml === 'function') ? msgBannerHtml(false) : ''}
     ${(!todayRunOn && todayNote) ? todayNoteHtml(todayNote) : ''}
     ${renderGettingStartedCard()}
-    ${todayRunOn ? '' : '<div class="today-cols"><div class="today-left">'}<div class="today-top${todayRunOn ? ' running' : ''}">
+    <div class="today-top${todayRunOn ? ' running' : ''}">
     ${(todayRunOn && typeof msgBannerHtml === 'function') ? msgBannerHtml(true) : ''}
     ${(todayRunOn && todayNote) ? todayNoteHtml(todayNote, true) : ''}
     <div class="today-hero${todayRunOn ? ' compact' : ''}">
