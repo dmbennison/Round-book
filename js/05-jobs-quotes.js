@@ -58,7 +58,7 @@ function jobCardHtml(j, today){
         <div class="cust-right">
           <div class="cust-price">${money(j.price)}</div>
           <div class="cust-btn-row">
-            ${j.phone ? `<button class="call-btn" onclick="event.stopPropagation(); callCustomer('job','${j.id}')" title="Call" aria-label="Call">${CALL_ICON}</button>` : ''}
+            ${j.phone ? `<button class="call-btn" onclick="event.stopPropagation(); callCustomer('job','${j.id}', this)" title="Call" aria-label="Call">${CALL_ICON}</button>` : ''}
             ${j.address ? `<button class="dir-btn" onclick="event.stopPropagation(); openDirections('job','${j.id}')" title="Directions" aria-label="Directions">${DIRECTIONS_ICON}</button>` : ''}
           </div>
         </div>

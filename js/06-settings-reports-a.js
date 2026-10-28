@@ -56,8 +56,8 @@ THEMES.forest.solid = { light:{ bg:'#E1ECE3', surface:'#FBFEFA', ink:'#12261A', 
   dark:{ bg:'#0B110D', surface:'#141C16', ink:'#EAF3E6', muted:'#A9C0AA', line:'#5F8A68' } };
 THEMES.plum.solid = { light:{ bg:'#EBE1EE', surface:'#FFFDFF', ink:'#26122C', muted:'#58405F', line:'#835E8E' },
   dark:{ bg:'#100C12', surface:'#1B151E', ink:'#F6EBF9', muted:'#BBA2C4', line:'#85648F' } };
-// 'solid' (flat, hard borders, like High contrast) or 'glass' (Liquid Glass). High contrast is always solid.
-let themeStyle = localStorage.getItem('roundBookStyle') === 'glass' ? 'glass' : 'solid';
+// Every scheme is drawn solid (flat, hard borders, like High contrast): its solid palette is the one used.
+Object.keys(THEMES).forEach(k => { if(THEMES[k].solid){ THEMES[k].light = THEMES[k].solid.light; THEMES[k].dark = THEMES[k].solid.dark; } });
 let themeName = localStorage.getItem('roundBookTheme') || 'ocean';
 if(!THEMES[themeName]) themeName = 'ocean'; // a scheme that no longer exists (e.g. the removed Ruby) falls back to Ocean
 
@@ -120,8 +120,8 @@ function contrastRatio(a, b){
   const la = relLum(a), lb = relLum(b);
   return (Math.max(la,lb)+0.05) / (Math.min(la,lb)+0.05);
 }
-// The glass slider's 0-100 as a multiplier on every glass opacity: 50 = 1 (the standard look), 0 = 0.2 (very clear), 100 = 2.1 (almost solid).
-function glassMultiplier(){ return glassLevel <= 50 ? 0.2 + 0.8 * (glassLevel / 50) : 1 + 1.1 * ((glassLevel - 50) / 50); }
+// Settings > Transparency 0-100 as an opacity for the header, tab bars, cards and pop-ups: 1 (fully solid) down to 0.3.
+function solidOpacity(){ return 1 - 0.7 * (transparencyLevel / 100); }
 // iOS reads the status-bar colour from the strip when it is drawn and doesn't always notice a later colour change, so after a
 // change of colour scheme the strip is taken out and put back, which makes it look again (see #statusStrip in index.html).
 function refreshStatusStrip(){
@@ -133,12 +133,13 @@ function refreshStatusStrip(){
 }
 function applyTheme(){
   const t = THEMES[themeName] || THEMES.ocean;
-  const solidStyle = themeStyle === 'solid' && !!t.solid;
-  const p = solidStyle ? (darkMode ? t.solid.dark : t.solid.light) : (darkMode ? t.dark : t.light); // this scheme's page / card / text colours for the current mode
+  const p = darkMode ? t.dark : t.light; // this scheme's page / card / text colours for the current mode
   const acc = (darkMode && t.blueDark) ? t.blueDark : t.blue; // the accent actually used in this mode
   // A scheme whose borders are strongly visible against its page (High contrast) is drawn "flat": opaque
   // cards, hard borders, no glass blur, no background glow.
-  const flat = solidStyle || contrastRatio(p.line, p.bg) >= 3;
+  const flat = true; // every scheme is drawn solid: opaque cards, hard borders, no glow (Settings > Transparency can make it see-through)
+  const opa = solidOpacity();
+  const rgbaOf = (hex, a) => `rgba(${rgbTriplet(hex)}, ${a.toFixed(3)})`;
   // Set on the body element itself (not html/:root) so these inline values take
   // precedence over the static light/dark-mode CSS blocks, which declare --blue-dim,
   // --bg etc. directly on body/body.dark and would otherwise win over anything
@@ -175,11 +176,10 @@ function applyTheme(){
     : `0 10px 30px ${hexToRgba(t.navy, 0.16)}, 0 2px 6px ${hexToRgba(t.navy, 0.08)}`);
   // Cards (cust-card, round-card, backup-btn, cust-section): a translucent fill of the scheme's surface colour
   // (nudged toward the accent in dark mode so schemes stay distinct), a faint accent wash, and a soft shadow.
-  const gk = flat ? 1 : glassMultiplier(); // the flat High contrast scheme has no glass to adjust
-  const ga = a => Math.max(0.04, Math.min(0.98, a * gk));
-  root.setProperty('--glass-k', String(gk));
-  if(flat) root.setProperty('--navy-glass', '100%'); else root.removeProperty('--navy-glass'); // flat: the header and tab bars are solid, not see-through
-  root.setProperty('--card-surface', flat ? p.surface : (darkMode ? hexToRgba(mixHex(p.surface, acc, 0.12 * tint), ga(0.58)) : hexToRgba(p.surface, ga(0.66))));
+  root.setProperty('--glass-k', '1');
+  root.setProperty('--navy-glass', Math.round(solidOpacity() * 100) + '%'); // how solid the header and tab bars are
+  const ga = a => a;
+  root.setProperty('--card-surface', flat ? rgbaOf(p.surface, solidOpacity()) : (darkMode ? hexToRgba(mixHex(p.surface, acc, 0.12 * tint), ga(0.58)) : hexToRgba(p.surface, ga(0.66))));
   root.setProperty('--card-tint', flat ? 'transparent' : (darkMode ? hexToRgba(acc, 0.10 * tint) : hexToRgba(acc, 0.07 * tint)));
   root.setProperty('--card-border', flat ? p.line : (darkMode ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.85)'));
   root.setProperty('--card-shadow', flat ? 'none' : (darkMode
@@ -187,11 +187,12 @@ function applyTheme(){
     : `inset 0 1px 0 rgba(255,255,255,0.95), inset 0 -1px 0 rgba(255,255,255,0.35), 0 8px 24px ${hexToRgba(t.navy, 0.12)}, 0 1px 3px rgba(0,0,0,0.06)`));
   // Flat scheme: solid fills (the stylesheet's fallbacks are glass), no blur, no background glow.
   const flatVars = {
-    '--glass-fill': `rgb(${rgbTriplet(p.surface)})`, '--glass-fill-strong': `rgb(${rgbTriplet(p.surface)})`,
-    '--sheet-fill': `rgb(${rgbTriplet(p.surface)})`, '--field-fill': `rgb(${rgbTriplet(p.bg)})`,
-    '--glass-blur': 'none', '--orb-a': '0%', '--orb-b': '0%', '--orb-c': '0%'
+    '--glass-fill': rgbaOf(p.surface, opa), '--glass-fill-strong': rgbaOf(p.surface, opa),
+    '--sheet-fill': rgbaOf(p.surface, Math.max(opa, 0.55)), '--field-fill': rgbaOf(p.bg, opa),
+    '--orb-a': '0%', '--orb-b': '0%', '--orb-c': '0%'
   };
-  Object.keys(flatVars).forEach(k => { if(flat) root.setProperty(k, flatVars[k]); else root.removeProperty(k); });
+  Object.keys(flatVars).forEach(k => root.setProperty(k, flatVars[k]));
+  if(opa < 1) root.removeProperty('--glass-blur'); else root.setProperty('--glass-blur', 'none'); // a see-through setting keeps the blur behind it
   // A scheme can soften the soft background glow (the accent-coloured light behind the page) with `orb`.
   if(!flat && t.orb != null){
     const orbBase = darkMode ? [30,20,14] : [34,22,16];
@@ -199,13 +200,6 @@ function applyTheme(){
   }
   const meta = document.querySelector('meta[name="theme-color"]');
   if(meta) meta.setAttribute('content', t.navy);
-}
-function setThemeStyle(style){
-  themeStyle = style === 'glass' ? 'glass' : 'solid';
-  localStorage.setItem('roundBookStyle', themeStyle);
-  applyTheme();
-  refreshStatusStrip();
-  openSettings();
 }
 function setTheme(name){
   if(!THEMES[name]) return;
@@ -215,19 +209,19 @@ function setTheme(name){
   refreshStatusStrip();
   openSettings();
 }
-function glassLabel(v){ v = Number(v); return v === 50 ? 'Standard' : (v < 50 ? 'Clearer' : 'More solid'); }
-function previewGlass(v){
-  glassLevel = Math.max(0, Math.min(100, parseInt(v,10) || 0));
+function transparencyLabel(v){ v = Number(v); return v === 0 ? 'Solid' : v + '%'; }
+function previewTransparency(v){
+  transparencyLevel = Math.max(0, Math.min(100, parseInt(v,10) || 0));
   applyTheme();
-  const label = document.getElementById('glassLabel');
-  if(label) label.textContent = glassLabel(glassLevel);
+  const label = document.getElementById('transparencyLabel');
+  if(label) label.textContent = transparencyLabel(transparencyLevel);
 }
-function setGlass(v){
-  previewGlass(v);
-  localStorage.setItem('roundBookGlass', String(glassLevel));
+function setTransparency(v){
+  previewTransparency(v);
+  localStorage.setItem('roundBookTransparency', String(transparencyLevel));
   refreshStatusStrip();
 }
-function resetGlass(){ setGlass(50); openSettings(); }
+function resetTransparency(){ setTransparency(0); openSettings(); }
 function openSettings(){
   openSheet(`
     <div class="sheet-head">
@@ -248,26 +242,20 @@ function openSettings(){
       <span style="font-size:1.375rem; color:var(--ink-muted); flex-shrink:0; line-height:1;">A</span>
       <span id="textSizeLabel" style="font-size:0.75rem; font-weight:800; color:var(--ink); min-width:34px; text-align:right; flex-shrink:0;">${textSize}px</span>
     </div>
-    <div class="section-label">Style</div>
-    <div class="seg-row">
-      <button class="seg-btn ${themeStyle==='solid'?'active':''}" onclick="setThemeStyle('solid')">🎨 Solid</button>
-      <button class="seg-btn ${themeStyle==='glass'?'active':''}" onclick="setThemeStyle('glass')">🫧 Glass</button>
-    </div>
-    <p style="color:var(--ink-muted); font-size:0.75rem; margin:4px 2px 16px; line-height:1.5;">Solid draws every colour scheme like High contrast: flat cards with firm coloured borders. Glass is the see-through look.</p>
-    ${themeStyle === 'glass' ? `<div class="section-label">Glass transparency</div>
+    <div class="section-label">Transparency</div>
     <div style="display:flex; align-items:center; gap:10px; margin:4px 2px 4px;">
-      <span style="font-size:0.75rem; color:var(--ink-muted); flex-shrink:0;">Clear</span>
-      <input type="range" min="0" max="100" step="5" value="${glassLevel}" oninput="previewGlass(this.value)" onchange="setGlass(this.value)" style="flex:1; accent-color:var(--blue);" aria-label="Glass transparency">
       <span style="font-size:0.75rem; color:var(--ink-muted); flex-shrink:0;">Solid</span>
-      <span id="glassLabel" style="font-size:0.75rem; font-weight:800; color:var(--ink); min-width:70px; text-align:right; flex-shrink:0;">${glassLabel(glassLevel)}</span>
+      <input type="range" min="0" max="100" step="5" value="${transparencyLevel}" oninput="previewTransparency(this.value)" onchange="setTransparency(this.value)" style="flex:1; accent-color:var(--blue);" aria-label="Transparency">
+      <span style="font-size:0.75rem; color:var(--ink-muted); flex-shrink:0;">Clear</span>
+      <span id="transparencyLabel" style="font-size:0.75rem; font-weight:800; color:var(--ink); min-width:70px; text-align:right; flex-shrink:0;">${transparencyLabel(transparencyLevel)}</span>
     </div>
-    <div style="margin:0 2px 16px;"><button onclick="resetGlass()" style="background:none; border:none; padding:2px 0; color:var(--blue-deep); font-weight:700; font-size:0.75rem; cursor:pointer;">Reset to standard</button></div>` : ''}
+    <div style="margin:0 2px 16px;"><button onclick="resetTransparency()" style="background:none; border:none; padding:2px 0; color:var(--blue-deep); font-weight:700; font-size:0.75rem; cursor:pointer;">Reset to solid</button></div>
     <div class="section-label">Colour scheme</div>
     <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:16px;">
       ${Object.keys(THEMES).map(key=>{
         const t = THEMES[key];
         const active = themeName===key;
-        const pal = (themeStyle === 'solid' && t.solid) ? (darkMode ? t.solid.dark : t.solid.light) : (darkMode ? t.dark : t.light);
+        const pal = darkMode ? t.dark : t.light;
         return `<button onclick="setTheme('${key}')" style="display:flex; flex-direction:column; align-items:center; gap:7px; padding:10px 4px; border-radius:12px; border:2px solid ${active?t.blue:'var(--line)'}; background:${pal.bg};">
           <span style="display:flex; width:48px; height:26px; border-radius:13px; overflow:hidden; box-shadow:0 0 0 1px rgba(0,0,0,0.14);"><span style="flex:1; background:${t.navy};"></span><span style="flex:1; background:${t.blue};"></span><span style="flex:1; background:${pal.surface};"></span></span>
           <span style="font-size:0.7188rem; font-weight:700; color:${pal.ink};">${t.name}</span>
@@ -656,7 +644,7 @@ function renderCampaignResponseRows(campaignId){
             ${c.marketingNextAction !== 'none' ? (c.marketingActionDone ? `<span class="badge ok">✓ ${actionLabel}</span>` : `<span class="badge due">${actionLabel}${c.marketingFollowUpDate ? ` (${fmtDate(c.marketingFollowUpDate)})` : ''}</span>`) : ''}
           </div>
           <div style="display:flex; gap:8px; margin-top:10px;">
-            ${c.phone ? `<button onclick="event.stopPropagation(); callCustomer('customer','${c.id}')" class="call-btn" style="border-radius:8px; width:auto; height:32px; padding:0 12px; font-size:0.75rem; font-weight:800; display:flex; align-items:center; gap:6px;">${CALL_ICON.replace('viewBox="0 0 24 24"','viewBox="0 0 24 24" width="13" height="13"')} Call</button>` : ''}
+            ${c.phone ? `<button onclick="event.stopPropagation(); callCustomer('customer','${c.id}', this)" class="call-btn" style="border-radius:8px; width:auto; height:32px; padding:0 12px; font-size:0.75rem; font-weight:800; display:flex; align-items:center; gap:6px;">${CALL_ICON.replace('viewBox="0 0 24 24"','viewBox="0 0 24 24" width="13" height="13"')} Call</button>` : ''}
             ${canText ? `<button onclick="event.stopPropagation(); quickTextFromMarketing('${c.id}')" style="border-radius:8px; width:auto; height:32px; padding:0 12px; font-size:0.75rem; font-weight:800; display:flex; align-items:center; gap:6px; background:var(--blue-dim); color:var(--blue-deep); border:none;">💬 Text</button>` : ''}
             <button onclick="event.stopPropagation(); quoteForCustomer('${c.id}', ()=>openMarketingResponses())" style="border-radius:8px; width:auto; height:32px; padding:0 12px; font-size:0.75rem; font-weight:800; display:flex; align-items:center; gap:6px; background:var(--amber-dim); color:var(--amber); border:none;">📝 Quote</button>
           </div>
@@ -1099,7 +1087,7 @@ function openPhotoGallery(){
     </div>
     <input type="text" id="gallery_search_input" placeholder="Filter by address or name..." oninput="galleryLimit = GALLERY_PAGE; renderPhotoGallery()" style="margin-top:0; margin-bottom:14px;">
     <div id="gallery_results"></div>
-  `, () => openMoreMenu());
+  `, () => render());
   renderPhotoGallery();
 }
 function renderPhotoGallery(){

@@ -139,38 +139,18 @@ async function shareRoundBook(){
 }
 
 /* ---------- the "…" menu in the top bar ---------- */
-function openMoreMenu(){
-  const ico = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
-  openSheet(`
-    <div class="sheet-head">
-      <h2>More</h2>
-      <button class="sheet-close" onclick="closeSheet()">✕</button>
-    </div>
-    <button class="backup-btn" onclick="openReports()">
-      ${ico('<path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/>')}
-      <div><div class="t1">Reports</div><div class="t2">Print or save schedules, customer lists, mileage and more</div></div>
-    </button>
-    <button class="backup-btn" onclick="openPhotoGallery()">
-      ${ico('<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/>')}
-      <div><div class="t1">Photo gallery</div><div class="t2">Browse every customer's photos in one place</div></div>
-    </button>
-    <button class="backup-btn" onclick="openBackup()">
-      ${ico('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/>')}
-      <div><div class="t1">Backup</div><div class="t2">Save a copy of your data, restore, and sync between devices</div></div>
-    </button>
-    <button class="backup-btn" onclick="openMessageDevice()">
-      ${ico('<rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 7l-10 7L2 7"/>')}
-      <div><div class="t1">Message other device</div><div class="t2">Send a note that pops up on Today on your other device</div></div>
-    </button>
-    <button class="backup-btn" onclick="checkForUpdates()">
-      ${ico('<path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/>')}
-      <div><div class="t1">Check for updates</div><div class="t2">Version ${formatVersion(APP_VERSION)} · look for a newer version now</div></div>
-    </button>
-    <button class="backup-btn" onclick="openInfo()">
-      ${ico('<circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>')}
-      <div><div class="t1">About</div><div class="t2">User guide and getting started</div></div>
-    </button>
-  `);
+// The ⋯ button in the header: a drop-down menu (anchor is the button that was tapped).
+function openMoreMenu(anchor){
+  anchor = anchor || document.querySelector('header [aria-label="More"]');
+  openDropdown(anchor, [
+    {label: 'Reports', run: () => openReports()},
+    {label: 'Photo gallery', run: () => openPhotoGallery()},
+    {label: 'Backup', run: () => openBackup()},
+    {label: 'Message other device', run: () => openMessageDevice()},
+    '-',
+    {label: 'Check for updates', hint: 'v' + formatVersion(APP_VERSION), run: () => checkForUpdates()},
+    {label: 'About', run: () => openInfo()}
+  ]);
 }
 // The height of the status-bar area the phone reports (0 in an ordinary browser). Shown in About, for troubleshooting.
 function topInsetPx(){
@@ -379,7 +359,7 @@ const FOCUSED_HELP = {
     title: 'Settings',
     body: () => [
       helpList([
-        '<b>Appearance</b> – light or dark, text size, <b>Style</b> (<b>Solid</b> draws every colour scheme flat with firm borders, like High contrast; <b>Glass</b> is the see-through look, with a <b>Glass transparency</b> slider from Clear to Solid) and colour scheme.',
+        '<b>Appearance</b> – light or dark, text size, <b>Transparency</b> (drag from Solid to Clear to make the header, tab bars and cards see-through) and colour scheme. Every scheme is drawn flat with firm borders, like High contrast.',
         '<b>Messaging app</b> – Messages or WhatsApp. A customer can have their own under <b>Message by</b> when you edit them.',
         '<b>Swipe to text</b> – turns the “Windows cleaned today” text on or off.',
         '<b>Business details</b> – your name, company and bank details, used on invoices and texts.',

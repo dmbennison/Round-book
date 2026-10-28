@@ -1679,37 +1679,19 @@ function selectTodayRound(rn){
 function backToRounds(){ currentRound = null; reorderMode = false; roundFilterMode = 'all'; roundDayFilter = 'all'; render(); pageScrollTo(0); }
 function setRoundFilterMode(v){ roundFilterMode = v; render(); }
 
-function openRoundActionsMenu(rn){
-  openSheet(`
-    <div class="sheet-head">
-      <h2 style="flex:1; min-width:0;">${escapeHtml(rn)}</h2>
-      <button class="sheet-close" onclick="closeSheet()">✕</button>
-    </div>
-    <button class="backup-btn" onclick="startRoundDirections('${escapeAttr(rn)}')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-      <div><div class="t1">Start round — directions</div><div class="t2">Opens Google Maps with every stop queued up, in your current order</div></div>
-    </button>
-    <button class="backup-btn" onclick="closeSheet(); showRoundMap('${escapeAttr(rn)}')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
-      <div><div class="t1">Show map</div><div class="t2">See every stop and the route between them</div></div>
-    </button>
-    <button class="backup-btn" onclick="printSingleRound('${escapeAttr(rn)}')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
-      <div><div class="t1">Print this round</div><div class="t2">Customer list with contact details and prices</div></div>
-    </button>
-    <button class="backup-btn" onclick="closeSheet(); openDeferSheet('round','${escapeAttr(rn)}')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-      <div><div class="t1">Defer</div><div class="t2">Push every active customer's due date back at once</div></div>
-    </button>
-    <button class="backup-btn" onclick="closeSheet(); openRoundUpliftSheet('${escapeAttr(rn)}')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-      <div><div class="t1">Apply price uplift</div><div class="t2">Increase every active customer's price by a % or flat amount</div></div>
-    </button>
-    <button class="backup-btn" onclick="openFocusedHelp('rounds', ()=>openRoundActionsMenu('${escapeAttr(rn)}'))">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-      <div><div class="t1">Help</div><div class="t2">How rounds work</div></div>
-    </button>
-  `);
+// A round's ⋯ button: a drop-down menu (anchor is the button that was tapped).
+function openRoundActionsMenu(rn, anchor){
+  if(!anchor) return;
+  openDropdown(anchor, [
+    {label: 'Start round — directions', run: () => startRoundDirections(rn)},
+    {label: 'Show map', run: () => showRoundMap(rn)},
+    {label: 'Print this round', run: () => printSingleRound(rn)},
+    '-',
+    {label: 'Defer…', run: () => openDeferSheet('round', rn)},
+    {label: 'Apply price uplift…', run: () => openRoundUpliftSheet(rn)},
+    '-',
+    {label: 'Help', run: () => openFocusedHelp('rounds', () => render())}
+  ], rn);
 }
 
 /* ---------- round notes ----------
@@ -1767,7 +1749,7 @@ function renderRoundDetail(main, rn){
         <button class="btn-open icon-plain" style="width:38px; height:38px; padding:0; flex-shrink:0;" onclick="openRoundNoteSheet('${escapeAttr(rn)}')" aria-label="${getRoundNote(rn) ? 'Edit note' : 'Add note'}">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
         </button>
-        <button class="btn-open icon-plain" style="width:38px; height:38px; padding:0; flex-shrink:0;" onclick="openRoundActionsMenu('${escapeAttr(rn)}')" aria-label="Round actions">
+        <button class="btn-open icon-plain" style="width:38px; height:38px; padding:0; flex-shrink:0;" onclick="openRoundActionsMenu('${escapeAttr(rn)}', this)" aria-label="Round actions">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
         </button>
       </div>
@@ -1954,7 +1936,7 @@ function custCardHtml(c, mode, opts){
         <div class="cust-right">
           <div class="cust-price">${money(c.price)}</div>
           <div class="cust-btn-row">
-            ${c.phone ? `<button class="call-btn" onclick="event.stopPropagation(); callCustomer('customer','${c.id}')" title="Call" aria-label="Call">${CALL_ICON}</button>` : ''}
+            ${c.phone ? `<button class="call-btn" onclick="event.stopPropagation(); callCustomer('customer','${c.id}', this)" title="Call" aria-label="Call">${CALL_ICON}</button>` : ''}
             ${c.address ? `<button class="dir-btn" onclick="event.stopPropagation(); openDirections('customer','${c.id}')" title="Directions" aria-label="Directions">${DIRECTIONS_ICON}</button>` : ''}
           </div>
         </div>

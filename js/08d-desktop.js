@@ -199,7 +199,17 @@ function renderPaneDash(){
    One menu, built per item, mirroring what swiping or pressing-and-holding a card does, plus the actions that live
    behind its detail screen. Items carry a hint of the keyboard shortcut that does the same (see section 4).
    ===================================================================== */
-let ctxMenuEl = null, ctxTargetEl = null;
+let ctxMenuEl = null, ctxTargetEl = null, ctxAnchor = null, ctxSuppressAt = 0;
+// A drop-down menu under (or, near the bottom of the screen, above) the button that was tapped. items are as for openContextMenu.
+// Used for the ⋯ menu, the + button on Today and a round's ⋯ button; it opens on the button's right edge and flips to stay on screen.
+function openDropdown(anchor, items, title){
+  if(!anchor || !anchor.getBoundingClientRect) return;
+  if(ctxAnchor === anchor && Date.now() - ctxSuppressAt < 500){ ctxSuppressAt = 0; return; }
+  const r = anchor.getBoundingClientRect();
+  const lowerHalf = r.top > window.innerHeight / 2;
+  ctxAnchor = anchor;
+  openContextMenu(r.right, lowerHalf ? r.top - 8 : r.bottom + 8, items, title, false);
+}
 function closeContextMenu(){
   if(ctxMenuEl){ ctxMenuEl.remove(); ctxMenuEl = null; }
   if(ctxTargetEl){ ctxTargetEl.classList.remove('ctx-target'); ctxTargetEl = null; }
@@ -249,7 +259,12 @@ function openContextMenu(x, y, items, title, focusFirst){
   if(focusFirst){ const first = el.querySelector('.ctx-item'); if(first) first.focus(); }
 }
 // Anything that moves the page out from under the menu, or clicks away from it, dismisses it.
-document.addEventListener('pointerdown', (e) => { if(ctxMenuEl && !ctxMenuEl.contains(e.target)) closeContextMenu(); }, true);
+document.addEventListener('pointerdown', (e) => {
+  if(ctxMenuEl && !ctxMenuEl.contains(e.target)){
+    if(ctxAnchor && ctxAnchor.contains(e.target)) ctxSuppressAt = Date.now(); // tapping the button again closes its dropdown rather than reopening it
+    closeContextMenu();
+  }
+}, true);
 document.addEventListener('scroll', (e) => { if(ctxMenuEl && !ctxMenuEl.contains(e.target)) closeContextMenu(); }, true);
 window.addEventListener('resize', closeContextMenu);
 window.addEventListener('blur', closeContextMenu);

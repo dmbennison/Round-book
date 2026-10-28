@@ -6,7 +6,7 @@ const STORE_KEY = 'roundBookData_v1';
 // APP_VERSION is a plain decimal number (e.g. 1.01, 1.02 ... 1.99, 2.00) —
 // bump by 0.01 for every change. formatVersion always renders it to exactly
 // two decimal places, so it's never shown as "1.1" or "1.100".
-const APP_VERSION = 3.27;
+const APP_VERSION = 3.28;
 function formatVersion(v){ return Number(v).toFixed(2); }
 // Release notes are NOT kept in the app: they live in CHANGELOG.txt, shipped alongside these files.
 // MAINTENANCE: every time APP_VERSION is bumped, add the new version to the top of CHANGELOG.txt.
@@ -1049,8 +1049,8 @@ let themeMode = localStorage.getItem('roundBookThemeMode') ||
 let darkMode = themeMode === 'auto'
   ? !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)
   : themeMode === 'dark';
-// Settings > Glass transparency, 0 (clearest) to 100 (most solid); 50 is the standard look. Kept on this device like the colour scheme.
-let glassLevel = (()=>{ const v = parseInt(localStorage.getItem('roundBookGlass'),10); return (Number.isFinite(v) && v>=0 && v<=100) ? v : 50; })();
+// Settings > Transparency: 0 (fully solid, the default) to 100 (most see-through). Kept on this device like the colour scheme.
+let transparencyLevel = (()=>{ const v = parseInt(localStorage.getItem('roundBookTransparency'),10); return (Number.isFinite(v) && v>=0 && v<=100) ? v : 0; })();
 let textSize = (()=>{ const v = parseInt(localStorage.getItem('roundBookTextSize'),10); return (Number.isFinite(v) && v>=15 && v<=24) ? v : 18; })();
 let bannerDismissed = false;
 let marketingFollowUpDismissed = false;

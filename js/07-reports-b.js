@@ -222,7 +222,7 @@ function printSingleRound(roundName){
     <table class="rpt-table"><thead><tr><th>Customer</th>${spansMultipleDays ? '<th>Day</th>' : ''}<th>Contact</th><th>Price</th><th>Frequency</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>
     <div class="rpt-total" style="border-top:2px solid #10344C; padding-top:10px; margin-top:16px; font-size:16px;">${custs.length} customer${custs.length===1?'':'s'} · Round total: ${money(roundTotal)} · Avg: ${money(roundAvg)}</div>
   `;
-  runPrint(roundName, body, false, false, () => openRoundActionsMenu(roundName));
+  runPrint(roundName, body, false, false, () => render());
 }
 
 function printCustomerRecord(id){
