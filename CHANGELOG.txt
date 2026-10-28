@@ -4,6 +4,14 @@ ROUND BOOK - RELEASE NOTES
 Newest first. This file is not part of the app and is not loaded by it; it ships alongside the code files.
 To add a release: raise APP_VERSION in js/01-data.js and CACHE_NAME in sw.js to the same number, then put a new entry at the top of this list.
 
+Version 3.28
+  - Colour schemes: the Glass option is gone (every scheme is solid, like High contrast). Settings > Appearance >
+    Transparency replaces the glass slider: Solid by default, and drag it to make the header, tab bars, cards and
+    pop-ups see-through
+  - The Paused and Fronts only flags are now solid dark-on-light (light-on-dark in dark mode), so they are easy to read
+  - Buttons that opened a pop-up list now open a drop-down menu under the button: the ⋯ menu, the + button on Today,
+    a round's ⋯ button, and the green call button (Call or Text). Tap the button again, or anywhere else, to close it
+
 Version 3.27
   - Colour schemes are now drawn like High contrast, in their own colours: opaque white or tinted cards, firm coloured
     borders, a solid header and tab bars, and no glass or background glow. Ocean, Slate, Rust, Forest and Plum each keep
