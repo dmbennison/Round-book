@@ -379,7 +379,7 @@ const FOCUSED_HELP = {
     title: 'Settings',
     body: () => [
       helpList([
-        '<b>Appearance</b> – light or dark, text size, <b>Glass transparency</b> (drag from Clear to Solid to change how see-through the panels are; Reset puts it back) and colour scheme.',
+        '<b>Appearance</b> – light or dark, text size, <b>Style</b> (<b>Solid</b> draws every colour scheme flat with firm borders, like High contrast; <b>Glass</b> is the see-through look, with a <b>Glass transparency</b> slider from Clear to Solid) and colour scheme.',
         '<b>Messaging app</b> – Messages or WhatsApp. A customer can have their own under <b>Message by</b> when you edit them.',
         '<b>Swipe to text</b> – turns the “Windows cleaned today” text on or off.',
         '<b>Business details</b> – your name, company and bank details, used on invoices and texts.',

@@ -44,6 +44,20 @@ const THEMES = {
     light:{ bg:'#FFFFFF', surface:'#FFFFFF', ink:'#000000', muted:'#3A3A3A', line:'#6B6B6B' },
     dark: { bg:'#000000', surface:'#0C0C0C', ink:'#FFFFFF', muted:'#D2D2D2', line:'#8C8C8C' } }
 };
+// SOLID style (the default): the same colours, drawn like High contrast: opaque cards, hard coloured borders, no glass or glow.
+// Each scheme's solid page / card / text / border colours, in light and dark. The Glass style keeps the softer palettes above.
+THEMES.ocean.solid = { light:{ bg:'#E3EDF2', surface:'#FFFFFF', ink:'#0C2230', muted:'#3A5668', line:'#5C8399' },
+  dark:{ bg:'#0A1319', surface:'#111F29', ink:'#F0F7FB', muted:'#B6CAD6', line:'#5F8AA0' } };
+THEMES.slate.solid = { light:{ bg:'#E2E2DF', surface:'#FFFFFF', ink:'#1B1D20', muted:'#46494E', line:'#6C6F74' },
+  dark:{ bg:'#0E0F10', surface:'#191B1D', ink:'#F2F0EC', muted:'#BDBAB4', line:'#7C7F84' } };
+THEMES.rust.solid = { light:{ bg:'#F0E4DA', surface:'#FFFCF8', ink:'#2C1A12', muted:'#5E463A', line:'#8A624C' },
+  dark:{ bg:'#120F0D', surface:'#1E1915', ink:'#F7ECDF', muted:'#C4AC9A', line:'#8E6C58' } };
+THEMES.forest.solid = { light:{ bg:'#E1ECE3', surface:'#FBFEFA', ink:'#12261A', muted:'#3F5A47', line:'#5F8268' },
+  dark:{ bg:'#0B110D', surface:'#141C16', ink:'#EAF3E6', muted:'#A9C0AA', line:'#5F8A68' } };
+THEMES.plum.solid = { light:{ bg:'#EBE1EE', surface:'#FFFDFF', ink:'#26122C', muted:'#58405F', line:'#835E8E' },
+  dark:{ bg:'#100C12', surface:'#1B151E', ink:'#F6EBF9', muted:'#BBA2C4', line:'#85648F' } };
+// 'solid' (flat, hard borders, like High contrast) or 'glass' (Liquid Glass). High contrast is always solid.
+let themeStyle = localStorage.getItem('roundBookStyle') === 'glass' ? 'glass' : 'solid';
 let themeName = localStorage.getItem('roundBookTheme') || 'ocean';
 if(!THEMES[themeName]) themeName = 'ocean'; // a scheme that no longer exists (e.g. the removed Ruby) falls back to Ocean
 
@@ -119,11 +133,12 @@ function refreshStatusStrip(){
 }
 function applyTheme(){
   const t = THEMES[themeName] || THEMES.ocean;
-  const p = darkMode ? t.dark : t.light; // this scheme's page / card / text colours for the current mode
+  const solidStyle = themeStyle === 'solid' && !!t.solid;
+  const p = solidStyle ? (darkMode ? t.solid.dark : t.solid.light) : (darkMode ? t.dark : t.light); // this scheme's page / card / text colours for the current mode
   const acc = (darkMode && t.blueDark) ? t.blueDark : t.blue; // the accent actually used in this mode
   // A scheme whose borders are strongly visible against its page (High contrast) is drawn "flat": opaque
   // cards, hard borders, no glass blur, no background glow.
-  const flat = contrastRatio(p.line, p.bg) >= 3;
+  const flat = solidStyle || contrastRatio(p.line, p.bg) >= 3;
   // Set on the body element itself (not html/:root) so these inline values take
   // precedence over the static light/dark-mode CSS blocks, which declare --blue-dim,
   // --bg etc. directly on body/body.dark and would otherwise win over anything
@@ -163,6 +178,7 @@ function applyTheme(){
   const gk = flat ? 1 : glassMultiplier(); // the flat High contrast scheme has no glass to adjust
   const ga = a => Math.max(0.04, Math.min(0.98, a * gk));
   root.setProperty('--glass-k', String(gk));
+  if(flat) root.setProperty('--navy-glass', '100%'); else root.removeProperty('--navy-glass'); // flat: the header and tab bars are solid, not see-through
   root.setProperty('--card-surface', flat ? p.surface : (darkMode ? hexToRgba(mixHex(p.surface, acc, 0.12 * tint), ga(0.58)) : hexToRgba(p.surface, ga(0.66))));
   root.setProperty('--card-tint', flat ? 'transparent' : (darkMode ? hexToRgba(acc, 0.10 * tint) : hexToRgba(acc, 0.07 * tint)));
   root.setProperty('--card-border', flat ? p.line : (darkMode ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.85)'));
@@ -183,6 +199,13 @@ function applyTheme(){
   }
   const meta = document.querySelector('meta[name="theme-color"]');
   if(meta) meta.setAttribute('content', t.navy);
+}
+function setThemeStyle(style){
+  themeStyle = style === 'glass' ? 'glass' : 'solid';
+  localStorage.setItem('roundBookStyle', themeStyle);
+  applyTheme();
+  refreshStatusStrip();
+  openSettings();
 }
 function setTheme(name){
   if(!THEMES[name]) return;
@@ -225,20 +248,26 @@ function openSettings(){
       <span style="font-size:1.375rem; color:var(--ink-muted); flex-shrink:0; line-height:1;">A</span>
       <span id="textSizeLabel" style="font-size:0.75rem; font-weight:800; color:var(--ink); min-width:34px; text-align:right; flex-shrink:0;">${textSize}px</span>
     </div>
-    <div class="section-label">Glass transparency</div>
+    <div class="section-label">Style</div>
+    <div class="seg-row">
+      <button class="seg-btn ${themeStyle==='solid'?'active':''}" onclick="setThemeStyle('solid')">🎨 Solid</button>
+      <button class="seg-btn ${themeStyle==='glass'?'active':''}" onclick="setThemeStyle('glass')">🫧 Glass</button>
+    </div>
+    <p style="color:var(--ink-muted); font-size:0.75rem; margin:4px 2px 16px; line-height:1.5;">Solid draws every colour scheme like High contrast: flat cards with firm coloured borders. Glass is the see-through look.</p>
+    ${themeStyle === 'glass' ? `<div class="section-label">Glass transparency</div>
     <div style="display:flex; align-items:center; gap:10px; margin:4px 2px 4px;">
       <span style="font-size:0.75rem; color:var(--ink-muted); flex-shrink:0;">Clear</span>
       <input type="range" min="0" max="100" step="5" value="${glassLevel}" oninput="previewGlass(this.value)" onchange="setGlass(this.value)" style="flex:1; accent-color:var(--blue);" aria-label="Glass transparency">
       <span style="font-size:0.75rem; color:var(--ink-muted); flex-shrink:0;">Solid</span>
       <span id="glassLabel" style="font-size:0.75rem; font-weight:800; color:var(--ink); min-width:70px; text-align:right; flex-shrink:0;">${glassLabel(glassLevel)}</span>
     </div>
-    <div style="margin:0 2px 16px;"><button onclick="resetGlass()" style="background:none; border:none; padding:2px 0; color:var(--blue-deep); font-weight:700; font-size:0.75rem; cursor:pointer;">Reset to standard</button></div>
+    <div style="margin:0 2px 16px;"><button onclick="resetGlass()" style="background:none; border:none; padding:2px 0; color:var(--blue-deep); font-weight:700; font-size:0.75rem; cursor:pointer;">Reset to standard</button></div>` : ''}
     <div class="section-label">Colour scheme</div>
     <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:16px;">
       ${Object.keys(THEMES).map(key=>{
         const t = THEMES[key];
         const active = themeName===key;
-        const pal = darkMode ? t.dark : t.light;
+        const pal = (themeStyle === 'solid' && t.solid) ? (darkMode ? t.solid.dark : t.solid.light) : (darkMode ? t.dark : t.light);
         return `<button onclick="setTheme('${key}')" style="display:flex; flex-direction:column; align-items:center; gap:7px; padding:10px 4px; border-radius:12px; border:2px solid ${active?t.blue:'var(--line)'}; background:${pal.bg};">
           <span style="display:flex; width:48px; height:26px; border-radius:13px; overflow:hidden; box-shadow:0 0 0 1px rgba(0,0,0,0.14);"><span style="flex:1; background:${t.navy};"></span><span style="flex:1; background:${t.blue};"></span><span style="flex:1; background:${pal.surface};"></span></span>
           <span style="font-size:0.7188rem; font-weight:700; color:${pal.ink};">${t.name}</span>
