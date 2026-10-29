@@ -674,7 +674,7 @@ function openCustomerDetail(id){
         </div>
         ${!c.paused ? `
           ${(s.cleanBadge && s.cleanBadge.type === 'deferred') ? `<div style="font-size:0.75rem; color:var(--ink-muted); margin:0 2px 6px;">⏭ Deferred to ${fmtDate(c.deferUntil)}${couldntCleanActive(c) ? ` · couldn't clean ${fmtDate(c.couldntCleanDate)}` : ''}</div>` : ''}
-          <button class="btn" style="width:100%; background:var(--blue-dim); color:var(--blue-deep); margin-bottom:10px;" onclick="openDeferSheet('customer','${id}')">⏭ Defer</button>
+          <button class="btn" style="width:100%; background:var(--blue-dim); color:var(--blue-deep); margin-bottom:10px;" onclick="openDeferSheet('customer','${id}', this)">⏭ Defer</button>
           <button class="btn" style="width:100%; background:var(--amber-dim); color:var(--amber); margin-bottom:10px;" onclick="markCouldntClean('${id}')">🚫 Couldn't clean — defer to next clean</button>
         ` : ''}
         <button class="btn" style="width:100%; background:var(--green-dim); color:var(--green); margin-bottom:10px;" onclick="openCustomerUpliftSheet('${id}')">📈 Apply price uplift</button>
@@ -693,30 +693,10 @@ function openCustomerDetail(id){
     <details class="cust-section">
       <summary>History ${chev}</summary>
       <div class="cust-section-body">
-        <button class="backup-btn" onclick="openCustomerHistoryList('${id}','clean')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
-          <div style="flex:1; min-width:0;"><div class="t1">Clean history</div><div class="t2">${(c.cleanHistory||[]).length} clean${(c.cleanHistory||[]).length===1?'':'s'} logged</div></div>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px; color:var(--ink-muted);"><path d="M9 18l6-6-6-6"/></svg>
-        </button>
-        <button class="backup-btn" onclick="openCustomerHistoryList('${id}','pay')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-          <div style="flex:1; min-width:0;"><div class="t1">Payment history</div><div class="t2">${(c.paymentHistory||[]).length} payment${(c.paymentHistory||[]).length===1?'':'s'} logged</div></div>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px; color:var(--ink-muted);"><path d="M9 18l6-6-6-6"/></svg>
-        </button>
-        <button class="backup-btn" onclick="openCustomerHistoryList('${id}','jobs')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-          <div style="flex:1; min-width:0;"><div class="t1">One-off jobs</div><div class="t2">${linkedJobs.length} job${linkedJobs.length===1?'':'s'} for this customer</div></div>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px; color:var(--ink-muted);"><path d="M9 18l6-6-6-6"/></svg>
-        </button>
-        <button class="backup-btn" onclick="openCustomerHistoryList('${id}','price')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 4 4 5-6"/></svg>
-          <div style="flex:1; min-width:0;"><div class="t1">Price history</div><div class="t2">${(c.priceHistory||[]).length} change${(c.priceHistory||[]).length===1?'':'s'} recorded</div></div>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px; color:var(--ink-muted);"><path d="M9 18l6-6-6-6"/></svg>
-        </button>
-        <button class="backup-btn" style="margin-bottom:0;" onclick="openMessageLog('customer','${id}')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-          <div style="flex:1; min-width:0;"><div class="t1">Messages</div><div class="t2">${(c.messageLog||[]).length} sent</div></div>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px; color:var(--ink-muted);"><path d="M9 18l6-6-6-6"/></svg>
+        <button class="backup-btn" style="margin-bottom:0;" onclick="openCustomerHistoryMenu('${id}', this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <div style="flex:1; min-width:0;"><div class="t1">History and messages</div><div class="t2">${(c.cleanHistory||[]).length} clean${(c.cleanHistory||[]).length===1?'':'s'} · ${(c.paymentHistory||[]).length} payment${(c.paymentHistory||[]).length===1?'':'s'} · ${(c.messageLog||[]).length} sent</div></div>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px; color:var(--ink-muted);"><polyline points="6 9 12 15 18 9"/></svg>
         </button>
       </div>
     </details>
@@ -751,11 +731,11 @@ function openCustomerHistoryList(id, kind){
   if(kind === 'clean'){
     title = 'Clean history';
     rowsHtml = (c.cleanHistory||[]).slice().sort((a,b)=>a.date<b.date?1:-1)
-      .map(e=>`<li style="cursor:pointer;" onclick="openHistEntryActions('${id}','clean','${e.date}',${e.amount})">${fmtDate(e.date)} — ${money(e.amount)}</li>`).join('') || '<li style="color:var(--ink-muted)">No cleans logged yet</li>';
+      .map(e=>`<li style="cursor:pointer;" onclick="openHistEntryActions('${id}','clean','${e.date}',${e.amount}, this)">${fmtDate(e.date)} — ${money(e.amount)}</li>`).join('') || '<li style="color:var(--ink-muted)">No cleans logged yet</li>';
   } else if(kind === 'pay'){
     title = 'Payment history';
     rowsHtml = (c.paymentHistory||[]).slice().sort((a,b)=>a.date<b.date?1:-1)
-      .map(p=>`<li style="cursor:pointer;" onclick="openHistEntryActions('${id}','pay','${p.date}',${p.amount})">${fmtDate(p.date)} — ${money(p.amount)}</li>`).join('') || '<li style="color:var(--ink-muted)">No payments logged yet</li>';
+      .map(p=>`<li style="cursor:pointer;" onclick="openHistEntryActions('${id}','pay','${p.date}',${p.amount}, this)">${fmtDate(p.date)} — ${money(p.amount)}</li>`).join('') || '<li style="color:var(--ink-muted)">No payments logged yet</li>';
   } else if(kind === 'jobs'){
     title = 'One-off jobs';
     const linkedJobs = (data.oneOffJobs||[]).filter(j=>j.customerId===id).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
@@ -764,7 +744,7 @@ function openCustomerHistoryList(id, kind){
   } else {
     title = 'Price history';
     rowsHtml = (c.priceHistory||[]).slice().sort((a,b)=>a.date<b.date?1:-1)
-      .map((p,i)=>`<li style="cursor:pointer;" onclick="openHistEntryActions('${id}','price','${p.date}',${p.price})">${fmtDate(p.date)} — ${money(p.price)}${i===0?' <span style="color:var(--ink-muted); font-weight:500;">(current)</span>':''}</li>`).join('') || '<li style="color:var(--ink-muted)">No price changes recorded</li>';
+      .map((p,i)=>`<li style="cursor:pointer;" onclick="openHistEntryActions('${id}','price','${p.date}',${p.price}, this)">${fmtDate(p.date)} — ${money(p.price)}${i===0?' <span style="color:var(--ink-muted); font-weight:500;">(current)</span>':''}</li>`).join('') || '<li style="color:var(--ink-muted)">No price changes recorded</li>';
   }
   const reviewBtn = kind === 'price' ? `
     <button class="backup-btn" onclick="openSetPriceReviewDate('${id}')">
@@ -841,7 +821,32 @@ function openMessageLog(kind, id){
 // Tapping a clean/payment/price row opens this small menu instead of showing
 // Edit/Remove (and Receipt, for payments) inline on every row — keeps the list
 // itself scannable, with the actions just one tap further in.
-function openHistEntryActions(id, kind, dateVal, amount){
+// The History section of a customer: one button, a drop-down of what to look at.
+function openCustomerHistoryMenu(id, anchor){
+  const c = data.customers.find(x=>x.id===id);
+  if(!c) return;
+  const linked = (data.oneOffJobs || []).filter(j => j.customerId === id).length;
+  openDropdown(anchor, [
+    {label: 'Clean history', hint: String((c.cleanHistory||[]).length), run: () => openCustomerHistoryList(id, 'clean')},
+    {label: 'Payment history', hint: String((c.paymentHistory||[]).length), run: () => openCustomerHistoryList(id, 'pay')},
+    {label: 'One-off jobs', hint: String(linked), run: () => openCustomerHistoryList(id, 'jobs')},
+    {label: 'Price history', hint: String((c.priceHistory||[]).length), run: () => openCustomerHistoryList(id, 'price')},
+    '-',
+    {label: 'Messages', hint: String((c.messageLog||[]).length), run: () => openMessageLog('customer', id)}
+  ], 'History');
+}
+function openHistEntryActions(id, kind, dateVal, amount, anchor){
+  const _label = kind==='clean' ? 'Clean' : kind==='pay' ? 'Payment' : 'Price entry';
+  // Tapped from a row of a history list: a drop-down by the row. (Without a row to hang it from, the sheet below is used.)
+  if(anchor){
+    openDropdown(anchor, [
+      kind === 'pay' ? {label: 'Send receipt…', run: () => openReceiptOptions(id, dateVal, amount, anchor)} : null,
+      {label: kind === 'price' ? 'Edit date or price' : 'Edit amount', run: () => kind === 'price' ? editPriceHistoryEntry(id, dateVal) : editHistAmount(id, kind, dateVal)},
+      '-',
+      {label: 'Remove entry', danger: true, run: () => kind === 'price' ? removePriceHistoryEntry(id, dateVal) : removeHist(id, kind, dateVal)}
+    ], `${_label} — ${fmtDate(dateVal)} · ${money(amount)}`);
+    return;
+  }
   const label = kind==='clean' ? 'Clean' : kind==='pay' ? 'Payment' : 'Price entry';
   openSheet(`
     <div class="sheet-head">

@@ -1138,7 +1138,15 @@ function openPhotoGalleryReturn(){
   openPhotoGallery();
 }
 
-function openRoundReports(){
+function openRoundReports(anchor){
+  if(anchor){
+    openDropdown(anchor, [
+      {label: 'Windows due, by round', run: () => printWindowsDue()},
+      {label: 'Money owed', run: () => printMoneyOwed()},
+      {label: 'Full round lists', run: () => printFullRounds()}
+    ], 'Print');
+    return;
+  }
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">Print</h2>
@@ -1163,7 +1171,22 @@ function openRoundReports(){
 // of covering the whole screen. This is the smaller version of the "two columns" idea: the preview element and the
 // pendingReport* / rp* globals stay single and global, and only where the preview is drawn changes (the same trick the
 // sheets use). The Reports list stays underneath it and comes back when the preview is closed.
-function openReports(){
+function openReports(anchor){
+  if(anchor){
+    openDropdown(anchor, [
+      {label: 'Round cleaning dates — list', run: () => printRoundsLastCleaned()},
+      {label: 'Round cleaning dates — calendar', run: () => printRoundsLastCleanedCalendar()},
+      {label: 'Earnings report', run: () => printEarnings()},
+      {label: 'Daily work done', run: () => printDailyWork()},
+      {label: 'Monthly schedule', run: () => printSchedule()},
+      '-',
+      {label: 'Price review due', run: () => printPriceReview()},
+      {label: 'Upsell opportunities', run: () => printUpsellOpportunities()},
+      {label: 'Property types', run: () => printPropertyTypesReport()},
+      {label: 'Mileage', run: () => printMileageReport()}
+    ], 'Print reports');
+    return;
+  }
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">Print reports</h2>

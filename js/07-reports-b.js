@@ -5,7 +5,7 @@ function printRoundsLastCleaned(){
   const rounds = groupByRound(data.customers);
   const roundNames = Object.keys(rounds).sort((a,b)=>a.localeCompare(b));
   if(!roundNames.length){
-    runPrint('Round Cleaning Dates', '<div class="rpt-empty-note">No rounds yet.</div>', false, false, () => openReports());
+    runPrint('Round Cleaning Dates', '<div class="rpt-empty-note">No rounds yet.</div>', false, false, null);
     return;
   }
   const cutoff = new Date();
@@ -41,12 +41,12 @@ function printRoundsLastCleaned(){
   }).join('');
   const body = `<table class="rpt-table rpt-table-as-tabs"><thead><tr><th>Round</th><th>Dates cleaned (last 5 weeks)</th></tr></thead><tbody>${rows}</tbody></table>
 `;
-  runPrint('Round Cleaning Dates', body, false, false, () => openReports());
+  runPrint('Round Cleaning Dates', body, false, false, null);
 }
 
 function printRoundsLastCleanedCalendar(){
   if(!data.customers.length){
-    runPrint('Round Cleaning Dates — Calendar', '<div class="rpt-empty-note">No rounds yet.</div>', false, false, () => openReports());
+    runPrint('Round Cleaning Dates — Calendar', '<div class="rpt-empty-note">No rounds yet.</div>', false, false, null);
     return;
   }
   const today = new Date();
@@ -99,7 +99,7 @@ function printRoundsLastCleanedCalendar(){
     </table>
 
   `;
-  runPrint('Round Cleaning Dates — Calendar', body, false, false, () => openReports());
+  runPrint('Round Cleaning Dates — Calendar', body, false, false, null);
 }
 
 function printWindowsDue(){
@@ -130,7 +130,7 @@ function printWindowsDue(){
     body += `<table class="rpt-table"><thead><tr><th>Customer</th><th>Last cleaned</th><th>Next due</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>`;
   });
   if(!anyRoundShown) body = '<div class="rpt-empty-note">Nobody\'s due a clean right now.</div>';
-  runPrint('Windows Due, by Round', body, false, false, () => openRoundReports());
+  runPrint('Windows Due, by Round', body, false, false, null);
 }
 
 function printMoneyOwed(){
@@ -159,7 +159,7 @@ function printMoneyOwed(){
     body = `<table class="rpt-table"><thead><tr><th>Round</th><th>Customer</th><th>Last paid</th><th style="text-align:right;">Owed</th></tr></thead><tbody>${rows}</tbody></table>
     <div class="rpt-total" style="border-top:2px solid #10344C; padding-top:10px; margin-top:12px; font-size:16px;">Total outstanding: ${money(total)}</div>`;
   }
-  runPrint('Money Owed', body, false, false, () => openRoundReports());
+  runPrint('Money Owed', body, false, false, null);
 }
 
 function printFullRounds(){
@@ -195,7 +195,7 @@ function printFullRounds(){
     const grandAvg = grandCount ? grandTotal/grandCount : 0;
     body += `<div class="rpt-total" style="border-top:2px solid #10344C; padding-top:10px; margin-top:16px; font-size:16px;">Grand total (all rounds): ${grandCount} customers · ${money(grandTotal)} · Avg: ${money(grandAvg)}</div>`;
   }
-  runPrint('Full Round Lists', body, false, false, () => openRoundReports());
+  runPrint('Full Round Lists', body, false, false, null);
 }
 
 function printSingleRound(roundName){
@@ -543,7 +543,7 @@ function printPriceReview(){
   belowAvg.sort((a,b)=> b.gap - a.gap);
 
   if(!flagged.length && !belowAvg.length){
-    runPrint('Price Review Due', '<div class="rpt-empty-note">Nobody is due a price review right now.</div>', false, false, () => openReports());
+    runPrint('Price Review Due', '<div class="rpt-empty-note">Nobody is due a price review right now.</div>', false, false, null);
     return;
   }
 
@@ -574,7 +574,7 @@ function printPriceReview(){
   ` : '';
 
   const body = firstTable + secondTable;
-  runPrint('Price Review Due', body, false, false, () => openReports());
+  runPrint('Price Review Due', body, false, false, null);
 }
 
 // Flat, easy-to-tweak uplift figures per reason. frontsToBacks is a fraction
@@ -622,7 +622,7 @@ function printUpsellOpportunities(){
   const opportunities = upsellOpportunitiesList();
 
   if(!opportunities.length){
-    runPrint('Upsell Opportunities', '<div class="rpt-empty-note">No upsell opportunities spotted right now.</div>', false, false, () => openReports());
+    runPrint('Upsell Opportunities', '<div class="rpt-empty-note">No upsell opportunities spotted right now.</div>', false, false, null);
     return;
   }
 
@@ -638,7 +638,7 @@ function printUpsellOpportunities(){
     <div class="rpt-total" style="border-top:2px solid #10344C; padding-top:10px; margin-top:12px; font-size:16px;">Total potential uplift: ${money(totalUplift)}</div>
 
   `;
-  runPrint('Upsell Opportunities', body, false, false, () => openReports());
+  runPrint('Upsell Opportunities', body, false, false, null);
 }
 
 function printPropertyTypesReport(){
@@ -646,7 +646,7 @@ function printPropertyTypesReport(){
   // out everywhere else (e.g. the Rounds tab, the exported summary sheet).
   const active = data.customers.filter(c=>!c.paused);
   if(!active.length){
-    runPrint('Property Types Report', '<div class="rpt-empty-note">No customers recorded yet.</div>', false, false, () => openReports());
+    runPrint('Property Types Report', '<div class="rpt-empty-note">No customers recorded yet.</div>', false, false, null);
     return;
   }
   // "Not recorded" catches anyone with no property type set — since the field
@@ -684,7 +684,7 @@ function printPropertyTypesReport(){
     ${roundSections}
 
   `;
-  runPrint('Property Types Report', body, false, false, () => openReports());
+  runPrint('Property Types Report', body, false, false, null);
 }
 
 // UK tax year runs 6 April to 5 April the following year — returns the ISO
@@ -751,7 +751,7 @@ function printMileageReport(){
   });
   const roundWorkedText = date => roundsByDate[date] ? Array.from(roundsByDate[date]).sort((a,b)=>a.localeCompare(b)).join(', ') : '—';
   if(!entries.length){
-    runPrint('Mileage Report', '<div class="rpt-empty-note">No mileage logged yet — use the mileage tile on the Today tab to start.</div>', false, false, () => openReports());
+    runPrint('Mileage Report', '<div class="rpt-empty-note">No mileage logged yet — use the mileage tile on the Today tab to start.</div>', false, false, null);
     return;
   }
   const today = todayISO();
@@ -806,7 +806,7 @@ function printMileageReport(){
     <div class="rpt-round-title">Daily mileage</div>
     <table class="rpt-table"><thead><tr><th>Date</th><th>Round worked</th><th style="text-align:right;">Miles</th></tr></thead><tbody>${dailyRows}</tbody></table>
   `;
-  runPrint('Mileage Report', body, false, false, () => openReports());
+  runPrint('Mileage Report', body, false, false, null);
 }
 
 function printEarnings(){
@@ -823,7 +823,7 @@ function printEarnings(){
   });
 
   if(!payments.length){
-    runPrint('Earnings Report', '<div class="rpt-empty-note">No payments recorded yet.</div>', false, false, () => openReports());
+    runPrint('Earnings Report', '<div class="rpt-empty-note">No payments recorded yet.</div>', false, false, null);
     return;
   }
 
@@ -863,7 +863,7 @@ function printEarnings(){
       </tbody>
     </table>
   `;
-  runPrint('Earnings Report', body, false, false, () => openReports());
+  runPrint('Earnings Report', body, false, false, null);
 }
 
 function printDailyWork(){
@@ -909,7 +909,7 @@ function printDailyWork(){
       30-day total: ${money(grandTotal)} across ${grandCount} clean${grandCount===1?'':'s'}/job${grandCount===1?'':'s'}
     </div>
   `;
-  runPrint('Daily Work Done — Last 30 Days', body, false, false, () => openReports());
+  runPrint('Daily Work Done — Last 30 Days', body, false, false, null);
 }
 
 function printSchedule(){
@@ -985,6 +985,6 @@ function printSchedule(){
     </table>
     ${longNotes.length ? `<div class="rpt-notes"><b>Notes in full</b>${longNotes.map(n => `<div>📝 <b>${escapeHtml(fmtDate(n.iso))}</b> — ${escapeHtml(n.note)}</div>`).join('')}</div>` : ''}
   `;
-  runPrint('Monthly Schedule', body, false, false, () => openReports());
+  runPrint('Monthly Schedule', body, false, false, null);
 }
 

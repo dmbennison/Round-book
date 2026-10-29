@@ -207,8 +207,8 @@ function openDropdown(anchor, items, title){
   if(ctxAnchor === anchor && Date.now() - ctxSuppressAt < 500){ ctxSuppressAt = 0; return; }
   const r = anchor.getBoundingClientRect();
   const lowerHalf = r.top > window.innerHeight / 2;
-  ctxAnchor = anchor;
   openContextMenu(r.right, lowerHalf ? r.top - 8 : r.bottom + 8, items, title, false);
+  ctxAnchor = anchor;
 }
 function closeContextMenu(){
   if(ctxMenuEl){ ctxMenuEl.remove(); ctxMenuEl = null; }
@@ -217,6 +217,7 @@ function closeContextMenu(){
 // items: {label, run, hint?, danger?} objects, or '-' for a divider. Opens at (x, y), flipping to stay on screen.
 function openContextMenu(x, y, items, title, focusFirst){
   closeContextMenu();
+  ctxAnchor = null; // openDropdown sets it again just after, when the menu hangs from a button
   // Tidy the dividers so the menu never starts, ends or doubles up on one.
   const list = [];
   items.forEach(it => { if(it === '-'){ if(list.length && list[list.length - 1] !== '-') list.push('-'); } else if(it) list.push(it); });
@@ -227,6 +228,7 @@ function openContextMenu(x, y, items, title, focusFirst){
   el.setAttribute('role', 'menu');
   el.innerHTML = (title ? `<div class="ctx-title">${escapeHtml(title)}</div>` : '') + list.map((it, i) => it === '-'
     ? `<div class="ctx-sep" role="separator"></div>`
+    : it.info ? `<div class="ctx-info">${escapeHtml(it.info)}</div>`
     : `<button type="button" role="menuitem" class="ctx-item${it.danger ? ' danger' : ''}" data-i="${i}"><span>${escapeHtml(it.label)}</span>${it.hint ? `<span class="ctx-hint">${escapeHtml(it.hint)}</span>` : ''}</button>`).join('');
   el.style.visibility = 'hidden';
   document.body.appendChild(el);

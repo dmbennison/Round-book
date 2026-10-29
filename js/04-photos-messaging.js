@@ -970,13 +970,26 @@ function cancelDefer(id){
    One "Defer" entry point, for a single customer or a whole round, offering
    1 day / 1 week / 4 weeks or an exact custom date — rather than several
    separate buttons for a fixed +4 weeks and a separate "set exact date". */
-function openDeferSheet(scope, idOrRoundName){
+function openDeferSheet(scope, idOrRoundName, anchor){
   const isRound = scope === 'round';
   const c = isRound ? null : data.customers.find(x=>x.id===idOrRoundName);
   if(!isRound && !c) return;
   const custs = isRound ? data.customers.filter(x=>x.round===idOrRoundName && !x.paused) : [c];
   if(isRound && !custs.length){ toast('No active customers in this round'); return; }
   const currentlyDeferred = !isRound && c.deferUntil;
+  // From a button: a drop-down of how long to defer by. (Without a button to hang it from, the sheet below is used.)
+  if(anchor){
+    openDropdown(anchor, [
+      currentlyDeferred ? {info: `Currently deferred to ${fmtDate(c.deferUntil)}`} : (isRound ? {info: `Applies to all ${custs.length} active customer${custs.length===1?'':'s'}`} : null),
+      {label: '1 day', run: () => applyDefer(scope, idOrRoundName, 1)},
+      {label: '1 week', run: () => applyDefer(scope, idOrRoundName, 7)},
+      {label: '4 weeks', run: () => applyDefer(scope, idOrRoundName, 28)},
+      {label: 'Custom date…', run: () => openDeferCustomDate(scope, idOrRoundName)},
+      currentlyDeferred ? '-' : null,
+      currentlyDeferred ? {label: 'Cancel deferral', danger: true, run: () => cancelDefer(idOrRoundName)} : null
+    ], 'Defer');
+    return;
+  }
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">Defer</h2>
@@ -1039,7 +1052,7 @@ function openDeferCustomDate(scope, idOrRoundName){
     <div class="form-actions">
       <button class="btn-primary" onclick="saveDeferCustomDate('${scope}','${escapeAttr(idOrRoundName)}')">Save</button>
     </div>
-  `, () => openDeferSheet(scope, idOrRoundName));
+  `, () => render());
 }
 function saveDeferCustomDate(scope, idOrRoundName){
   const v = document.getElementById('defer_date_input').value;
@@ -1483,16 +1496,23 @@ function sendReceipt(id, dateISO, amount){
     name: firstName, amount: Number(amount), company, date: fmtDate(dateISO), yourname
   });
   if(mobile){
-    openMessagePreview('Send receipt', c.phone, msg, null, () => openReceiptOptions(id, dateISO, amount), {item: c, kind: 'receipt'});
+    openMessagePreview('Send receipt', c.phone, msg, null, () => openCustomerHistoryList(id, 'pay'), {item: c, kind: 'receipt'});
   } else {
     window.location.href = `mailto:${mailtoAddress(c.email)}?subject=${encodeURIComponent('Receipt')}&body=${encodeURIComponent(msg)}`;
   }
 }
 
-function openReceiptOptions(id, dateISO, amount){
+function openReceiptOptions(id, dateISO, amount, anchor){
   const c = data.customers.find(x=>x.id===id);
   if(!c) return;
   const mobile = isMobileNumber(c.phone);
+  if(anchor){
+    openDropdown(anchor, [
+      (mobile||c.email) ? {label: 'Quick text message', hint: mobile ? (messagingAppFor(c.phone)==='whatsapp' ? 'WhatsApp' : 'Text') : 'Email', run: () => sendReceipt(id, dateISO, amount)} : null,
+      {label: 'Formatted receipt', hint: 'Print or PDF', run: () => printReceipt(id, dateISO, amount)}
+    ], `Send receipt · ${money(amount)}`);
+    return;
+  }
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">Send receipt</h2>
@@ -1507,7 +1527,7 @@ function openReceiptOptions(id, dateISO, amount){
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
       <div><div class="t1">Formatted receipt</div><div class="t2">Print it or send a PDF copy via WhatsApp</div></div>
     </button>
-  `, () => openHistEntryActions(id, 'pay', dateISO, amount));
+  `, () => openCustomerHistoryList(id, 'pay'));
 }
 
 function printReceipt(customerId, dateISO, amount){
@@ -1564,7 +1584,7 @@ function printReceipt(customerId, dateISO, amount){
       Thank you for your payment.${fromLine ? '<br>' + escapeHtml(fromLine) : ''}
     </div>
   `;
-  runPrint(`Receipt — ${c.address || c.name || receiptNumber}`, body, true, true, () => openReceiptOptions(customerId, dateISO, amount), c.phone);
+  runPrint(`Receipt — ${c.address || c.name || receiptNumber}`, body, true, true, () => openCustomerHistoryList(customerId, 'pay'), c.phone);
 }
 
 

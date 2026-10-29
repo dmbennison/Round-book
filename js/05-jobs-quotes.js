@@ -561,7 +561,7 @@ function openQuoteDetail(id){
           <button class="btn" style="background:var(--blue-dim); color:var(--blue-deep);" onclick="printQuote('${id}')">🖨️ Print quote</button>
         </div>
         ${!converted ? `
-          <button class="btn" style="width:100%; background:var(--amber-dim); color:var(--amber); margin-bottom:10px;" onclick="openQuoteFollowUp('${id}')">🔔 Follow up${sentCount ? ` <span style="font-weight:600; opacity:0.8;">(chased ${sentCount} time${sentCount===1?'':'s'})</span>` : ''}</button>
+          <button class="btn" style="width:100%; background:var(--amber-dim); color:var(--amber); margin-bottom:10px;" onclick="openQuoteFollowUp('${id}', this)">🔔 Follow up${sentCount ? ` <span style="font-weight:600; opacity:0.8;">(chased ${sentCount} time${sentCount===1?'':'s'})</span>` : ''}</button>
           <button class="btn" style="width:100%; background:var(--blue-dim); color:var(--blue-deep); margin-bottom:10px;" onclick="openConvertQuoteToCustomer('${id}')">👤 Convert to customer</button>
           <button class="btn" style="width:100%; background:var(--green-dim); color:var(--green);" onclick="convertQuoteToJob('${id}')">🔧 Convert to job</button>
         ` : ''}
@@ -613,11 +613,19 @@ function saveQuoteDetailNotes(id){
 // Follow up = either send the (softer each time) follow-up text/email, or just
 // record a call you made. Both count as a chase, so the next reminder is pushed
 // further out the same way a sent follow-up already does.
-function openQuoteFollowUp(id){
+function openQuoteFollowUp(id, anchor){
   const q = data.quotes.find(x=>x.id===id);
   if(!q) return;
   const canSend = isMobileNumber(q.phone) || !!q.email;
   const n = q.quoteFollowUpCount || 0;
+  if(anchor){
+    openDropdown(anchor, [
+      {info: n ? `You've chased this quote ${n} time${n===1?'':'s'} so far.` : 'Not chased yet.'},
+      canSend ? {label: `Send a follow-up ${isMobileNumber(q.phone)?'text':'email'}`, run: () => sendQuoteText(id, 'followup')} : {info: 'No mobile number or email to send to'},
+      {label: 'I called them', run: () => logQuoteCall(id)}
+    ], 'Follow up');
+    return;
+  }
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">Follow up</h2>

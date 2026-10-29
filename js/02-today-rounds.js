@@ -1507,7 +1507,7 @@ function renderRoundsList(main){
   let html = `<div style="display:flex; align-items:center; justify-content:flex-end; margin-bottom:12px; gap:8px;">
     <div style="display:flex; align-items:center; gap:8px;">
       ${mainScreenHelpBtn('rounds', "()=>setTab('rounds')")}
-      <button class="btn-open icon-plain" style="width:38px; height:38px; padding:0;" onclick="openRoundReports()" aria-label="Print reports">
+      <button class="btn-open icon-plain" style="width:38px; height:38px; padding:0;" onclick="openRoundReports(this)" aria-label="Print reports">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
       </button>
     </div>
@@ -1687,7 +1687,7 @@ function openRoundActionsMenu(rn, anchor){
     {label: 'Show map', run: () => showRoundMap(rn)},
     {label: 'Print this round', run: () => printSingleRound(rn)},
     '-',
-    {label: 'Defer…', run: () => openDeferSheet('round', rn)},
+    {label: 'Defer…', run: () => openDeferSheet('round', rn, anchor)},
     {label: 'Apply price uplift…', run: () => openRoundUpliftSheet(rn)},
     '-',
     {label: 'Help', run: () => openFocusedHelp('rounds', () => render())}

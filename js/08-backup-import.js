@@ -143,9 +143,9 @@ async function shareRoundBook(){
 function openMoreMenu(anchor){
   anchor = anchor || document.querySelector('header [aria-label="More"]');
   openDropdown(anchor, [
-    {label: 'Reports', run: () => openReports()},
+    {label: 'Reports ▸', run: () => openReports(anchor)},
     {label: 'Photo gallery', run: () => openPhotoGallery()},
-    {label: 'Backup', run: () => openBackup()},
+    {label: 'Backup ▸', run: () => openBackup(anchor)},
     {label: 'Message other device', run: () => openMessageDevice()},
     '-',
     {label: 'Check for updates', hint: 'v' + formatVersion(APP_VERSION), run: () => checkForUpdates()},
@@ -403,7 +403,7 @@ function openHelp(returnTo){
       'Install it as an app: in Safari tap Share → <b>Add to Home Screen</b>.',
       'The four tabs are <b>Today</b>, <b>Schedule</b>, <b>Work</b> (with <b>Rounds</b> and <b>Jobs</b> underneath) and <b>Sales</b> (with <b>Quotes</b> and <b>Marketing</b> underneath).',
       'The blue <b>+</b> button adds a customer, job or quote, depending on the screen you are on.',
-      'The top bar has <b>Search</b> (it forgives typos, treats Rd as Road and so on, and lists the closest matches first; tap <b>📅</b> beside the box, or type a date like 14/10, to see everything recorded on that day), the <b>⋯</b> menu (Reports, Photo gallery, Backup, <b>Message other device</b>, <b>Check for updates</b> and About) and <b>Settings</b>.',
+      'Menus open as drop-downs under the button you tapped; tap it again, or anywhere else, to close them. The top bar has <b>Search</b> (it forgives typos, treats Rd as Road and so on, and lists the closest matches first; tap <b>📅</b> beside the box, or type a date like 14/10, to see everything recorded on that day), the <b>⋯</b> menu (Reports, Photo gallery, Backup, <b>Message other device</b>, <b>Check for updates</b> and About) and <b>Settings</b>.',
       'Tap the <b>🎤</b> in any text box to speak instead of typing.',
       'A <b>?</b> button next to a screen’s title opens help for just that screen.',
       'On an iPad or computer you can also right-click a card for its actions, and use the keyboard: <b>J</b> / <b>K</b> to move down and up the list, <b>Enter</b> to open, <b>C</b> for cleaned and <b>P</b> for paid.'
@@ -438,7 +438,43 @@ function formatBytes(bytes){
   return (bytes/(1024*1024*1024)).toFixed(1) + ' GB';
 }
 
-async function openBackup(){
+// Backup & restore as a drop-down: the same choices as the full Backup screen, with the last-backup line (and any
+// storage or protection warning) as the first lines of the menu.
+async function openBackupDropdown(anchor){
+  const count = data.customers.length;
+  const days = daysSinceBackup();
+  const lastText = days === Infinity ? "You haven't backed up yet" : days === 0 ? 'Backed up today' : `Last backup: ${days} day${days===1?'':'s'} ago`;
+  const info = [{info: lastText}];
+  try{
+    const estimate = await getStorageEstimate();
+    if(estimate){
+      const pct = Math.round((estimate.usage / estimate.quota) * 100);
+      if(pct >= 80) info.push({info: `⚠️ Storage is ${pct}% full. Back up now and consider deleting old photos.`});
+    }
+    if(navigator.storage && navigator.storage.persisted && !(await navigator.storage.persisted()))
+      info.push({info: "⚠️ Your phone hasn't promised to keep this data if it runs low on space, so keep a backup in iCloud Drive."});
+  }catch(e){}
+  let safetyCount = 0;
+  try{ safetyCount = (await listSafetyCopies()).length; }catch(e){}
+  openDropdown(anchor, info.concat([
+    '-',
+    {label: 'Export backup', hint: count + (count === 1 ? ' customer' : ' customers'), run: () => exportData()},
+    {label: 'Sync with another device…', run: () => openSyncSheet()},
+    {label: 'Safety copies', hint: String(safetyCount), run: () => openSafetyCopies()},
+    '-',
+    {label: 'Export as Excel', run: () => exportExcel()},
+    {label: 'Export customers (CSV)', run: () => exportCustomersCSV()},
+    {label: 'Export contacts', run: () => exportContacts()},
+    {label: 'Export for accounting software…', run: () => openAccountingExport()},
+    '-',
+    {label: 'Restore from backup…', run: () => document.getElementById('importFile').click()},
+    {label: 'Import customers from spreadsheet…', run: () => document.getElementById('importSpreadsheetFile').click()},
+    '-',
+    {label: 'Help', run: () => openFocusedHelp('backup', () => render())}
+  ]), 'Backup & restore');
+}
+async function openBackup(anchor){
+  if(anchor){ await openBackupDropdown(anchor); return; }
   const count = data.customers.length;
   const days = daysSinceBackup();
   const lastText = days === Infinity ? "You haven't backed up yet" : days === 0 ? "Backed up today" : `Last backup: ${days} day${days===1?'':'s'} ago`;
