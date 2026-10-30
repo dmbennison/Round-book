@@ -4,6 +4,17 @@ ROUND BOOK - RELEASE NOTES
 Newest first. This file is not part of the app and is not loaded by it; it ships alongside the code files.
 To add a release: raise APP_VERSION in js/01-data.js and CACHE_NAME in sw.js to the same number, then put a new entry at the top of this list.
 
+Version 3.30
+  - Review pass for consistency: one wording ("You're offline - connect to the internet and try again") is now used
+    everywhere the app needs a signal, in place of four different messages
+  - Deleting a customer, job or quote no longer shows a grey "Deleted" message on top of the red Undo bar; the bar
+    alone confirms it (this also fixes "Deleted job at job" when there was no address)
+  - The Schedule day note's Delete button now reads Remove note, like every other note
+  - Every pop-up's close button (and the Undo bar's) now has a spoken label for VoiceOver
+  - The Today Start / Stop / round buttons are a little bigger and easier to tap
+  - User guide: the Today section is split into short points (phone and iPad upright / iPad sideways and computer /
+    messages), and the Customers and Today sections mention the delete Undo bar and the offline message
+
 Version 3.29
   - More drop-down menus in place of pop-up lists: the printer button on Rounds, Reports and Backup (both open from
     the ⋯ menu, which now shows Reports ▸ and Backup ▸), a customer's History and messages, the action menu on a
