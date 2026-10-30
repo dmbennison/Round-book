@@ -78,7 +78,7 @@ function openMessageDevice(){
   openSheet(`
     <div class="sheet-head">
       <h2>Message other device</h2>
-      <button class="sheet-close" onclick="closeSheet()">\u2715</button>
+      <button class="sheet-close" onclick="closeSheet()" aria-label="Close">\u2715</button>
     </div>
     <p style="color:var(--ink-muted); font-size:0.8125rem; line-height:1.45; margin:0 0 10px;">Pops up as a card at the top of Today on your other device until it is dismissed, and you'll be told when it has been read.${liveActive ? '' : ' Live sync isn\u2019t switched on here, so it only gets there when you next sync.'}</p>
     <textarea id="msgText" maxlength="${MSG_MAX_LEN}" rows="3" placeholder="e.g. Mrs Patel wants the gutters done too" style="width:100%; box-sizing:border-box; padding:12px; border:1.5px solid var(--line); border-radius:12px; font:inherit; font-size:1rem; background:var(--surface); color:var(--ink); resize:vertical;"></textarea>

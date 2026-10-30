@@ -876,7 +876,7 @@ function seNoteOpen(iso){
     <p class="se-note">A reminder for the day — it shows on the calendar and on Today once you Commit.</p>
     <textarea id="seNoteText" maxlength="300" placeholder="e.g. Dentist at 2 — finish by 1pm">${escapeHtml(cur)}</textarea>
     <div class="se-btn-row">
-      ${cur ? `<button class="se-btn danger" onclick="seNoteApply('${iso}', true)">Delete</button>` : `<button class="se-btn" onclick="seCloseModal()">Cancel</button>`}
+      ${cur ? `<button class="se-btn danger" onclick="seNoteApply('${iso}', true)">Remove note</button>` : `<button class="se-btn" onclick="seCloseModal()">Cancel</button>`}
       <button class="se-btn primary" onclick="seNoteApply('${iso}', false)">Save note</button>
     </div>
   `);

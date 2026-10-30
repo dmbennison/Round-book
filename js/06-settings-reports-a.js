@@ -227,7 +227,7 @@ function openSettings(){
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">Settings</h2>
       ${helpIconBtn('settings', () => openSettings())}
-      <button class="sheet-close" onclick="closeSheet()">✕</button>
+      <button class="sheet-close" onclick="closeSheet()" aria-label="Close">✕</button>
     </div>
     <div class="section-label" style="margin-top:0;">Appearance</div>
     <div class="seg-row">
@@ -310,7 +310,7 @@ function openMileageRates(year){
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">Mileage rates</h2>
-      <button class="sheet-close" onclick="closeSheet()">✕</button>
+      <button class="sheet-close" onclick="closeSheet()" aria-label="Close">✕</button>
     </div>
     <p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 14px; line-height:1.5;">HMRC's approved mileage rates are set per tax year (6 April – 5 April). Whatever you save here applies to <b>all</b> the mileage in that tax year — including days you've already logged — in the mileage report. Other tax years aren't affected. The standard car/van rate is 45p for the first 10,000 miles, then 25p.</p>
     <div class="section-label" style="margin-top:0;">Tax year</div>
@@ -375,7 +375,7 @@ function openMessageTemplates(){
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">Message templates</h2>
-      <button class="sheet-close" onclick="closeSheet()">✕</button>
+      <button class="sheet-close" onclick="closeSheet()" aria-label="Close">✕</button>
     </div>
     <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 12px; line-height:1.5;">Tap a message to edit its wording. Use <b>{name}</b>, <b>{amount}</b>, <b>{date}</b> (receipts), <b>{work}</b> (quotes), <b>{daysoverdue}</b> (payment reminders), <b>{price}</b> (photo offers — becomes "for £X" if you enter a price), <b>{company}</b>, <b>{yourname}</b>, and <b>{bankdetails}</b> (only appears if you've added bank details under Business details). The payment reminder automatically switches to the "2nd+ chase" wording from the second reminder onwards for that customer or job, and quote follow-ups get progressively softer the same way.</p>
     ${TEMPLATE_DEFS.map(def=>{
@@ -398,7 +398,7 @@ function openEditTemplate(key){
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">${escapeHtml(def.label)}</h2>
-      <button class="sheet-close" onclick="closeSheet()">✕</button>
+      <button class="sheet-close" onclick="closeSheet()" aria-label="Close">✕</button>
     </div>
     <label style="margin-top:0;">Message</label>
     <textarea id="tpl_edit_text" rows="7">${escapeHtml(val)}</textarea>
@@ -442,7 +442,7 @@ function openBusinessDetails(){
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">Business details</h2>
-      <button class="sheet-close" onclick="closeSheet()">✕</button>
+      <button class="sheet-close" onclick="closeSheet()" aria-label="Close">✕</button>
     </div>
     <div class="section-label" style="margin-top:0;">Company name</div>
     <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 10px; line-height:1.5;">Shown on printed reports and invoices, and available as the <b>{company}</b> token in text messages.</p>
@@ -557,7 +557,7 @@ function openCampaignDetail(id){
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">${escapeHtml(camp.name)}</h2>
-      <button class="sheet-close" onclick="marketingDetailCampaignId=null; closeSheet();">✕</button>
+      <button class="sheet-close" onclick="marketingDetailCampaignId=null; closeSheet();" aria-label="Close">✕</button>
     </div>
     <label style="margin-top:0;">Name</label>
     <input type="text" id="camp_name" value="${escapeAttr(camp.name)}" placeholder="e.g. Spring gutter offer">
@@ -685,7 +685,7 @@ function openMarketingResponseEditor(id){
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">${escapeHtml(c.address||c.name||'Customer')}</h2>
-      <button class="sheet-close" onclick="closeSheet()">✕</button>
+      <button class="sheet-close" onclick="closeSheet()" aria-label="Close">✕</button>
     </div>
     <label style="margin-top:0;">Response</label>
     <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:18px;">${statusButtons}</div>
@@ -748,7 +748,7 @@ function openUniversalSearch(){
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">Search</h2>
-      <button class="sheet-close" onclick="closeSheet()">✕</button>
+      <button class="sheet-close" onclick="closeSheet()" aria-label="Close">✕</button>
     </div>
     <div style="display:flex; gap:8px; align-items:center; margin-bottom:14px;">
       <input type="text" id="search_input" placeholder="Customers, jobs, quotes, rounds, or a date..." oninput="searchTyped()" style="margin:0; flex:1; min-width:0;">
@@ -1083,7 +1083,7 @@ function openPhotoGallery(){
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">Photo gallery</h2>
-      <button class="sheet-close" onclick="closeSheet()">✕</button>
+      <button class="sheet-close" onclick="closeSheet()" aria-label="Close">✕</button>
     </div>
     <input type="text" id="gallery_search_input" placeholder="Filter by address or name..." oninput="galleryLimit = GALLERY_PAGE; renderPhotoGallery()" style="margin-top:0; margin-bottom:14px;">
     <div id="gallery_results"></div>
@@ -1150,7 +1150,7 @@ function openRoundReports(anchor){
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">Print</h2>
-      <button class="sheet-close" onclick="closeSheet()">✕</button>
+      <button class="sheet-close" onclick="closeSheet()" aria-label="Close">✕</button>
     </div>
     <button class="backup-btn" onclick="printWindowsDue()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
@@ -1191,7 +1191,7 @@ function openReports(anchor){
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">Print reports</h2>
       ${helpIconBtn('reports', () => openReports())}
-      <button class="sheet-close" onclick="closeSheet()">✕</button>
+      <button class="sheet-close" onclick="closeSheet()" aria-label="Close">✕</button>
     </div>
     <p style="color:var(--ink-muted); font-size:0.8438rem; line-height:1.5; margin:0 2px 16px;">
       Opens a preview you can zoom and scroll, with buttons to Print, Share PDF or Share doc — works offline too.

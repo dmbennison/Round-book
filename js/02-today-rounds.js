@@ -284,7 +284,7 @@ function openMileageEntry(forceMode){
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">${mode==='start' ? 'Start of day mileage' : 'End of day mileage'}</h2>
-      <button class="sheet-close" onclick="closeSheet()">✕</button>
+      <button class="sheet-close" onclick="closeSheet()" aria-label="Close">✕</button>
     </div>
     <label style="margin-top:0;">Odometer reading now</label>
     <input type="number" id="mileage_input" inputmode="decimal" step="0.1" min="0" value="${mode==='start' ? suggestedStart : (entry && entry.end!=null ? entry.end : '')}" placeholder="e.g. 45210">
@@ -322,7 +322,7 @@ function openMileageSummary(){
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">Today's mileage</h2>
-      <button class="sheet-close" onclick="closeSheet()">✕</button>
+      <button class="sheet-close" onclick="closeSheet()" aria-label="Close">✕</button>
     </div>
     <div class="summary-overall" style="margin-bottom:16px;">
       <div class="stat"><div class="num">${entry.start}</div><div class="lbl">Start</div></div>
@@ -371,7 +371,7 @@ function openMissingMileagePrompt(entry){
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">Missing end mileage</h2>
-      <button class="sheet-close" onclick="closeSheet()">✕</button>
+      <button class="sheet-close" onclick="closeSheet()" aria-label="Close">✕</button>
     </div>
     <p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 16px; line-height:1.5;">You logged a start reading of <b>${entry.start}</b> on ${fmtDate(entry.date)} but never logged an end reading for that day. Enter it now so that day's mileage is counted.</p>
     <label style="margin-top:0;">End of day odometer reading</label>
@@ -1132,7 +1132,7 @@ function renderSuggestedRoutePreview(rn, orderedCusts, notLocated, usedCurrentLo
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">Suggested order${scopeLabel ? ` · ${escapeHtml(scopeLabel)}` : ''}</h2>
-      <button class="sheet-close" onclick="suggestedRouteState=null; closeSheet();">✕</button>
+      <button class="sheet-close" onclick="suggestedRouteState=null; closeSheet();" aria-label="Close">✕</button>
     </div>
     <div style="margin:0 2px 10px;">${methodPill}</div>
     <p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 14px; line-height:1.5;">
@@ -1222,7 +1222,7 @@ function renderRoundMapSheet(rn, customers, fallbackCoords){
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">${escapeHtml(rn)} — map${roundScopeLabel(rn) ? ` · ${escapeHtml(roundScopeLabel(rn))}` : ''}</h2>
-      <button class="sheet-close" onclick="destroyRoundMap(); closeSheet();">✕</button>
+      <button class="sheet-close" onclick="destroyRoundMap(); closeSheet();" aria-label="Close">✕</button>
     </div>
     ${approxCount ? `<p style="color:var(--amber); font-size:0.75rem; margin:0 2px 10px; line-height:1.4; font-weight:700;">📍 ${approxCount} address${approxCount===1?'':'es'} couldn't be found automatically — shown as a grey dashed pin near the others. Drag ${approxCount===1?'it':'them'} to the right spot to fix.</p>` : ''}
     <div id="roundMapEl" style="height:min(65vh, 520px); border-radius:14px; overflow:hidden; background:var(--surface); border:1px solid var(--box-border); margin-bottom:12px;"></div>
@@ -1706,7 +1706,7 @@ function openRoundNoteSheet(rn){
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">${note ? 'Edit note' : 'Add note'}</h2>
-      <button class="sheet-close" onclick="closeSheet()">✕</button>
+      <button class="sheet-close" onclick="closeSheet()" aria-label="Close">✕</button>
     </div>
     <div style="color:var(--ink-muted); font-size:0.8125rem; font-weight:600; margin-bottom:8px;">${escapeHtml(rn)}</div>
     <textarea id="rn_note" rows="4" placeholder="e.g. Park on the green, side gates locked until 9...">${escapeHtml(note)}</textarea>

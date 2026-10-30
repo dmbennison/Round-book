@@ -165,7 +165,7 @@ function openInfo(){
   openSheet(`
     <div class="sheet-head">
       <h2>About Round Book</h2>
-      <button class="sheet-close" onclick="closeSheet()">✕</button>
+      <button class="sheet-close" onclick="closeSheet()" aria-label="Close">✕</button>
     </div>
     <p style="color:var(--ink); font-size:0.875rem; line-height:1.6; margin:0 2px 16px;">
       Round Book is a simple, offline window cleaning round tracker — built to keep on top of customers, rounds, cleaning and payment dates, all stored privately on your own phone.
@@ -228,11 +228,23 @@ const FOCUSED_HELP = {
     title: 'Today',
     body: () => [
       helpP('Your home screen. The big card shows who is due today and how much you have cleaned and been paid so far. Tap a tile to see its list.'),
-      helpP('On a phone (or an iPad held upright), press <b>▶ Start</b> under the big card to swap the tiles for today’s to-do list, in the order you visit them. Swipe the cards just like on the Rounds screen. A note sent from your other device (⋯ menu > <b>Message other device</b>) shows as a card at the top until you tap <b>Got it</b>. On an iPad held sideways or a computer, Today has the big card on the left with the Text and Mileage tiles under it, and the customers who owe on the right, most overdue first. The big card shrinks to the totals and progress bar while the list is running. A customer can only be marked cleaned once a day, so swiping right on a finished card does nothing: swipe left, or use Mark paid, to record the payment. A card also shows what the customer <b>owes</b> (red) or has in <b>credit</b> (green). The bar at the bottom of the big card shows how much of today is done. <b>■ Stop</b> brings the tiles back.'),
+      helpP('<b>On a phone (or an iPad held upright)</b>'),
+      helpList([
+        'Press <b>▶ Start</b> under the big card to swap the tiles for today’s to-do list, in the order you visit them. Swipe the cards just like on the Rounds screen. <b>■ Stop</b> brings the tiles back.',
+        'While the list is running the big card shrinks to the totals and a progress bar showing how much of today is done.',
+        'A customer can only be marked cleaned once a day, so swiping right on a finished card does nothing: swipe left, or use Mark paid, to record the payment.',
+        'A card also shows what the customer <b>owes</b> (red) or has in <b>credit</b> (green).'
+      ]),
+      helpP('<b>On an iPad held sideways or a computer</b>'),
+      helpList([
+        'The big card is on the left with the Text and Mileage tiles under it, and the customers who owe are on the right, most overdue first. There is no Start / Stop here.'
+      ]),
+      helpP('<b>Messages from your other device</b> (⋯ menu > <b>Message other device</b>) show as a card at the top until you tap <b>Got it</b>. The sender is then told it has been read.'),
       helpList([
         '<b>Mileage</b> – tap in the morning to log your start reading, and again in the evening for your end reading.',
         'A 📝 note you left on today in the Schedule shows above the big card and stays there as you scroll the list.',
-        'The green <b>call button</b> on a customer’s card asks whether to <b>Call</b> or <b>Text</b> (a landline just calls).'
+        'The green <b>call button</b> on a customer’s card asks whether to <b>Call</b> or <b>Text</b> (a landline just calls).',
+        'If a button says you are offline, connect to the internet and try again – everything else works without a signal.'
       ])
     ]
   },
@@ -286,6 +298,7 @@ const FOCUSED_HELP = {
       helpP('Tap a customer to open them: their round, price, how often they are cleaned, what they owe and their notes.'),
       helpList([
         '<b>Add a clean</b> or <b>Add a payment</b> – pick the date and amount. Tap any entry in <b>History</b> to edit or remove it, or send a receipt.',
+        '<b>Delete customer</b> (at the bottom of Edit) asks first, then shows a red bar with <b>Undo</b>. Jobs and quotes work the same way.',
         '<b>Defer</b> pushes their next clean back. <b>Couldn’t clean</b> moves them to your next visit.',
         '<b>Get a quote for this customer</b> starts a quote with their details filled in.',
         '<b>Pays by</b> – Bank or Cash. Texts to cash customers leave out your bank details.'
@@ -378,7 +391,7 @@ function openFocusedHelp(topic, explicitReturnTo){
   openSheet(`
     <div class="sheet-head">
       <h2>${escapeHtml(h.title)}</h2>
-      <button class="sheet-close" onclick="closeSheet()">✕</button>
+      <button class="sheet-close" onclick="closeSheet()" aria-label="Close">✕</button>
     </div>
     ${h.body().join('')}
     <button onclick="openHelp(helpReturnCallback)" style="display:flex; align-items:center; gap:10px; width:100%; text-align:left; background:var(--blue-dim); color:var(--blue-deep); border:1px solid var(--box-border); border-radius:12px; padding:13px 14px; font-size:0.9375rem; font-weight:700; margin-top:18px;">
@@ -393,7 +406,7 @@ function openHelp(returnTo){
   openSheet(`
     <div class="sheet-head">
       <h2>User guide</h2>
-      <button class="sheet-close" onclick="closeSheet()">✕</button>
+      <button class="sheet-close" onclick="closeSheet()" aria-label="Close">✕</button>
     </div>
 
     ${helpP('Round Book keeps track of your customers, rounds, cleans, payments, one-off jobs and quotes. Everything is stored on this device and it works without a signal.')}
@@ -512,7 +525,7 @@ async function openBackup(anchor){
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">Backup &amp; restore</h2>
       ${helpIconBtn('backup', () => openBackup())}
-      <button class="sheet-close" onclick="closeSheet()">✕</button>
+      <button class="sheet-close" onclick="closeSheet()" aria-label="Close">✕</button>
     </div>
     <p style="color:var(--ink-muted); font-size:0.8438rem; line-height:1.5; margin:0 2px 4px;">
       Everything is stored only on this phone, in this browser. Nothing is sent anywhere. Export a backup regularly — when the share sheet appears, choose <b>Save to Files → iCloud Drive</b> (or <b>Drive</b>, if you have Google Drive) rather than just saving to this phone, in case the app data is ever cleared.
@@ -577,7 +590,7 @@ async function openSafetyCopies(){
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">Safety copies</h2>
-      <button class="sheet-close" onclick="closeSheet()">✕</button>
+      <button class="sheet-close" onclick="closeSheet()" aria-label="Close">✕</button>
     </div>
     <p style="color:var(--ink-muted); font-size:0.8438rem; line-height:1.5; margin:0 2px 14px;">
       Round Book keeps a copy of your customers, jobs, quotes and settings automatically about once a day, and just before you restore a backup. The latest ${SAFETY_KEEP} are kept. They stay on this phone, so they protect against a mistake or a bad import — not against losing the phone. For that, keep exporting backups to iCloud Drive or Google Drive. Photos aren't part of safety copies.
@@ -811,7 +824,7 @@ function openImportColumnMapping(map){
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">Match columns</h2>
-      <button class="sheet-close" onclick="cancelSpreadsheetImport()">✕</button>
+      <button class="sheet-close" onclick="cancelSpreadsheetImport()" aria-label="Close">✕</button>
     </div>
     <p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 4px; line-height:1.5;">${pendingImportRows.length} row${pendingImportRows.length===1?'':'s'} found. Columns are matched automatically below — check them and adjust any that aren't right, then import.</p>
     ${rowsHtml}
@@ -896,7 +909,7 @@ function confirmSpreadsheetImport(){
     openSheet(`
       <div class="sheet-head">
         <h2>Import complete</h2>
-        <button class="sheet-close" onclick="closeSheet()">✕</button>
+        <button class="sheet-close" onclick="closeSheet()" aria-label="Close">✕</button>
       </div>
       <p style="color:var(--ink); font-size:0.875rem; line-height:1.6; margin:0 2px 10px;">${escapeHtml(summary)}.</p>
       <p style="color:var(--ink-muted); font-size:0.8125rem; line-height:1.6; margin:0 2px 18px;">They've been placed in a <b>"${escapeHtml(IMPORT_HOLDING_ROUND)}"</b> round rather than their real round. Open each one to check the details and assign it to the right round.</p>

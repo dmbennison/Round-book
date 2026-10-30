@@ -177,7 +177,7 @@ function openJobForm(existing, prefill, returnTo){
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
       </button>`:''}
       ${helpIconBtn('jobs', () => openJobForm(existing, prefill, returnTo))}
-      <button class="sheet-close" style="flex-shrink:0;" onclick="closeSheet()">✕</button>
+      <button class="sheet-close" style="flex-shrink:0;" onclick="closeSheet()" aria-label="Close">✕</button>
     </div>
     ${(!existing)?`
       <label style="margin-top:0">Fill from existing customer <span style="text-transform:none; font-weight:500; opacity:0.7;">(optional)</span></label>
@@ -367,7 +367,6 @@ function deleteJob(id){
     data.oneOffJobs.splice(idx,1);
     saveData(); closeSheet(); render();
     recordLastAction('job', removed, idx, `job at ${removed.address||removed.name||'this address'}`);
-    toast(`Deleted job at ${removed.address||removed.name||'job'}`);
   }});
 }
 
@@ -524,10 +523,10 @@ function openQuoteDetail(id){
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">${escapeHtml(q.address || q.name || 'Quote')}</h2>
-      <button class="sheet-close" style="flex-shrink:0; margin-right:6px;" onclick="openQuoteForm(data.quotes.find(x=>x.id==='${id}'), null, () => openQuoteDetail('${id}'))" aria-label="Edit quote">
+      <button class="sheet-close" style="flex-shrink:0; margin-right:6px;" onclick="openQuoteForm(data.quotes.find(x= aria-label="Close">x.id==='${id}'), null, () => openQuoteDetail('${id}'))" aria-label="Edit quote">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
       </button>
-      <button class="sheet-close" style="flex-shrink:0;" onclick="closeSheet()">✕</button>
+      <button class="sheet-close" style="flex-shrink:0;" onclick="closeSheet()" aria-label="Close">✕</button>
     </div>
     ${(q.name && q.address) ? `<div style="color:var(--ink); font-size:0.9375rem; font-weight:700; margin-bottom:2px;">${escapeHtml(q.name)}</div>` : ''}
     ${(q.phone || q.email) ? `<div style="color:var(--ink-muted); font-size:0.8125rem; margin-bottom:10px;">${[q.phone?escapeHtml(q.phone):'', q.email?escapeHtml(q.email):''].filter(Boolean).join(' · ')}</div>` : ''}
@@ -629,7 +628,7 @@ function openQuoteFollowUp(id, anchor){
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">Follow up</h2>
-      <button class="sheet-close" onclick="closeSheet()">✕</button>
+      <button class="sheet-close" onclick="closeSheet()" aria-label="Close">✕</button>
     </div>
     <p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 14px; line-height:1.5;">${n ? `You've chased this quote ${n} time${n===1?'':'s'} so far. Each follow-up gets a little softer in wording.` : 'This quote hasn\'t been chased yet.'}</p>
     <button class="backup-btn" style="${canSend?'':'opacity:0.45; pointer-events:none;'}" onclick="sendQuoteText('${id}','followup')">
@@ -766,7 +765,7 @@ function openQuoteForm(existing, prefill, returnTo){
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">${existing?'Edit quote':'Add quote'}</h2>
       ${helpIconBtn('quotes', () => openQuoteForm(existing, prefill, returnTo))}
-      <button class="sheet-close" onclick="closeSheet()">✕</button>
+      <button class="sheet-close" onclick="closeSheet()" aria-label="Close">✕</button>
     </div>
     <input type="hidden" id="q_fromJobId" value="${escapeAttr((prefill&&prefill.fromJobId)||'')}">
     <input type="hidden" id="q_marketingCustomerId" value="${escapeAttr((existing&&existing.marketingCustomerId)||(prefill&&prefill.marketingCustomerId)||'')}">
@@ -880,7 +879,6 @@ function deleteQuote(id){
     data.quotes.splice(idx,1);
     saveData(); closeSheet(); render();
     recordLastAction('quote', removed, idx, `quote for ${removed.address||removed.name||'this customer'}`);
-    toast(`Deleted quote for ${removed.address||removed.name||'quote'}`);
   }});
 }
 
@@ -915,7 +913,7 @@ function openConvertQuoteToCustomer(quoteId){
   openSheet(`
     <div class="sheet-head">
       <h2>Convert to customer</h2>
-      <button class="sheet-close" onclick="closeSheet()">✕</button>
+      <button class="sheet-close" onclick="closeSheet()" aria-label="Close">✕</button>
     </div>
     <p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 16px; line-height:1.5;">Creates a new recurring customer from this quote. Pick a round and how often they'll be cleaned.</p>
     <label style="margin-top:0">Round</label>

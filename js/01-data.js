@@ -6,7 +6,7 @@ const STORE_KEY = 'roundBookData_v1';
 // APP_VERSION is a plain decimal number (e.g. 1.01, 1.02 ... 1.99, 2.00) —
 // bump by 0.01 for every change. formatVersion always renders it to exactly
 // two decimal places, so it's never shown as "1.1" or "1.100".
-const APP_VERSION = 3.29;
+const APP_VERSION = 3.30;
 function formatVersion(v){ return Number(v).toFixed(2); }
 // Release notes are NOT kept in the app: they live in CHANGELOG.txt, shipped alongside these files.
 // MAINTENANCE: every time APP_VERSION is bumped, add the new version to the top of CHANGELOG.txt.
@@ -64,6 +64,7 @@ function loadLib(name){
   p.then(ok => { if(!ok) delete libPromises[name]; }); // allow another try later
   return p;
 }
+const OFFLINE_MSG = 'You\u2019re offline \u2014 connect to the internet and try again';
 const LIB_NEEDS_SIGNAL = 'Couldn’t load that tool — it needs a signal the first time you use it';
 
 const DIRECTIONS_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>';
@@ -182,7 +183,7 @@ function openAccountingExport(){
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">Export for accounting software</h2>
-      <button class="sheet-close" onclick="closeSheet()">\u2715</button>
+      <button class="sheet-close" onclick="closeSheet()" aria-label="Close">\u2715</button>
     </div>
     <p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 16px; line-height:1.5;">
       A plain CSV of payments received \u2014 Date, Description, Amount. FreeAgent, Xero and QuickBooks all accept this for importing or matching bank transactions; their import screen is where you confirm these columns and the date format (DD/MM/YYYY here).
@@ -1257,7 +1258,7 @@ function renderLastActionBanner(){
     <span>🗑 Deleted ${escapeHtml(lastAction.label)}</span>
     <span style="display:flex; gap:8px; flex-shrink:0; align-items:center;">
       <button onclick="undoLastAction()" style="background:var(--red); color:#fff; border:none; border-radius:8px; padding:6px 10px; font-weight:800; font-size:0.7812rem;">Undo</button>
-      <button onclick="dismissLastAction()" style="background:none; border:none; color:var(--red); font-weight:800; font-size:1rem; line-height:1; padding:0 2px;">✕</button>
+      <button aria-label="Dismiss" onclick="dismissLastAction()" style="background:none; border:none; color:var(--red); font-weight:800; font-size:1rem; line-height:1; padding:0 2px;">✕</button>
     </span>
   </div>`;
 }

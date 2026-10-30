@@ -207,7 +207,7 @@ function livePromptClashes(list){
     liveClashState = { list, picks: list.map(() => null), finish };
     const n = list.length;
     openSheet(`
-      <div class="sheet-head"><h2>Choose which to keep</h2><button class="sheet-close" onclick="liveClashLater()">✕</button></div>
+      <div class="sheet-head"><h2>Choose which to keep</h2><button class="sheet-close" onclick="liveClashLater()" aria-label="Close">✕</button></div>
       <p style="font-size:0.8438rem; line-height:1.55; margin:0 2px 12px; color:var(--ink);">${n === 1 ? 'One detail was' : n + ' details were'} changed differently on this device and your other device. Choose the version to keep${n === 1 ? '' : ' for each'}. Everything else has merged normally.</p>
       ${n > 1 ? `<div style="display:flex; gap:8px; margin-bottom:12px;"><button class="lc-all" onclick="liveClashAll('local')">Keep this device for all</button><button class="lc-all" onclick="liveClashAll('remote')">Keep other device for all</button></div>` : ''}
       ${list.map((c, i) => `
@@ -713,7 +713,7 @@ async function liveAdoptPeer(){
   const key = live.key || liveMem.key;
   if(!key){ toast('Unlock live sync first'); return; }
   let head;
-  try{ head = await liveApi(live, 'GET', '/head'); }catch(e){ toast('No signal — try again'); return; }
+  try{ head = await liveApi(live, 'GET', '/head'); }catch(e){ toast(OFFLINE_MSG); return; }
   const devs = (head.json && head.json.devices) || {};
   const peerId = liveHeadPeer(devs);
   if(!head.ok || !peerId){ toast('The other device hasn\'t sent any data yet'); return; }
@@ -775,7 +775,7 @@ function liveDeleteCloud(){
         try{
           const r = await liveApi(live, 'DELETE', '');
           if(!r.ok){ toast('Couldn\'t delete it right now — try again'); return; }
-        }catch(e){ toast('No signal — try again'); return; }
+        }catch(e){ toast(OFFLINE_MSG); return; }
       }
       liveActive = false; clearTimeout(livePushTimer); liveFirstDirtyAt = 0;
       const meta = await syncMetaGet();

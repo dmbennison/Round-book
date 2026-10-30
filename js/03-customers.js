@@ -184,7 +184,7 @@ function openCustomerForm(existing){
   openSheet(`
     <div class="sheet-head">
       <h2>${existing?'Edit customer':'Add customer'}</h2>
-      <button class="sheet-close" onclick="closeSheet()">✕</button>
+      <button class="sheet-close" onclick="closeSheet()" aria-label="Close">✕</button>
     </div>
     <div style="display:flex; align-items:center; justify-content:space-between; margin:0 2px 6px;">
       <label style="margin:0;">Address</label>
@@ -441,7 +441,6 @@ function deleteCustomer(id){
     data.customers.splice(idx,1);
     saveData(); closeSheet(); render();
     recordLastAction('customer', removed, idx, removed.address||removed.name||'customer');
-    toast(`Deleted ${removed.address||removed.name||'customer'}`);
   }});
 }
 
@@ -488,7 +487,7 @@ function openCustomerNoteSheet(id){
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">${c.notes ? 'Edit note' : 'Add note'}</h2>
-      <button class="sheet-close" onclick="openCustomerInfoBox('${id}')">✕</button>
+      <button class="sheet-close" onclick="openCustomerInfoBox('${id}')" aria-label="Close">✕</button>
     </div>
     <div style="color:var(--ink-muted); font-size:0.8125rem; font-weight:600; margin-bottom:8px;">${escapeHtml(c.address || c.name || 'Customer')}</div>
     <textarea id="cn_note" rows="4" placeholder="Gate code, dog, access notes...">${escapeHtml(c.notes||'')}</textarea>
@@ -587,7 +586,7 @@ function openCustomerInfoBox(id){
       <button class="sheet-close" style="flex-shrink:0; margin-right:6px;" onclick="openCustomerNoteSheet('${c.id}')" aria-label="${c.notes ? 'Edit note' : 'Add note'}">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
       </button>
-      <button class="sheet-close" style="flex-shrink:0;" onclick="closeSheet()">✕</button>
+      <button class="sheet-close" style="flex-shrink:0;" onclick="closeSheet()" aria-label="Close">✕</button>
     </div>
     <div style="display:flex; gap:8px; margin:4px 0 4px;">
       <div class="ib-half">
@@ -630,7 +629,7 @@ function openCustomerDetail(id){
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
       </button>
       ${helpIconBtn('customer', () => openCustomerDetail(id))}
-      <button class="sheet-close" style="flex-shrink:0;" onclick="closeSheet()">✕</button>
+      <button class="sheet-close" style="flex-shrink:0;" onclick="closeSheet()" aria-label="Close">✕</button>
     </div>
     ${(c.name && c.address) ? `<div style="color:var(--ink); font-size:0.9375rem; font-weight:700; margin-bottom:2px;">${escapeHtml(c.name)}</div>` : ''}
     <div style="color:var(--ink-muted); font-size:0.8125rem; margin-bottom:10px;">${escapeHtml(c.round||'Unassigned')} · ${money(c.price)} standard · every ${c.frequencyWeeks||4} week${(c.frequencyWeeks||4)===1?'':'s'}${c.accountNumber?` · Acct #${escapeHtml(c.accountNumber)}`:''}${c.paused?` · <span style="color:var(--ink-muted); font-weight:700;">Paused${c.pauseReason?' — '+escapeHtml(c.pauseReason):''}${c.pauseDate?' ('+fmtDate(c.pauseDate)+')':''}</span>`:''}</div>
@@ -754,7 +753,7 @@ function openCustomerHistoryList(id, kind){
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">${title}</h2>
-      <button class="sheet-close" onclick="closeSheet()">✕</button>
+      <button class="sheet-close" onclick="closeSheet()" aria-label="Close">✕</button>
     </div>
     ${reviewBtn}
     <ul class="hist-list">${rowsHtml}</ul>
@@ -770,7 +769,7 @@ function openSetPriceReviewDate(id){
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">Last price review</h2>
-      <button class="sheet-close" onclick="openCustomerHistoryList('${id}','price')">✕</button>
+      <button class="sheet-close" onclick="openCustomerHistoryList('${id}','price')" aria-label="Close">✕</button>
     </div>
     <p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 14px; line-height:1.5;">The date this customer's price was last set or increased. The price review reminder counts from here.</p>
     <label style="margin-top:0;">Date</label>
@@ -812,7 +811,7 @@ function openMessageLog(kind, id){
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">Messages</h2>
-      <button class="sheet-close" onclick="closeSheet()">✕</button>
+      <button class="sheet-close" onclick="closeSheet()" aria-label="Close">✕</button>
     </div>
     <ul class="hist-list">${rowsHtml}</ul>
   `, () => kind === 'job' ? openJobForm(data.oneOffJobs.find(x=>x.id===id)) : openCustomerDetail(id));
@@ -851,7 +850,7 @@ function openHistEntryActions(id, kind, dateVal, amount, anchor){
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">${label} — ${fmtDate(dateVal)}</h2>
-      <button class="sheet-close" onclick="closeSheet()">✕</button>
+      <button class="sheet-close" onclick="closeSheet()" aria-label="Close">✕</button>
     </div>
     <p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 16px;">${money(amount)}</p>
     ${kind==='pay' ? `<button class="backup-btn" onclick="openReceiptOptions('${id}','${dateVal}',${amount})">
@@ -1051,7 +1050,7 @@ function renderPhotoViewer(){
   openSheet(`
     <div class="sheet-head">
       <h2>Photo</h2>
-      <button class="sheet-close" onclick="closeSheet()">✕</button>
+      <button class="sheet-close" onclick="closeSheet()" aria-label="Close">✕</button>
     </div>
     ${counter}
     <div style="position:relative; margin-bottom:6px;">

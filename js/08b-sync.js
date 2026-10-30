@@ -644,7 +644,7 @@ async function openSyncSheet(){
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">Sync with another device</h2>
-      <button class="sheet-close" onclick="closeSheet()">✕</button>
+      <button class="sheet-close" onclick="closeSheet()" aria-label="Close">✕</button>
     </div>
     ${liveSyncSectionHtml(meta)}
     <p style="color:var(--ink-muted); font-size:0.8438rem; line-height:1.5; margin:0 2px 14px;">

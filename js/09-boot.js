@@ -479,7 +479,7 @@ let updateCheckBusy = false;
 async function checkForUpdates(){
   if(!('serviceWorker' in navigator)){ toast('Updates aren\u2019t available in this browser'); return; }
   if(document.getElementById('updatePopup')){ closeSheet(); toast('A new version is already waiting \u2014 tap Update'); return; }
-  if(navigator.onLine === false){ toast('You\u2019re offline \u2014 connect to the internet and try again'); return; }
+  if(navigator.onLine === false){ toast(OFFLINE_MSG); return; }
   if(updateCheckBusy) return;
   updateCheckBusy = true;
   toast('Checking for updates\u2026');
@@ -513,7 +513,7 @@ async function checkForUpdates(){
 // Throws away the app's stored program files (the offline copy) and fetches them again. Customers, jobs, photos and
 // settings live in the phone's own storage, not in these files, so they stay as they are.
 async function forceFreshInstall(){
-  if(navigator.onLine === false){ toast('You need an internet connection to do this'); return; }
+  if(navigator.onLine === false){ toast(OFFLINE_MSG); return; }
   try{
     const regs = await navigator.serviceWorker.getRegistrations();
     await Promise.all(regs.map(r => r.unregister()));

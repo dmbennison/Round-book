@@ -46,7 +46,7 @@ function renderPhotoAnnotator(){
   openSheet(`
     <div class="sheet-head">
       <h2>Annotate photo</h2>
-      <button class="sheet-close" onclick="cancelPhotoAnnotation()">✕</button>
+      <button class="sheet-close" onclick="cancelPhotoAnnotation()" aria-label="Close">✕</button>
     </div>
     <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 10px; line-height:1.4;">Circle, point at or draw around anything worth flagging, or choose Text and tap where a label should go. Choose Move to drag any annotation into a new position. Saved as a new photo — the original is kept as-is.</p>
     <div style="position:relative; background:#000; border-radius:12px; overflow:hidden; margin-bottom:12px;">
@@ -449,7 +449,7 @@ function renderBeforeAfter(){
   openSheet(`
     <div class="sheet-head">
       <h2>Before &amp; after</h2>
-      <button class="sheet-close" onclick="closeSheet()">✕</button>
+      <button class="sheet-close" onclick="closeSheet()" aria-label="Close">✕</button>
     </div>
     <div class="seg-row">
       <button class="seg-btn seg-btn-sm" data-ba-layout="landscape" onclick="setBaLayout('landscape')">Landscape · side by side</button>
@@ -676,7 +676,7 @@ function renderUpsellSheet(){
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">Send photo with an offer</h2>
-      <button class="sheet-close" onclick="closeSheet()">✕</button>
+      <button class="sheet-close" onclick="closeSheet()" aria-label="Close">✕</button>
     </div>
     ${src ? `<img src="${src}" style="display:block; max-height:130px; max-width:100%; border-radius:10px; margin:0 auto 12px;">` : ''}
     <label style="margin-top:0;">What are you offering?</label>
@@ -806,7 +806,7 @@ function editPriceHistoryEntry(id, dateKey){
   openSheet(`
     <div class="sheet-head">
       <h2>Edit price entry</h2>
-      <button class="sheet-close" onclick="openCustomerHistoryList('${id}','price')">✕</button>
+      <button class="sheet-close" onclick="openCustomerHistoryList('${id}','price')" aria-label="Close">✕</button>
     </div>
     <label style="margin-top:0">Date</label>
     <input type="date" id="ph_date" value="${entry.date}">
@@ -863,7 +863,7 @@ function openPauseReasonSheet(id){
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">Pause this customer</h2>
-      <button class="sheet-close" onclick="closeSheet()">✕</button>
+      <button class="sheet-close" onclick="closeSheet()" aria-label="Close">✕</button>
     </div>
     <p style="color:var(--ink-muted); font-size:0.8438rem; line-height:1.5; margin:0 2px 16px;">
       They'll be skipped from due reminders and left out of round totals until resumed.
@@ -993,7 +993,7 @@ function openDeferSheet(scope, idOrRoundName, anchor){
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">Defer</h2>
-      <button class="sheet-close" onclick="closeSheet()">✕</button>
+      <button class="sheet-close" onclick="closeSheet()" aria-label="Close">✕</button>
     </div>
     ${currentlyDeferred ? `<p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 16px;">Currently deferred to ${fmtDate(c.deferUntil)}.</p>`
       : (isRound ? `<p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 16px;">Applies to all ${custs.length} active customer${custs.length===1?'':'s'} in "${escapeHtml(idOrRoundName)}".</p>` : '')}
@@ -1044,7 +1044,7 @@ function openDeferCustomDate(scope, idOrRoundName){
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">Defer — custom date</h2>
-      <button class="sheet-close" onclick="closeSheet()">✕</button>
+      <button class="sheet-close" onclick="closeSheet()" aria-label="Close">✕</button>
     </div>
     <label style="margin-top:0;">Due again from</label>
     <input type="date" id="defer_date_input" value="${isRound ? deferredDateFor(custs[0],28) : (c.deferUntil || deferredDateFor(c,28))}">
@@ -1091,7 +1091,7 @@ function openCustomerUpliftSheet(id){
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">Price uplift</h2>
-      <button class="sheet-close" onclick="closeSheet()">✕</button>
+      <button class="sheet-close" onclick="closeSheet()" aria-label="Close">✕</button>
     </div>
     <p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 14px;">Current price: ${money(c.price)}</p>
     <label style="margin-top:0;">Uplift type</label>
@@ -1131,7 +1131,7 @@ function openRoundUpliftSheet(rn){
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">Price uplift</h2>
-      <button class="sheet-close" onclick="closeSheet()">✕</button>
+      <button class="sheet-close" onclick="closeSheet()" aria-label="Close">✕</button>
     </div>
     <label style="margin-top:0;">Uplift type</label>
     <select id="uplift_type">
@@ -1354,7 +1354,7 @@ function startRoundDirections(rn){
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">${escapeHtml(rn)} — directions</h2>
-      <button class="sheet-close" onclick="closeSheet()">✕</button>
+      <button class="sheet-close" onclick="closeSheet()" aria-label="Close">✕</button>
     </div>
     <p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 16px; line-height:1.5;">
       Google Maps can only queue up ${MAPS_LINK_MAX_STOPS} stops in one link, so this round's split into ${batches.length} legs — open the next one once you're nearing the end of the last.
@@ -1390,7 +1390,7 @@ function callCustomer(kind, id, anchor){
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">${escapeHtml(who)}</h2>
-      <button class="sheet-close" onclick="closeSheet()">✕</button>
+      <button class="sheet-close" onclick="closeSheet()" aria-label="Close">✕</button>
     </div>
     <div style="color:var(--ink-muted); font-size:0.8125rem; font-weight:700; margin:-4px 0 14px;">${escapeHtml(item.phone)}</div>
     <div style="display:flex; gap:10px;">
@@ -1444,7 +1444,7 @@ function openMessagePreview(title, phone, msg, afterSend, returnTo, logInfo){
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">${escapeHtml(title)}</h2>
-      <button class="sheet-close" onclick="closeSheet()">✕</button>
+      <button class="sheet-close" onclick="closeSheet()" aria-label="Close">✕</button>
     </div>
     <label style="margin-top:0;">Message</label>
     <textarea id="msg_preview_text" rows="7">${escapeHtml(msg)}</textarea>
@@ -1516,7 +1516,7 @@ function openReceiptOptions(id, dateISO, amount, anchor){
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">Send receipt</h2>
-      <button class="sheet-close" onclick="closeSheet()">✕</button>
+      <button class="sheet-close" onclick="closeSheet()" aria-label="Close">✕</button>
     </div>
     <p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 16px; line-height:1.5;">${escapeHtml(c.name||c.address||'This customer')} · ${money(amount)} on ${fmtDate(dateISO)}</p>
     ${(mobile||c.email) ? `<button class="backup-btn" onclick="sendReceipt('${id}','${dateISO}',${amount})">
@@ -1785,7 +1785,7 @@ function openBulkReminders(kind, roundName){
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">Remind — ${escapeHtml(roundName)}</h2>
-      <button class="sheet-close" onclick="closeSheet()">✕</button>
+      <button class="sheet-close" onclick="closeSheet()" aria-label="Close">✕</button>
     </div>
     <label style="margin-top:0;">${kind==='owed' ? 'First reminder' : 'Message'} <span style="text-transform:none; font-weight:500; opacity:0.7;">({name}${kind==='owed'?', {amount}, {bankdetails}':''}, {company}, {yourname})</span></label>
     <textarea id="bulk_msg" rows="4">${escapeHtml(tpl)}</textarea>
@@ -1823,7 +1823,7 @@ function openBulkTextBeforeVisit(){
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">Text all — before you arrive</h2>
-      <button class="sheet-close" onclick="closeSheet()">✕</button>
+      <button class="sheet-close" onclick="closeSheet()" aria-label="Close">✕</button>
     </div>
     <label style="margin-top:0;">Message <span style="text-transform:none; font-weight:500; opacity:0.7;">({name}, {company}, {yourname})</span></label>
     <textarea id="bulk_msg" rows="4">${escapeHtml(tpl)}</textarea>
@@ -2009,7 +2009,7 @@ function openGroupMarketingText(){
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">Send group text</h2>
-      <button class="sheet-close" onclick="closeSheet()">✕</button>
+      <button class="sheet-close" onclick="closeSheet()" aria-label="Close">✕</button>
     </div>
     <label style="margin-top:0;">Campaign</label>
     <select id="mkt_msg_campaign_id" onchange="selectMarketingCampaign(this.value)" style="margin-bottom:6px;">
@@ -2132,7 +2132,7 @@ function openAddCleanForm(id){
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">Add a clean</h2>
-      <button class="sheet-close" onclick="openCustomerDetail('${id}')">✕</button>
+      <button class="sheet-close" onclick="openCustomerDetail('${id}')" aria-label="Close">✕</button>
     </div>
     <label style="margin-top:0">Date</label>
     <input type="date" id="d_clean" value="${todayISO()}">
@@ -2153,7 +2153,7 @@ function openAddPaymentForm(id){
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">Add a payment</h2>
-      <button class="sheet-close" onclick="openCustomerDetail('${id}')">✕</button>
+      <button class="sheet-close" onclick="openCustomerDetail('${id}')" aria-label="Close">✕</button>
     </div>
     <label style="margin-top:0">Date</label>
     <input type="date" id="d_pay" value="${todayISO()}">
