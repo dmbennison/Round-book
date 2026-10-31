@@ -656,49 +656,11 @@ function openCustomerDetail(id){
       <div class="stat"><div class="num">${fmtDate(s.lastPaid).split(' ').slice(0,2).join(' ')}</div><div class="lbl">Last paid</div></div>
     </div>
 
-    <details class="cust-section">
-      <summary>Actions ${chev}</summary>
-      <div class="cust-section-body">
-        <div class="cust-actions" style="margin-bottom:12px;">
-          <button class="btn btn-clean" onclick="quickClean('${id}'); openCustomerDetail('${id}');">Mark cleaned today</button>
-          <button class="btn btn-paid" onclick="quickPaid('${id}'); openCustomerDetail('${id}');">Mark paid today</button>
-        </div>
-        ${isMobileNumber(c.phone)?`<div class="row2" style="margin-bottom:10px;">
-          <button class="btn" style="background:var(--blue-dim); color:var(--blue-deep);" onclick="sendTemplate('${id}','clean',()=>openCustomerDetail('${id}'))">💬 Cleaning reminder</button>
-          <button class="btn" style="background:var(--amber-dim); color:var(--amber);" onclick="sendTemplate('${id}','pay',()=>openCustomerDetail('${id}'))">💬 Payment reminder</button>
-        </div>`:''}
-        <div class="row2" style="margin-bottom:10px;">
-          <button class="btn btn-clean" onclick="openAddCleanForm('${id}')">+ Add a clean</button>
-          <button class="btn btn-paid" onclick="openAddPaymentForm('${id}')">+ Add a payment</button>
-        </div>
-        ${!c.paused ? `
-          ${(s.cleanBadge && s.cleanBadge.type === 'deferred') ? `<div style="font-size:0.75rem; color:var(--ink-muted); margin:0 2px 6px;">⏭ Deferred to ${fmtDate(c.deferUntil)}${couldntCleanActive(c) ? ` · couldn't clean ${fmtDate(c.couldntCleanDate)}` : ''}</div>` : ''}
-          <button class="btn" style="width:100%; background:var(--blue-dim); color:var(--blue-deep); margin-bottom:10px;" onclick="openDeferSheet('customer','${id}', this)">⏭ Defer</button>
-          <button class="btn" style="width:100%; background:var(--amber-dim); color:var(--amber); margin-bottom:10px;" onclick="markCouldntClean('${id}')">🚫 Couldn't clean — defer to next clean</button>
-        ` : ''}
-        <button class="btn" style="width:100%; background:var(--green-dim); color:var(--green); margin-bottom:10px;" onclick="openCustomerUpliftSheet('${id}')">📈 Apply price uplift</button>
-        <button class="btn" style="width:100%; background:${c.paused?'var(--green-dim)':'var(--line)'}; color:${c.paused?'var(--green)':'var(--ink-muted)'}; margin-bottom:10px;" onclick="${c.paused?`resumeCustomer('${id}')`:`openPauseReasonSheet('${id}')`}">
-          ${c.paused ? '▶ Resume this customer' : '⏸ Pause'}
-        </button>
-        <button class="btn" style="width:100%; background:var(--amber-dim); color:var(--amber); margin-bottom:10px;" onclick="quoteForCustomer('${id}')">
-          💷 Get a quote
-        </button>
-        <button class="btn" style="width:100%; background:var(--blue-dim); color:var(--blue-deep);" onclick="scheduleJobForCustomer('${id}')">
-          📋 Schedule a one-off job
-        </button>
-      </div>
-    </details>
-
-    <details class="cust-section">
-      <summary>History ${chev}</summary>
-      <div class="cust-section-body">
-        <button class="backup-btn" style="margin-bottom:0;" onclick="openCustomerHistoryMenu('${id}', this)">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-          <div style="flex:1; min-width:0;"><div class="t1">History and messages</div><div class="t2">${(c.cleanHistory||[]).length} clean${(c.cleanHistory||[]).length===1?'':'s'} · ${(c.paymentHistory||[]).length} payment${(c.paymentHistory||[]).length===1?'':'s'} · ${(c.messageLog||[]).length} sent</div></div>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px; color:var(--ink-muted);"><polyline points="6 9 12 15 18 9"/></svg>
-        </button>
-      </div>
-    </details>
+    <div class="row2" style="margin-bottom:14px;">
+      <div>${actionMenuBtn('Actions', `openCustomerActionsMenu('${id}', this)`)}</div>
+      <div>${actionMenuBtn('History', `openCustomerHistoryMenu('${id}', this)`)}</div>
+    </div>
+    ${(!c.paused && s.cleanBadge && s.cleanBadge.type === 'deferred') ? `<div style="font-size:0.75rem; font-weight:700; color:var(--ink-muted); margin:-6px 2px 10px;">⏭ Deferred to ${fmtDate(c.deferUntil)}${couldntCleanActive(c) ? ` · couldn't clean ${fmtDate(c.couldntCleanDate)}` : ''}</div>` : ''}
 
     <details class="cust-section"${((c.photos&&c.photos.length) || linkedJobs.some(j=>j.photos&&j.photos.length))?' open':''}>
       <summary>Photos${(() => { const total = (c.photos||[]).length + linkedJobs.reduce((sum,j)=>sum+(j.photos||[]).length,0); return total ? ` (${total})` : ''; })()} ${chev}</summary>
@@ -820,7 +782,31 @@ function openMessageLog(kind, id){
 // Tapping a clean/payment/price row opens this small menu instead of showing
 // Edit/Remove (and Receipt, for payments) inline on every row — keeps the list
 // itself scannable, with the actions just one tap further in.
-// The History section of a customer: one button, a drop-down of what to look at.
+// A customer's Actions button: every action in one drop-down (no Mark cleaned / Mark paid here - swipe the card for those).
+function openCustomerActionsMenu(id, anchor){
+  const c = data.customers.find(x=>x.id===id);
+  if(!c) return;
+  const mobile = isMobileNumber(c.phone);
+  const back = () => openCustomerDetail(id);
+  openDropdown(anchor, [
+    {label: 'Add a clean…', run: () => openAddCleanForm(id)},
+    {label: 'Add a payment…', run: () => openAddPaymentForm(id)},
+    mobile ? '-' : null,
+    mobile ? {label: 'Send cleaning reminder…', run: () => sendTemplate(id, 'clean', back)} : null,
+    mobile ? {label: 'Send payment reminder…', run: () => sendTemplate(id, 'pay', back)} : null,
+    '-',
+    !c.paused ? {label: 'Defer…', run: () => openDeferSheet('customer', id, anchor)} : null,
+    !c.paused ? {label: 'Couldn\u2019t clean \u2014 defer to next clean', run: () => markCouldntClean(id)} : null,
+    c.paused ? {label: 'Resume this customer', run: () => resumeCustomer(id)} : {label: 'Pause…', run: () => openPauseReasonSheet(id)},
+    '-',
+    {label: 'Apply price uplift…', run: () => openCustomerUpliftSheet(id)},
+    {label: 'Get a quote…', run: () => quoteForCustomer(id)},
+    {label: 'Schedule a one-off job…', run: () => scheduleJobForCustomer(id)},
+    '-',
+    {label: 'Help', run: () => openFocusedHelp('customer', back)}
+  ], 'Actions');
+}
+// The History button of a customer: a drop-down of what to look at.
 function openCustomerHistoryMenu(id, anchor){
   const c = data.customers.find(x=>x.id===id);
   if(!c) return;
@@ -1044,15 +1030,19 @@ function renderPhotoViewer(){
   const src = photoEntrySrc(entry);
   const hasPrev = photoViewerIndex > 0;
   const hasNext = photoViewerIndex < photoViewerList.length - 1;
-  const counter = photoViewerList.length > 1
-    ? `<div style="text-align:center; color:var(--ink-muted); font-size:0.75rem; margin-bottom:8px;">${photoViewerIndex+1} of ${photoViewerList.length}</div>` : '';
   const navBtn = (dir, symbol) => `<button onclick="navigatePhotoViewer(${dir})" aria-label="${dir<0?'Previous':'Next'} photo" class="pv-nav" style="position:absolute; ${dir<0?'left':'right'}:6px; top:50%; transform:translateY(-50%); width:36px; height:36px; border-radius:50%; border:none; background:rgba(0,0,0,0.45); color:#fff; font-size:1.25rem; line-height:1; display:flex; align-items:center; justify-content:center;">${symbol}</button>`;
+  const sub = `Added ${fmtDate(entry.date)}${photoViewerList.length > 1 ? ` · ${photoViewerIndex+1} of ${photoViewerList.length}` : ''}`;
   openSheet(`
-    <div class="sheet-head">
-      <h2>Photo</h2>
-      <button class="sheet-close" onclick="closeSheet()" aria-label="Close">✕</button>
+    <div class="sheet-head" style="padding-bottom:8px;">
+      <div style="flex:1; min-width:0;">
+        <h2 style="margin:0;">Photo</h2>
+        <div style="color:var(--ink-muted); font-size:0.75rem; font-weight:600; margin-top:1px;">${sub}</div>
+      </div>
+      <button class="sheet-close" style="flex-shrink:0; margin-right:6px;" onclick="openPhotoViewerMenu(this)" aria-label="Photo actions" aria-haspopup="menu">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
+      </button>
+      <button class="sheet-close" style="flex-shrink:0;" onclick="closeSheet()" aria-label="Close">✕</button>
     </div>
-    ${counter}
     <div style="position:relative; margin-bottom:6px;">
       <div id="photoZoomBox" style="overflow:hidden; border-radius:12px; touch-action:pan-y; position:relative;">
         <img id="photoViewerImg" src="${src}" draggable="false" style="width:100%; display:block; transform-origin:0 0; will-change:transform; -webkit-user-drag:none;">
@@ -1060,19 +1050,22 @@ function renderPhotoViewer(){
       ${hasPrev ? navBtn(-1,'‹') : ''}
       ${hasNext ? navBtn(1,'›') : ''}
     </div>
-    <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 12px;">Added ${fmtDate(entry.date)}</p>
-    <p style="color:var(--ink-muted); font-size:0.7188rem; margin:0 2px 14px; text-align:center;">Pinch or double-tap the photo to zoom, then drag to move around. ${photoViewerList.length>1?'Swipe left or right to browse, or ':''}Press and hold the photo to save or share it directly.</p>
-    <div class="pv-actions">
-      <div class="row2" style="margin-bottom:8px;">
-        <button class="btn btn-clean" onclick="openPhotoAnnotator()">✏️ Annotate</button>
-        <button class="btn btn-clean" onclick="sharePhotoViewerEntry()">📤 Share</button>
-        <button class="btn" style="background:var(--red-dim); color:var(--red);" onclick="deletePhotoViewerEntry()">Delete</button>
-      </div>
-      <button class="btn" style="width:100%; background:var(--blue-dim); color:var(--blue-deep); margin-bottom:8px;" onclick="openPhotoUpsell()">💬 Send with an offer (gutters, conservatory…)</button>
-      <button class="btn" style="width:100%; background:var(--blue-dim); color:var(--blue-deep);" onclick="openBeforeAfter()">↔ Make a before &amp; after photo</button>
-    </div>
   `, () => { if(photoViewerOnClose) photoViewerOnClose(); });
   attachPhotoViewerSwipe();
+}
+// Everything you can do with the photo being viewed, in one drop-down above it so the photo gets the screen.
+function openPhotoViewerMenu(anchor){
+  if(!photoViewerList[photoViewerIndex]) return;
+  openDropdown(anchor, [
+    {label: 'Annotate', run: () => openPhotoAnnotator()},
+    {label: 'Share', run: () => sharePhotoViewerEntry()},
+    {label: 'Send with an offer…', run: () => openPhotoUpsell()},
+    {label: 'Make a before & after photo…', run: () => openBeforeAfter()},
+    '-',
+    {label: 'Delete photo', danger: true, run: () => deletePhotoViewerEntry()},
+    '-',
+    {label: 'Help', run: () => openFocusedHelp('photos', () => renderPhotoViewer())}
+  ], 'Photo');
 }
 function navigatePhotoViewer(delta){
   const next = photoViewerIndex + delta;

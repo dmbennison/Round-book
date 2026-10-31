@@ -1382,8 +1382,8 @@ function callCustomer(kind, id, anchor){
   // Tapped from a card's call button: a drop-down under it. (Without a button to hang it from, a sheet is used.)
   if(anchor){
     openDropdown(anchor, [
-      {label: '📞 Call', run: () => placeCall(kind, id)},
-      {label: '💬 Text', run: () => textFromCallChoice(kind, id)}
+      {label: 'Call', run: () => placeCall(kind, id)},
+      {label: 'Text', run: () => textFromCallChoice(kind, id)}
     ], item.phone);
     return;
   }

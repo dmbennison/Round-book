@@ -143,14 +143,14 @@ async function shareRoundBook(){
 function openMoreMenu(anchor){
   anchor = anchor || document.querySelector('header [aria-label="More"]');
   openDropdown(anchor, [
-    {label: 'Reports ▸', run: () => openReports(anchor)},
+    {label: 'Reports…', run: () => openReports(anchor)},
     {label: 'Photo gallery', run: () => openPhotoGallery()},
-    {label: 'Backup ▸', run: () => openBackup(anchor)},
+    {label: 'Backup…', run: () => openBackup(anchor)},
     {label: 'Message other device', run: () => openMessageDevice()},
     '-',
     {label: 'Check for updates', hint: 'v' + formatVersion(APP_VERSION), run: () => checkForUpdates()},
     {label: 'About', run: () => openInfo()}
-  ]);
+  ], 'More');
 }
 // The height of the status-bar area the phone reports (0 in an ordinary browser). Shown in About, for troubleshooting.
 function topInsetPx(){
@@ -277,7 +277,7 @@ const FOCUSED_HELP = {
       helpList([
         '<b>Press and hold</b> a card for a quick info box. The green button calls the customer and the blue button gives directions. At the top of the box, the <b>camera</b> button takes a photo straight into that customer and opens it ready to annotate or send.',
         '<b>Owed</b> – tap <b>✉️ Chase</b> on a card to send a reminder text, or <b>Remind all</b>. <b>Text first</b> – tap a customer’s badge to text them, or <b>Text all</b>.',
-        'A round’s <b>⋯</b> menu has <b>Show map</b>, <b>Start round</b> (directions to every stop), <b>Print</b>, <b>Defer</b> and <b>Apply price uplift</b>. <b>Reorder</b> sets your visiting order.',
+        'A round’s <b>⋯</b> menu (top right of the round) has <b>Show map</b>, <b>Start round</b> (directions to every stop), <b>Print</b>, <b>Defer</b> and <b>Apply price uplift</b>. <b>Reorder</b> sets your visiting order.',
         'The <b>pencil</b> next to a round’s name adds a note to the round.'
       ])
     ]
@@ -287,6 +287,7 @@ const FOCUSED_HELP = {
     body: () => [
       helpP('For anything outside your regular rounds. Swipe <b>right</b> when a job is done and <b>left</b> when it is paid.'),
       helpList([
+        'Open a job and tap <b>Actions</b> to print the invoice, send a receipt or payment reminder, see its messages, add it to Contacts or turn it into a quote for repeat work.',
         'Type a <b>discount %</b> next to the price to take it off that job’s invoice.',
         'Open a finished job to invoice it, send it as a PDF or send a payment reminder.'
       ])
@@ -297,7 +298,8 @@ const FOCUSED_HELP = {
     body: () => [
       helpP('Tap a customer to open them: their round, price, how often they are cleaned, what they owe and their notes.'),
       helpList([
-        '<b>Add a clean</b> or <b>Add a payment</b> – pick the date and amount. Tap any entry in <b>History</b> to edit or remove it, or send a receipt.',
+        'Under the customer’s details are two buttons: <b>Actions</b> and <b>History</b>. <b>Actions</b> has Add a clean, Add a payment, the cleaning and payment reminder texts, Defer, Couldn’t clean, Pause or Resume, Apply price uplift, Get a quote and Schedule a one-off job. (To mark someone cleaned or paid today, swipe their card on Today or Rounds.)',
+        '<b>History</b> opens a drop-down: Clean history, Payment history, One-off jobs, Price history and Messages. Tap any entry to edit or remove it, or send a receipt.',
         '<b>Delete customer</b> (at the bottom of Edit) asks first, then shows a red bar with <b>Undo</b>. Jobs and quotes work the same way.',
         '<b>Defer</b> pushes their next clean back. <b>Couldn’t clean</b> moves them to your next visit.',
         '<b>Get a quote for this customer</b> starts a quote with their details filled in.',
@@ -309,8 +311,9 @@ const FOCUSED_HELP = {
   photos: {
     title: 'Photos',
     body: () => [
-      helpP('Add photos from a customer’s Photos section. Tap a photo to open it, then pinch or double-tap to zoom and swipe for the next. Every photo is also in the <b>Photo gallery</b> (⋯ menu).'),
+      helpP('Add photos from a customer’s Photos section. Tap a photo to open it, then pinch or double-tap to zoom and swipe for the next. Press and hold the photo to save it. Every photo is also in the <b>Photo gallery</b> (⋯ menu).'),
       helpList([
+        'The <b>⋯</b> button at the top of the photo holds everything you can do with it: Annotate, Share, Send with an offer, Make a before &amp; after photo and Delete. The photo has the rest of the screen to itself.',
         '<b>Annotate</b> – draw on the photo or add text. The original is kept.',
         '<b>Make a before &amp; after photo</b> – pick two photos, then save or share the result.',
         '<b>Send with an offer</b> – adds an offer message to the photo. From a customer it opens Messages or WhatsApp straight to them with the message filled in; the photo is copied, so tap the message box and choose <b>Paste</b>. From the Photo gallery it opens the share sheet.'
@@ -322,7 +325,7 @@ const FOCUSED_HELP = {
     body: () => [
       helpP('A quote is a list of items with prices and an optional discount.'),
       helpList([
-        'Open a quote to send it, print it, share it as a PDF, or turn it into a customer or a one-off job.',
+        'Open a quote and tap <b>Actions</b> to send it, print it, follow it up, or turn it into a customer or a one-off job. Pending, Accepted and Declined stay on the screen so you can change the status in one tap.',
         '<b>Swipe right</b> to accept, <b>left</b> to decline.',
         'A yellow number on the <b>Quotes</b> tab (under Sales) means quotes are waiting for a follow-up.'
       ])
@@ -416,7 +419,7 @@ function openHelp(returnTo){
       'Install it as an app: in Safari tap Share → <b>Add to Home Screen</b>.',
       'The four tabs are <b>Today</b>, <b>Schedule</b>, <b>Work</b> (with <b>Rounds</b> and <b>Jobs</b> underneath) and <b>Sales</b> (with <b>Quotes</b> and <b>Marketing</b> underneath).',
       'The blue <b>+</b> button adds a customer, job or quote, depending on the screen you are on.',
-      'Menus open as drop-downs under the button you tapped; tap it again, or anywhere else, to close them. The top bar has <b>Search</b> (it forgives typos, treats Rd as Road and so on, and lists the closest matches first; tap <b>📅</b> beside the box, or type a date like 14/10, to see everything recorded on that day), the <b>⋯</b> menu (Reports, Photo gallery, Backup, <b>Message other device</b>, <b>Check for updates</b> and About) and <b>Settings</b>.',
+      'Menus all open as drop-downs under the button you tapped, in the same style (a <b>…</b> after a name means it asks for a little more first); tap the button again, or anywhere else, to close them. Where a screen has a lot of buttons, they are gathered into an <b>Actions</b> drop-down (customers, jobs and quotes) or a <b>⋯</b> button (photos) to leave more room. The top bar has <b>Search</b> (it forgives typos, treats Rd as Road and so on, and lists the closest matches first; tap <b>📅</b> beside the box, or type a date like 14/10, to see everything recorded on that day), the <b>⋯</b> menu (Reports, Photo gallery, Backup, <b>Message other device</b>, <b>Check for updates</b> and About) and <b>Settings</b>.',
       'Tap the <b>🎤</b> in any text box to speak instead of typing.',
       'A <b>?</b> button next to a screen’s title opens help for just that screen.',
       'On an iPad or computer you can also right-click a card for its actions, and use the keyboard: <b>J</b> / <b>K</b> to move down and up the list, <b>Enter</b> to open, <b>C</b> for cleaned and <b>P</b> for paid.'

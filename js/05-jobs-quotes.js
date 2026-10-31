@@ -193,6 +193,8 @@ function openJobForm(existing, prefill, returnTo){
     <input type="hidden" id="j_fromQuoteId" value="${escapeAttr((prefill&&prefill.fromQuoteId)||'')}">
     ${existing&&existing.customerId?`<p style="color:var(--blue); font-size:0.75rem; font-weight:700; margin:0 2px 14px;">🔗 Linked to a customer — shows in their history</p>`:''}
     ${prefill&&prefill.fromQuoteId?`<p style="color:var(--green); font-size:0.75rem; font-weight:700; margin:0 2px 14px;">✅ Converting from a quote — it'll be marked converted once saved</p>`:''}
+    ${existing ? `<div style="margin-bottom:14px;">${actionMenuBtn('Actions', `openJobActionsMenu('${existing.id}', this)`)}</div>` : ''}
+    ${(existing && existing.done && !existing.paid && existing.paymentReminderSent) ? `<div style="font-size:0.75rem; font-weight:700; margin:-6px 2px 12px; color:var(--amber);">🔔 Payment reminder sent ${fmtDate(existing.paymentReminderSentDate)}</div>` : ''}
     <label ${existing?'style="margin-top:0"':''}>Address</label>
     <input type="text" id="j_address" value="${escapeAttr(j.address||'')}" placeholder="e.g. 5 Oak Close">
     <label>Name <span style="text-transform:none; font-weight:500; opacity:0.7;">(optional)</span></label>
@@ -213,21 +215,6 @@ function openJobForm(existing, prefill, returnTo){
     <label>Notes</label>
     <textarea id="j_notes" rows="2" placeholder="Access notes, anything else about the job...">${escapeHtml(jNotesValue)}</textarea>
     ${propertyFieldsHtml(j, 'j')}
-    ${(existing && existing.done && !existing.paid && existing.paymentReminderSent) ? `<div style="font-size:0.75rem; font-weight:700; margin:10px 2px 0; color:var(--amber);">🔔 Payment reminder sent ${fmtDate(existing.paymentReminderSentDate)}</div>` : ''}
-    ${existing?`<div class="row2" style="margin-top:14px;">
-      <button class="btn" style="background:var(--blue-dim); color:var(--blue-deep);" onclick="printJobInvoice('${existing.id}')">🧾 Print invoice</button>
-      ${isMobileNumber(existing.phone) ? `<button class="btn" style="background:var(--amber-dim); color:var(--amber);" onclick="sendJobReceipt('${existing.id}')">🧾 Send receipt</button>` : ''}
-    </div>`:''}
-    ${(existing && existing.done && !existing.paid && isMobileNumber(existing.phone)) ? `<button class="btn" style="background:var(--amber-dim); color:var(--amber); width:100%; margin-top:10px;" onclick="sendJobPaymentReminder('${existing.id}')">💬 Payment reminder</button>` : ''}
-    ${(existing && existing.messageLog && existing.messageLog.length) ? `<button class="backup-btn" style="margin-top:10px;" onclick="openMessageLog('job','${existing.id}')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-      <div style="flex:1; min-width:0;"><div class="t1">Messages</div><div class="t2">${existing.messageLog.length} sent</div></div>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px; color:var(--ink-muted);"><path d="M9 18l6-6-6-6"/></svg>
-    </button>` : ''}
-    ${(existing && (existing.phone||existing.email||existing.address)) ? `<button class="backup-btn" style="margin-top:10px; margin-bottom:0;" onclick="addToContacts('job','${existing.id}')">
-      ${ADD_CONTACT_ICON}
-      <div style="flex:1; min-width:0;"><div class="t1">Add to Contacts</div><div class="t2">Saves them to your phone's Contacts app</div></div>
-    </button>` : ''}
     <label style="display:flex; align-items:center; gap:8px; margin-top:16px; cursor:pointer;">
       <input type="checkbox" id="j_remind" ${j.remind24h?'checked':''} style="width:18px; height:18px; flex-shrink:0;">
       <span style="font-size:0.8125rem; font-weight:600; color:var(--ink); text-transform:none; letter-spacing:0;">Remind me the day before this job</span>
@@ -241,10 +228,6 @@ function openJobForm(existing, prefill, returnTo){
     </div>
     ${existing?`<button class="btn-danger-text" onclick="deleteJob('${existing.id}')">Delete job</button>`:''}
     ${existing?`
-      <div class="section-label">Repeat work</div>
-      <button class="btn" style="width:100%; background:var(--blue-dim); color:var(--blue-deep); margin-bottom:8px;" onclick="convertJobToQuote('${existing.id}')">💬 Turn into a quote for repeat work</button>
-    `:''}
-    ${existing?`
       <div class="section-label">Photos</div>
       <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
         ${(j.photos||[]).map(p=>`<img src="${photoUrlCache.get(p.id) || p.dataUrl || ''}" onclick="viewJobPhoto('${existing.id}','${p.id}')" style="width:72px; height:72px; object-fit:cover; border-radius:10px; border:1px solid var(--line); cursor:pointer;">`).join('')}
@@ -253,6 +236,25 @@ function openJobForm(existing, prefill, returnTo){
       </div>
     `:`<div class="section-label">Photos</div><p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 8px;">Save this job first, then reopen it to add photos.</p>`}
   `, returnTo);
+}
+
+function openJobActionsMenu(id, anchor){
+  const j = data.oneOffJobs.find(x=>x.id===id);
+  if(!j) return;
+  const mobile = isMobileNumber(j.phone);
+  const back = () => openJobForm(data.oneOffJobs.find(x=>x.id===id));
+  openDropdown(anchor, [
+    {label: 'Print invoice', run: () => printJobInvoice(id)},
+    mobile ? {label: 'Send receipt…', run: () => sendJobReceipt(id)} : null,
+    (j.done && !j.paid && mobile) ? {label: 'Send payment reminder…', run: () => sendJobPaymentReminder(id)} : null,
+    '-',
+    (j.messageLog && j.messageLog.length) ? {label: 'Messages', hint: String(j.messageLog.length), run: () => openMessageLog('job', id)} : null,
+    (j.phone || j.email || j.address) ? {label: 'Add to Contacts', run: () => addToContacts('job', id)} : null,
+    '-',
+    {label: 'Turn into a quote for repeat work…', run: () => convertJobToQuote(id)},
+    '-',
+    {label: 'Help', run: () => openFocusedHelp('jobs', back)}
+  ], 'Actions');
 }
 
 function viewJobPhoto(id, photoId, ctx){
@@ -523,7 +525,7 @@ function openQuoteDetail(id){
   openSheet(`
     <div class="sheet-head">
       <h2 style="flex:1; min-width:0;">${escapeHtml(q.address || q.name || 'Quote')}</h2>
-      <button class="sheet-close" style="flex-shrink:0; margin-right:6px;" onclick="openQuoteForm(data.quotes.find(x= aria-label="Close">x.id==='${id}'), null, () => openQuoteDetail('${id}'))" aria-label="Edit quote">
+      <button class="sheet-close" style="flex-shrink:0; margin-right:6px;" onclick="openQuoteForm(data.quotes.find(x=>x.id==='${id}'), null, () => openQuoteDetail('${id}'))" aria-label="Edit quote">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
       </button>
       <button class="sheet-close" style="flex-shrink:0;" onclick="closeSheet()" aria-label="Close">✕</button>
@@ -547,25 +549,12 @@ function openQuoteDetail(id){
 
     ${breakdownHtml}
 
-    <details class="cust-section" open>
-      <summary>Actions ${chev}</summary>
-      <div class="cust-section-body">
-        ${converted ? `<p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 12px;">✓ This quote has been converted${q.convertedToCustomerId ? ' to a customer' : (q.convertedToJobId ? ' to a one-off job' : '')}.</p>` : `
-          <div class="seg-row" style="margin-bottom:12px;">
-            ${statusBtn('pending','Pending')}${statusBtn('accepted','Accepted')}${statusBtn('declined','Declined')}
-          </div>`}
-        ${canSend ? '' : `<p style="color:var(--amber); font-size:0.75rem; font-weight:700; margin:0 2px 10px;">Add a mobile number or email (pencil, top right) to send this quote.</p>`}
-        <div class="row2" style="margin-bottom:10px;">
-          <button class="btn" style="background:var(--amber-dim); color:var(--amber); ${canSend?'':'opacity:0.45; pointer-events:none;'}" onclick="sendQuoteText('${id}','initial')">💬 Send quote</button>
-          <button class="btn" style="background:var(--blue-dim); color:var(--blue-deep);" onclick="printQuote('${id}')">🖨️ Print quote</button>
-        </div>
-        ${!converted ? `
-          <button class="btn" style="width:100%; background:var(--amber-dim); color:var(--amber); margin-bottom:10px;" onclick="openQuoteFollowUp('${id}', this)">🔔 Follow up${sentCount ? ` <span style="font-weight:600; opacity:0.8;">(chased ${sentCount} time${sentCount===1?'':'s'})</span>` : ''}</button>
-          <button class="btn" style="width:100%; background:var(--blue-dim); color:var(--blue-deep); margin-bottom:10px;" onclick="openConvertQuoteToCustomer('${id}')">👤 Convert to customer</button>
-          <button class="btn" style="width:100%; background:var(--green-dim); color:var(--green);" onclick="convertQuoteToJob('${id}')">🔧 Convert to job</button>
-        ` : ''}
-      </div>
-    </details>
+    ${converted ? `<p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 12px;">✓ This quote has been converted${q.convertedToCustomerId ? ' to a customer' : (q.convertedToJobId ? ' to a one-off job' : '')}.</p>` : `
+      <div class="seg-row" style="margin-bottom:12px;">
+        ${statusBtn('pending','Pending')}${statusBtn('accepted','Accepted')}${statusBtn('declined','Declined')}
+      </div>`}
+    ${canSend ? '' : `<p style="color:var(--amber); font-size:0.75rem; font-weight:700; margin:0 2px 10px;">Add a mobile number or email (pencil, top right) to send this quote.</p>`}
+    <div style="margin-bottom:14px;">${actionMenuBtn('Actions', `openQuoteDetailActionsMenu('${id}', this)`)}</div>
 
     <details class="cust-section">
       <summary>History (${history.length}) ${chev}</summary>
@@ -799,18 +788,46 @@ function openQuoteForm(existing, prefill, returnTo){
       <button class="seg-btn ${q.status==='declined'?'active':''}" onclick="setQuoteStatusField('declined', this)">Declined</button>
     </div>
     <input type="hidden" id="q_status" value="${q.status||'pending'}">
-    ${existing && (isMobileNumber(existing.phone) || existing.email) ? `<button class="btn" style="width:100%; background:var(--amber-dim); color:var(--amber); margin-top:14px;" onclick="sendQuoteText('${existing.id}')">💬 ${isMobileNumber(existing.phone)?'Send quote by text':'Send quote by email'}${existing.fromJobId?' (repeat work)':''}</button>` : ''}
+    ${existing ? `<div style="margin-top:14px;">${actionMenuBtn('Actions', `openQuoteActionsMenu('${existing.id}', this)`)}</div>` : ''}
     <div class="form-actions">
       <button class="btn-primary" onclick="saveQuoteForm('${existing?existing.id:''}')">${existing?'Save changes':'Add quote'}</button>
     </div>
     ${existing?`<button class="btn-danger-text" onclick="deleteQuote('${existing.id}')">Delete quote</button>`:''}
-    ${existing && existing.status!=='converted' ? `
-      <div class="section-label">Convert this quote</div>
-      <button class="btn" style="width:100%; background:var(--blue-dim); color:var(--blue-deep); margin-bottom:8px;" onclick="openConvertQuoteToCustomer('${existing.id}')">👤 Convert to a customer in a round</button>
-      <button class="btn" style="width:100%; background:var(--green-dim); color:var(--green); margin-bottom:8px;" onclick="convertQuoteToJob('${existing.id}')">📋 Convert to a one-off job</button>
-    ` : ''}
     ${existing && existing.status==='converted' ? `<p style="color:var(--ink-muted); font-size:0.75rem; margin:14px 2px 0;">✅ This quote has already been converted.</p>` : ''}
   `, returnTo);
+}
+// The Actions button on a quote's detail screen.
+function openQuoteDetailActionsMenu(id, anchor){
+  const q = data.quotes.find(x=>x.id===id);
+  if(!q) return;
+  const canSend = isMobileNumber(q.phone) || !!q.email;
+  const converted = q.status === 'converted';
+  const n = q.quoteFollowUpCount || 0;
+  const back = () => openQuoteDetail(id);
+  openDropdown(anchor, [
+    canSend ? {label: 'Send quote…', run: () => sendQuoteText(id, 'initial')} : {info: 'Add a mobile number or email to send this quote'},
+    {label: 'Print quote', run: () => printQuote(id)},
+    !converted ? {label: 'Follow up…', hint: n ? `chased ${n}\u00d7` : '', run: () => openQuoteFollowUp(id, anchor)} : null,
+    !converted ? '-' : null,
+    !converted ? {label: 'Convert to customer…', run: () => openConvertQuoteToCustomer(id)} : null,
+    !converted ? {label: 'Convert to job…', run: () => convertQuoteToJob(id)} : null,
+    '-',
+    {label: 'Help', run: () => openFocusedHelp('quotes', back)}
+  ], 'Actions');
+}
+function openQuoteActionsMenu(id, anchor){
+  const q = data.quotes.find(x=>x.id===id);
+  if(!q) return;
+  const canSend = isMobileNumber(q.phone) || !!q.email;
+  const back = () => openQuoteForm(data.quotes.find(x=>x.id===id));
+  openDropdown(anchor, [
+    canSend ? {label: `Send quote by ${isMobileNumber(q.phone)?'text':'email'}${q.fromJobId?' (repeat work)':''}…`, run: () => sendQuoteText(id)} : {info: 'No mobile number or email to send to'},
+    q.status !== 'converted' ? '-' : null,
+    q.status !== 'converted' ? {label: 'Convert to a customer in a round…', run: () => openConvertQuoteToCustomer(id)} : null,
+    q.status !== 'converted' ? {label: 'Convert to a one-off job…', run: () => convertQuoteToJob(id)} : null,
+    '-',
+    {label: 'Help', run: () => openFocusedHelp('quotes', back)}
+  ], 'Actions');
 }
 function setQuoteStatusField(status, btn){
   const el = document.getElementById('q_status');

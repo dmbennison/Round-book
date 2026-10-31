@@ -210,6 +210,11 @@ function openDropdown(anchor, items, title){
   openContextMenu(r.right, lowerHalf ? r.top - 8 : r.bottom + 8, items, title, false);
   ctxAnchor = anchor;
 }
+// A full-width button for a sheet that opens a drop-down menu (fn is the onclick expression, e.g. "openJobActionsMenu('id', this)").
+// Used wherever a stack of action buttons would otherwise take up the screen.
+function actionMenuBtn(label, fn){
+  return `<button type="button" class="btn menu-btn" aria-haspopup="menu" style="width:100%; background:var(--blue-dim); color:var(--blue-deep); display:flex; align-items:center; justify-content:center; gap:6px;" onclick="${fn}">${label}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:14px; height:14px; flex:none;"><path d="M6 9l6 6 6-6"/></svg></button>`;
+}
 function closeContextMenu(){
   if(ctxMenuEl){ ctxMenuEl.remove(); ctxMenuEl = null; }
   if(ctxTargetEl){ ctxTargetEl.classList.remove('ctx-target'); ctxTargetEl = null; }
