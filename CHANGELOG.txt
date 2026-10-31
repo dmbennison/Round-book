@@ -4,6 +4,22 @@ ROUND BOOK - RELEASE NOTES
 Newest first. This file is not part of the app and is not loaded by it; it ships alongside the code files.
 To add a release: raise APP_VERSION in js/01-data.js and CACHE_NAME in sw.js to the same number, then put a new entry at the top of this list.
 
+Version 3.31
+  - Photos: the Annotate, Share, Send with an offer, Before & after and Delete buttons that sat along the bottom are now
+    in one ⋯ drop-down at the top of the photo, next to the close button, so the photo has far more of the screen. The
+    "Added on / 2 of 5" line and the hint text now sit under the title
+  - Customers: the Actions section is now an Actions drop-down button, and History is its own drop-down button beside
+    it (one tap, not two). Mark cleaned today and Mark paid today are gone from here (swipe the card instead). A
+    deferred customer shows "Deferred to ..." under their details
+  - Jobs and quotes: the stacks of buttons (invoice, receipt, payment reminder, messages, add to Contacts, turn into a
+    quote; send, print, follow up, convert) are now an Actions drop-down on each. A quote's Pending / Accepted /
+    Declined switch stays on screen
+  - A round no longer has a full-width Show map button (it is in the round's ⋯ menu), giving the list more room
+  - All drop-down menus now share one format: a heading, plain wording with no emoji, "..." after items that ask for more
+    first, and Help last. The ⋯ menu's Reports ▸ / Backup ▸ now read Reports... / Backup...; the Call / Text menu lost its icons
+  - Fixed: a quote's pencil (edit) button on its detail screen stopped working in 3.30 because of a mis-edited button
+  - User guide updated for all of the above
+
 Version 3.30
   - Review pass for consistency: one wording ("You're offline - connect to the internet and try again") is now used
     everywhere the app needs a signal, in place of four different messages
