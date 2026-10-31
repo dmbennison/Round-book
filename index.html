@@ -226,7 +226,6 @@
   .dir-btn:active{background:var(--fixed-blue-deep);}
   .call-btn:active{filter:brightness(0.88);}
   .cust-meta{display:flex; gap:6px; flex-wrap:wrap; margin-top:10px;}
-  .cust-actions{display:flex; gap:8px; margin-top:12px;}
   .btn{
     flex:1; padding:10px 8px; border-radius:10px; font-size:0.8438rem; font-weight:var(--fw-black);
     display:flex; align-items:center; justify-content:center; gap:6px;
@@ -306,17 +305,6 @@
   }
   @keyframes slideup{from{transform:translateY(20px); opacity:0.4;} to{transform:translateY(0); opacity:1;}}
   .sheet-handle{width:38px; height:4px; background:var(--line); border-radius:3px; margin:8px auto 6px;}
-  /* The photo viewer's buttons stay pinned to the bottom of the sheet while the photo scrolls underneath them. The
-     sheet's own bottom padding moves into the bar so it reaches the very bottom edge; the frosted backing lets
-     the photo show faintly through as it passes. */
-  .sheet:has(.pv-actions){padding-bottom:0;}
-  .pv-actions{
-    position:sticky; bottom:0; z-index:3; margin:0 -16px; padding:10px 16px calc(env(safe-area-inset-bottom, 0px) + 14px);
-    background:var(--bg); border-top:1px solid var(--line);
-  }
-  @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)){
-    .pv-actions{ background:color-mix(in srgb, var(--bg) 82%, transparent); -webkit-backdrop-filter:blur(14px); backdrop-filter:blur(14px); }
-  }
   .sheet-head{display:flex; align-items:center; justify-content:space-between; padding:6px 2px 14px;}
   .sheet-head h2{font-size:1.125rem; font-weight:var(--fw-black); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
   .sheet-close{width:32px;height:32px;border-radius:50%; border:none; background:var(--surface); color:var(--ink-muted); display:flex; align-items:center; justify-content:center;}
@@ -790,10 +778,10 @@
 
   /* In-app confirm / backup / unsaved-changes / update pop-ups are built in JS
      with inline styles, so they're restyled here (!important beats inline). */
-  #appConfirmPrompt > div:first-child, #backupPopup > div:first-child, #unsavedChangesPrompt > div:first-child{
+  #appConfirmPrompt > div:first-child, #backupPopup > div:first-child{
     -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px);
   }
-  #appConfirmPrompt > div:last-child, #backupPopup > div:last-child, #unsavedChangesPrompt > div:last-child{
+  #appConfirmPrompt > div:last-child, #backupPopup > div:last-child{
     width:calc(100% - 16px) !important; max-width:480px !important;
     margin-bottom:calc(env(safe-area-inset-bottom) + 8px);
     border-radius:32px !important;
@@ -802,7 +790,7 @@
     -webkit-backdrop-filter:blur(34px) saturate(190%); backdrop-filter:blur(34px) saturate(190%);
   }
   @supports (background:color-mix(in srgb, red, blue)){
-    #appConfirmPrompt > div:last-child, #backupPopup > div:last-child, #unsavedChangesPrompt > div:last-child{
+    #appConfirmPrompt > div:last-child, #backupPopup > div:last-child{
       background:var(--sheet-fill) !important;
     }
   }
@@ -943,7 +931,6 @@
       padding:18px 28px calc(env(safe-area-inset-bottom, 0px) + 28px);
       box-shadow:none;
     }
-    .pv-actions{ margin:0 -28px; padding-left:28px; padding-right:28px; }
     .sheet-handle{ display:none; }
     .overlay.top-sheet{ align-items:stretch; }
     .overlay.top-sheet .sheet{ margin:0; max-height:none; animation:none; }
@@ -1075,14 +1062,15 @@
   .day-row .dr-t{font-weight:var(--fw-black); font-size:0.9375rem; overflow-wrap:anywhere;}
   .day-row .dr-s{color:var(--ink-muted); font-size:0.75rem; margin-top:1px; overflow-wrap:anywhere;}
   .day-row .dr-r{flex:none; font-weight:var(--fw-black); font-size:0.875rem; color:var(--ink);}
-  .subtabs{position:fixed; left:0; right:0; top:var(--sub-top, 64px); z-index:19; display:flex; gap:4px; padding:6px max(14px, env(safe-area-inset-right)) 8px max(14px, env(safe-area-inset-left)); background:var(--navy); border-radius:0 0 22px 22px;
-    box-shadow:inset 0 -1px 0 rgba(255,255,255,0.18), 0 8px 24px rgba(0,0,0,0.18); -webkit-backdrop-filter:var(--glass-blur); backdrop-filter:var(--glass-blur);} /* the same glass as the main tabs */
+  /* The Work / Sales sub tabs: thinner, smaller and a shade darker than the main tabs, so they read as subordinate. */
+  .subtabs{position:fixed; left:0; right:0; top:var(--sub-top, 64px); z-index:19; display:flex; justify-content:center; gap:6px; padding:3px max(14px, env(safe-area-inset-right)) 5px max(14px, env(safe-area-inset-left)); background:var(--navy-dark); border-radius:0 0 16px 16px;
+    box-shadow:inset 0 -1px 0 rgba(255,255,255,0.12), 0 4px 14px rgba(0,0,0,0.14); -webkit-backdrop-filter:var(--glass-blur); backdrop-filter:var(--glass-blur);}
   @supports (background:color-mix(in srgb, red, blue)){
-    .subtabs{background:linear-gradient(180deg, rgba(255,255,255,0.14), rgba(255,255,255,0.02)), color-mix(in srgb, var(--navy) var(--navy-glass), transparent);}
+    .subtabs{background:linear-gradient(180deg, rgba(0,0,0,0.22), rgba(0,0,0,0.22)), color-mix(in srgb, var(--navy) var(--navy-glass), transparent);}
   }
   .subtabs[hidden]{display:none;}
-  .subtab{position:relative; flex:1 1 0; min-width:0; padding:10px 6px; border:none; border-radius:999px; background:transparent; color:rgba(255,255,255,0.78); font-size:0.9375rem; font-weight:var(--fw-black); transition:background .2s ease, color .2s ease;}
-  .subtab.active{background:rgba(255,255,255,0.24); color:#fff; box-shadow:inset 0 1px 0 rgba(255,255,255,0.50), inset 0 0 0 1px rgba(255,255,255,0.18), 0 2px 8px rgba(0,0,0,0.18);}
+  .subtab{position:relative; flex:0 1 112px; min-width:0; padding:5px 12px; border:none; border-radius:999px; background:transparent; color:rgba(255,255,255,0.66); font-size:0.8125rem; font-weight:600; line-height:1.25; transition:background .2s ease, color .2s ease;}
+  .subtab.active{background:rgba(255,255,255,0.16); color:#fff; box-shadow:inset 0 0 0 1px rgba(255,255,255,0.14);}
   .subtab .tab-badge{position:static; display:inline-block; margin-left:6px; vertical-align:1px;}
 
   /* ---------- iPad / desktop extras (08d-desktop.js) ---------- */
