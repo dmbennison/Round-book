@@ -1013,8 +1013,6 @@ let photoViewerList = [];
 let photoViewerIndex = 0;
 let photoViewerOnClose = null;
 let photoViewerSource = null; // 'gallery' when opened from the Photo gallery (sharing there always uses the share sheet)
-let photoViewerTouchStartX = null;
-let photoViewerTouchStartY = null;
 
 function openPhotoViewerAt(list, index, onClose, source){
   if(!list.length || index < 0 || index >= list.length) return;

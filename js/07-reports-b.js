@@ -279,7 +279,6 @@ function printJobInvoice(id){
   const companyAddress = data.settings.companyAddress || '';
   const companyPhone = data.settings.companyPhone || '';
   const yourName = data.settings.yourName || '';
-  const hasLogo = !!data.settings.logo;
   const fromLine = [yourName, company].filter(Boolean).join(' · ');
 
   const metaRows = [
@@ -350,7 +349,6 @@ function printQuote(id){
   const companyAddress = data.settings.companyAddress || '';
   const companyPhone = data.settings.companyPhone || '';
   const yourName = data.settings.yourName || '';
-  const hasLogo = !!data.settings.logo;
   const fromLine = [yourName, company].filter(Boolean).join(' · ');
 
   // Same letterhead construction as printJobInvoice (see the notes there on why the

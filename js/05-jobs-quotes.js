@@ -503,7 +503,6 @@ function openQuoteDetail(id){
   const converted = q.status === 'converted';
   const hasMobile = isMobileNumber(q.phone);
   const canSend = hasMobile || !!q.email;
-  const sentCount = q.quoteFollowUpCount || 0;
   const history = quoteHistoryEntries(q);
   const dItems = quoteItems(q);
   const dTot = quoteTotals(dItems, q.discountPct);

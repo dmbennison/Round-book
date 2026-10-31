@@ -1538,7 +1538,6 @@ function printReceipt(customerId, dateISO, amount){
   const companyAddress = data.settings.companyAddress || '';
   const companyPhone = data.settings.companyPhone || '';
   const yourName = data.settings.yourName || '';
-  const hasLogo = !!data.settings.logo;
   const fromLine = [yourName, company].filter(Boolean).join(' · ');
 
   const metaRows = [

@@ -6,7 +6,7 @@ const STORE_KEY = 'roundBookData_v1';
 // APP_VERSION is a plain decimal number (e.g. 1.01, 1.02 ... 1.99, 2.00) —
 // bump by 0.01 for every change. formatVersion always renders it to exactly
 // two decimal places, so it's never shown as "1.1" or "1.100".
-const APP_VERSION = 3.31;
+const APP_VERSION = 3.32;
 function formatVersion(v){ return Number(v).toFixed(2); }
 // Release notes are NOT kept in the app: they live in CHANGELOG.txt, shipped alongside these files.
 // MAINTENANCE: every time APP_VERSION is bumped, add the new version to the top of CHANGELOG.txt.
@@ -937,7 +937,6 @@ function roundMajorityDueDate(roundName){
 function custStatus(c){
   const lastClean = lastDateOf(c.cleanHistory);
   const lastPaid = lastOf((c.paymentHistory||[]).map(p=>p.date));
-  const freq = freqDays(c);
   let cleanBadge = null;
   const deferred = c.deferUntil && c.deferUntil > todayISO();
   if(c.paused){
