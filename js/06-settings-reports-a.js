@@ -121,7 +121,15 @@ function contrastRatio(a, b){
   return (Math.max(la,lb)+0.05) / (Math.min(la,lb)+0.05);
 }
 // Settings > Transparency 0-100 as an opacity for the header, tab bars, cards and pop-ups: 1 (fully solid) down to 0.3.
-function solidOpacity(){ return 1 - 0.7 * (transparencyLevel / 100); }
+// On an iPad or computer the header and tab bars never have anything scrolling underneath them (the lists scroll in their own
+// panes between the bars), so see-through would show nothing but a faded bar: there the screen is always solid and the
+// Transparency slider is not offered.
+function transparencyAvailable(){ return !(typeof isTabletOrDesktop === 'function' && isTabletOrDesktop()); }
+function solidOpacity(){ return transparencyAvailable() ? 1 : 1 - 0.7 * (transparencyLevel / 100); }
+let themeWasTablet = null;
+window.addEventListener('resize', () => { // a window dragged across the tablet size, or a rotated iPad, changes what applies
+  if(typeof isTabletOrDesktop === 'function' && themeWasTablet !== null && isTabletOrDesktop() !== themeWasTablet && typeof applyTheme === 'function') applyTheme();
+});
 // iOS reads the status-bar colour from the strip when it is drawn and doesn't always notice a later colour change, so after a
 // change of colour scheme the strip is taken out and put back, which makes it look again (see #statusStrip in index.html).
 function refreshStatusStrip(){
@@ -139,6 +147,7 @@ function applyTheme(){
   // cards, hard borders, no glass blur, no background glow.
   const flat = true; // every scheme is drawn solid: opaque cards, hard borders, no glow (Settings > Transparency can make it see-through)
   const opa = solidOpacity();
+  themeWasTablet = (typeof isTabletOrDesktop === 'function') ? isTabletOrDesktop() : false;
   const rgbaOf = (hex, a) => `rgba(${rgbTriplet(hex)}, ${a.toFixed(3)})`;
   // Set on the body element itself (not html/:root) so these inline values take
   // precedence over the static light/dark-mode CSS blocks, which declare --blue-dim,
@@ -204,6 +213,8 @@ function applyTheme(){
     root.setProperty('--' + prefix + '-hover', hexToRgba(ink, 0.09));
     root.setProperty('--' + prefix + '-btn', hexToRgba(ink, 0.12));
   };
+  // The Today hero card: solid navy at Solid, easing down to 65% navy at the clearest setting (its white lettering needs that much).
+  root.setProperty('--hero-glass', Math.round(65 + 35 * (opa - 0.3) / 0.7) + '%');
   setBarInk('bar', barInk(0));
   setBarInk('subbar', barInk(0.22));
   const ga = a => a;
@@ -270,7 +281,7 @@ function openSettings(){
       <span style="font-size:1.375rem; color:var(--ink-muted); flex-shrink:0; line-height:1;">A</span>
       <span id="textSizeLabel" style="font-size:0.75rem; font-weight:800; color:var(--ink); min-width:34px; text-align:right; flex-shrink:0;">${textSize}px</span>
     </div>
-    <div class="section-label">Transparency</div>
+    ${transparencyAvailable() ? `    <div class="section-label">Transparency</div>
     <div style="display:flex; align-items:center; gap:10px; margin:4px 2px 4px;">
       <span style="font-size:0.75rem; color:var(--ink-muted); flex-shrink:0;">Solid</span>
       <input type="range" min="0" max="100" step="5" value="${transparencyLevel}" oninput="previewTransparency(this.value)" onchange="setTransparency(this.value)" style="flex:1; accent-color:var(--blue);" aria-label="Transparency">
@@ -278,6 +289,7 @@ function openSettings(){
       <span id="transparencyLabel" style="font-size:0.75rem; font-weight:800; color:var(--ink); min-width:70px; text-align:right; flex-shrink:0;">${transparencyLabel(transparencyLevel)}</span>
     </div>
     <div style="margin:0 2px 16px;"><button onclick="resetTransparency()" style="background:none; border:none; padding:2px 0; color:var(--blue-deep); font-weight:700; font-size:0.75rem; cursor:pointer;">Reset to solid</button></div>
+` : ''}
     <div class="section-label">Colour scheme</div>
     <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:16px;">
       ${Object.keys(THEMES).map(key=>{
