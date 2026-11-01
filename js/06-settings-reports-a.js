@@ -178,6 +178,34 @@ function applyTheme(){
   // (nudged toward the accent in dark mode so schemes stay distinct), a faint accent wash, and a soft shadow.
   root.setProperty('--glass-k', '1');
   root.setProperty('--navy-glass', Math.round(solidOpacity() * 100) + '%'); // how solid the header and tab bars are
+  // The header and tab bars are tinted navy at the Transparency setting's opacity over the page, so the more see-through
+  // they are the lighter they look - and in light mode white lettering stops being readable. Work out roughly what colour
+  // the bar really is (navy over a light page, plus its faint sheen) and switch the lettering to a dark navy when white
+  // would fall below a readable contrast. At the standard setting nothing changes. The sub tab bar is darker (it has an
+  // extra dark layer), so it is judged on its own.
+  const barInk = (extraDark) => {
+    const under = darkMode ? p.bg : mixHex(p.bg, '#FFFFFF', 0.5); // what shows through behind the bar when scrolling
+    let eff = mixHex(under, t.navy, opa);                          // navy at opa over it
+    eff = mixHex(eff, '#FFFFFF', 0.09);                            // the bar's own light sheen
+    if(extraDark) eff = mixHex(eff, '#000000', extraDark);
+    if(contrastRatio('#FFFFFF', eff) >= 4.5) return null;          // white is fine: leave the stylesheet's own colours
+    let ink = mixHex(t.navy, '#000000', 0.28);
+    if(contrastRatio(ink, eff) < 4.5) ink = '#000000';
+    return ink;
+  };
+  const setBarInk = (prefix, ink) => {
+    ['ink','dim','sub','pill','pill-soft','hover','btn'].forEach(k => root.removeProperty('--' + prefix + '-' + k));
+    if(!ink) return;
+    root.setProperty('--' + prefix + '-ink', ink);
+    root.setProperty('--' + prefix + '-dim', hexToRgba(ink, 0.74));
+    root.setProperty('--' + prefix + '-sub', hexToRgba(ink, 0.70));
+    root.setProperty('--' + prefix + '-pill', hexToRgba(ink, 0.16));
+    root.setProperty('--' + prefix + '-pill-soft', hexToRgba(ink, 0.12));
+    root.setProperty('--' + prefix + '-hover', hexToRgba(ink, 0.09));
+    root.setProperty('--' + prefix + '-btn', hexToRgba(ink, 0.12));
+  };
+  setBarInk('bar', barInk(0));
+  setBarInk('subbar', barInk(0.22));
   const ga = a => a;
   root.setProperty('--card-surface', flat ? rgbaOf(p.surface, solidOpacity()) : (darkMode ? hexToRgba(mixHex(p.surface, acc, 0.12 * tint), ga(0.58)) : hexToRgba(p.surface, ga(0.66))));
   root.setProperty('--card-tint', flat ? 'transparent' : (darkMode ? hexToRgba(acc, 0.10 * tint) : hexToRgba(acc, 0.07 * tint)));
