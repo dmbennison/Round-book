@@ -4,6 +4,14 @@ ROUND BOOK - RELEASE NOTES
 Newest first. This file is not part of the app and is not loaded by it; it ships alongside the code files.
 To add a release: raise APP_VERSION in js/01-data.js and CACHE_NAME in sw.js to the same number, then put a new entry at the top of this list.
 
+Version 3.33
+  - Less blur: the frosted-glass effect on the header, tab bars, cards and pop-ups is much lighter, so what scrolls
+    underneath stays recognisable instead of turning to mush
+  - Readable in light mode: when Transparency is turned up far enough that the header, tab bars and sub tabs look pale,
+    their lettering, icons and selected-tab highlight switch to dark navy automatically (judged from the bar's real colour,
+    so it only happens when white would be hard to read). At the standard setting nothing changes, and dark mode is untouched
+  - The header's Search / ⋯ / Settings icons now follow the lettering colour
+
 Version 3.32
   - Sub tabs (Rounds / Jobs under Work, Quotes / Marketing under Sales) are now thinner and smaller, centred rather than
     stretched across the screen, and a shade darker with softer lettering than the main tabs, so they read as
