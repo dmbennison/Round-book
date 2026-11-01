@@ -701,7 +701,7 @@
 
   /* Today tab */
   .today-hero{
-    --hero-bg:linear-gradient(155deg, rgba(255,255,255,0.20), rgba(255,255,255,0) 45%), color-mix(in srgb, var(--navy) 90%, transparent);
+    --hero-bg:linear-gradient(155deg, rgba(255,255,255,0.20), rgba(255,255,255,0) 45%), color-mix(in srgb, var(--navy) var(--hero-glass, 100%), transparent);
     background:var(--hero-bg); border-radius:28px;
     box-shadow:inset 0 1px 0 rgba(255,255,255,0.40), inset 0 0 0 1px rgba(255,255,255,0.10), 0 14px 34px color-mix(in srgb, var(--navy) 38%, transparent);
     -webkit-backdrop-filter:var(--glass-blur); backdrop-filter:var(--glass-blur);
@@ -1044,7 +1044,7 @@
   /* While running, the hero and its buttons are pinned under the header and the list scrolls beneath them. The hero is
      normally a little see-through; here it is made solid so the cards passing under it don't show. */
   .today-top.running{position:sticky; top:var(--header-h, 170px); z-index:6; background:transparent; padding-top:4px;} /* no solid backing, so the customers scroll up underneath the glass hero */
-  .today-top.running .today-hero{background:linear-gradient(155deg, rgba(255,255,255,0.16), rgba(255,255,255,0) 45%), color-mix(in srgb, var(--navy) clamp(20%, calc(68% * var(--glass-k)), 100%), transparent); -webkit-backdrop-filter:var(--glass-blur); backdrop-filter:var(--glass-blur);}
+  .today-top.running .today-hero{background:linear-gradient(155deg, rgba(255,255,255,0.16), rgba(255,255,255,0) 45%), color-mix(in srgb, var(--navy) var(--hero-glass, 100%), transparent); -webkit-backdrop-filter:var(--glass-blur); backdrop-filter:var(--glass-blur);}
   .today-hero.compact{padding:12px 14px;} /* during a Start run the hero shrinks to the totals and the progress bar (no round chips) */
   .today-hero.compact .num{font-size:1.75rem;}
   .today-hero.compact .num[style]{font-size:1.25rem !important;}
