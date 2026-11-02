@@ -4,6 +4,11 @@ ROUND BOOK - RELEASE NOTES
 Newest first. This file is not part of the app and is not loaded by it; it ships alongside the code files.
 To add a release: raise APP_VERSION in js/01-data.js and CACHE_NAME in sw.js to the same number, then put a new entry at the top of this list.
 
+Version 3.36
+  - Fixed: the Transparency setting had stopped working on phones in 3.34. The check that switches it off on iPad and
+    computer was the wrong way round, so a phone was forced solid and only a tablet or computer could be made see-through.
+    It now works on a phone again and is solid (with no slider) on iPad and computer, as intended
+
 Version 3.35
   - Colour schemes are bolder: the header and tab colour is more saturated (Ocean is a clear blue, Forest a rich green,
     Rust a warm terracotta, Plum a vivid purple, Slate a blue-grey), and the page background, card borders and dark mode
