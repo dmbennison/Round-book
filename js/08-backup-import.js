@@ -327,7 +327,7 @@ const FOCUSED_HELP = {
       helpList([
         'Open a quote and tap <b>Actions</b> to send it, print it, follow it up, or turn it into a customer or a one-off job. Pending, Accepted and Declined stay on the screen so you can change the status in one tap.',
         '<b>Swipe right</b> to accept, <b>left</b> to decline.',
-        'A yellow number on the <b>Quotes</b> tab (under Sales) means quotes are waiting for a follow-up.'
+        'Quotes waiting for a follow-up are flagged and listed first in the Quotes list (and counted on the iPad / computer Today dashboard).'
       ])
     ]
   },

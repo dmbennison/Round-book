@@ -6,7 +6,7 @@
    due for a clean (same definition as the Rounds > Due list), which of those
    need a text before you arrive, any one-off jobs actually dated today (the tile
    only appears when there is one), and marketing follow-ups that have come due.
-   Quotes needing follow-up are shown as a yellow badge on the Quotes tab. */
+   Quotes needing follow-up are flagged and listed first in the Quotes list. */
 // Everyone marked "text before you arrive" who's also due for a clean today,
 // grouped by round (round names sorted, customers within a round sorted by
 // how overdue they are) — used by both the Today screen and the "Text all"
@@ -410,15 +410,6 @@ function quotesNeedingFollowUp(){
   const today = todayISO();
   return (data.quotes||[]).filter(q => quoteNeedsFollowUp(q, today));
 }
-// Yellow number on the Quotes sub tab (Sales > Quotes): how many quotes need attention.
-// Called from render(), so it stays current after anything that changes a quote.
-function updateQuotesBadge(){
-  const el = document.getElementById('quotesBadge');
-  if(!el) return;
-  const n = quotesNeedingFollowUp().length;
-  el.textContent = n > 99 ? '99+' : String(n);
-  el.hidden = n === 0;
-}
 
 // A pending marketing action (a call to make, a text to send again) is only
 // "due" for the banner once it has a follow-up date that's arrived — an action
@@ -672,9 +663,8 @@ function renderSubTabs(){
   else {
     bar.hidden = false;
     bar.innerHTML = defs.map(([id, label]) =>
-      `<button class="subtab${currentTab === id ? ' active' : ''}" onclick="setTab('${id}', true)">${label}${id === 'quotes' ? '<span class="tab-badge" id="quotesBadge" hidden></span>' : ''}</button>`).join('');
+      `<button class="subtab${currentTab === id ? ' active' : ''}" onclick="setTab('${id}', true)">${label}</button>`).join('');
   }
-  updateQuotesBadge(); // the yellow quotes-needing-attention number lives on the Quotes sub tab, which was just redrawn
   if(wasHidden !== bar.hidden && typeof window.syncHeaderHeights === 'function') window.syncHeaderHeights();
 }
 // The page itself scrolls (the header and tab bar are fixed), so these are simply the window scroll —
@@ -1365,7 +1355,6 @@ async function getOsrmRouteGeometry(points){
 /* ---------- rendering ---------- */
 function render(){
   roundPhaseCache = null;
-  updateQuotesBadge();
   renderBackupBanner();
   renderLastActionBanner();
   renderMarketingFollowUpBanner();
