@@ -15,27 +15,27 @@
    Every pairing was checked with a contrast calculator: ink >= 7:1, muted and accent >= 4.5:1, white on
    navy >= 7:1. If you change a value, re-check it (e.g. webaim.org/resources/contrastchecker). */
 const THEMES = {
-  // OCEAN — deep sea-blue header on a cool, near-neutral grey page with white cards. The only strong colours are the
+  // OCEAN — clear sea-blue header on a cool, near-neutral grey page with white cards. The only strong colours are the
   // header and a warm coral accent that stands out against the blue (the same recipe as Slate: neutral base, one contrasting accent).
   // `tint` and `orb` (both 0-1) scale how much accent colour washes into cards and the soft page glow; Slate keeps the full amount.
-  ocean: { name:'Ocean', navy:'#164559', blue:'#B83E27', blueDark:'#FF8C74', glow:'#2F7A96', tint:0.45, orb:0.6,
+  ocean: { name:'Ocean', navy:'#0A5A94', blue:'#B83E27', blueDark:'#FF8C74', glow:'#2F8FD0', tint:0.45, orb:0.6,
     light:{ bg:'#EEF1F3', surface:'#FFFFFF', ink:'#14283A', muted:'#556B7C', line:'#D9DFE3' },
     dark: { bg:'#0F1418', surface:'#171E24', ink:'#EAF1F6', muted:'#93A8B9', line:'#2A343C' } },
   // SLATE — professional and neutral: true charcoal header, stone-grey pages, and one warm copper accent for contrast.
   // Almost no hue except the copper, so it reads as a tool, not a theme.
-  slate: { name:'Slate', navy:'#2B2F34', blue:'#99531D', blueDark:'#E3995A', glow:'#8E9AA6',
+  slate: { name:'Slate', navy:'#2E3D4D', blue:'#99531D', blueDark:'#E3995A', glow:'#7C93AB',
     light:{ bg:'#ECECEA', surface:'#FAFAF8', ink:'#212427', muted:'#62656A', line:'#D6D6D2' },
     dark: { bg:'#101112', surface:'#1B1D1F', ink:'#ECEAE6', muted:'#A09D97', line:'#303234' } },
   // RUST — brown-terracotta header on a warm-grey page with cream cards, and a clear cobalt-blue accent that contrasts with the clay.
-  rust: { name:'Rust', navy:'#5A2E1C', blue:'#1D5FA8', blueDark:'#7DB4F2', glow:'#8A5A44', tint:0.45, orb:0.6,
+  rust: { name:'Rust', navy:'#9A431E', blue:'#1D5FA8', blueDark:'#7DB4F2', glow:'#C8704A', tint:0.45, orb:0.6,
     light:{ bg:'#F1EEEA', surface:'#FFFCF8', ink:'#33201A', muted:'#6F5A50', line:'#E1DAD1' },
     dark: { bg:'#151210', surface:'#1F1B18', ink:'#F3E9DD', muted:'#B49C8A', line:'#38302B' } },
-  // FOREST — deep pine header on a soft stone page with off-white cards, and a golden ochre accent against the green.
-  forest: { name:'Forest', navy:'#14402C', blue:'#8A6508', blueDark:'#E8B94C', glow:'#3E7A57', tint:0.45, orb:0.6,
+  // FOREST — rich green header on a soft stone page with off-white cards, and a golden ochre accent against the green.
+  forest: { name:'Forest', navy:'#11693B', blue:'#7A5806', blueDark:'#E8B94C', glow:'#35A667', tint:0.45, orb:0.6,
     light:{ bg:'#EEF0EA', surface:'#FBFCF8', ink:'#1C2B20', muted:'#576852', line:'#D9DDD0' },
     dark: { bg:'#0F1311', surface:'#181E1A', ink:'#E7EFE2', muted:'#94AA94', line:'#2B342D' } },
-  // PLUM — aubergine header on a quiet grey-lilac page with white cards, and a teal accent that contrasts with the purple.
-  plum: { name:'Plum', navy:'#3F1A47', blue:'#0F766E', blueDark:'#4FD1C5', glow:'#7A4A86', tint:0.45, orb:0.6,
+  // PLUM — vivid purple header on a quiet grey-lilac page with white cards, and a teal accent that contrasts with the purple.
+  plum: { name:'Plum', navy:'#68218A', blue:'#0B6B63', blueDark:'#4FD1C5', glow:'#A25CC4', tint:0.45, orb:0.6,
     light:{ bg:'#F2EFF3', surface:'#FFFDFF', ink:'#2D1B33', muted:'#6A5871', line:'#E2DCE4' },
     dark: { bg:'#131014', surface:'#1C181F', ink:'#F1E8F4', muted:'#A891B1', line:'#302933' } },
   // HIGH CONTRAST — for outdoor and gloved use: pure black and white, hard borders, solid (non-glass) cards, no glow.
@@ -46,16 +46,16 @@ const THEMES = {
 };
 // SOLID style (the default): the same colours, drawn like High contrast: opaque cards, hard coloured borders, no glass or glow.
 // Each scheme's solid page / card / text / border colours, in light and dark. The Glass style keeps the softer palettes above.
-THEMES.ocean.solid = { light:{ bg:'#E3EDF2', surface:'#FFFFFF', ink:'#0C2230', muted:'#3A5668', line:'#5C8399' },
-  dark:{ bg:'#0A1319', surface:'#111F29', ink:'#F0F7FB', muted:'#B6CAD6', line:'#5F8AA0' } };
-THEMES.slate.solid = { light:{ bg:'#E2E2DF', surface:'#FFFFFF', ink:'#1B1D20', muted:'#46494E', line:'#6C6F74' },
-  dark:{ bg:'#0E0F10', surface:'#191B1D', ink:'#F2F0EC', muted:'#BDBAB4', line:'#7C7F84' } };
-THEMES.rust.solid = { light:{ bg:'#F0E4DA', surface:'#FFFCF8', ink:'#2C1A12', muted:'#5E463A', line:'#8A624C' },
-  dark:{ bg:'#120F0D', surface:'#1E1915', ink:'#F7ECDF', muted:'#C4AC9A', line:'#8E6C58' } };
-THEMES.forest.solid = { light:{ bg:'#E1ECE3', surface:'#FBFEFA', ink:'#12261A', muted:'#3F5A47', line:'#5F8268' },
-  dark:{ bg:'#0B110D', surface:'#141C16', ink:'#EAF3E6', muted:'#A9C0AA', line:'#5F8A68' } };
-THEMES.plum.solid = { light:{ bg:'#EBE1EE', surface:'#FFFDFF', ink:'#26122C', muted:'#58405F', line:'#835E8E' },
-  dark:{ bg:'#100C12', surface:'#1B151E', ink:'#F6EBF9', muted:'#BBA2C4', line:'#85648F' } };
+THEMES.ocean.solid = { light:{ bg:'#D6E8F5', surface:'#FFFFFF', ink:'#08243A', muted:'#2F5873', line:'#4A8DBA' },
+  dark:{ bg:'#07161F', surface:'#0D2635', ink:'#F0F7FB', muted:'#B0CCDD', line:'#3E86B3' } };
+THEMES.slate.solid = { light:{ bg:'#DFE3E7', surface:'#FFFFFF', ink:'#1B1D20', muted:'#434B54', line:'#6B7886' },
+  dark:{ bg:'#0E1114', surface:'#181C21', ink:'#F2F0EC', muted:'#BAC0C7', line:'#74828F' } };
+THEMES.rust.solid = { light:{ bg:'#F4DFCE', surface:'#FFFCF8', ink:'#2C1A12', muted:'#6A4430', line:'#B4693F' },
+  dark:{ bg:'#160E0A', surface:'#241812', ink:'#F7ECDF', muted:'#CBA88E', line:'#B0673F' } };
+THEMES.forest.solid = { light:{ bg:'#D8EEDD', surface:'#FBFEFA', ink:'#0E2A18', muted:'#37603F', line:'#4E9A66' },
+  dark:{ bg:'#08140C', surface:'#112418', ink:'#EAF3E6', muted:'#A5C9AB', line:'#48935F' } };
+THEMES.plum.solid = { light:{ bg:'#E8D8F1', surface:'#FFFDFF', ink:'#26122C', muted:'#5B3F6B', line:'#9559B2' },
+  dark:{ bg:'#120816', surface:'#1F1126', ink:'#F6EBF9', muted:'#C7A4D6', line:'#9059AD' } };
 // Every scheme is drawn solid (flat, hard borders, like High contrast): its solid palette is the one used.
 Object.keys(THEMES).forEach(k => { if(THEMES[k].solid){ THEMES[k].light = THEMES[k].solid.light; THEMES[k].dark = THEMES[k].solid.dark; } });
 let themeName = localStorage.getItem('roundBookTheme') || 'ocean';
