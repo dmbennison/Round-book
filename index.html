@@ -1063,7 +1063,7 @@
   .day-row .dr-s{color:var(--ink-muted); font-size:0.75rem; margin-top:1px; overflow-wrap:anywhere;}
   .day-row .dr-r{flex:none; font-weight:var(--fw-black); font-size:0.875rem; color:var(--ink);}
   /* The Work / Sales sub tabs: thinner, smaller and a shade darker than the main tabs, so they read as subordinate. */
-  .subtabs{position:fixed; left:0; right:0; top:var(--sub-top, 64px); z-index:19; display:flex; justify-content:center; gap:6px; padding:3px max(14px, env(safe-area-inset-right)) 5px max(14px, env(safe-area-inset-left)); background:var(--navy-dark); border-radius:0 0 16px 16px;
+  .subtabs{position:fixed; left:50%; right:auto; transform:translateX(-50%); width:max-content; max-width:calc(100% - 24px); top:var(--sub-top, 64px); z-index:19; display:flex; justify-content:center; gap:6px; padding:3px 10px 5px; background:var(--navy-dark); border-radius:0 0 16px 16px;
     box-shadow:inset 0 -1px 0 rgba(255,255,255,0.12), 0 4px 14px rgba(0,0,0,0.14); -webkit-backdrop-filter:var(--glass-blur); backdrop-filter:var(--glass-blur);}
   @supports (background:color-mix(in srgb, red, blue)){
     .subtabs{background:linear-gradient(180deg, rgba(0,0,0,0.22), rgba(0,0,0,0.22)), color-mix(in srgb, var(--navy) var(--navy-glass), transparent);}

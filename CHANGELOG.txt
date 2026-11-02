@@ -4,6 +4,15 @@ ROUND BOOK - RELEASE NOTES
 Newest first. This file is not part of the app and is not loaded by it; it ships alongside the code files.
 To add a release: raise APP_VERSION in js/01-data.js and CACHE_NAME in sw.js to the same number, then put a new entry at the top of this list.
 
+Version 3.35
+  - Colour schemes are bolder: the header and tab colour is more saturated (Ocean is a clear blue, Forest a rich green,
+    Rust a warm terracotta, Plum a vivid purple, Slate a blue-grey), and the page background, card borders and dark mode
+    carry a stronger tint of the same colour. Lettering contrast was checked and stays readable in every scheme, light and
+    dark; High contrast is unchanged. Forest's gold and Plum's teal accents were deepened a little to stay readable on the
+    stronger backgrounds
+  - Sub tabs (Rounds / Jobs, Quotes / Marketing): the bar they sit on now shrinks to wrap just the two buttons,
+    centred under the header, instead of running the full width of the screen
+
 Version 3.34
   - The big Today card now follows the Transparency setting: fully solid at Solid, and no clearer than about two-thirds
     navy at the clearest setting so its white lettering stays readable (it was fixed at 90% before, and during a Start run
