@@ -4,6 +4,13 @@ ROUND BOOK - RELEASE NOTES
 Newest first. This file is not part of the app and is not loaded by it; it ships alongside the code files.
 To add a release: raise APP_VERSION in js/01-data.js and CACHE_NAME in sw.js to the same number, then put a new entry at the top of this list.
 
+Version 3.37
+  - Removed the small yellow number from the Quotes sub tab (quotes waiting for a follow-up are still flagged and listed first in the Quotes list, and counted on the iPad / computer dashboard)
+  - The sub tab labels (Rounds, Jobs, Quotes, Marketing) are now centred explicitly within their buttons
+  - Zoom buttons are consistent: in the Schedule's side tool rail on an iPad or computer, + is now on top and - below
+    (they were the wrong way round), and the report preview's side bar does the same (+, then the percentage, then -).
+    Across the top of a phone screen they still read left to right as - then +
+
 Version 3.36
   - Fixed: the Transparency setting had stopped working on phones in 3.34. The check that switches it off on iPad and
     computer was the wrong way round, so a phone was forced solid and only a tablet or computer could be made see-through.

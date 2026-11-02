@@ -143,11 +143,6 @@
   }
   .tab.active{background:var(--bar-pill-soft, rgba(255,255,255,0.14)); color:var(--bar-ink, #fff);}
   .tab{position:relative;}
-  .tab-badge{
-    position:absolute; top:1px; right:2px; min-width:16px; height:16px; padding:0 4px; box-sizing:border-box;
-    border-radius:8px; background:#FFD60A; color:#1a1a1a; font-size:0.625rem; font-weight:var(--fw-black); line-height:16px; text-align:center;
-  }
-  .tab-badge[hidden]{display:none;}
   #liveSyncChip[hidden]{display:none;}
 
   /* The page never scrolls: the header and the bottom tab bar stay put on every screen, and only this
@@ -432,6 +427,7 @@
   .se-tools{flex:none; display:flex; gap:6px; padding:6px 10px; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; background:var(--glass-fill-strong); border-bottom:1px solid var(--glass-edge-soft); box-shadow:inset 0 1px 0 var(--glass-edge); -webkit-backdrop-filter:var(--glass-blur); backdrop-filter:var(--glass-blur);}
   .se-tools::-webkit-scrollbar{display:none;}
   .se-tool{flex:none; padding:7px 11px; border:none; border-radius:999px; background:var(--glass-fill); box-shadow:var(--glass-hi); color:var(--ink); font-size:0.75rem; font-weight:var(--fw-black); white-space:nowrap;}
+  .se-zoom{flex:none; display:flex; flex-direction:row-reverse; gap:6px;} /* across the top: − then +; in the wide side rail it stacks with + on top (see below) */
   .se-tool.active{background:var(--blue); border-color:var(--blue); color:var(--on-accent, #fff);}
   .se-tool:disabled{opacity:0.4;}
   .se-tools:not(.more-open) .se-extra:not(.active){display:none;} /* tucked behind ⋯ More… (Multi stays visible while it's switched on) */
@@ -913,6 +909,7 @@
     .report-preview.in-pane .rp-title{ order:-1; flex:none; white-space:normal; overflow:visible; font-size:0.8125rem; line-height:1.25; margin:2px 2px 6px; }
     .report-preview.in-pane .rp-bar .rp-btn:first-child{ order:-2; }
     .report-preview.in-pane .rp-btn{ width:100%; }
+    .report-preview.in-pane .rp-in{ order:0; } .report-preview.in-pane .rp-zoom-lbl{ order:1; } .report-preview.in-pane .rp-out{ order:2; } /* + on top, then the %, then − */
     .report-preview.in-pane .rp-action{ flex:none; flex-direction:column; gap:4px; padding:10px 4px; font-size:0.75rem; text-align:center; }
     body[data-tab="today"]:not(:has(#overlay.show)) .report-preview.in-pane{ left:0; border-left:none; } /* Today is full width until something opens */
     body[data-tab="schedule"] .report-preview.in-pane{ left:0; border-left:none; } /* the Schedule has no list on the left, so a printout fills the width */
@@ -978,6 +975,7 @@
     .sched-editor.show{ display:grid; grid-template-columns:88px minmax(0, 1fr); grid-template-rows:auto minmax(0, 1fr); }
     .se-tools{ grid-column:1; grid-row:1 / -1; flex-direction:column; gap:6px; padding:10px 8px; overflow-x:hidden; overflow-y:auto; border-bottom:none; border-right:1px solid var(--glass-edge-soft); }
     .se-tool{ width:100%; padding:10px 4px; white-space:normal; text-align:center; line-height:1.25; }
+    .se-zoom{ flex-direction:column; width:100%; }
     .se-tool.se-tool-weeks{ display:block; }
     .se-bar{ grid-column:2; grid-row:1; padding-top:12px; }
     .se-scroll{ grid-column:2; grid-row:2; }
@@ -1069,9 +1067,8 @@
     .subtabs{background:linear-gradient(180deg, rgba(0,0,0,0.22), rgba(0,0,0,0.22)), color-mix(in srgb, var(--navy) var(--navy-glass), transparent);}
   }
   .subtabs[hidden]{display:none;}
-  .subtab{position:relative; flex:0 1 112px; min-width:0; padding:5px 12px; border:none; border-radius:999px; background:transparent; color:var(--subbar-dim, rgba(255,255,255,0.66)); font-size:0.8125rem; font-weight:600; line-height:1.25; transition:background .2s ease, color .2s ease;}
+  .subtab{position:relative; flex:0 1 112px; min-width:0; display:flex; align-items:center; justify-content:center; text-align:center; padding:5px 12px; border:none; border-radius:999px; background:transparent; color:var(--subbar-dim, rgba(255,255,255,0.66)); font-size:0.8125rem; font-weight:600; line-height:1.25; transition:background .2s ease, color .2s ease;}
   .subtab.active{background:var(--subbar-pill-soft, rgba(255,255,255,0.16)); color:var(--subbar-ink, #fff); box-shadow:inset 0 0 0 1px rgba(255,255,255,0.14);}
-  .subtab .tab-badge{position:static; display:inline-block; margin-left:6px; vertical-align:1px;}
 
   /* ---------- iPad / desktop extras (08d-desktop.js) ---------- */
   /* Right-pane summary panel and divider: only ever shown by the wide split-view block above. */
@@ -1211,8 +1208,10 @@
   </div>
   <div class="se-tools" id="seTools">
     <button class="se-tool" onclick="seScrollToToday()">📍 Today</button>
-    <button class="se-tool" onclick="seZoomBy(1/1.25)" aria-label="Zoom out">🔍−</button>
-    <button class="se-tool" onclick="seZoomBy(1.25)" aria-label="Zoom in">🔍＋</button>
+    <div class="se-zoom">
+      <button class="se-tool" onclick="seZoomBy(1.25)" aria-label="Zoom in">🔍＋</button>
+      <button class="se-tool" onclick="seZoomBy(1/1.25)" aria-label="Zoom out">🔍−</button>
+    </div>
     <button class="se-tool" id="seUndo" onclick="seUndo()">↶ Undo</button>
     <button class="se-tool" id="seMoreToolsBtn" onclick="seToggleMoreTools()" aria-expanded="false">⋯ More…</button>
     <button class="se-tool se-extra" onclick="sePushBackOpen()">☔ Push back</button>
@@ -1231,9 +1230,9 @@
   <div class="rp-bar">
     <button class="rp-btn" onclick="closeReportPreview()" aria-label="Close preview">✕</button>
     <div class="rp-title" id="rpTitle"></div>
-    <button class="rp-btn" onclick="rpZoomBy(1/1.25)" aria-label="Zoom out">−</button>
+    <button class="rp-btn rp-out" onclick="rpZoomBy(1/1.25)" aria-label="Zoom out">−</button>
     <button class="rp-btn rp-zoom-lbl" id="rpZoomLbl" onclick="rpFit()" aria-label="Fit to screen">100%</button>
-    <button class="rp-btn" onclick="rpZoomBy(1.25)" aria-label="Zoom in">+</button>
+    <button class="rp-btn rp-in" onclick="rpZoomBy(1.25)" aria-label="Zoom in">+</button>
   </div>
   <div class="rp-scroll" id="rpScroll"><div class="rp-sizer" id="rpSizer"><div class="rp-paper" id="rpPaper"></div></div></div>
   <div class="rp-actions">
