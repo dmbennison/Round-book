@@ -125,7 +125,7 @@ function contrastRatio(a, b){
 // panes between the bars), so see-through would show nothing but a faded bar: there the screen is always solid and the
 // Transparency slider is not offered.
 function transparencyAvailable(){ return !(typeof isTabletOrDesktop === 'function' && isTabletOrDesktop()); }
-function solidOpacity(){ return transparencyAvailable() ? 1 : 1 - 0.7 * (transparencyLevel / 100); }
+function solidOpacity(){ return transparencyAvailable() ? 1 - 0.7 * (transparencyLevel / 100) : 1; }
 let themeWasTablet = null;
 window.addEventListener('resize', () => { // a window dragged across the tablet size, or a rotated iPad, changes what applies
   if(typeof isTabletOrDesktop === 'function' && themeWasTablet !== null && isTabletOrDesktop() !== themeWasTablet && typeof applyTheme === 'function') applyTheme();
