@@ -386,7 +386,7 @@
   .sched-editor{position:fixed; top:var(--header-h, 170px); bottom:var(--tabbar-h, 64px); left:0; right:0; z-index:12; display:none; flex-direction:column; background:transparent; color:var(--ink);} /* glass: the page shows through the panes below */
   body[data-tab="schedule"] main, body[data-tab="schedule"] .fab{display:none;} /* the editor is this tab's page */
   .sched-editor.show{display:flex;}
-  .se-bar{flex:none; display:flex; align-items:center; gap:8px; padding:8px 14px; background:var(--glass-fill-strong); border-bottom:1px solid var(--glass-edge-soft); box-shadow:inset 0 1px 0 var(--glass-edge); -webkit-backdrop-filter:var(--glass-blur); backdrop-filter:var(--glass-blur);}
+  .se-bar{flex:none; display:flex; align-items:center; gap:8px; padding:8px 14px; background:var(--bg); border-bottom:1px solid var(--glass-edge-soft);}
   .se-bar-text{flex:1; min-width:0;}
   .se-bar .sheet-close{flex-shrink:0;}
   .se-title{font-size:0.9375rem; font-weight:var(--fw-black);}
@@ -424,14 +424,13 @@
   .se-cellhead{display:flex; align-items:center; justify-content:space-between; gap:2px; margin:0 1px 2px;}
   .se-meta{display:flex; flex-wrap:wrap; gap:0 6px; margin:0 1px 3px; font-size:max(0.5rem, calc(0.5625rem * var(--z,1.4))); font-weight:var(--fw-bold); color:var(--ink-muted);}
   .se-off{margin:0 1px 3px; font-size:max(0.5rem, calc(0.5625rem * var(--z,1.4))); font-weight:var(--fw-black); color:var(--ink-muted);}
-  .se-tools{flex:none; display:flex; gap:6px; padding:6px 10px; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; background:var(--glass-fill-strong); border-bottom:1px solid var(--glass-edge-soft); box-shadow:inset 0 1px 0 var(--glass-edge); -webkit-backdrop-filter:var(--glass-blur); backdrop-filter:var(--glass-blur);}
+  .se-tools{flex:none; display:flex; gap:6px; padding:6px 10px; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; background:var(--bg); border-bottom:1px solid var(--glass-edge-soft);}
   .se-tools::-webkit-scrollbar{display:none;}
-  .se-tool{flex:none; padding:7px 11px; border:none; border-radius:999px; background:var(--glass-fill); box-shadow:var(--glass-hi); color:var(--ink); font-size:0.75rem; font-weight:var(--fw-black); white-space:nowrap;}
+  .se-tool{flex:none; padding:7px 11px; border:none; border-radius:999px; background:var(--bg); box-shadow:inset 0 0 0 1px var(--line); color:var(--ink); font-size:0.75rem; font-weight:var(--fw-black); white-space:nowrap;}
   .se-zoom{flex:none; display:flex; flex-direction:row-reverse; gap:6px;} /* across the top: − then +; in the wide side rail it stacks with + on top (see below) */
-  .se-tool.active{background:var(--blue); border-color:var(--blue); color:var(--on-accent, #fff);}
+  .se-tool.active{background:var(--blue); box-shadow:none; color:var(--on-accent, #fff);}
   .se-tool:disabled{opacity:0.4;}
   .se-tools:not(.more-open) .se-extra:not(.active){display:none;} /* tucked behind ⋯ More… (Multi stays visible while it's switched on) */
-  .se-tool.se-tool-weeks{display:none;} /* only shown in the wide-screen tool rail (see the landscape block below) */
   .se-more.se-earlier{margin:10px 10px 4px;}
   .se-more{display:block; width:calc(100% - 20px); margin:12px 10px 16px; padding:11px; border:1px dashed var(--line); border-radius:12px; background:transparent; color:var(--ink-muted); font-size:0.8125rem; font-weight:var(--fw-black);}
   .se-modal{position:absolute; inset:0; z-index:5; display:none; align-items:flex-end; justify-content:center; background:rgba(11,36,56,0.45);}
@@ -976,10 +975,8 @@
     .se-tools{ grid-column:1; grid-row:1 / -1; flex-direction:column; gap:6px; padding:10px 8px; overflow-x:hidden; overflow-y:auto; border-bottom:none; border-right:1px solid var(--glass-edge-soft); }
     .se-tool{ width:100%; padding:10px 4px; white-space:normal; text-align:center; line-height:1.25; }
     .se-zoom{ flex-direction:column; width:100%; }
-    .se-tool.se-tool-weeks{ display:block; }
     .se-bar{ grid-column:2; grid-row:1; padding-top:12px; }
     .se-scroll{ grid-column:2; grid-row:2; }
-    .se-more{ display:none; } /* replaced by ＋ Weeks in the rail */
     .se-chip{ scroll-margin-top:40px; } /* keeps a chip moved with the arrow keys clear of the sticky day names */
     .se-modal{ align-items:center; }
     .se-modal-card{ border-radius:20px; padding-bottom:16px; }
@@ -1220,8 +1217,6 @@
     <button class="se-tool se-extra" onclick="seAddJobOpen()">＋ Job</button>
     <button class="se-tool se-extra" onclick="seNoteOpen()">📝 Note</button>
     <button class="se-tool se-extra" onclick="seDaysOffOpen()">🚫 Days off</button>
-    <button class="se-tool se-tool-weeks" id="seEarlierBtn" onclick="seShowEarlierWeeks()">◀ Earlier</button>
-    <button class="se-tool se-tool-weeks" id="seWeeksBtn" onclick="seShowMoreWeeks()">＋ Weeks</button>
   </div>
   <div class="se-scroll" id="seScroll"><button class="se-more se-earlier" id="seEarlier" onclick="seShowEarlierWeeks()">◀ Show 4 earlier weeks</button><div class="se-grid" id="seGrid"></div><button class="se-more" id="seMore" onclick="seShowMoreWeeks()">＋ Show 4 more weeks</button></div>
   <div class="se-modal" id="seModal"><div class="se-modal-card" id="seModalCard"></div></div>
