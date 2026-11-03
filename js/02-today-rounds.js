@@ -1382,6 +1382,7 @@ function render(){
   if(typeof desktopAfterRender === 'function') desktopAfterRender();
   if(typeof todayRunAfterRender === 'function') todayRunAfterRender();
   if(typeof msgAfterRender === 'function') msgAfterRender(); // notes between your two devices (08e-messages.js)
+  if(typeof todayCelebrateAfterRender === 'function') todayCelebrateAfterRender(); // fireworks when the day's list reaches 100% (02b-today-run.js)
 }
 
 // Compact "avg price by property type" row, shown under the Customers/Round

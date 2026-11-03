@@ -199,3 +199,100 @@ function todayRunAfterRender(){
   // Scrolls on by about half a tile more, so the finished card is half tucked under the hero and the next one has room.
   pageScrollToEl(card, sideBySide ? 0 : topEl.offsetHeight, 10 - Math.round(card.offsetHeight / 2));
 }
+
+/* ---------- fireworks when the day's list reaches 100% ----------
+   Runs after every redraw. When the progress bar goes from under 100% to 100% while you are looking at it (not merely on
+   opening the app with everything already done), fireworks burst across the screen for a few seconds. It happens once for
+   a given day, round choice and list size, so redrawing, an Undo and doing it again doesn't repeat it, but adding more
+   to the list and finishing that does. The animation never blocks taps, and with "reduce motion" switched on in the
+   device settings it shows a message instead. */
+const FIREWORKS_KEY = 'roundBookFireworks';
+let todayLastPct = null, todayLastScopeKey = null, fireworksRunning = false;
+function fireworksSeen(key){
+  try{ const o = JSON.parse(localStorage.getItem(FIREWORKS_KEY) || 'null'); return !!(o && o.date === todayISO() && o.keys.indexOf(key) >= 0); }catch(e){ return false; }
+}
+function fireworksMark(key){
+  try{
+    let o = JSON.parse(localStorage.getItem(FIREWORKS_KEY) || 'null');
+    if(!o || o.date !== todayISO()) o = { date: todayISO(), keys: [] };
+    if(o.keys.indexOf(key) < 0) o.keys.push(key);
+    localStorage.setItem(FIREWORKS_KEY, JSON.stringify(o));
+  }catch(e){}
+}
+function todayCelebrateAfterRender(){
+  if(currentTab !== 'today') return;
+  const m = todayListModel();
+  const scopeKey = todayISO() + '|' + (m.scope || '');
+  const prev = (todayLastScopeKey === scopeKey) ? todayLastPct : null; // changing round or day starts the comparison afresh
+  todayLastScopeKey = scopeKey;
+  todayLastPct = m.total ? m.pct : null;
+  if(!m.total || m.pct < 100 || prev === null || prev >= 100) return;
+  const key = scopeKey + '|' + m.total;
+  if(fireworksSeen(key)) return;
+  fireworksMark(key);
+  launchFireworks(m.scope ? m.scope + ' is all done!' : 'All done for today!');
+}
+function launchFireworks(message){
+  if(fireworksRunning) return;
+  if(typeof haptic === 'function') haptic([30, 60, 30, 60, 90]);
+  if(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches){ toast('\uD83C\uDF89 ' + message); return; }
+  fireworksRunning = true;
+  const cv = document.createElement('canvas');
+  cv.setAttribute('aria-hidden', 'true');
+  cv.style.cssText = 'position:fixed; inset:0; width:100%; height:100%; z-index:2147482000; pointer-events:none;';
+  const msg = document.createElement('div');
+  msg.setAttribute('role', 'status');
+  msg.textContent = '\uD83C\uDF89 ' + message;
+  msg.style.cssText = 'position:fixed; left:50%; top:38%; transform:translate(-50%,-50%) scale(0.85); z-index:2147482001; pointer-events:none; padding:14px 22px; border-radius:18px; background:rgba(0,0,0,0.55); color:#fff; font-size:1.375rem; font-weight:800; text-align:center; max-width:86%; opacity:0; transition:opacity .5s ease, transform .5s ease;';
+  document.body.appendChild(cv); document.body.appendChild(msg);
+  requestAnimationFrame(() => { msg.style.opacity = '1'; msg.style.transform = 'translate(-50%,-50%) scale(1)'; });
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const W = cv.width = Math.round(innerWidth * dpr), H = cv.height = Math.round(innerHeight * dpr);
+  const ctx = cv.getContext('2d');
+  const colours = ['#FF5252', '#FFD740', '#69F0AE', '#40C4FF', '#E040FB', '#FF9100', '#FFFFFF'];
+  const rockets = [], sparks = [];
+  const DURATION = 5200, started = performance.now();
+  let nextLaunch = 0, last = started;
+  function launch(){
+    rockets.push({ x: (0.12 + Math.random() * 0.76) * W, y: H, vx: (Math.random() - 0.5) * 2.2 * dpr,
+      vy: -(0.62 + Math.random() * 0.2) * H / 62, targetY: (0.12 + Math.random() * 0.36) * H, colour: colours[Math.floor(Math.random() * colours.length)] });
+  }
+  function burst(r){
+    const n = 56 + Math.floor(Math.random() * 28), c2 = colours[Math.floor(Math.random() * colours.length)];
+    for(let i = 0; i < n; i++){
+      const a = (i / n) * Math.PI * 2 + Math.random() * 0.15, sp = (1.6 + Math.random() * 3.4) * dpr;
+      sparks.push({ x: r.x, y: r.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 1, decay: 0.011 + Math.random() * 0.012, colour: i % 3 ? r.colour : c2 });
+    }
+  }
+  function finish(){
+    cv.remove();
+    msg.style.opacity = '0';
+    setTimeout(() => { msg.remove(); fireworksRunning = false; }, 500);
+  }
+  function frame(now){
+    const dt = Math.min((now - last) / 16.7, 3); last = now;
+    const elapsed = now - started;
+    if(elapsed < DURATION - 1500 && now >= nextLaunch){ launch(); if(Math.random() < 0.5) launch(); nextLaunch = now + 380 + Math.random() * 320; }
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.fillStyle = 'rgba(0,0,0,0.22)'; ctx.fillRect(0, 0, W, H); // fades the trails instead of clearing, so sparks streak
+    ctx.globalCompositeOperation = 'lighter';
+    for(let i = rockets.length - 1; i >= 0; i--){
+      const r = rockets[i];
+      r.x += r.vx * dt; r.y += r.vy * dt; r.vy += 0.05 * dpr * dt;
+      ctx.fillStyle = r.colour; ctx.beginPath(); ctx.arc(r.x, r.y, 2.2 * dpr, 0, 6.2832); ctx.fill();
+      if(r.y <= r.targetY || r.vy >= -0.5){ burst(r); rockets.splice(i, 1); }
+    }
+    for(let i = sparks.length - 1; i >= 0; i--){
+      const s = sparks[i];
+      s.x += s.vx * dt; s.y += s.vy * dt; s.vy += 0.045 * dpr * dt; s.vx *= 0.992; s.life -= s.decay * dt;
+      if(s.life <= 0){ sparks.splice(i, 1); continue; }
+      ctx.globalAlpha = Math.max(s.life, 0); ctx.fillStyle = s.colour;
+      ctx.beginPath(); ctx.arc(s.x, s.y, (1.2 + s.life * 1.6) * dpr, 0, 6.2832); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    if(elapsed > DURATION - 700) msg.style.opacity = '0';
+    if(elapsed < DURATION || sparks.length || rockets.length){ if(elapsed < DURATION + 2500) return requestAnimationFrame(frame); }
+    finish();
+  }
+  requestAnimationFrame(frame);
+}

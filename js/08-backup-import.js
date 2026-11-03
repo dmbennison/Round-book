@@ -231,6 +231,7 @@ const FOCUSED_HELP = {
       helpP('<b>On a phone (or an iPad held upright)</b>'),
       helpList([
         'Press <b>▶ Start</b> under the big card to swap the tiles for today’s to-do list, in the order you visit them. Swipe the cards just like on the Rounds screen. <b>■ Stop</b> brings the tiles back.',
+        'When the progress bar reaches 100% fireworks celebrate a finished day.',
         'While the list is running the big card shrinks to the totals and a progress bar showing how much of today is done.',
         'A customer can only be marked cleaned once a day, so swiping right on a finished card does nothing: swipe left, or use Mark paid, to record the payment.',
         'A card also shows what the customer <b>owes</b> (red) or has in <b>credit</b> (green).'
