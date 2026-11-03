@@ -4,6 +4,14 @@ ROUND BOOK - RELEASE NOTES
 Newest first. This file is not part of the app and is not loaded by it; it ships alongside the code files.
 To add a release: raise APP_VERSION in js/01-data.js and CACHE_NAME in sw.js to the same number, then put a new entry at the top of this list.
 
+Version 1.339
+  - NEW VERSION NUMBERING: versions are now written 1.xxx and count up by one thousandth (1.339, 1.340, ...). The last
+    release under the old numbering was 3.38; 1.339 follows on from it. Devices that are still on an old 3.xx version
+    can still sync with this one without false "newer version" warnings
+  - Today's big card: the large number is now labelled To do (it was Due), the small count beside it is labelled Done,
+    and the money totals are Cleaned and Paid (were Clean total and Paid total), side by side with their labels underneath.
+    The "value today" line has gone
+
 Version 3.38
   - Schedule: the title bar, the tool buttons and the tool rail now use the same background as the rest of the app (the
     page colour, with a thin outline on the buttons) instead of white; only the calendar itself is white
