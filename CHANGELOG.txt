@@ -4,6 +4,13 @@ ROUND BOOK - RELEASE NOTES
 Newest first. This file is not part of the app and is not loaded by it; it ships alongside the code files.
 To add a release: raise APP_VERSION in js/01-data.js and CACHE_NAME in sw.js to the same number, then put a new entry at the top of this list.
 
+Version 1.341
+  - Tapping a customer card now opens the quick info box (it used to take a long press). The long press is removed and
+    does nothing now. The box's "Open full details" button goes on to the whole record. On an iPad / computer, Enter on a
+    selected card opens the quick info too, and the right-click menu lists Quick info first, then Open full details
+  - The Round Book mark now sits as a faint watermark in the middle of the background of every page. It is a cut-out in
+    the text colour, so it follows light and dark mode and the colour scheme, and the cards sit over it
+
 Version 1.340
   - Fireworks: when the progress bar on Today reaches 100% (everyone due, and any jobs, are done) fireworks burst across
     the screen for a few seconds with an "All done for today!" message (or "<round> is all done!" when one round is
