@@ -4,6 +4,13 @@ ROUND BOOK - RELEASE NOTES
 Newest first. This file is not part of the app and is not loaded by it; it ships alongside the code files.
 To add a release: raise APP_VERSION in js/01-data.js and CACHE_NAME in sw.js to the same number, then put a new entry at the top of this list.
 
+Version 1.340
+  - Fireworks: when the progress bar on Today reaches 100% (everyone due, and any jobs, are done) fireworks burst across
+    the screen for a few seconds with an "All done for today!" message (or "<round> is all done!" when one round is
+    picked), and the phone gives a little buzz. It only happens as you complete the last one, not when you open the app
+    with everything already done, and once per day for a given round and list size, so an Undo and redo doesn't repeat it.
+    It never blocks the screen, and with Reduce Motion switched on in the device's settings you get a message instead
+
 Version 1.339
   - NEW VERSION NUMBERING: versions are now written 1.xxx and count up by one thousandth (1.339, 1.340, ...). The last
     release under the old numbering was 3.38; 1.339 follows on from it. Devices that are still on an old 3.xx version
