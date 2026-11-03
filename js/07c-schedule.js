@@ -40,8 +40,8 @@ function seEls(){
            commit: document.getElementById('seCommit'), modal: document.getElementById('seModal'),
            card: document.getElementById('seModalCard'), undo: document.getElementById('seUndo'),
            multi: document.getElementById('seMultiBtn'), split: document.getElementById('seSplitBtn'),
-           more: document.getElementById('seMore'), weeksBtn: document.getElementById('seWeeksBtn'),
-           earlier: document.getElementById('seEarlier'), earlierBtn: document.getElementById('seEarlierBtn') };
+           more: document.getElementById('seMore'),
+           earlier: document.getElementById('seEarlier') };
 }
 
 /* ---------- small date helpers (isoToDays / daysToISO live in 01-data.js) ---------- */
@@ -257,7 +257,7 @@ function seHistOpen(iso){
 function renderScheduleEditor(){
   if(!se) return;
   se.pendingRender = false;
-  const { grid, count, commit, undo, multi, split, more, weeksBtn, earlier, earlierBtn } = seEls();
+  const { grid, count, commit, undo, multi, split, more, earlier } = seEls();
   grid.style.setProperty('--z', se.zoom);
   const chips = seBuildChips();
   se.sel = se.sel.filter(id => se.chipIndex[id]);
@@ -325,9 +325,7 @@ function renderScheduleEditor(){
   const one = se.sel.length === 1 && se.chipIndex[se.sel[0]];
   split.disabled = !(one && one.kind === 'round');
   more.style.display = se.weeks >= SE_MAX_WEEKS ? 'none' : '';
-  if(weeksBtn) weeksBtn.style.display = se.weeks >= SE_MAX_WEEKS ? 'none' : ''; // the wide-screen rail's version of the same button
   if(earlier) earlier.style.display = back >= SE_MAX_BACK_WEEKS ? 'none' : '';
-  if(earlierBtn) earlierBtn.style.display = back >= SE_MAX_BACK_WEEKS ? 'none' : ''; // and the rail's version of the earlier-weeks button
 }
 
 /* ---------- history (undo) ---------- */

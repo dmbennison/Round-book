@@ -258,7 +258,7 @@ const FOCUSED_HELP = {
         
         '<b>⋯ More…</b> has <b>☔ Push back</b> (for a rained-off day), <b>☑ Multi</b> (move several tiles at once), <b>👥 Split</b> (move some of a round’s customers), <b>＋ Job</b> (add a one-off job to a day), <b>📝 Note</b> (leave a reminder on a day) and <b>🚫 Days off</b> (set your days off and holidays). Tap the day first for Job and Note.',
         'A new customer who has not been cleaned yet waits on today in <b>green</b> 🆕. Move them to the day of their first clean, then Commit.',
-        '<b>Looking back</b> – tap <b>◀ Show 4 earlier weeks</b> above the calendar (<b>◀ Earlier</b> on iPad and computer) to see past days. Each green ✓ tile is a round that was cleaned, or the one-off jobs done, that day. Tap one to see who was cleaned and what they paid. They can’t be moved.',
+        '<b>Looking back</b> – tap <b>◀ Show 4 earlier weeks</b> above the calendar to see past days (and <b>＋ Show 4 more weeks</b> below it to look further ahead – the same on phone, iPad and computer). Each green ✓ tile is a round that was cleaned, or the one-off jobs done, that day. Tap one to see who was cleaned and what they paid. They can’t be moved.',
         'The <b>printer icon</b> next to the help icon (top right) prints the calendar as you are looking at it, including any weeks you have looked back at.'
       ])
     ]
