@@ -314,7 +314,7 @@ async function livePullInner(opts){
       liveSetStatus('error', 'Couldn\'t read the other device\'s data — check both devices use the same passphrase.');
       return { ok:false };
     }
-    if(payload.appVersion && payload.appVersion > APP_VERSION){
+    if(payload.appVersion && versionNewerThanMine(payload.appVersion)){
       liveSetStatus('error', 'The other device has a newer version of Round Book. Close and reopen the app here to update, then sync will continue.');
       return { ok:false };
     }
@@ -688,7 +688,7 @@ async function liveJoin(){
   const key = await syncDeriveKey(pw, st.json.salt);
   const payload = await syncDecrypt(st.json, key);
   if(!payload || !payload.state){ appAlert('That passphrase didn\'t unlock the data. Check it matches the other device exactly.', {title:'Join live sync'}); return; }
-  if(payload.appVersion && payload.appVersion > APP_VERSION){ appAlert('The other device has a newer version of Round Book. Close and reopen the app here to update it, then try again.', {title:'Join live sync'}); return; }
+  if(payload.appVersion && versionNewerThanMine(payload.appVersion)){ appAlert('The other device has a newer version of Round Book. Close and reopen the app here to update it, then try again.', {title:'Join live sync'}); return; }
   const n = (payload.state.customers || []).length;
   const proceed = async () => {
     const live = { enabled:true, url, roomId: room.roomId, token: room.token, salt: st.json.salt, key, base: null, uploaded:{}, lastPushHash:null };

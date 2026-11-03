@@ -136,7 +136,6 @@ function renderTodayHome(main){
   // disappearing from view — dueByRound only lists rounds with 1+ due, so a
   // fully-worked round just falls back to an empty array here, not a reset.
   const heroDueCusts = todaySelectedRound ? (dueByRound[todaySelectedRound]||[]) : dueCustomers;
-  const heroDueValue = heroDueCusts.reduce((s,c)=>s+Number(c.price||0),0);
   const heroCleanedToday = todaySelectedRound ? cleanedTodayCountForRound(todaySelectedRound) : null;
   const doneToday = valueOfWorkDoneToday();
   const paidToday = valueOfPaymentsReceivedToday();
@@ -185,17 +184,14 @@ function renderTodayHome(main){
       <div onclick="${todaySelectedRound ? `goToRoundDue('${escapeAttr(todaySelectedRound)}')` : `setTab('rounds'); setRoundsView('due');`}" style="cursor:pointer; display:flex; align-items:flex-start; justify-content:space-between; gap:14px;">
         <div>
           <div style="display:flex; align-items:baseline; gap:16px;">
-            <div><div class="num">${heroDueCusts.length}</div><div class="lbl" style="margin-top:2px;">Due</div></div>
-            ${heroCleanedToday!=null ? `<div><div class="num" style="font-size:1.75rem;">${heroCleanedToday}</div><div class="lbl" style="margin-top:2px;">Cleaned</div></div>` : ''}
+            <div><div class="num">${heroDueCusts.length}</div><div class="lbl" style="margin-top:2px;">To do</div></div>
+            ${heroCleanedToday!=null ? `<div><div class="num" style="font-size:1.75rem;">${heroCleanedToday}</div><div class="lbl" style="margin-top:2px;">Done</div></div>` : ''}
           </div>
           ${todaySelectedRound ? `<div class="lbl" style="margin-top:8px; color:#fff;">${escapeHtml(todaySelectedRound)}</div>` : ''}
-          <div class="value">${money(heroDueValue)} value today</div>
         </div>
-        <div style="text-align:right; flex-shrink:0;">
-          <div class="num" style="font-size:1.5rem;">${money(doneToday)}</div>
-          <div class="lbl">Clean total</div>
-          <div class="num" style="font-size:1.5rem; margin-top:10px;">${money(paidToday)}</div>
-          <div class="lbl">Paid total</div>
+        <div style="display:flex; align-items:flex-start; justify-content:flex-end; flex-wrap:wrap; gap:6px 18px; text-align:right; flex-shrink:0;">
+          <div><div class="num" style="font-size:1.5rem;">${money(doneToday)}</div><div class="lbl">Cleaned</div></div>
+          <div><div class="num" style="font-size:1.5rem;">${money(paidToday)}</div><div class="lbl">Paid</div></div>
         </div>
       </div>
       ${(roundsWithDue.length && !todayRunOn) ? `

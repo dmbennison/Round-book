@@ -3,11 +3,14 @@
 
 /* ---------- storage ---------- */
 const STORE_KEY = 'roundBookData_v1';
-// APP_VERSION is a plain decimal number (e.g. 1.01, 1.02 ... 1.99, 2.00) —
-// bump by 0.01 for every change. formatVersion always renders it to exactly
-// two decimal places, so it's never shown as "1.1" or "1.100".
-const APP_VERSION = 3.38;
-function formatVersion(v){ return Number(v).toFixed(2); }
+// APP_VERSION is a plain decimal number in the form 1.xxx (1.339, 1.340 ... 1.999) -
+// bump by 0.001 for every change. formatVersion always renders it to exactly three decimals.
+// Earlier releases were numbered 3.xx (the last was 3.38), so versionRank() maps those onto the same scale
+// (3.38 -> 1.338) and the two kinds can still be compared when a device that has not updated yet syncs.
+const APP_VERSION = 1.339;
+function formatVersion(v){ return Number(v).toFixed(3); }
+function versionRank(v){ v = Number(v) || 0; return v >= 2 ? 1.3 + (v - 3) / 10 : v; }
+function versionNewerThanMine(v){ return versionRank(v) - versionRank(APP_VERSION) > 0.0004; }
 // Release notes are NOT kept in the app: they live in CHANGELOG.txt, shipped alongside these files.
 // MAINTENANCE: every time APP_VERSION is bumped, add the new version to the top of CHANGELOG.txt.
 /* ---------- on-demand libraries ----------

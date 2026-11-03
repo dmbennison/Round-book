@@ -526,7 +526,7 @@ async function syncReceiveFiles(fileList){
     if(!p){ appAlert('One of the files couldn\'t be read — it may be damaged. Nothing was changed.', {title:'Receive from other device'}); return; }
     payloads.push(p);
   }
-  if(payloads.some(p => p.appVersion > APP_VERSION)){
+  if(payloads.some(p => versionNewerThanMine(p.appVersion))){
     appAlert('Those files came from a newer version of Round Book. Close and reopen the app here to update it, then try again.', {title:'Receive from other device'});
     return;
   }
