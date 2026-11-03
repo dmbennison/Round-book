@@ -444,7 +444,7 @@ function deleteCustomer(id){
   }});
 }
 
-/* ---------- quick info box (press and hold a customer card) ----------
+/* ---------- quick info box (tap a customer card) ----------
    Everything worth knowing at the door, without opening the full record. */
 // Average number of days between a clean and the payment that covered it.
 // There's no per-invoice tracking, so payments are matched to cleans oldest

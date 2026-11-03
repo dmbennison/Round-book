@@ -1910,7 +1910,7 @@ function custCardHtml(c, mode, opts){
     <div class="swipe-bg swipe-bg-left">✓ Cleaned</div>
     <div class="swipe-bg swipe-bg-right">💷 Paid</div>
     <div class="cust-card" data-id="${c.id}" data-kind="customer">
-      <div class="cust-top" onclick="openCustomerDetail('${c.id}')">
+      <div class="cust-top" onclick="openCustomerInfoBox('${c.id}')">
         <div>
           <div class="cust-addr" style="font-size:1rem; font-weight:800; color:var(--ink);">${escapeHtml(c.address||'No address')}</div>
           ${(c.name||c.phone) ? `<div class="cust-name" style="font-size:0.8125rem; font-weight:600; color:var(--ink-muted); margin-top:2px;">${[escapeHtml(c.name||''), c.phone?escapeHtml(c.phone):''].filter(Boolean).join(' · ')}</div>` : ''}

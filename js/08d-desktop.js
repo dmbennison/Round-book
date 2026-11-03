@@ -72,7 +72,7 @@ function paneDashRounds(){
   const paused = all.length - active.length;
   const roundCount = Object.keys(groupByRound(all)).length;
   const top = owing.slice(0, 6).map(({c, balance}) => pdRow({
-    click: `openCustomerDetail('${c.id}')`, ctxKind: 'customer', ctxId: c.id,
+    click: `openCustomerInfoBox('${c.id}')`, ctxKind: 'customer', ctxId: c.id,
     title: escapeHtml(c.address || c.name || 'Customer'),
     sub: [c.address ? c.name : '', scopeName ? '' : (c.round || 'Unassigned'), `${daysSinceLastPayment(c)}d outstanding`].filter(Boolean).map(escapeHtml).join(' · '),
     amt: money(balance), amtColor: 'var(--red)'
@@ -285,8 +285,8 @@ function ctxCustomerItems(id){
   if(!c) return null;
   const s = custStatus(c), mobile = isMobileNumber(c.phone);
   const items = [
-    {label: 'Open', hint: '↵', run: () => openCustomerDetail(id)},
-    {label: 'Quick info', run: () => openCustomerInfoBox(id)},
+    {label: 'Quick info', hint: '↵', run: () => openCustomerInfoBox(id)},
+    {label: 'Open full details', run: () => openCustomerDetail(id)},
     '-',
     {label: 'Mark cleaned', hint: 'C', run: () => quickClean(id, false)}
   ];
@@ -386,7 +386,7 @@ function showContextMenuFor(target, x, y, focusFirst){
   return true;
 }
 // Capture phase: this runs before the older touch-era handler on #main (09-boot.js), which then sees
-// defaultPrevented and leaves it alone. On touch screens this returns at once, so Android's long-press still opens the info box.
+// defaultPrevented and leaves it alone. On touch screens this returns at once.
 document.addEventListener('contextmenu', (e) => {
   if(!hasFinePointer() || e.defaultPrevented) return;
   // Keep the browser's own menu where it's useful: text fields (copy / paste / spelling), links, and an open menu.
