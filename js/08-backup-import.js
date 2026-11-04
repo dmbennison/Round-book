@@ -299,7 +299,8 @@ const FOCUSED_HELP = {
     body: () => [
       helpP('Tap a customer to open them: their round, price, how often they are cleaned, what they owe and their notes.'),
       helpList([
-        'Under the customer’s details are two buttons: <b>Actions</b> and <b>History</b>. <b>Actions</b> has Add a clean, Add a payment, the cleaning and payment reminder texts, Defer, Couldn’t clean, Pause or Resume, Apply price uplift, Get a quote and Schedule a one-off job. (To mark someone cleaned or paid today, swipe their card on Today or Rounds.)',
+        'Under the customer’s details are two buttons: <b>Actions</b> and <b>History</b>. <b>Actions</b> has Add a clean, Add a payment, the cleaning and payment reminder texts, Defer, Couldn’t clean, Pause or Resume, Apply price uplift, Get a quote, Schedule a one-off job and <b>Export their data</b>. (To mark someone cleaned or paid today, swipe their card on Today or Rounds.)',
+        '<b>Export their data</b> (in Actions) gives a customer everything held about them, for a data request: a <b>PDF</b> to read or a portable <b>data file</b>, either with an optional password.',
         '<b>History</b> opens a drop-down: Clean history, Payment history, One-off jobs, Price history and Messages. Tap any entry to edit or remove it, or send a receipt.',
         '<b>Delete customer</b> (at the bottom of Edit) asks first, then shows a red bar with <b>Undo</b>. Jobs and quotes work the same way.',
         '<b>Defer</b> pushes their next clean back. <b>Couldn’t clean</b> moves them to your next visit.',
@@ -354,6 +355,7 @@ const FOCUSED_HELP = {
     body: () => [
       helpP('Your data is stored on this device, so back it up regularly: ⋯ menu → <b>Backup</b> → <b>Export backup</b>. Keep the file somewhere safe, such as iCloud Drive.'),
       helpList([
+        '<b>Export password-protected backup</b> locks the file with a password you choose (strong encryption). Restore asks for the password. It can’t be recovered if you forget it, so keep it somewhere safe. Excel, CSV and contacts exports can’t be password-protected here, so keep those somewhere private.',
         '<b>Restore</b> brings everything back from a backup file.',
         '<b>Safety copies</b> are made automatically about once a day and before any restore, so you can undo a mistake.',
         'You can also export to Excel and <b>import customers</b> from a spreadsheet.'
@@ -379,6 +381,7 @@ const FOCUSED_HELP = {
         '<b>Appearance</b> – light or dark, text size, <b>Transparency</b> (phone only – on an iPad or computer the screen is always solid; drag from Solid to Clear to make the header, tab bars, the big Today card and the cards see-through; what scrolls underneath stays only lightly blurred, and in light mode the lettering on the header and tab bars turns dark automatically when they become pale enough that white would be hard to read) and colour scheme. Every scheme is drawn flat with firm borders, like High contrast.',
         '<b>Messaging app</b> – Messages or WhatsApp. A customer can have their own under <b>Message by</b> when you edit them.',
         '<b>Swipe to text</b> – turns the “Windows cleaned today” text on or off.',
+        '<b>Privacy</b> – <b>Delete after 2 years</b> removes customers (and one-off jobs and quotes that belong to no customer) with no activity for 2 years. You get a 30-day warning on Today and can <b>Keep</b> them; anyone who still owes money is never deleted, a safety copy is taken first, and your tax records are kept separately. <b>Keep everything</b> turns it off.',
         '<b>Business details</b> – your name, company and bank details, used on invoices and texts.',
         '<b>Message templates</b> – the wording of every text.',
         '<b>Mileage rates</b> – the allowance rates for the tax year.'
@@ -476,6 +479,7 @@ async function openBackupDropdown(anchor){
   openDropdown(anchor, info.concat([
     '-',
     {label: 'Export backup', hint: count + (count === 1 ? ' customer' : ' customers'), run: () => exportData()},
+    {label: 'Export password-protected backup…', run: () => exportData(true)},
     {label: 'Sync with another device…', run: () => openSyncSheet()},
     {label: 'Safety copies', hint: String(safetyCount), run: () => openSafetyCopies()},
     '-',
@@ -541,6 +545,10 @@ async function openBackup(anchor){
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
       <div><div class="t1">Export backup</div><div class="t2">${count} customer${count===1?'':'s'} · saves a .json file — choose iCloud Drive or Google Drive when prompted</div></div>
     </button>
+    <button class="backup-btn" onclick="exportData(true)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+      <div><div class="t1">Export password-protected backup</div><div class="t2">Locked with a password you choose · can't be opened without it</div></div>
+    </button>
     <button class="backup-btn" onclick="openSyncSheet()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg>
       <div><div class="t1">Sync with another device</div><div class="t2">Encrypted file via AirDrop — merges changes both ways</div></div>
@@ -605,8 +613,10 @@ async function openSafetyCopies(){
 function confirmRestoreSafetyCopy(at){
   appConfirm('Replace everything on this phone with this safety copy? What\'s here now is saved as a safety copy first, so you can switch back.', {title:'Restore safety copy', confirmLabel:'Restore', onConfirm: () => restoreSafetyCopy(at)});
 }
-async function exportData(){
+async function exportData(protect){
   requestPersistentStorage(); // a tap is a good moment to ask; harmless if already granted
+  let password = null;
+  if(protect === true){ password = await exportAskPassword('backup'); if(!password) return; } // 08f-privacy.js
 
 
   toast('Preparing backup…');
@@ -633,12 +643,13 @@ async function exportData(){
     }));
     exportObj._photoBlobs = photoBlobs;
   }
-  const jsonStr = JSON.stringify(exportObj, null, 2);
+  let jsonStr = JSON.stringify(exportObj, null, password ? 0 : 2);
+  if(password){ toast('Locking it with your password…'); jsonStr = await exportEncryptText(jsonStr, password, 'backup'); }
   // Local date + time, so every backup gets its own name (todayISO() is the UTC date
   // and gave identical names for several backups in one day).
   const _n = new Date(), _p = v => String(v).padStart(2,'0');
   const backupStamp = `${_n.getFullYear()}-${_p(_n.getMonth()+1)}-${_p(_n.getDate())}-${_p(_n.getHours())}${_p(_n.getMinutes())}`;
-  const filename = `round-book-backup-${backupStamp}.json`;
+  const filename = `round-book-backup-${backupStamp}${password ? '-protected' : ''}.json`;
 
   const markBackedUp = ()=>{
     localStorage.setItem('roundBookLastBackup', todayISO());
@@ -687,6 +698,11 @@ document.getElementById('importFile').addEventListener('change', function(e){
     let parsed;
     try{
       parsed = JSON.parse(evt.target.result);
+      if(parsed && parsed.app === 'round-book-export'){ // a password-protected file (08f-privacy.js)
+        if(parsed.kind !== 'backup'){ appAlert('That is a single customer\u2019s data export, not a full backup, so it can\u2019t be restored.', {title:'Import backup'}); return; }
+        parsed = await exportAskUnlock(parsed);
+        if(!parsed) return; // cancelled
+      }
       if(!parsed.customers || !Array.isArray(parsed.customers)) throw new Error('bad format');
     }catch(err){
       appAlert('That file could not be read as a Round Book backup.', {title:'Import backup'});

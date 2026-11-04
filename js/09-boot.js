@@ -395,7 +395,7 @@ initStorage().catch(()=>{}).finally(()=>{
     const ov = document.getElementById('overlay');
     if(ov && ov.classList.contains('show')) return; // they've already opened something: don't replace it
     if(!maybeShowFirstRun()) maybeShowMissingMileagePrompt();
-  });
+  }).then(() => { if(typeof retentionRun === 'function'){ retentionLastRunDay = todayISO(); retentionRun(); } }); // 08f-privacy.js: tidy records with no activity for 2 years
 });
 // A home-screen app can stay open for days, so also check each time it comes
 // back to the foreground whether a daily safety copy is due.

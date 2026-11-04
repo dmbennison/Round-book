@@ -206,6 +206,7 @@ function syncMerge3(base, local, remote, ctx, path){
   }
   // Same field changed to different values on both devices.
   const key = path[path.length-1] || '';
+  if((key === 'purgeOn' || key === 'retainedOn') && typeof local === 'string' && typeof remote === 'string') return local > remote ? local : remote; // privacy dates (08f-privacy.js): never a clash, the later one wins
   if(typeof local === 'number' && typeof remote === 'number' && (key === 'nextAccountNumber' || /Count$/.test(key))) return Math.max(local, remote);
   // One side blank, the other filled in: that isn't really a clash, keep what's filled in.
   const blank = v => v === undefined || v === null || v === '';

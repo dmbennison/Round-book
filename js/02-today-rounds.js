@@ -175,6 +175,7 @@ function renderTodayHome(main){
   main.innerHTML = `
     ${todayRunOn ? '' : '<div class="today-cols"><div class="today-left">'}
     ${(!todayRunOn && typeof msgBannerHtml === 'function') ? msgBannerHtml(false) : ''}
+    ${(!todayRunOn && typeof retentionBannerHtml === 'function') ? retentionBannerHtml() : ''}
     ${(!todayRunOn && todayNote) ? todayNoteHtml(todayNote) : ''}
     ${renderGettingStartedCard()}
     <div class="today-top${todayRunOn ? ' running' : ''}">

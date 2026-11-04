@@ -803,6 +803,8 @@ function openCustomerActionsMenu(id, anchor){
     {label: 'Get a quote…', run: () => quoteForCustomer(id)},
     {label: 'Schedule a one-off job…', run: () => scheduleJobForCustomer(id)},
     '-',
+    {label: 'Export their data…', run: () => openCustomerExport(id)},
+    '-',
     {label: 'Help', run: () => openFocusedHelp('customer', back)}
   ], 'Actions');
 }
