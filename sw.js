@@ -1,4 +1,4 @@
-const CACHE_NAME = 'round-book-v1.341';
+const CACHE_NAME = 'round-book-v1.342';
 
 // The app itself. These are all-or-nothing: a new version only takes over once EVERY one of
 // these has downloaded fresh. If any fails (a dropped connection, a half-finished deploy) the
@@ -20,6 +20,7 @@ const CORE = [
   './js/08c-live-sync.js',
   './js/08d-desktop.js',
   './js/08e-messages.js',
+  './js/08f-privacy.js',
   './js/09-boot.js'
 ];
 

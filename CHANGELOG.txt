@@ -4,6 +4,21 @@ ROUND BOOK - RELEASE NOTES
 Newest first. This file is not part of the app and is not loaded by it; it ships alongside the code files.
 To add a release: raise APP_VERSION in js/01-data.js and CACHE_NAME in sw.js to the same number, then put a new entry at the top of this list.
 
+Version 1.342
+  - Export their data: Customer > Actions > Export their data gives everything held about that customer (details, cleans,
+    payments, prices, messages, notes, linked jobs and quotes) as a tidy PDF to read, or a portable data file that also
+    carries their photos. For answering a customer's data request
+  - Password-protected exports: Backup > Export password-protected backup locks the whole backup with a password you
+    choose (AES-256 encryption, the same strength as live sync); Restore asks for the password. A customer's PDF or data
+    file can be password-protected too. The password is never stored, so a lost password can't be recovered. Excel, CSV
+    and contacts exports can't be password-protected in the app
+  - Automatic deletion: customers, and one-off jobs and quotes that belong to no customer, with no activity for 2 years
+    are deleted. You get a 30-day warning (a card on Today with a Review screen where you can Keep them, which starts
+    their 2 years again). Anyone who still owes money is never deleted, a safety copy is taken first, and the setting is
+    under Settings > Privacy (Delete after 2 years / Keep everything). Existing customers who are already past 2 years
+    get the 30-day warning first, not an instant deletion. Your tax records are separate and untouched
+  - Syncing: the warning and keep dates merge without asking you to settle a clash
+
 Version 1.341
   - Tapping a customer card now opens the quick info box (it used to take a long press). The long press is removed and
     does nothing now. The box's "Open full details" button goes on to the whole record. On an iPad / computer, Enter on a
