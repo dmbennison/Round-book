@@ -4,6 +4,13 @@ ROUND BOOK - RELEASE NOTES
 Newest first. This file is not part of the app and is not loaded by it; it ships alongside the code files.
 To add a release: raise APP_VERSION in js/01-data.js and CACHE_NAME in sw.js to the same number, then put a new entry at the top of this list.
 
+Version 1.346
+  - Share doc, Pages: the "Round Cleaning Dates" report was being written as plain tab-separated lines (so no lines, and
+    the columns wandered). It is now a real table like every other report, with the same lines, headings and alignment
+  - Share doc: the title and date at the top are now a borderless two-column table, so the date sits at the right edge in
+    Pages (it ignored the right-hand tab stop and put the date next to the title)
+  - Share doc: the "Page X of Y" footer is removed. Pages doesn't fill in page-number fields, so it showed "Page of"
+
 Version 1.345
   - New logo: the squeegee-and-window picture is now the app icon (home screen / Dock: icon-512, icon-192 and
     apple-touch-icon), the little mark at the top left of the header (logo-mark.png), and the background watermark
