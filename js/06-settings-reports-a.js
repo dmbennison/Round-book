@@ -1721,40 +1721,113 @@ async function sendPendingReportPdf(){
   rpSetBusy('rpBtnPdf', false);
 }
 
+// Word page set-up for the report export. Margins are in twips (1/1440 inch): about half an inch all round, which is
+// close to the padding on the PDF page, so a report fills the page the way the PDF does.
+const DOCX_FONT = 'Arial';
+const DOCX_MARGIN = 720;
+const DOCX_PAGE_WIDTH = 11906 - DOCX_MARGIN * 2; // usable width on A4
+
+// Turns the report's HTML (the same markup the PDF is drawn from) into Word paragraphs and tables, copying the PDF's look:
+// the same colours, rules, shaded boxes and table styling, in one clean sans-serif font.
 function htmlToDocxElements(bodyHtml){
-  const { Paragraph, TextRun, Table, TableRow, TableCell, WidthType, HeadingLevel, ImageRun, TableLayoutType, AlignmentType, BorderStyle, Tab, TabStopType } = docx;
+  const { Paragraph, TextRun, Table, TableRow, TableCell, WidthType, ImageRun, TableLayoutType, AlignmentType, BorderStyle, Tab, TabStopType, ShadingType, HeightRule, VerticalAlign, PageBreak } = docx;
   const parsed = new DOMParser().parseFromString(`<div>${bodyHtml}</div>`, 'text/html');
   const root = parsed.body.firstElementChild;
   const elements = [];
-  const PAGE_WIDTH_DXA = 9026; // usable width for an A4 page with 1440-twip margins (must match the Document's page setup below)
+  const PAGE = DOCX_PAGE_WIDTH, FONT = DOCX_FONT;
+  const INK = '1C2B36', MUTED = '66798A', NAVY = '10344C';
+  const hp = px => Math.round(px * 1.5); // CSS pixels -> Word half-points (13px ~ 10pt)
+  const none = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' };
+  const noBorders = { top: none, bottom: none, left: none, right: none };
+  const noTableBorders = { top: none, bottom: none, left: none, right: none, insideHorizontal: none, insideVertical: none };
+  const rule = (color, size) => ({ style: BorderStyle.SINGLE, size: size || 4, color });
+  const fixedLayout = (TableLayoutType && TableLayoutType.FIXED) ? TableLayoutType.FIXED : undefined;
+  const shade = fill => ({ type: ShadingType.CLEAR, fill, color: 'auto' });
 
-  // Recursively pulls text out of a cell, inserting a separator wherever the
-  // source HTML has a line break (e.g. "<td>123 Main St<br>John Smith</td>")
-  // or a boundary between child elements/text nodes, so values don't get
-  // smashed together the way plain textContent would.
-  const textOf = (node) => {
-    const parts = [];
-    node.childNodes.forEach(child=>{
-      if(child.nodeType === 3){
-        const t = child.textContent;
-        if(t && t.trim()) parts.push(t.trim());
-      } else if(child.nodeType === 1){
-        if(child.tagName === 'BR'){ parts.push('·'); return; }
-        const t = textOf(child);
-        if(t) parts.push(t);
+  const cssHex = c => {
+    c = String(c || '').trim();
+    let m = /^#([0-9a-f]{6})\b/i.exec(c); if(m) return m[1].toUpperCase();
+    m = /^#([0-9a-f])([0-9a-f])([0-9a-f])\b/i.exec(c); if(m) return (m[1]+m[1]+m[2]+m[2]+m[3]+m[3]).toUpperCase();
+    m = /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i.exec(c);
+    if(m) return [m[1], m[2], m[3]].map(n => Math.min(255, +n).toString(16).padStart(2, '0')).join('').toUpperCase();
+    return null;
+  };
+  const styleAttr = el => (el.getAttribute && el.getAttribute('style')) || '';
+  const alignOf = el => { const m = /text-align\s*:\s*(right|center)/i.exec(styleAttr(el)); return m ? (m[1].toLowerCase() === 'right' ? AlignmentType.RIGHT : AlignmentType.CENTER) : undefined; };
+
+  // What a node adds to the text style it inherits (bold, colour, size ...), from its tag, its class and its inline style.
+  const styleOf = (el, base) => {
+    const b = Object.assign({}, base), st = styleAttr(el), cl = el.classList, tag = el.tagName;
+    if(tag === 'B' || tag === 'STRONG' || tag === 'TH') b.bold = true;
+    if(tag === 'I' || tag === 'EM') b.italics = true;
+    if(cl){
+      if(cl.contains('rpt-flag')){ b.bold = true; if(cl.contains('overdue')) b.color = 'C4453F'; else if(cl.contains('due')) b.color = 'C98A1D'; }
+      if(cl.contains('inv-label')){ b.color = MUTED; b.size = hp(10); b.bold = true; b.caps = true; }
+      if(cl.contains('daynum')){ b.bold = true; b.size = hp(11.5); b.color = INK; }
+      if(cl.contains('round-chip')){
+        b.bold = true; b.size = hp(9); b.color = '1C6FA3'; b.fill = 'DCEFFA';
+        if(cl.contains('job-chip')){ b.color = '8A5A15'; b.fill = 'FBEBD2'; }
+        if(cl.contains('done-chip')){ b.color = '1C7A44'; b.fill = 'E2F5EA'; }
       }
-    });
-    return parts.join(' ').replace(/\s+/g,' ').trim();
+      if(cl.contains('day-off')){ b.bold = true; b.size = hp(8); b.color = '8A97A3'; }
+      if(cl.contains('day-note')){ b.bold = true; b.size = hp(8); b.color = NAVY; b.fill = 'FFF3D6'; }
+      if(cl.contains('inv-total-amount')){ b.bold = true; b.size = hp(22); }
+    }
+    let m;
+    if((m = /(?:^|;)\s*color\s*:\s*([^;]+)/i.exec(st))){ const h = cssHex(m[1]); if(h) b.color = h; }
+    if(tag === 'SPAN' && (m = /(?:^|;)\s*background(?:-color)?\s*:\s*([^;]+)/i.exec(st))){ const h = cssHex(m[1]); if(h) b.fill = h; }
+    if(/font-weight\s*:\s*(bold|[6-9]00)/i.test(st)) b.bold = true;
+    if((m = /font-size\s*:\s*([\d.]+)px/i.exec(st))) b.size = hp(parseFloat(m[1]));
+    if(/text-transform\s*:\s*uppercase/i.test(st)) b.caps = true;
+    return b;
   };
-
-  const cellBorder = { style: BorderStyle.SINGLE, size: 4, color: 'D5DBDF' };
-  const tableBorders = {
-    top: cellBorder, bottom: cellBorder, left: cellBorder, right: cellBorder,
-    insideHorizontal: cellBorder, insideVertical: cellBorder
+  const isBlock = el => {
+    const cl = el.classList;
+    return ['DIV', 'P', 'TR', 'LI', 'H1', 'H2', 'H3'].indexOf(el.tagName) >= 0 ||
+      !!(cl && (cl.contains('inv-label') || cl.contains('round-chip') || cl.contains('day-note') || cl.contains('day-off') || cl.contains('daynum')));
   };
-  const cellMargins = { top: 60, bottom: 60, left: 100, right: 100 };
+  // The text of a node as Word runs, keeping line breaks and the bold / colour / shading the PDF shows.
+  const runsOf = (node, base) => {
+    const out = [];
+    let needBreak = false;
+    const push = (text, b) => {
+      const opts = { text, font: FONT, size: b.size || hp(13), bold: !!b.bold, italics: !!b.italics, color: b.color || INK };
+      if(b.caps) opts.allCaps = true;
+      if(b.fill){ opts.shading = shade(b.fill); opts.text = '\u00a0' + text.trim() + '\u00a0'; }
+      if(needBreak && out.length) opts.break = 1;
+      needBreak = false;
+      out.push(new TextRun(opts));
+    };
+    const walk = (n, b) => {
+      n.childNodes.forEach(ch => {
+        if(ch.nodeType === 3){
+          let t = ch.textContent.replace(/\s+/g, ' ');
+          if(!out.length || needBreak) t = t.replace(/^\s+/, '');
+          if(t) push(t, b);
+        } else if(ch.nodeType === 1){
+          if(ch.tagName === 'BR'){ out.push(new TextRun({ break: 1 })); needBreak = false; return; }
+          const blk = isBlock(ch);
+          if(blk && out.length) needBreak = true;
+          walk(ch, styleOf(ch, b));
+          if(blk && out.length) needBreak = true;
+        }
+      });
+    };
+    walk(node, styleOf(node, base || {}));
+    return out;
+  };
+  const textOf = node => (node.textContent || '').replace(/\s+/g, ' ').trim();
+  const para = (node, base, extra) => {
+    const children = runsOf(node, base);
+    return children.length ? new Paragraph(Object.assign({ children, alignment: alignOf(node) }, extra || {})) : null;
+  };
+  const spacer = (after) => new Paragraph({ children: [], spacing: { after: after == null ? 80 : after } });
+  const oneCellTable = (cellChildren, width, fill, margins, borders, align) => new Table({
+    rows: [new TableRow({ cantSplit: true, children: [new TableCell({ children: cellChildren, width: { size: width, type: WidthType.DXA }, shading: fill ? shade(fill) : undefined, margins, borders: borders || noBorders, verticalAlign: VerticalAlign ? VerticalAlign.CENTER : undefined })] })],
+    columnWidths: [width], width: { size: width, type: WidthType.DXA }, borders: noTableBorders, layout: fixedLayout, alignment: align
+  });
 
-  // Builds a Word ImageRun from an <img> with a data: URL (null if it can't be embedded).
+  // A Word ImageRun from an <img> with a data: URL (null if it can't be embedded).
   const imageRunFor = (img) => {
     const src = img.getAttribute('src') || '';
     if(!src.startsWith('data:image')) return null;
@@ -1762,16 +1835,14 @@ function htmlToDocxElements(bodyHtml){
       const base64 = src.split(',')[1];
       const binary = atob(base64);
       const bytes = new Uint8Array(binary.length);
-      for(let i=0;i<binary.length;i++) bytes[i] = binary.charCodeAt(i);
+      for(let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
       let w = 160, h = 160;
       if(img.classList.contains('inv-logo') && src.startsWith('data:image/png')){
-        // Logos are PNGs from compressLogo() — read the natural size straight out of the
-        // PNG IHDR chunk so the logo keeps its own aspect ratio instead of being forced square.
+        // Logos are PNGs: read the natural size straight from the IHDR chunk so the logo keeps its own proportions.
         const nw = ((bytes[16]<<24) | (bytes[17]<<16) | (bytes[18]<<8) | bytes[19]) >>> 0;
         const nh = ((bytes[20]<<24) | (bytes[21]<<16) | (bytes[22]<<8) | bytes[23]) >>> 0;
         if(nw > 0 && nh > 0){
-          const maxW = 200, maxH = 90;
-          const scale = Math.min(maxW/nw, maxH/nh, 1);
+          const scale = Math.min(200/nw, 90/nh, 1);
           w = Math.round(nw*scale); h = Math.round(nh*scale);
         }
       }
@@ -1779,133 +1850,163 @@ function htmlToDocxElements(bodyHtml){
     }catch(e){ return null; }
   };
 
-  Array.from(root.children).forEach(node=>{
-    const tag = node.tagName;
-    const imgs = node.querySelectorAll ? node.querySelectorAll('img') : [];
-    if(tag === 'DIV' && node.classList.contains('inv-letterhead')){
-      // Logo on the left, address / phone on the right: a borderless two-column table.
-      const none = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' };
-      const noBorders = { top: none, bottom: none, left: none, right: none };
+  const tableFor = (tbl) => {
+    const cls = tbl.classList;
+    const trs = Array.from(tbl.querySelectorAll('tr'));
+    if(!trs.length) return [];
+    // Plain tab-separated lines (the round cleaning dates list) rather than a table object, so they are easy to edit.
+    if(cls.contains('rpt-table-as-tabs')){
+      const out = trs.map(tr => {
+        const cells = Array.from(tr.children);
+        if(!cells.length) return null;
+        const head = cells.some(td => td.tagName === 'TH');
+        const kids = [];
+        cells.forEach((td, i) => { if(i > 0) kids.push(new Tab()); kids.push(textOf(td)); });
+        return new Paragraph({ tabStops: [{ type: TabStopType.LEFT, position: 2600 }, { type: TabStopType.LEFT, position: 5200 }],
+          children: [new TextRun({ children: kids, bold: head, font: FONT, size: hp(13), color: head ? MUTED : INK })] });
+      }).filter(Boolean);
+      return out.concat([spacer()]);
+    }
+    const isCal = cls.contains('rpt-calendar');
+    let numCols = 0;
+    trs.forEach(tr => { let n = 0; Array.from(tr.children).forEach(td => { n += Math.max(1, parseInt(td.getAttribute('colspan') || '1', 10)); }); numCols = Math.max(numCols, n); });
+    if(!numCols) return [];
+    // Column widths: equal for the calendar, otherwise shared out by how much text each column holds (like an auto-width table).
+    const weights = Array(numCols).fill(isCal ? 1 : 6);
+    if(!isCal) trs.forEach(tr => { let c = 0; Array.from(tr.children).forEach(td => {
+      const span = Math.max(1, parseInt(td.getAttribute('colspan') || '1', 10));
+      if(span === 1) weights[c] = Math.max(weights[c], Math.min(45, textOf(td).length));
+      c += span; }); });
+    const wsum = weights.reduce((a, b) => a + b, 0);
+    const columnWidths = weights.map(w => Math.floor(PAGE * w / wsum));
+    columnWidths[numCols - 1] += PAGE - columnWidths.reduce((a, b) => a + b, 0);
+    const rows = trs.map(tr => {
+      const cellNodes = Array.from(tr.children);
+      if(!cellNodes.length) return null;
+      const headRow = cellNodes.some(td => td.tagName === 'TH');
+      let col = 0;
+      const cells = cellNodes.map(td => {
+        const span = Math.max(1, parseInt(td.getAttribute('colspan') || '1', 10));
+        const width = columnWidths.slice(col, col + span).reduce((a, b) => a + b, 0);
+        col += span;
+        const th = td.tagName === 'TH';
+        let base, borders, fill, margins;
+        if(isCal){
+          margins = { top: 75, bottom: 75, left: 90, right: 90 };
+          if(th){ base = { size: hp(11), bold: true, color: 'FFFFFF' }; fill = NAVY; borders = { top: rule(NAVY), bottom: rule(NAVY), left: rule(NAVY), right: rule(NAVY) }; }
+          else {
+            const out = td.classList.contains('outside');
+            base = { size: hp(10), color: out ? 'B7C2CA' : INK }; fill = out ? 'F7F9FA' : undefined;
+            const e = rule('E3E9EC'); borders = { top: e, bottom: e, left: e, right: e };
+          }
+        } else {
+          margins = { top: 100, bottom: 100, left: 120, right: 120 };
+          base = th ? { size: hp(11), bold: true, color: MUTED, caps: true } : { size: hp(13) };
+          borders = { top: none, left: none, right: none, bottom: rule(th ? 'CCCCCC' : 'EEEEEE') };
+        }
+        const kids = runsOf(td, base);
+        const cfg = {
+          children: [new Paragraph({ children: kids, alignment: (isCal && th) ? AlignmentType.CENTER : alignOf(td) })],
+          width: { size: width, type: WidthType.DXA }, margins, borders,
+          shading: fill ? shade(fill) : undefined, verticalAlign: (VerticalAlign && !(isCal && th)) ? VerticalAlign.TOP : undefined
+        };
+        if(span > 1) cfg.columnSpan = span;
+        return new TableCell(cfg);
+      });
+      const rowCfg = { children: cells, cantSplit: true, tableHeader: headRow && !isCal };
+      if(isCal && !headRow && HeightRule) rowCfg.height = { value: 1300, rule: HeightRule.ATLEAST };
+      return new TableRow(rowCfg);
+    }).filter(Boolean);
+    return [new Table({ rows, columnWidths, width: { size: PAGE, type: WidthType.DXA }, borders: noTableBorders, layout: fixedLayout }), spacer(isCal ? 160 : 60)];
+  };
+
+  let pendingBreak = false;
+  const add = (...els) => {
+    els.filter(Boolean).forEach(e => {
+      if(pendingBreak){ elements.push(new Paragraph({ children: [new PageBreak()] })); pendingBreak = false; }
+      elements.push(e);
+    });
+  };
+
+  Array.from(root.children).forEach(node => {
+    const tag = node.tagName, cl = node.classList;
+    if(cl.contains('rpt-page-break')) pendingBreak = true;
+    if(tag === 'DIV' && cl.contains('inv-letterhead')){
+      // Logo on the left, name / address / phone on the right: a borderless two-column table.
       const textNode = node.querySelector('.inv-lh-text');
-      const textParas = textNode ? Array.from(textNode.children).map(line=>{
-        const isName = /font-weight\s*:\s*(bold|[7-9]00)/i.test(line.getAttribute('style')||'');
-        return new Paragraph({ children:[new TextRun({ text: textOf(line), bold: isName })] });
-      }).filter(p=>p) : [];
+      const lines = textNode ? Array.from(textNode.children).map(line => new Paragraph({ children: runsOf(line, { size: hp(11), color: MUTED }), spacing: { after: 20 } })).filter(p => p) : [];
       const imgEl = node.querySelector('img');
       const run = imgEl ? imageRunFor(imgEl) : null;
-      if(run && textParas.length){
-        elements.push(new Table({
-          rows: [ new TableRow({ children: [
-            new TableCell({ children:[ new Paragraph({ children:[run] }) ], width:{ size: 3400, type: WidthType.DXA }, borders: noBorders, verticalAlign: 'center' }),
-            new TableCell({ children: textParas, width:{ size: PAGE_WIDTH_DXA - 3400, type: WidthType.DXA }, borders: noBorders, verticalAlign: 'center' })
-          ] }) ],
-          columnWidths: [3400, PAGE_WIDTH_DXA - 3400],
-          width: { size: PAGE_WIDTH_DXA, type: WidthType.DXA },
-          borders: { top: none, bottom: none, left: none, right: none, insideHorizontal: none, insideVertical: none },
-          layout: (TableLayoutType && TableLayoutType.FIXED) ? TableLayoutType.FIXED : undefined
+      if(run && lines.length){
+        add(new Table({
+          rows: [new TableRow({ children: [
+            new TableCell({ children: [new Paragraph({ children: [run] })], width: { size: 3400, type: WidthType.DXA }, borders: noBorders, verticalAlign: VerticalAlign ? VerticalAlign.CENTER : undefined }),
+            new TableCell({ children: lines, width: { size: PAGE - 3400, type: WidthType.DXA }, borders: noBorders, verticalAlign: VerticalAlign ? VerticalAlign.CENTER : undefined })
+          ] })],
+          columnWidths: [3400, PAGE - 3400], width: { size: PAGE, type: WidthType.DXA }, borders: noTableBorders, layout: fixedLayout
         }));
-      } else if(run){
-        elements.push(new Paragraph({ children:[run] }));
-      } else {
-        textParas.forEach(p=>elements.push(p));
-      }
-      elements.push(new Paragraph({ text: '' }));
+      } else if(run){ add(new Paragraph({ children: [run] })); }
+      else { lines.forEach(p => add(p)); }
+      add(spacer(160));
       return;
     }
-    if(tag === 'TABLE'){
-      const trs = Array.from(node.querySelectorAll('tr'));
-
-      // Some reports (e.g. the round cleaning dates list) ask for tab-separated text in the
-      // Word export instead of a real table object, so the rows are plain, easily-editable
-      // lines rather than table cells. A literal tab character inside run text isn't enough —
-      // Word only treats it as a real tab stop when it's an explicit Tab() between runs.
-      if(node.classList.contains('rpt-table-as-tabs')){
-        trs.forEach(tr=>{
-          const cellNodes = Array.from(tr.children);
-          if(!cellNodes.length) return;
-          const isHeaderRow = cellNodes.some(td => td.tagName === 'TH');
-          const runChildren = [];
-          cellNodes.forEach((td, i)=>{
-            if(i > 0) runChildren.push(new Tab());
-            runChildren.push(textOf(td));
-          });
-          elements.push(new Paragraph({
-            tabStops: [{ type: TabStopType.LEFT, position: 2600 }, { type: TabStopType.LEFT, position: 5200 }],
-            children: [ new TextRun({ children: runChildren, bold: isHeaderRow }) ]
-          }));
-        });
-        elements.push(new Paragraph({ text: '' }));
-        return;
-      }
-
-      let numCols = 0;
-      trs.forEach(tr => {
-        let span = 0;
-        Array.from(tr.children).forEach(td => { span += Math.max(1, parseInt(td.getAttribute('colspan')||'1',10)); });
-        numCols = Math.max(numCols, span);
-      });
-
-      if(numCols > 0){
-        const baseWidth = Math.floor(PAGE_WIDTH_DXA / numCols);
-        const columnWidths = Array(numCols).fill(baseWidth);
-        columnWidths[numCols-1] += PAGE_WIDTH_DXA - (baseWidth * numCols); // give rounding remainder to the last column
-        const rows = [];
-        trs.forEach(tr=>{
-          const cellNodes = Array.from(tr.children);
-          if(!cellNodes.length) return;
-          const isHeaderRow = cellNodes.some(td => td.tagName === 'TH');
-          let colIndex = 0;
-          const cells = cellNodes.map(td=>{
-            const span = Math.max(1, parseInt(td.getAttribute('colspan')||'1',10));
-            const widthDxa = columnWidths.slice(colIndex, colIndex+span).reduce((a,b)=>a+b,0);
-            colIndex += span;
-            const styleAttr = td.getAttribute('style') || '';
-            const alignRight = /text-align\s*:\s*right/i.test(styleAttr);
-            const isBold = td.tagName==='TH' || /font-weight\s*:\s*(bold|[7-9]00)/i.test(styleAttr);
-            const cellConfig = {
-              children: [new Paragraph({
-                alignment: alignRight ? AlignmentType.RIGHT : undefined,
-                children: [new TextRun({ text: textOf(td), bold: isBold })]
-              })],
-              width: { size: widthDxa, type: WidthType.DXA },
-              margins: cellMargins
-            };
-            if(span > 1) cellConfig.columnSpan = span;
-            if(isHeaderRow) cellConfig.shading = { fill: 'EFF3F5' };
-            return new TableCell(cellConfig);
-          });
-          rows.push(new TableRow({ children: cells, cantSplit: true }));
-        });
-        if(rows.length){
-          const tableConfig = {
-            rows,
-            columnWidths,
-            width: { size: PAGE_WIDTH_DXA, type: WidthType.DXA },
-            borders: tableBorders
-          };
-          if(TableLayoutType && TableLayoutType.FIXED){ tableConfig.layout = TableLayoutType.FIXED; }
-          elements.push(new Table(tableConfig));
-          elements.push(new Paragraph({ text: '' }));
-        }
-      }
-    } else if(imgs.length){
-      imgs.forEach(img=>{
-        const run = imageRunFor(img);
-        if(run) elements.push(new Paragraph({ children: [ run ] }));
-      });
-    } else if(tag === 'DIV' && node.classList.contains('rpt-round-title')){
-      const t = textOf(node);
-      if(t) elements.push(new Paragraph({ text: t, heading: HeadingLevel.HEADING_2, spacing:{ before:200, after:100 } }));
-    } else if(tag === 'DIV' && node.classList.contains('rpt-total')){
-      const t = textOf(node);
-      if(t) elements.push(new Paragraph({ children:[new TextRun({ text: t, bold:true })], spacing:{ before:100, after:200 } }));
-    } else if(tag === 'DIV' && node.classList.contains('rpt-empty-note')){
-      const t = textOf(node);
-      if(t) elements.push(new Paragraph({ children:[new TextRun({ text: t, italics:true })] }));
-    } else {
-      const t = textOf(node);
-      if(t) elements.push(new Paragraph({ children:[new TextRun({ text: t })], spacing:{ after:120 } }));
+    if(tag === 'TABLE'){ add(...tableFor(node)); return; }
+    if(node.querySelectorAll('img').length){
+      node.querySelectorAll('img').forEach(img => { const run = imageRunFor(img); if(run) add(new Paragraph({ children: [run], spacing: { after: 100 } })); });
+      return;
     }
+    if(tag === 'DIV' && cl.contains('rpt-round-title')){
+      const kids = runsOf(node, { size: hp(16), bold: true });
+      if(kids.length) add(new Paragraph({ children: kids, keepNext: true, spacing: { before: 360, after: 140 }, border: { bottom: { style: BorderStyle.SINGLE, size: 12, color: NAVY, space: 3 } } }));
+      return;
+    }
+    if(tag === 'DIV' && cl.contains('inv-billto')){
+      add(oneCellTable([new Paragraph({ children: runsOf(node, { size: hp(13) }), spacing: { line: 340 } })], PAGE, 'F5F7F8', { top: 180, bottom: 180, left: 240, right: 240 }), spacer(200));
+      return;
+    }
+    if(tag === 'DIV' && cl.contains('inv-total-box')){
+      const kids = Array.from(node.children);
+      const label = kids[0] ? textOf(kids[0]) : 'Total', amount = kids[1] ? textOf(kids[1]) : '';
+      const cell = (children, width, align) => new TableCell({ children: [new Paragraph({ children, alignment: align })], width: { size: width, type: WidthType.DXA }, shading: shade(NAVY), margins: { top: 200, bottom: 200, left: 320, right: 320 }, borders: noBorders, verticalAlign: VerticalAlign ? VerticalAlign.CENTER : undefined });
+      add(new Table({
+        rows: [new TableRow({ cantSplit: true, children: [
+          cell([new TextRun({ text: label, bold: true, font: FONT, size: hp(16), color: 'FFFFFF' })], PAGE - 3600),
+          cell([new TextRun({ text: amount, bold: true, font: FONT, size: hp(22), color: 'FFFFFF' })], 3600, AlignmentType.RIGHT)
+        ] })],
+        columnWidths: [PAGE - 3600, 3600], width: { size: PAGE, type: WidthType.DXA }, borders: noTableBorders, layout: fixedLayout
+      }), spacer(100));
+      return;
+    }
+    const stamp = node.querySelector && node.querySelector('.inv-stamp');
+    if(stamp){
+      const colour = stamp.classList.contains('paid') ? '1F7A46' : stamp.classList.contains('quote') ? NAVY : 'C4453F';
+      const b = { style: BorderStyle.SINGLE, size: 12, color: colour };
+      add(oneCellTable([new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: textOf(stamp).toUpperCase(), bold: true, font: FONT, size: hp(12), color: colour, characterSpacing: 12 })] })],
+        2800, null, { top: 70, bottom: 70, left: 160, right: 160 }, { top: b, bottom: b, left: b, right: b }, AlignmentType.LEFT), spacer(160));
+      return;
+    }
+    if(tag === 'DIV' && cl.contains('rpt-total')){
+      add(para(node, { size: hp(14), bold: true }, { alignment: AlignmentType.RIGHT, spacing: { before: 120, after: 200 } }));
+      return;
+    }
+    if(tag === 'DIV' && cl.contains('rpt-empty-note')){
+      add(para(node, { size: hp(12), color: MUTED }, { spacing: { before: 100, after: 100 } }));
+      return;
+    }
+    if(tag === 'DIV' && cl.contains('rpt-footer')){
+      const flat = /border-top\s*:\s*none/i.test(styleAttr(node));
+      const leftAligned = /text-align\s*:\s*left/i.test(styleAttr(node));
+      add(para(node, { size: hp(11), color: MUTED }, {
+        alignment: leftAligned ? AlignmentType.LEFT : AlignmentType.CENTER, spacing: { before: flat ? 400 : 320, after: 0 },
+        border: flat ? undefined : { top: { style: BorderStyle.SINGLE, size: 4, color: 'CCCCCC', space: 8 } }
+      }));
+      return;
+    }
+    if(tag === 'DIV' && cl.contains('rpt-notes')){
+      add(para(node, { size: hp(10) }, { spacing: { before: 200, after: 80, line: 300 } }));
+      return;
+    }
+    add(para(node, { size: hp(13) }, { spacing: { after: 120 } }));
   });
   return elements;
 }
@@ -1917,31 +2018,40 @@ async function exportPendingReportDocx(){
   }
   rpSetBusy('rpBtnDoc', true);
   try{
-    const { Document, Packer, Paragraph, TextRun, HeadingLevel } = docx;
+    const { Document, Packer, Paragraph, TextRun, Tab, TabStopType, AlignmentType, Footer, PageNumber } = docx;
     const plainTitle = pendingReportTitle.replace(/<[^>]+>/g,'');
     const company = pendingReportHideCompany ? '' : (data.settings.companyName || '');
+    const W = DOCX_PAGE_WIDTH;
 
-    // Customer-facing documents (invoice, quote, receipt) carry their own letterhead and
-    // details, so they don't get the generic title / company / date lines on top.
+    // Customer-facing documents (invoice, quote, receipt) carry their own letterhead and details, so they don't get
+    // the generic title / company / date lines on top. Otherwise it matches the PDF: bold title with the date at the
+    // right edge, and the company name underneath in grey.
     const headerChildren = [];
     if(!pendingReportHideCompany){
-      headerChildren.push(new Paragraph({ text: plainTitle, heading: HeadingLevel.HEADING_1 }));
-      if(company) headerChildren.push(new Paragraph({ children:[new TextRun({ text: company, italics:true })] }));
-      headerChildren.push(new Paragraph({ children:[new TextRun({ text: reportDate(), color:'666666' })], spacing:{ after:300 } }));
+      headerChildren.push(new Paragraph({
+        tabStops: [{ type: TabStopType.RIGHT, position: W }],
+        spacing: { after: company ? 20 : 160 },
+        children: [
+          new TextRun({ text: plainTitle, bold: true, font: DOCX_FONT, size: 30, color: '1C2B36' }),
+          new TextRun({ children: [new Tab(), reportDate()], font: DOCX_FONT, size: 18, color: '66798A' })
+        ]
+      }));
+      if(company) headerChildren.push(new Paragraph({ spacing: { after: 160 }, children: [new TextRun({ text: company, bold: true, font: DOCX_FONT, size: 20, color: '66798A' })] }));
     }
 
     const bodyChildren = htmlToDocxElements(pendingReportBody);
 
+    const section = {
+      properties: { page: { size: { width: 11906, height: 16838 }, margin: { top: DOCX_MARGIN, bottom: 900, left: DOCX_MARGIN, right: DOCX_MARGIN } } },
+      children: [...headerChildren, ...bodyChildren]
+    };
+    if(!pendingReportHideCompany){
+      section.footers = { default: new Footer({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Page ', font: DOCX_FONT, size: 16, color: '66798A' }), new TextRun({ children: [PageNumber.CURRENT], font: DOCX_FONT, size: 16, color: '66798A' }), new TextRun({ text: ' of ', font: DOCX_FONT, size: 16, color: '66798A' }), new TextRun({ children: [PageNumber.TOTAL_PAGES], font: DOCX_FONT, size: 16, color: '66798A' })] })] }) };
+    }
     const wordDoc = new Document({
-      sections: [{
-        properties: {
-          page: {
-            size: { width: 11906, height: 16838 }, // A4, in twips (DXA)
-            margin: { top: 1440, bottom: 1440, left: 1440, right: 1440 }
-          }
-        },
-        children: [...headerChildren, ...bodyChildren]
-      }]
+      creator: data.settings.companyName || 'Round Book', title: plainTitle,
+      styles: { default: { document: { run: { font: DOCX_FONT, size: 20, color: '1C2B36' } } } },
+      sections: [section]
     });
 
     const blob = await Packer.toBlob(wordDoc);
@@ -1951,7 +2061,9 @@ async function exportPendingReportDocx(){
       try{
         const file = new File([blob], filename, { type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
         if(navigator.canShare({files:[file]})){
-          await navigator.share({ files:[file], title: plainTitle });
+          // Just the file, with no title or text alongside it: on iPhone and iPad a share that also carries text hides
+          // "Open in Pages" and other apps that open documents.
+          await navigator.share({ files:[file] });
           toast('Word document shared');
           rpSetBusy('rpBtnDoc', false);
           return;

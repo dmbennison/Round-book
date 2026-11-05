@@ -316,7 +316,7 @@ const FOCUSED_HELP = {
       helpP('Add photos from a customer’s Photos section. Tap a photo to open it, then pinch or double-tap to zoom and swipe for the next. Press and hold the photo to save it. Every photo is also in the <b>Photo gallery</b> (⋯ menu).'),
       helpList([
         'The <b>⋯</b> button at the top of the photo holds everything you can do with it: Annotate, Share, Send with an offer, Make a before &amp; after photo and Delete. The photo has the rest of the screen to itself.',
-        '<b>Annotate</b> – circle, point at or draw around anything worth flagging, or choose <b>Text</b> and tap where a label should go. Choose <b>Move</b> to drag any mark, then <b>Delete selected</b> to remove it. The photo is shown whole, fitted to the screen, and <b>Save as new photo</b> keeps the original untouched.',
+        '<b>Annotate</b> – circle, point at or draw around anything worth flagging, or choose <b>Text</b> and tap where a label should go. Choose <b>Move</b> to drag any mark, then <b>Delete</b> to remove it. The photo is shown whole, fitted to the screen. <b>Pinch</b> to zoom in for detail (two fingers also drag it around), or use the <b>+</b> / <b>−</b> buttons on the photo, the mouse wheel on a computer, <b>⤢</b> to fit it again and <b>Pan</b> to drag it with one finger; and <b>Save as new photo</b> keeps the original untouched.',
         '<b>Make a before &amp; after photo</b> – pick two photos, then save or share the result.',
         '<b>Send with an offer</b> – adds an offer message to the photo. From a customer it opens Messages or WhatsApp straight to them with the message filled in; the photo is copied, so tap the message box and choose <b>Paste</b>. From the Photo gallery it opens the share sheet.'
       ])
@@ -347,7 +347,7 @@ const FOCUSED_HELP = {
   reports: {
     title: 'Reports',
     body: () => [
-      helpP('Tap the printer icon for a list of reports. Every report, invoice, quote and receipt opens in a preview first, with <b>Print</b>, <b>Share PDF</b> and <b>Share doc</b> (a Word file) along the bottom (down the left side on iPad and computer, with the zoom buttons).')
+      helpP('Tap the printer icon for a list of reports. Every report, invoice, quote and receipt opens in a preview first, with <b>Print</b>, <b>Share PDF</b> and <b>Share doc</b> (a Word file laid out like the PDF: same fonts, colours, tables and invoice boxes, so it can be edited in Word or Pages) along the bottom (down the left side on iPad and computer, with the zoom buttons).')
     ]
   },
   backup: {

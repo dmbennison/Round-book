@@ -15,6 +15,11 @@ let annotateColor = ANNOTATE_COLORS[0];
 let annotateStrokes = [];   // finished shapes: {type, color, ...}
 let annotateDrawing = null; // the in-progress shape while a finger/pointer is down
 let annotatePointerId = null;
+// Zoom: the photo can be pinched (two fingers) or zoomed with the + / - buttons or the mouse wheel, and dragged with two
+// fingers or the Pan tool. It is a CSS transform on the canvas, so drawing and moving marks still land in the right place.
+let annotateView = { s: 1, tx: 0, ty: 0 };
+const annotPtrs = new Map();
+let annotPinch = null, annotPan = null;
 let annotateTextPoint = null; // where a Text-tool tap landed, until its label has been typed
 let annotateSelected = null;  // the annotation picked with the Move tool
 let annotateHistory = [];     // undo steps: {kind:'add'|'move'|'delete', ...}
@@ -32,6 +37,7 @@ function openPhotoAnnotator(){
   annotateTool = 'circle';
   annotateColor = ANNOTATE_COLORS[0];
   annotateSelected = null; annotateHistory = []; annotateMoveDrag = null;
+  annotateView = { s: 1, tx: 0, ty: 0 }; annotPtrs.clear(); annotPinch = null; annotPan = null;
   const img = new Image();
   img.onload = () => { annotateImg = img; renderPhotoAnnotator(); };
   img.onerror = () => toast('Could not load that photo to annotate');
@@ -48,8 +54,17 @@ function renderPhotoAnnotator(){
       <h2>Annotate photo</h2>
       <button class="sheet-close" onclick="cancelPhotoAnnotation()" aria-label="Close">✕</button>
     </div>
-    <div style="position:relative; background:#000; border-radius:12px; overflow:hidden; margin-bottom:8px; display:flex; justify-content:center;">
-      <canvas id="annotateCanvas" style="max-width:100%; width:auto; height:auto; display:block; touch-action:none;"></canvas>
+    <div style="display:flex; justify-content:center; margin-bottom:8px;">
+      <div style="position:relative; max-width:100%;">
+        <div id="annotateWrap" style="overflow:hidden; border-radius:12px; background:#000; touch-action:none;">
+          <canvas id="annotateCanvas" style="max-width:100%; width:auto; height:auto; display:block; touch-action:none; transform-origin:0 0;"></canvas>
+        </div>
+        <div style="position:absolute; top:8px; right:8px; display:flex; flex-direction:column; gap:6px;">
+          <button class="ann-zoom" onclick="annotateZoomBy(1.5)" aria-label="Zoom in">+</button>
+          <button class="ann-zoom" onclick="annotateZoomBy(1/1.5)" aria-label="Zoom out">\u2212</button>
+          <button class="ann-zoom" onclick="annotateZoomReset()" aria-label="Fit the photo to the screen">\u2922</button>
+        </div>
+      </div>
     </div>
     <div class="seg-row">
       <button class="seg-btn ${annotateTool==='circle'?'active':''}" onclick="setAnnotateTool('circle')">⭕ Circle</button>
@@ -59,7 +74,8 @@ function renderPhotoAnnotator(){
     </div>
     <div class="seg-row">
       <button class="seg-btn ${annotateTool==='move'?'active':''}" onclick="setAnnotateTool('move')">✋ Move</button>
-      <button class="seg-btn" id="annDeleteSel" onclick="deleteSelectedAnnotation()">🗑 Delete selected</button>
+      <button class="seg-btn ${annotateTool==='pan'?'active':''}" onclick="setAnnotateTool('pan')">🔍 Pan</button>
+      <button class="seg-btn" id="annDeleteSel" onclick="deleteSelectedAnnotation()">🗑 Delete</button>
     </div>
     <div style="display:flex; gap:10px; align-items:center; margin:2px 2px 10px;">
       ${ANNOTATE_COLORS.map(c=>`<button onclick="setAnnotateColor('${c}')" aria-label="Colour" style="width:30px; height:30px; border-radius:50%; background:${c}; border:3px solid ${annotateColor===c?'var(--ink)':'transparent'}; box-shadow:0 0 0 1px rgba(0,0,0,0.15); padding:0;"></button>`).join('')}
@@ -185,6 +201,7 @@ function initAnnotateCanvas(){
   redrawAnnotateCanvas();
   attachAnnotateCanvasEvents(canvas);
   fitAnnotateCanvas();
+  annotateApplyView();
 }
 // Sizes the photo so the whole annotate screen (photo, tools, buttons) fits the window with no scrolling: the photo is
 // shrunk, keeping its shape, by however much the screen would otherwise overflow.
@@ -194,9 +211,9 @@ function fitAnnotateCanvas(){
   if(!sheet) return;
   canvas.style.maxHeight = 'none';
   const overflow = sheet.scrollHeight - sheet.clientHeight;
-  if(overflow > 0) canvas.style.maxHeight = Math.max(120, Math.floor(canvas.getBoundingClientRect().height - overflow - 2)) + 'px';
+  if(overflow > 0) canvas.style.maxHeight = Math.max(120, Math.floor(canvas.offsetHeight - overflow - 2)) + 'px';
 }
-window.addEventListener('resize', () => { if(document.getElementById('annotateCanvas')) fitAnnotateCanvas(); }); // rotating the device
+window.addEventListener('resize', () => { if(document.getElementById('annotateCanvas')){ fitAnnotateCanvas(); annotateApplyView(); } }); // rotating the device
 function annotateLineWidth(canvasWidth){
   // Scales with the photo's own resolution so the line reads clearly whether
   // it's a small compressed photo or a large one, rather than a fixed pixel
@@ -302,6 +319,44 @@ function redrawAnnotateCanvas(){
     ctx.restore();
   }
 }
+function annotateApplyView(){
+  const c = document.getElementById('annotateCanvas');
+  if(!c) return;
+  const v = annotateView, w = c.offsetWidth, h = c.offsetHeight;
+  v.s = Math.min(8, Math.max(1, v.s));
+  v.tx = Math.min(0, Math.max(w - w * v.s, v.tx)); // the photo always covers its frame
+  v.ty = Math.min(0, Math.max(h - h * v.s, v.ty));
+  c.style.transform = v.s === 1 ? '' : `translate(${v.tx}px, ${v.ty}px) scale(${v.s})`;
+}
+// Zoom by a factor, keeping the point (client coordinates) under the same spot of the frame; default is the centre.
+function annotateZoomBy(f, cx, cy){
+  const wrap = document.getElementById('annotateWrap');
+  if(!wrap) return;
+  const r = wrap.getBoundingClientRect(), v = annotateView;
+  const px = (cx == null ? r.left + r.width / 2 : cx) - r.left, py = (cy == null ? r.top + r.height / 2 : cy) - r.top;
+  const s2 = Math.min(8, Math.max(1, v.s * f));
+  v.tx = px - (px - v.tx) * (s2 / v.s); v.ty = py - (py - v.ty) * (s2 / v.s); v.s = s2;
+  annotateApplyView();
+}
+function annotateZoomReset(){ annotateView = { s: 1, tx: 0, ty: 0 }; annotateApplyView(); }
+function annotateStartPinch(){
+  if(annotateMoveDrag){ annotateTranslate(annotateMoveDrag.s, -annotateMoveDrag.dx, -annotateMoveDrag.dy); annotateMoveDrag = null; } // a second finger means zoom, not a half-made move
+  annotateDrawing = null; annotateTextPoint = null; annotatePointerId = null; annotPan = null;
+  redrawAnnotateCanvas();
+  const [a, b] = [...annotPtrs.values()];
+  annotPinch = { d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, mx0: (a.x + b.x) / 2, my0: (a.y + b.y) / 2, s0: annotateView.s, tx0: annotateView.tx, ty0: annotateView.ty };
+}
+function annotateUpdatePinch(){
+  const wrap = document.getElementById('annotateWrap');
+  if(!wrap || !annotPinch) return;
+  const [a, b] = [...annotPtrs.values()], r = wrap.getBoundingClientRect(), P = annotPinch;
+  const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+  const s = Math.min(8, Math.max(1, P.s0 * Math.hypot(a.x - b.x, a.y - b.y) / P.d0));
+  // the bit of photo that was under the fingers' starting midpoint stays under their midpoint now (so it pans as well)
+  const ux = (P.mx0 - r.left - P.tx0) / P.s0, uy = (P.my0 - r.top - P.ty0) / P.s0;
+  annotateView.s = s; annotateView.tx = (mx - r.left) - ux * s; annotateView.ty = (my - r.top) - uy * s;
+  annotateApplyView();
+}
 function canvasPointFromEvent(canvas, e){
   const rect = canvas.getBoundingClientRect();
   const scaleX = canvas.width / (rect.width || canvas.width);
@@ -309,10 +364,16 @@ function canvasPointFromEvent(canvas, e){
   return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
 }
 function attachAnnotateCanvasEvents(canvas){
+  const wrap = document.getElementById('annotateWrap');
+  if(wrap) wrap.onwheel = (e) => { e.preventDefault(); annotateZoomBy(e.deltaY < 0 ? 1.15 : 1 / 1.15, e.clientX, e.clientY); };
   canvas.onpointerdown = (e) => {
     e.preventDefault();
-    annotatePointerId = e.pointerId;
+    annotPtrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if(canvas.setPointerCapture){ try{ canvas.setPointerCapture(e.pointerId); }catch(err){} }
+    if(annotPtrs.size === 2){ annotateStartPinch(); return; }
+    if(annotPtrs.size > 2) return;
+    annotatePointerId = e.pointerId;
+    if(annotateTool === 'pan'){ annotPan = { x: e.clientX, y: e.clientY, tx: annotateView.tx, ty: annotateView.ty }; return; }
     const pt = canvasPointFromEvent(canvas, e);
     if(annotateTool === 'move'){
       // Pick the annotation under the finger (or deselect), then drag it.
@@ -329,6 +390,14 @@ function attachAnnotateCanvasEvents(canvas){
     redrawAnnotateCanvas();
   };
   canvas.onpointermove = (e) => {
+    if(annotPtrs.has(e.pointerId)) annotPtrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if(annotPinch && annotPtrs.size >= 2){ e.preventDefault(); annotateUpdatePinch(); return; }
+    if(annotPan && e.pointerId === annotatePointerId){
+      e.preventDefault();
+      annotateView.tx = annotPan.tx + (e.clientX - annotPan.x); annotateView.ty = annotPan.ty + (e.clientY - annotPan.y);
+      annotateApplyView();
+      return;
+    }
     if(annotatePointerId === null || e.pointerId !== annotatePointerId) return;
     if(annotateMoveDrag){
       e.preventDefault();
@@ -348,8 +417,11 @@ function attachAnnotateCanvasEvents(canvas){
     redrawAnnotateCanvas();
   };
   const finish = (e) => {
+    annotPtrs.delete(e.pointerId);
+    if(annotPinch){ if(annotPtrs.size < 2) annotPinch = null; return; } // lifting a finger ends the zoom; the other one doesn't start drawing
     if(annotatePointerId === null || e.pointerId !== annotatePointerId) return;
     annotatePointerId = null;
+    if(annotPan){ annotPan = null; return; }
     if(annotateMoveDrag){
       if(annotateMoveDrag.dx || annotateMoveDrag.dy) annotateHistory.push({ kind:'move', s: annotateMoveDrag.s, dx: annotateMoveDrag.dx, dy: annotateMoveDrag.dy });
       annotateMoveDrag = null;
