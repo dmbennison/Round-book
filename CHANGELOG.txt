@@ -4,6 +4,19 @@ ROUND BOOK - RELEASE NOTES
 Newest first. This file is not part of the app and is not loaded by it; it ships alongside the code files.
 To add a release: raise APP_VERSION in js/01-data.js and CACHE_NAME in sw.js to the same number, then put a new entry at the top of this list.
 
+Version 1.345
+  - New logo: the squeegee-and-window picture is now the app icon (home screen / Dock: icon-512, icon-192 and
+    apple-touch-icon), the little mark at the top left of the header (logo-mark.png), and the background watermark
+    (watermark.png, a single-colour version that follows light / dark mode and the colour scheme, a little stronger than
+    before). Delete the old app from your home screen and add it again to see the new home-screen icon
+  - Share doc, Pages: the Word file is now built in the background as soon as the preview opens, so tapping Share doc
+    hands it to the share sheet straight away. iPhones and iPads only allow sharing straight after a tap; when the file
+    had to be built first the tap had expired, the share was refused, and the file was quietly saved instead - which is
+    why Pages was never offered. If that ever happens now you get a "Your Word document is ready" box with a Share button
+    instead of a silent save
+  - Share doc, tables: table lines are now also set on the table itself (not just on each cell), a touch stronger,
+    because Pages only draws the lines defined at table level. Header rows are repeated on each page
+
 Version 1.344
   - Word reports now look like the PDF: one clean sans-serif font (Arial) instead of Word's defaults, the same bold
     title with the date at the right and the company name under it, round headings with the navy rule, light grey table

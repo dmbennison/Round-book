@@ -1,4 +1,4 @@
-const CACHE_NAME = 'round-book-v1.344';
+const CACHE_NAME = 'round-book-v1.345';
 
 // The app itself. These are all-or-nothing: a new version only takes over once EVERY one of
 // these has downloaded fresh. If any fails (a dropped connection, a half-finished deploy) the
@@ -30,6 +30,7 @@ const EXTRA = [
   './icon-192.png',
   './icon-512.png',
   './watermark.png',
+  './logo-mark.png',
   './apple-touch-icon.png'
 ];
 
