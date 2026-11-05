@@ -1855,19 +1855,6 @@ function htmlToDocxElements(bodyHtml){
     const cls = tbl.classList;
     const trs = Array.from(tbl.querySelectorAll('tr'));
     if(!trs.length) return [];
-    // Plain tab-separated lines (the round cleaning dates list) rather than a table object, so they are easy to edit.
-    if(cls.contains('rpt-table-as-tabs')){
-      const out = trs.map(tr => {
-        const cells = Array.from(tr.children);
-        if(!cells.length) return null;
-        const head = cells.some(td => td.tagName === 'TH');
-        const kids = [];
-        cells.forEach((td, i) => { if(i > 0) kids.push(new Tab()); kids.push(textOf(td)); });
-        return new Paragraph({ tabStops: [{ type: TabStopType.LEFT, position: 2600 }, { type: TabStopType.LEFT, position: 5200 }],
-          children: [new TextRun({ children: kids, bold: head, font: FONT, size: hp(13), color: head ? MUTED : INK })] });
-      }).filter(Boolean);
-      return out.concat([spacer()]);
-    }
     const isCal = cls.contains('rpt-calendar');
     let numCols = 0;
     trs.forEach(tr => { let n = 0; Array.from(tr.children).forEach(td => { n += Math.max(1, parseInt(td.getAttribute('colspan') || '1', 10)); }); numCols = Math.max(numCols, n); });
@@ -2028,7 +2015,7 @@ function rpPrepareDocx(){
 }
 async function buildPendingReportDocx(){
   if(typeof docx === 'undefined' && !(await loadLib('docx'))) return null;
-  const { Document, Packer, Paragraph, TextRun, Tab, TabStopType, AlignmentType, Footer, PageNumber } = docx;
+  const { Document, Packer, Paragraph, TextRun, AlignmentType } = docx;
   const plainTitle = pendingReportTitle.replace(/<[^>]+>/g,'');
   const company = pendingReportHideCompany ? '' : (data.settings.companyName || '');
   const W = DOCX_PAGE_WIDTH;
@@ -2038,28 +2025,26 @@ async function buildPendingReportDocx(){
   // right edge, and the company name underneath in grey.
   const headerChildren = [];
   if(!pendingReportHideCompany){
-    headerChildren.push(new Paragraph({
-      tabStops: [{ type: TabStopType.RIGHT, position: W }],
-      spacing: { after: company ? 20 : 160 },
-      children: [
-        new TextRun({ text: plainTitle, bold: true, font: DOCX_FONT, size: 30, color: '1C2B36' }),
-        new TextRun({ children: [new Tab(), reportDate()], font: DOCX_FONT, size: 18, color: '66798A' })
-      ]
+    const none = { style: docx.BorderStyle.NONE, size: 0, color: 'FFFFFF' };
+    const nb = { top: none, bottom: none, left: none, right: none };
+    const DATE_W = 2600;
+    headerChildren.push(new docx.Table({
+      rows: [new docx.TableRow({ children: [
+        new docx.TableCell({ width: { size: W - DATE_W, type: docx.WidthType.DXA }, borders: nb, margins: { left: 0, right: 0, top: 0, bottom: 0 }, verticalAlign: docx.VerticalAlign.BOTTOM,
+          children: [new Paragraph({ children: [new TextRun({ text: plainTitle, bold: true, font: DOCX_FONT, size: 30, color: '1C2B36' })] })] }),
+        new docx.TableCell({ width: { size: DATE_W, type: docx.WidthType.DXA }, borders: nb, margins: { left: 0, right: 0, top: 0, bottom: 0 }, verticalAlign: docx.VerticalAlign.BOTTOM,
+          children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: reportDate(), font: DOCX_FONT, size: 18, color: '66798A' })] })] })
+      ] })],
+      columnWidths: [W - DATE_W, DATE_W], width: { size: W, type: docx.WidthType.DXA },
+      borders: { top: none, bottom: none, left: none, right: none, insideHorizontal: none, insideVertical: none }, layout: docx.TableLayoutType.FIXED
     }));
-    if(company) headerChildren.push(new Paragraph({ spacing: { after: 160 }, children: [new TextRun({ text: company, bold: true, font: DOCX_FONT, size: 20, color: '66798A' })] }));
+    headerChildren.push(new Paragraph({ spacing: { before: 20, after: 160 }, children: company ? [new TextRun({ text: company, bold: true, font: DOCX_FONT, size: 20, color: '66798A' })] : [] }));
   }
   const bodyChildren = htmlToDocxElements(pendingReportBody);
   const section = {
     properties: { page: { size: { width: 11906, height: 16838 }, margin: { top: DOCX_MARGIN, bottom: 900, left: DOCX_MARGIN, right: DOCX_MARGIN } } },
     children: [...headerChildren, ...bodyChildren]
   };
-  if(!pendingReportHideCompany){
-    const fp = { font: DOCX_FONT, size: 16, color: '66798A' };
-    section.footers = { default: new Footer({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [
-      new TextRun(Object.assign({ text: 'Page ' }, fp)), new TextRun(Object.assign({ children: [PageNumber.CURRENT] }, fp)),
-      new TextRun(Object.assign({ text: ' of ' }, fp)), new TextRun(Object.assign({ children: [PageNumber.TOTAL_PAGES] }, fp))
-    ] })] }) };
-  }
   const wordDoc = new Document({
     creator: data.settings.companyName || 'Round Book', title: plainTitle,
     styles: { default: { document: { run: { font: DOCX_FONT, size: 20, color: '1C2B36' } } } },
