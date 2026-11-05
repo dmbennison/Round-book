@@ -1583,6 +1583,7 @@ async function openReportPreview(){
   const { root, paper } = rpEls();
   rpBind();
   rpLabelShareButtons();
+  rpPrepareDocx();
   const token = ++rpToken;
   document.getElementById('rpTitle').innerHTML = pendingReportTitle;
   paper.innerHTML = '<div class="rp-wait">Preparing preview…</div>';
@@ -1902,7 +1903,7 @@ function htmlToDocxElements(bodyHtml){
         } else {
           margins = { top: 100, bottom: 100, left: 120, right: 120 };
           base = th ? { size: hp(11), bold: true, color: MUTED, caps: true } : { size: hp(13) };
-          borders = { top: none, left: none, right: none, bottom: rule(th ? 'CCCCCC' : 'EEEEEE') };
+          borders = { top: none, left: none, right: none, bottom: th ? rule('B8C2CA', 8) : rule('DDE3E7', 6) };
         }
         const kids = runsOf(td, base);
         const cfg = {
@@ -1917,7 +1918,12 @@ function htmlToDocxElements(bodyHtml){
       if(isCal && !headRow && HeightRule) rowCfg.height = { value: 1300, rule: HeightRule.ATLEAST };
       return new TableRow(rowCfg);
     }).filter(Boolean);
-    return [new Table({ rows, columnWidths, width: { size: PAGE, type: WidthType.DXA }, borders: noTableBorders, layout: fixedLayout }), spacer(isCal ? 160 : 60)];
+    // The lines are also set on the table itself: Pages and some other apps only draw the ones defined there.
+    const calLine = rule('E3E9EC');
+    const tableBorders = isCal
+      ? { top: calLine, bottom: calLine, left: calLine, right: calLine, insideHorizontal: calLine, insideVertical: calLine }
+      : { top: none, left: none, right: none, bottom: rule('DDE3E7', 6), insideHorizontal: rule('DDE3E7', 6), insideVertical: none };
+    return [new Table({ rows, columnWidths, width: { size: PAGE, type: WidthType.DXA }, borders: tableBorders, layout: fixedLayout }), spacer(isCal ? 160 : 60)];
   };
 
   let pendingBreak = false;
@@ -2011,73 +2017,97 @@ function htmlToDocxElements(bodyHtml){
   return elements;
 }
 
-async function exportPendingReportDocx(){
-  if(typeof docx === 'undefined'){
-    toast('Loading Word tools…');
-    if(!(await loadLib('docx'))){ toast(LIB_NEEDS_SIGNAL); return; }
+const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+let rpDocxPromise = null;
+// The Word file is built in the background as soon as the preview opens, so that when Share doc is tapped it can be
+// handed to the share sheet at once. iPhones and iPads only allow sharing straight after a tap; if the file had to be
+// built first the tap had expired, the share was refused and the file was just saved instead of offering Pages.
+function rpPrepareDocx(){
+  rpDocxPromise = null;
+  setTimeout(() => { rpDocxPromise = buildPendingReportDocx().catch(() => null); }, 250);
+}
+async function buildPendingReportDocx(){
+  if(typeof docx === 'undefined' && !(await loadLib('docx'))) return null;
+  const { Document, Packer, Paragraph, TextRun, Tab, TabStopType, AlignmentType, Footer, PageNumber } = docx;
+  const plainTitle = pendingReportTitle.replace(/<[^>]+>/g,'');
+  const company = pendingReportHideCompany ? '' : (data.settings.companyName || '');
+  const W = DOCX_PAGE_WIDTH;
+
+  // Customer-facing documents (invoice, quote, receipt) carry their own letterhead and details, so they don't get
+  // the generic title / company / date lines on top. Otherwise it matches the PDF: bold title with the date at the
+  // right edge, and the company name underneath in grey.
+  const headerChildren = [];
+  if(!pendingReportHideCompany){
+    headerChildren.push(new Paragraph({
+      tabStops: [{ type: TabStopType.RIGHT, position: W }],
+      spacing: { after: company ? 20 : 160 },
+      children: [
+        new TextRun({ text: plainTitle, bold: true, font: DOCX_FONT, size: 30, color: '1C2B36' }),
+        new TextRun({ children: [new Tab(), reportDate()], font: DOCX_FONT, size: 18, color: '66798A' })
+      ]
+    }));
+    if(company) headerChildren.push(new Paragraph({ spacing: { after: 160 }, children: [new TextRun({ text: company, bold: true, font: DOCX_FONT, size: 20, color: '66798A' })] }));
   }
+  const bodyChildren = htmlToDocxElements(pendingReportBody);
+  const section = {
+    properties: { page: { size: { width: 11906, height: 16838 }, margin: { top: DOCX_MARGIN, bottom: 900, left: DOCX_MARGIN, right: DOCX_MARGIN } } },
+    children: [...headerChildren, ...bodyChildren]
+  };
+  if(!pendingReportHideCompany){
+    const fp = { font: DOCX_FONT, size: 16, color: '66798A' };
+    section.footers = { default: new Footer({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [
+      new TextRun(Object.assign({ text: 'Page ' }, fp)), new TextRun(Object.assign({ children: [PageNumber.CURRENT] }, fp)),
+      new TextRun(Object.assign({ text: ' of ' }, fp)), new TextRun(Object.assign({ children: [PageNumber.TOTAL_PAGES] }, fp))
+    ] })] }) };
+  }
+  const wordDoc = new Document({
+    creator: data.settings.companyName || 'Round Book', title: plainTitle,
+    styles: { default: { document: { run: { font: DOCX_FONT, size: 20, color: '1C2B36' } } } },
+    sections: [section]
+  });
+  const blob = await Packer.toBlob(wordDoc);
+  const filename = `${plainTitle.replace(/[^a-z0-9]+/gi,'-').toLowerCase()}-${todayISO()}.docx`;
+  return { blob, filename, plainTitle };
+}
+function rpDownloadDocx(built){
+  const url = URL.createObjectURL(built.blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = built.filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url), 2000);
+  toast('Word document saved');
+}
+async function exportPendingReportDocx(){
   rpSetBusy('rpBtnDoc', true);
   try{
-    const { Document, Packer, Paragraph, TextRun, Tab, TabStopType, AlignmentType, Footer, PageNumber } = docx;
-    const plainTitle = pendingReportTitle.replace(/<[^>]+>/g,'');
-    const company = pendingReportHideCompany ? '' : (data.settings.companyName || '');
-    const W = DOCX_PAGE_WIDTH;
-
-    // Customer-facing documents (invoice, quote, receipt) carry their own letterhead and details, so they don't get
-    // the generic title / company / date lines on top. Otherwise it matches the PDF: bold title with the date at the
-    // right edge, and the company name underneath in grey.
-    const headerChildren = [];
-    if(!pendingReportHideCompany){
-      headerChildren.push(new Paragraph({
-        tabStops: [{ type: TabStopType.RIGHT, position: W }],
-        spacing: { after: company ? 20 : 160 },
-        children: [
-          new TextRun({ text: plainTitle, bold: true, font: DOCX_FONT, size: 30, color: '1C2B36' }),
-          new TextRun({ children: [new Tab(), reportDate()], font: DOCX_FONT, size: 18, color: '66798A' })
-        ]
-      }));
-      if(company) headerChildren.push(new Paragraph({ spacing: { after: 160 }, children: [new TextRun({ text: company, bold: true, font: DOCX_FONT, size: 20, color: '66798A' })] }));
+    let built = rpDocxPromise ? await rpDocxPromise : null; // normally already built: no wait, so the tap is still fresh
+    if(!built){
+      toast('Preparing Word document…');
+      built = await buildPendingReportDocx();
     }
-
-    const bodyChildren = htmlToDocxElements(pendingReportBody);
-
-    const section = {
-      properties: { page: { size: { width: 11906, height: 16838 }, margin: { top: DOCX_MARGIN, bottom: 900, left: DOCX_MARGIN, right: DOCX_MARGIN } } },
-      children: [...headerChildren, ...bodyChildren]
-    };
-    if(!pendingReportHideCompany){
-      section.footers = { default: new Footer({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Page ', font: DOCX_FONT, size: 16, color: '66798A' }), new TextRun({ children: [PageNumber.CURRENT], font: DOCX_FONT, size: 16, color: '66798A' }), new TextRun({ text: ' of ', font: DOCX_FONT, size: 16, color: '66798A' }), new TextRun({ children: [PageNumber.TOTAL_PAGES], font: DOCX_FONT, size: 16, color: '66798A' })] })] }) };
-    }
-    const wordDoc = new Document({
-      creator: data.settings.companyName || 'Round Book', title: plainTitle,
-      styles: { default: { document: { run: { font: DOCX_FONT, size: 20, color: '1C2B36' } } } },
-      sections: [section]
-    });
-
-    const blob = await Packer.toBlob(wordDoc);
-    const filename = `${plainTitle.replace(/[^a-z0-9]+/gi,'-').toLowerCase()}-${todayISO()}.docx`;
-
-    if(navigator.canShare){
+    if(!built){ toast(LIB_NEEDS_SIGNAL); rpSetBusy('rpBtnDoc', false); return; }
+    const file = new File([built.blob], built.filename, { type: DOCX_MIME });
+    if(navigator.canShare && navigator.canShare({files:[file]})){
       try{
-        const file = new File([blob], filename, { type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
-        if(navigator.canShare({files:[file]})){
-          // Just the file, with no title or text alongside it: on iPhone and iPad a share that also carries text hides
-          // "Open in Pages" and other apps that open documents.
-          await navigator.share({ files:[file] });
-          toast('Word document shared');
-          rpSetBusy('rpBtnDoc', false);
-          return;
-        }
+        // Just the file, with no title or text alongside it, so apps that open documents (Pages, Word) are offered.
+        await navigator.share({ files:[file] });
+        toast('Word document shared');
+        rpSetBusy('rpBtnDoc', false);
+        return;
       }catch(e){
         if(e && e.name === 'AbortError'){ rpSetBusy('rpBtnDoc', false); return; }
+        if(e && e.name === 'NotAllowedError'){
+          // The tap had expired. Ask for a fresh one rather than quietly saving the file.
+          rpSetBusy('rpBtnDoc', false);
+          appConfirm('Your Word document is ready.', {
+            title:'Share Word document', confirmLabel:'Share', danger:false,
+            onConfirm: async () => { try{ await navigator.share({ files:[file] }); toast('Word document shared'); }catch(err){ if(!(err && err.name === 'AbortError')) rpDownloadDocx(built); } }
+          });
+          return;
+        }
       }
     }
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = filename;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    setTimeout(()=>URL.revokeObjectURL(url), 2000);
-    toast('Word document saved');
+    rpDownloadDocx(built);
   }catch(e){
     toast('Could not create the Word document — try Print instead');
   }
