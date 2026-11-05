@@ -4,6 +4,18 @@ ROUND BOOK - RELEASE NOTES
 Newest first. This file is not part of the app and is not loaded by it; it ships alongside the code files.
 To add a release: raise APP_VERSION in js/01-data.js and CACHE_NAME in sw.js to the same number, then put a new entry at the top of this list.
 
+Version 1.344
+  - Word reports now look like the PDF: one clean sans-serif font (Arial) instead of Word's defaults, the same bold
+    title with the date at the right and the company name under it, round headings with the navy rule, light grey table
+    lines with small grey capital column headings, red and amber status text, the shaded Bill to box, the navy Total bar,
+    the bordered Paid / Payment due stamp, the letterhead, the schedule calendar with its navy day headings and coloured
+    chips, and page numbers in the footer. Page margins are about half an inch, like the PDF
+  - Share doc: the Word file is now handed to the share sheet on its own (previously it went with a title too, which can
+    hide "Open in Pages" and other apps that open documents on an iPhone or iPad)
+  - Annotate photo: the photo can now be zoomed. Pinch with two fingers (which also drags it around), or use the + / -
+    buttons and the fit button on the photo, or the mouse wheel on a computer. The new Pan tool drags it with one finger.
+    Drawing, text and moving marks still land in the right place when zoomed. The Delete selected button is now just Delete
+
 Version 1.343
   - Annotate photo: the photo now shrinks, keeping its shape, so the whole screen (photo, tools and buttons) fits the
     window without scrolling, and it refits if the device is rotated. The instruction text at the top is gone (the user
