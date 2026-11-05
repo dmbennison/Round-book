@@ -316,7 +316,7 @@ const FOCUSED_HELP = {
       helpP('Add photos from a customer’s Photos section. Tap a photo to open it, then pinch or double-tap to zoom and swipe for the next. Press and hold the photo to save it. Every photo is also in the <b>Photo gallery</b> (⋯ menu).'),
       helpList([
         'The <b>⋯</b> button at the top of the photo holds everything you can do with it: Annotate, Share, Send with an offer, Make a before &amp; after photo and Delete. The photo has the rest of the screen to itself.',
-        '<b>Annotate</b> – draw on the photo or add text. The original is kept.',
+        '<b>Annotate</b> – circle, point at or draw around anything worth flagging, or choose <b>Text</b> and tap where a label should go. Choose <b>Move</b> to drag any mark, then <b>Delete selected</b> to remove it. The photo is shown whole, fitted to the screen, and <b>Save as new photo</b> keeps the original untouched.',
         '<b>Make a before &amp; after photo</b> – pick two photos, then save or share the result.',
         '<b>Send with an offer</b> – adds an offer message to the photo. From a customer it opens Messages or WhatsApp straight to them with the message filled in; the photo is copied, so tap the message box and choose <b>Paste</b>. From the Photo gallery it opens the share sheet.'
       ])

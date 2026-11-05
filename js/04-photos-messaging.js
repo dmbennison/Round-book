@@ -48,9 +48,8 @@ function renderPhotoAnnotator(){
       <h2>Annotate photo</h2>
       <button class="sheet-close" onclick="cancelPhotoAnnotation()" aria-label="Close">✕</button>
     </div>
-    <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 10px; line-height:1.4;">Circle, point at or draw around anything worth flagging, or choose Text and tap where a label should go. Choose Move to drag any annotation into a new position. Saved as a new photo — the original is kept as-is.</p>
-    <div style="position:relative; background:#000; border-radius:12px; overflow:hidden; margin-bottom:12px;">
-      <canvas id="annotateCanvas" style="width:100%; display:block; touch-action:none;"></canvas>
+    <div style="position:relative; background:#000; border-radius:12px; overflow:hidden; margin-bottom:8px; display:flex; justify-content:center;">
+      <canvas id="annotateCanvas" style="max-width:100%; width:auto; height:auto; display:block; touch-action:none;"></canvas>
     </div>
     <div class="seg-row">
       <button class="seg-btn ${annotateTool==='circle'?'active':''}" onclick="setAnnotateTool('circle')">⭕ Circle</button>
@@ -62,7 +61,7 @@ function renderPhotoAnnotator(){
       <button class="seg-btn ${annotateTool==='move'?'active':''}" onclick="setAnnotateTool('move')">✋ Move</button>
       <button class="seg-btn" id="annDeleteSel" onclick="deleteSelectedAnnotation()">🗑 Delete selected</button>
     </div>
-    <div style="display:flex; gap:10px; align-items:center; margin:2px 2px 14px;">
+    <div style="display:flex; gap:10px; align-items:center; margin:2px 2px 10px;">
       ${ANNOTATE_COLORS.map(c=>`<button onclick="setAnnotateColor('${c}')" aria-label="Colour" style="width:30px; height:30px; border-radius:50%; background:${c}; border:3px solid ${annotateColor===c?'var(--ink)':'transparent'}; box-shadow:0 0 0 1px rgba(0,0,0,0.15); padding:0;"></button>`).join('')}
     </div>
     <div class="row2" style="margin-bottom:8px;">
@@ -185,7 +184,19 @@ function initAnnotateCanvas(){
   canvas.height = annotateImg.naturalHeight;
   redrawAnnotateCanvas();
   attachAnnotateCanvasEvents(canvas);
+  fitAnnotateCanvas();
 }
+// Sizes the photo so the whole annotate screen (photo, tools, buttons) fits the window with no scrolling: the photo is
+// shrunk, keeping its shape, by however much the screen would otherwise overflow.
+function fitAnnotateCanvas(){
+  const canvas = document.getElementById('annotateCanvas');
+  const sheet = canvas && canvas.closest('.sheet');
+  if(!sheet) return;
+  canvas.style.maxHeight = 'none';
+  const overflow = sheet.scrollHeight - sheet.clientHeight;
+  if(overflow > 0) canvas.style.maxHeight = Math.max(120, Math.floor(canvas.getBoundingClientRect().height - overflow - 2)) + 'px';
+}
+window.addEventListener('resize', () => { if(document.getElementById('annotateCanvas')) fitAnnotateCanvas(); }); // rotating the device
 function annotateLineWidth(canvasWidth){
   // Scales with the photo's own resolution so the line reads clearly whether
   // it's a small compressed photo or a large one, rather than a fixed pixel
