@@ -4,6 +4,13 @@ ROUND BOOK - RELEASE NOTES
 Newest first. This file is not part of the app and is not loaded by it; it ships alongside the code files.
 To add a release: raise APP_VERSION in js/01-data.js and CACHE_NAME in sw.js to the same number, then put a new entry at the top of this list.
 
+Version 1.348
+  - Imported customers: in the "Needs review (imported)" round, tapping a customer now goes straight to the Edit
+    customer screen (instead of the quick info box), so each can be checked and fixed in turn
+  - Delete a whole round: a round's ⋯ menu has Delete round... It asks first (saying how many customers go with it, and
+    that their history goes too), takes a safety copy, deletes the round, its customers and its note, and shows the red
+    Undo bar, which puts everyone back where they were
+
 Version 1.347
   - Sort quotes: a new sort button at the top of the Quotes list (needs attention first - the old order and still the
     default, newest, oldest, highest value, lowest value, name / address A-Z, status). The choice is remembered on the
