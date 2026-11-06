@@ -4,6 +4,20 @@ ROUND BOOK - RELEASE NOTES
 Newest first. This file is not part of the app and is not loaded by it; it ships alongside the code files.
 To add a release: raise APP_VERSION in js/01-data.js and CACHE_NAME in sw.js to the same number, then put a new entry at the top of this list.
 
+Version 1.347
+  - Sort quotes: a new sort button at the top of the Quotes list (needs attention first - the old order and still the
+    default, newest, oldest, highest value, lowest value, name / address A-Z, status). The choice is remembered on the
+    device and the list says how it is sorted
+  - Quotes are deleted automatically 3 months after the date they were quoted (any status, a safety copy is taken first,
+    checked when the app opens and once a day). The date it will go is shown on the quote. Settings > Privacy has
+    "Quotes: delete after 3 months / Keep quotes". Quotes already older than 3 months go the first time it runs
+  - Consistency: every pop-up in the Schedule now has the same heading as the rest of the app (title with the round ✕ at
+    the right), closes when you tap outside it, and no longer has its own Done / Cancel buttons (the ✕ closes, and form
+    pop-ups have just their action button). Text boxes in the Schedule pop-ups, the message box and the export password
+    box now use the app's standard text box style instead of their own
+  - Tidy-up: removed two unused Word-export imports. A scan of every function, variable, style and import found nothing
+    else that is unused
+
 Version 1.346
   - Share doc, Pages: the "Round Cleaning Dates" report was being written as plain tab-separated lines (so no lines, and
     the columns wandered). It is now a real table like every other report, with the same lines, headings and alignment
