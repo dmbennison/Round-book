@@ -373,24 +373,56 @@ function deleteJob(id){
 }
 
 /* ---------- quotes ---------- */
+// How the Quotes list is ordered. Remembered on this device (like the schedule zoom).
+const QUOTE_SORT_KEY = 'roundBookQuoteSort';
+const QUOTE_SORTS = [
+  ['attention', 'Needs attention first'], ['newest', 'Newest first'], ['oldest', 'Oldest first'],
+  ['value-high', 'Highest value first'], ['value-low', 'Lowest value first'], ['name', 'Name / address A–Z'], ['status', 'Status']
+];
+function quoteSortKey(){
+  let k = null;
+  try{ k = localStorage.getItem(QUOTE_SORT_KEY); }catch(e){}
+  return QUOTE_SORTS.some(s => s[0] === k) ? k : 'attention';
+}
+function setQuoteSort(k){
+  try{ localStorage.setItem(QUOTE_SORT_KEY, k); }catch(e){}
+  render();
+}
+function openQuoteSortMenu(anchor){
+  const cur = quoteSortKey();
+  openDropdown(anchor, QUOTE_SORTS.map(([k, label]) => ({ label, hint: k === cur ? '✓' : '', run: () => setQuoteSort(k) })), 'Sort quotes');
+}
+function sortQuotes(list, key){
+  const today = todayISO();
+  const date = q => q.date || '', value = q => Number(q.price || 0), name = q => (q.address || q.name || '');
+  const newest = (a, b) => date(b).localeCompare(date(a));
+  const statusRank = q => q.status === 'pending' ? (quoteNeedsFollowUp(q, today) ? 0 : 1) : q.status === 'accepted' ? 2 : q.status === 'converted' ? 3 : 4;
+  const by = {
+    attention: (a, b) => {
+      const ra = statusRank(a) > 1 ? 2 : statusRank(a), rb = statusRank(b) > 1 ? 2 : statusRank(b);
+      if(ra !== rb) return ra - rb;
+      return ra <= 1 ? date(a).localeCompare(date(b)) : newest(a, b); // waiting quotes oldest first, the rest newest first
+    },
+    newest, oldest: (a, b) => date(a).localeCompare(date(b)),
+    'value-high': (a, b) => value(b) - value(a) || newest(a, b), 'value-low': (a, b) => value(a) - value(b) || newest(a, b),
+    name: (a, b) => name(a).localeCompare(name(b), undefined, { numeric: true }) || newest(a, b),
+    status: (a, b) => statusRank(a) - statusRank(b) || newest(a, b)
+  };
+  return list.slice().sort(by[key] || by.attention);
+}
 function renderQuotes(main){
   let html = '';
   html += `<div style="display:flex; align-items:center; justify-content:flex-end; gap:8px; margin-bottom:8px;">
     ${mainScreenHelpBtn('quotes', "()=>setTab('quotes')")}
+    <button class="btn-open icon-plain" style="width:38px; height:38px; padding:0;" onclick="openQuoteSortMenu(this)" aria-label="Sort quotes" aria-haspopup="menu">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M6 12h12M10 18h4"/></svg>
+    </button>
     <button class="btn-open icon-plain" style="width:38px; height:38px; padding:0;" onclick="printQuotes()" aria-label="Print report">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
     </button>
   </div>`;
-  const todayForSort = todayISO();
-  const quotes = (data.quotes || [])
-    .slice()
-    .sort((a,b)=>{
-      const rank = q => q.status!=='pending' ? 2 : (quoteNeedsFollowUp(q, todayForSort) ? 0 : 1);
-      const ra = rank(a), rb = rank(b);
-      if(ra !== rb) return ra - rb;
-      if(ra <= 1) return (a.date||'').localeCompare(b.date||'');
-      return (b.date||'').localeCompare(a.date||'');
-    });
+  const sortKey = quoteSortKey();
+  const quotes = sortQuotes(data.quotes || [], sortKey);
   if(!quotes.length){
     html += `<div class="empty">
       <svg viewBox="0 0 24 24" fill="none" stroke="#66798A" stroke-width="1.6"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
@@ -400,7 +432,7 @@ function renderQuotes(main){
     main.innerHTML = html;
     return;
   }
-  html += `<div class="section-label">${quotes.length} quote${quotes.length===1?'':'s'}</div>`;
+  html += `<div class="section-label">${quotes.length} quote${quotes.length===1?'':'s'} <span style="text-transform:none; letter-spacing:0; font-weight:600; color:var(--ink-muted);">· ${escapeHtml(QUOTE_SORTS.find(x => x[0] === sortKey)[1].toLowerCase())}</span></div>`;
   html += quotes.map(quoteCardHtml).join('');
   const quotesTotal = quotes.reduce((sum,q)=>sum+Number(q.price||0),0);
   html += listTotalHtml(`${quotes.length} quote${quotes.length===1?'':'s'} · ${money(quotesTotal)}`);
@@ -537,7 +569,7 @@ function openQuoteDetail(id){
       <div>
         <div style="font-size:0.6875rem; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-muted);">Quoted price</div>
         <div style="font-size:1.75rem; font-weight:800; color:var(--emphasis); line-height:1.15;">${money(q.price)}</div>
-        <div style="font-size:0.75rem; color:var(--ink-muted); margin-top:2px;">Quoted ${fmtDate(q.date)}</div>
+        <div style="font-size:0.75rem; color:var(--ink-muted); margin-top:2px;">Quoted ${fmtDate(q.date)}${(typeof quoteExpiryOn === 'function' && quoteExpiryOn() && q.date) ? ` · removed ${fmtDate(quoteExpiryDate(q))}` : ''}</div>
       </div>
       <div style="text-align:right; display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
         ${quoteStatusBadge(q)}

@@ -7,7 +7,8 @@
       password-protected too (standard PDF encryption, which is weaker but opens in any PDF reader).
    2. Export a customer's data (Customer > Actions > Export their data): everything held about them as a readable PDF
       and/or a portable data file, for a subject access request.
-   3. Automatic deletion after 2 years of inactivity. Customers, and one-off jobs and quotes that belong to no customer,
+   3. Quotes are deleted automatically 3 months after the date they were quoted (quoteExpiryRun, below).
+   4. Automatic deletion after 2 years of inactivity. Customers, and one-off jobs and quotes that belong to no customer,
       that have had no activity for 2 years are deleted, after a 30-day warning on Today that lets you keep them. Anyone who
       still owes money is never deleted. Tax records are kept separately by you and are not part of this. */
 
@@ -121,7 +122,7 @@ function openCustomerExport(id){
     </div>
     <p id="cxFormatNote" style="color:var(--ink-muted); font-size:0.75rem; line-height:1.5; margin:4px 2px 14px;"></p>
     <div class="section-label">Password <span style="text-transform:none; font-weight:500; opacity:0.7;">(optional)</span></div>
-    <input type="password" id="cx_pw" autocomplete="new-password" placeholder="Leave blank for no password" style="width:100%; box-sizing:border-box; padding:12px; border:1.5px solid var(--line); border-radius:12px; font:inherit; font-size:1rem; background:var(--surface); color:var(--ink);">
+    <input type="password" id="cx_pw" autocomplete="new-password" placeholder="Leave blank for no password">
     <p id="cxPwNote" style="color:var(--ink-muted); font-size:0.75rem; line-height:1.5; margin:4px 2px 14px;"></p>
     <button class="btn-primary" style="width:100%;" onclick="cxRun('${id}')">Export</button>
     ${photos ? `<p style="color:var(--ink-muted); font-size:0.75rem; line-height:1.5; margin:10px 2px 0;">${photos} photo${photos === 1 ? ' is' : 's are'} held for this customer. They are included in the data file; the PDF just says how many there are.</p>` : ''}
@@ -249,7 +250,43 @@ async function cxBuildPdf(c, password){
 }
 
 /* ===================================================================
-   3. Automatic deletion after 2 years of inactivity
+   3. Quotes expire after 3 months
+   =================================================================== */
+const QUOTE_KEEP_MONTHS = 3;
+function quoteExpiryOn(){ return !(data && data.settings && data.settings.autoDeleteQuotes === false); }
+// The date after which a quote is deleted: 3 months after it was quoted.
+function quoteExpiryDate(q){
+  const d = new Date(q.date + 'T12:00:00Z');
+  d.setUTCMonth(d.getUTCMonth() + QUOTE_KEEP_MONTHS);
+  return d.toISOString().slice(0, 10);
+}
+async function quoteExpiryRun(){
+  if(!data || !data.settings || !quoteExpiryOn()) return;
+  const today = todayISO();
+  const gone = (data.quotes || []).filter(q => q.date && quoteExpiryDate(q) < today);
+  if(!gone.length) return;
+  try{ await takeSafetyCopy('Before automatically deleting quotes older than 3 months'); }catch(e){}
+  const set = new Set(gone);
+  data.quotes = data.quotes.filter(q => !set.has(q));
+  saveData();
+  try{ await cleanupOrphanedPhotos(); }catch(e){}
+  render();
+  toast(`Deleted ${gone.length} quote${gone.length === 1 ? '' : 's'} older than 3 months`);
+}
+function setQuoteExpiry(on){
+  data.settings.autoDeleteQuotes = !!on;
+  saveData();
+  openSettings();
+  if(on) quoteExpiryRun();
+}
+// Both tidy-ups, run when the app opens and once a day after that.
+async function privacyDailyRun(){
+  await quoteExpiryRun();
+  await retentionRun();
+}
+
+/* ===================================================================
+   4. Automatic deletion after 2 years of inactivity
    =================================================================== */
 const RETENTION_DAYS = 730;      // 2 years
 const RETENTION_WARN_DAYS = 30;  // how long you're warned (and can keep them) before anything is deleted
@@ -386,7 +423,12 @@ function retentionSettingsHtml(){
       <button class="seg-btn ${retentionOn() ? '' : 'active'}" onclick="setRetention(false)">Keep everything</button>
     </div>
     <p style="color:var(--ink-muted); font-size:0.75rem; margin:4px 2px ${n ? '8px' : '16px'}; line-height:1.5;">When on, customers (and one-off jobs and quotes that belong to no customer) with <b>no activity for 2 years</b> are deleted, after a 30-day warning on Today where you can keep them. Anyone who still owes money is never deleted. Your tax records are kept separately and aren\u2019t touched. A safety copy is taken first.</p>
-    ${n ? `<button class="btn" style="width:100%; background:var(--amber-dim); color:var(--ink); margin:0 0 16px;" onclick="openRetentionReview()">\u23f3 ${n} waiting for deletion \u2014 review</button>` : ''}`;
+    ${n ? `<button class="btn" style="width:100%; background:var(--amber-dim); color:var(--ink); margin:0 0 16px;" onclick="openRetentionReview()">\u23f3 ${n} waiting for deletion \u2014 review</button>` : ''}
+    <div class="seg-row">
+      <button class="seg-btn ${quoteExpiryOn() ? 'active' : ''}" onclick="setQuoteExpiry(true)">Quotes: delete after 3 months</button>
+      <button class="seg-btn ${quoteExpiryOn() ? '' : 'active'}" onclick="setQuoteExpiry(false)">Keep quotes</button>
+    </div>
+    <p style="color:var(--ink-muted); font-size:0.75rem; margin:4px 2px 16px; line-height:1.5;">Each quote is deleted 3 months after the date it was quoted, whatever its status, with a safety copy taken first. Its date to be removed is shown on the quote.</p>`;
 }
 // Check once a day (the app can stay open for days on a phone).
 document.addEventListener('visibilitychange', () => {
@@ -394,5 +436,5 @@ document.addEventListener('visibilitychange', () => {
   const day = todayISO();
   if(retentionLastRunDay === day) return;
   retentionLastRunDay = day;
-  retentionRun();
+  privacyDailyRun();
 });

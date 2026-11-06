@@ -249,7 +249,6 @@ function seHistOpen(iso){
     <p class="se-note">${sePlural(dd.count, 'clean')}${dd.value > 0 ? ' · ' + money(dd.value) : ''}. This is a record of what was done, so it can’t be moved.</p>
     ${names.map(n => `<label>${escapeHtml(n)} (${dd.rounds[n].rows.length})</label><ul class="se-review">${dd.rounds[n].rows.map(row).join('')}</ul>`).join('')}
     ${dd.jobs.length ? `<label>🔧 One-off jobs (${dd.jobs.length})</label><ul class="se-review">${dd.jobs.map(row).join('')}</ul>` : ''}
-    <div class="se-btn-row"><button class="se-btn primary" onclick="seCloseModal()">Done</button></div>
   `);
 }
 
@@ -683,7 +682,10 @@ function seBind(){
 /* ---------- dialogs ---------- */
 function seModal(html){
   const { modal, card } = seEls();
+  // The same heading as every other window: the title, and the round ✕ at the right (see openSheet).
+  html = html.replace(/<h3>([\s\S]*?)<\/h3>/, '<div class="sheet-head"><h2>$1</h2><button class="sheet-close" onclick="seCloseModal()" aria-label="Close">\u2715</button></div>');
   card.innerHTML = html; card.scrollTop = 0;
+  if(!modal.dataset.bound){ modal.dataset.bound = '1'; modal.addEventListener('click', e => { if(e.target === modal) seCloseModal(); }); } // tapping outside closes it, like a sheet
   // A dialog with a box to type in (or a date picker) opens at the top and tracks the visible area, so the
   // keyboard can't cover it — the same rule the sheets follow (see trackKeyboardFit in 03-customers.js).
   const typing = !!card.querySelector(SHEET_TEXT_ENTRY);
@@ -702,7 +704,6 @@ function seHelpOpen(){
   seModal(`
     <h3>Schedule help</h3>
     ${FOCUSED_HELP.schedule.body().join('')}
-    <div class="se-btn-row"><button class="se-btn primary" onclick="seCloseModal()">Done</button></div>
   `);
 }
 function seModalOpen(){ const { modal } = seEls(); return !!modal && modal.classList.contains('show'); }
@@ -727,7 +728,7 @@ function sePushBackOpen(){
       ${[1,2,3,4,5].map(n => `<option value="${n}">${n} working day${n === 1 ? '' : 's'}</option>`).join('')}
     </select>
     <div class="se-preview" id="sePbPreview"></div>
-    <div class="se-btn-row"><button class="se-btn" onclick="seCloseModal()">Cancel</button><button class="se-btn primary" onclick="sePushBackApply()">☔ Push back</button></div>
+    <div class="se-btn-row"><button class="se-btn primary" onclick="sePushBackApply()">☔ Push back</button></div>
   `);
   sePushBackPreview();
 }
@@ -782,7 +783,7 @@ function seSplitOpen(){
     </div>
     <label>Move ticked customers to</label>
     <input type="date" id="seSplitDate" value="${def}" min="${se.todayStr}">
-    <div class="se-btn-row"><button class="se-btn" onclick="seCloseModal()">Cancel</button><button class="se-btn primary" onclick="seSplitApply()">Move ticked</button></div>
+    <div class="se-btn-row"><button class="se-btn primary" onclick="seSplitApply()">Move ticked</button></div>
   `);
 }
 function seSplitTick(on){ document.querySelectorAll('.seSplitChk').forEach(c => { c.checked = on; }); }
@@ -822,7 +823,7 @@ function seAddJobOpen(){
     <label>Date</label><input type="date" id="seJobDate" value="${def}" min="${se.todayStr}">
     <input type="hidden" id="seJobCustId" value=""><input type="hidden" id="seJobPhone" value="">
     <p class="se-note">The job is added to One-off jobs when you Commit. Open it there later to add the phone number, photos and reminders.</p>
-    <div class="se-btn-row"><button class="se-btn" onclick="seCloseModal()">Cancel</button><button class="se-btn primary" onclick="seAddJobApply()">Add job</button></div>
+    <div class="se-btn-row"><button class="se-btn primary" onclick="seAddJobApply()">Add job</button></div>
   `);
 }
 function seJobFill(id){
@@ -874,7 +875,7 @@ function seNoteOpen(iso){
     <p class="se-note">A reminder for the day — it shows on the calendar and on Today once you Commit.</p>
     <textarea id="seNoteText" maxlength="300" placeholder="e.g. Dentist at 2 — finish by 1pm">${escapeHtml(cur)}</textarea>
     <div class="se-btn-row">
-      ${cur ? `<button class="se-btn danger" onclick="seNoteApply('${iso}', true)">Remove note</button>` : `<button class="se-btn" onclick="seCloseModal()">Cancel</button>`}
+      ${cur ? `<button class="se-btn danger" onclick="seNoteApply('${iso}', true)">Remove note</button>` : ''}
       <button class="se-btn primary" onclick="seNoteApply('${iso}', false)">Save note</button>
     </div>
   `);
@@ -905,7 +906,7 @@ function seDaysOffHtml(){
     <div class="se-range"><div><span class="se-opt">From</span><input type="date" id="seOffFrom" value="${def}" min="${se.todayStr}"></div><div><span class="se-opt">To <i>(optional)</i></span><input type="date" id="seOffTo" min="${se.todayStr}"></div></div>
     <button class="se-btn" style="width:100%; margin-top:8px;" onclick="seMarkOff()">🚫 Mark as off</button>
     ${up.length ? `<label>Marked off</label><div class="se-chips-off">${up.map(d => `<span class="se-offchip">${seFmtDay(d)}<button onclick="seUnblock('${d}')" aria-label="Make ${seFmtDay(d)} a working day">✕</button></span>`).join('')}</div>` : ''}
-    <div class="se-btn-row"><button class="se-btn primary" onclick="seCloseModal()">Done</button></div>`;
+`;
 }
 function seDaysOffOpen(){ if(se) seModal(seDaysOffHtml()); }
 function seToggleWeekday(d){

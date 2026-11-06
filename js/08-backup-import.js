@@ -329,6 +329,8 @@ const FOCUSED_HELP = {
       helpList([
         'Open a quote and tap <b>Actions</b> to send it, print it, follow it up, or turn it into a customer or a one-off job. Pending, Accepted and Declined stay on the screen so you can change the status in one tap.',
         '<b>Swipe right</b> to accept, <b>left</b> to decline.',
+        'The sort button at the top (three lines) changes the order: <b>needs attention first</b> (the default), newest, oldest, highest or lowest value, name / address, or status. It is remembered on this device.',
+        'A quote is <b>deleted automatically 3 months after the date it was quoted</b>, whatever its status (the date it goes is shown on the quote). A safety copy is taken first. <b>Settings &gt; Privacy</b> turns this off.',
         'Quotes waiting for a follow-up are flagged and listed first in the Quotes list (and counted on the iPad / computer Today dashboard).'
       ])
     ]

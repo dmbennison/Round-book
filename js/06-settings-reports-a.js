@@ -1731,7 +1731,7 @@ const DOCX_PAGE_WIDTH = 11906 - DOCX_MARGIN * 2; // usable width on A4
 // Turns the report's HTML (the same markup the PDF is drawn from) into Word paragraphs and tables, copying the PDF's look:
 // the same colours, rules, shaded boxes and table styling, in one clean sans-serif font.
 function htmlToDocxElements(bodyHtml){
-  const { Paragraph, TextRun, Table, TableRow, TableCell, WidthType, ImageRun, TableLayoutType, AlignmentType, BorderStyle, Tab, TabStopType, ShadingType, HeightRule, VerticalAlign, PageBreak } = docx;
+  const { Paragraph, TextRun, Table, TableRow, TableCell, WidthType, ImageRun, TableLayoutType, AlignmentType, BorderStyle, ShadingType, HeightRule, VerticalAlign, PageBreak } = docx;
   const parsed = new DOMParser().parseFromString(`<div>${bodyHtml}</div>`, 'text/html');
   const root = parsed.body.firstElementChild;
   const elements = [];
