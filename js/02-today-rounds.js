@@ -1677,8 +1677,31 @@ function openRoundActionsMenu(rn, anchor){
     {label: 'Defer…', run: () => openDeferSheet('round', rn, anchor)},
     {label: 'Apply price uplift…', run: () => openRoundUpliftSheet(rn)},
     '-',
+    {label: 'Delete round…', danger: true, run: () => deleteRound(rn)},
+    '-',
     {label: 'Help', run: () => openFocusedHelp('rounds', () => render())}
   ], rn);
+}
+// Deletes a round and every customer in it (with their history). A safety copy is taken first, and the red bar that
+// follows has Undo, which puts the customers back where they were.
+function deleteRound(rn){
+  const members = [];
+  data.customers.forEach((c, i) => { if((c.round || 'Unassigned') === rn) members.push({ c, i }); });
+  const n = members.length;
+  appConfirm(`Delete the round "${rn}" and its ${n} customer${n === 1 ? '' : 's'}? This removes all their history too. You can undo it straight afterwards.`, {
+    title: 'Delete round', confirmLabel: 'Delete round',
+    onConfirm: async () => {
+      try{ await takeSafetyCopy(`Before deleting the round ${rn}`); }catch(e){}
+      const note = getRoundNote(rn);
+      const gone = new Set(members.map(m => m.c));
+      data.customers = data.customers.filter(c => !gone.has(c));
+      if(data.settings.roundNotes) delete data.settings.roundNotes[rn];
+      saveData();
+      currentRound = null; reorderMode = false;
+      render();
+      recordLastAction('round', { name: rn, note, members }, 0, `round ${rn} (${n} customer${n === 1 ? '' : 's'})`);
+    }
+  });
 }
 
 /* ---------- round notes ----------
@@ -1911,7 +1934,7 @@ function custCardHtml(c, mode, opts){
     <div class="swipe-bg swipe-bg-left">✓ Cleaned</div>
     <div class="swipe-bg swipe-bg-right">💷 Paid</div>
     <div class="cust-card" data-id="${c.id}" data-kind="customer">
-      <div class="cust-top" onclick="openCustomerInfoBox('${c.id}')">
+      <div class="cust-top" onclick="${(c.round || 'Unassigned') === IMPORT_HOLDING_ROUND ? `openCustomerEdit('${c.id}')` : `openCustomerInfoBox('${c.id}')`}">
         <div>
           <div class="cust-addr" style="font-size:1rem; font-weight:800; color:var(--ink);">${escapeHtml(c.address||'No address')}</div>
           ${(c.name||c.phone) ? `<div class="cust-name" style="font-size:0.8125rem; font-weight:600; color:var(--ink-muted); margin-top:2px;">${[escapeHtml(c.name||''), c.phone?escapeHtml(c.phone):''].filter(Boolean).join(' · ')}</div>` : ''}

@@ -7,7 +7,7 @@ const STORE_KEY = 'roundBookData_v1';
 // bump by 0.001 for every change. formatVersion always renders it to exactly three decimals.
 // Earlier releases were numbered 3.xx (the last was 3.38), so versionRank() maps those onto the same scale
 // (3.38 -> 1.338) and the two kinds can still be compared when a device that has not updated yet syncs.
-const APP_VERSION = 1.347;
+const APP_VERSION = 1.348;
 function formatVersion(v){ return Number(v).toFixed(3); }
 function versionRank(v){ v = Number(v) || 0; return v >= 2 ? 1.3 + (v - 3) / 10 : v; }
 function versionNewerThanMine(v){ return versionRank(v) - versionRank(APP_VERSION) > 0.0004; }
@@ -1239,6 +1239,10 @@ function undoLastAction(){
   if(!lastAction) return;
   const { kind, item, index } = lastAction;
   if(kind === 'customer') data.customers.splice(Math.min(index, data.customers.length), 0, item);
+  else if(kind === 'round'){
+    item.members.slice().sort((a, b) => a.i - b.i).forEach(m => data.customers.splice(Math.min(m.i, data.customers.length), 0, m.c));
+    if(item.note){ data.settings.roundNotes = data.settings.roundNotes || {}; data.settings.roundNotes[item.name] = item.note; }
+  }
   else if(kind === 'job') data.oneOffJobs.splice(Math.min(index, data.oneOffJobs.length), 0, item);
   else if(kind === 'quote') data.quotes.splice(Math.min(index, data.quotes.length), 0, item);
   lastAction = null;

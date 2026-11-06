@@ -178,6 +178,11 @@ function propertyDetailsOf(obj){
   };
 }
 
+// Tapping a customer in the imported "needs review" round goes straight here: they all need their details checking.
+function openCustomerEdit(id){
+  const c = data.customers.find(x => x.id === id);
+  if(c) openCustomerForm(c);
+}
 function openCustomerForm(existing){
   const c = existing || {};
   const rounds = [...new Set(data.customers.map(x=>x.round).filter(Boolean))];
