@@ -349,7 +349,7 @@
   .cust-section .cust-section-body{padding:2px 14px 14px;}
   .cust-section .cust-section-body > *:first-child{margin-top:0;}
 
-  #importFile, #importSpreadsheetFile, #syncFile{display:none;}
+  #importFile, #importSpreadsheetFile{display:none;}
   .toast{
     position:fixed; bottom:calc(var(--tabbar-h, 64px) + 16px); left:50%; transform:translateX(-50%); background:var(--navy-dark); color:#fff;
     padding:11px 18px; border-radius:24px; font-size:0.8438rem; font-weight:var(--fw-bold); z-index:60; opacity:0; transition:opacity .2s;
@@ -1001,7 +1001,7 @@
     }
     html, body{ overflow:visible !important; height:auto !important; }
     #appScroll{ position:static !important; overflow:visible !important; width:auto !important; }
-    header, .tabs, #lastActionBanner, #marketingFollowUpBanner, #jobAnniversaryBanner, #importReviewBanner, main, .fab, .overlay, .report-preview, .sched-editor, .pane-divider, .ctx-menu, #importFile, #importSpreadsheetFile, #syncFile, .toast{
+    header, .tabs, #lastActionBanner, #marketingFollowUpBanner, #jobAnniversaryBanner, #importReviewBanner, main, .fab, .overlay, .report-preview, .sched-editor, .pane-divider, .ctx-menu, #importFile, #importSpreadsheetFile, .toast{
       display:none !important;
     }
     body{ padding-top:0 !important; padding-bottom:0 !important; min-height:0 !important; }
@@ -1189,7 +1189,6 @@
 </div>
 
 <input type="file" id="importFile" accept="application/json">
-<input type="file" id="syncFile" multiple>
 <input type="file" id="importSpreadsheetFile" accept=".csv,.xlsx,.xls,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
 <div class="toast" id="toast"></div>
 <div class="print-area" id="printArea"></div>

@@ -4,6 +4,14 @@ ROUND BOOK - RELEASE NOTES
 Newest first. This file is not part of the app and is not loaded by it; it ships alongside the code files.
 To add a release: raise APP_VERSION in js/01-data.js and CACHE_NAME in sw.js to the same number, then put a new entry at the top of this list.
 
+Version 1.349
+  - Removed sync by file / AirDrop (Send to other device, Receive from other device, Forget pairing, and the file picker
+    behind them). Live sync and password-protected backups cover it. The sync screen is now just Live sync, and its menu
+    entries are labelled Live sync. Live sync itself is unchanged: it keeps the same encryption and merging, which are
+    shared with the code that was kept. To move data between devices without live sync, export a password-protected
+    backup, send it across and restore it. About 280 lines of code went, along with the hidden file picker
+  - User guide updated to match (Using two devices)
+
 Version 1.348
   - Imported customers: in the "Needs review (imported)" round, tapping a customer now goes straight to the Edit
     customer screen (instead of the quick info box), so each can be checked and fixed in turn
