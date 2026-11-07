@@ -367,12 +367,12 @@ const FOCUSED_HELP = {
   sync: {
     title: 'Using two devices',
     body: () => [
-      helpP('To keep a phone and an iPad in step, open <b>Backup → Sync</b>.'),
+      helpP('To keep a phone, an iPad and a computer in step, open <b>Backup → Live sync</b>.'),
       helpList([
         '<b>Live sync</b> – on the first device tap <b>Set up live sync</b> and choose a passphrase. On the second tap <b>Join live sync</b> and enter the same passphrase. Changes then arrive within a minute while the app is open.',
         '<b>Set up on the device that has your up-to-date data.</b> The device that joins is replaced by it.',
         'If both devices change the same detail, you are shown both versions and tap the one to keep.',
-        '<b>Sync by file</b> (no internet) – tap <b>Send to other device</b>, AirDrop the file across, then tap <b>Receive from other device</b> on the other.'
+        'To move everything across <b>without</b> live sync, use a <b>password-protected backup</b>: export it on one device (Backup &gt; Export password-protected backup), send it over (AirDrop, Messages or Files) and restore it on the other.'
       ])
     ]
   },
@@ -482,7 +482,7 @@ async function openBackupDropdown(anchor){
     '-',
     {label: 'Export backup', hint: count + (count === 1 ? ' customer' : ' customers'), run: () => exportData()},
     {label: 'Export password-protected backup…', run: () => exportData(true)},
-    {label: 'Sync with another device…', run: () => openSyncSheet()},
+    {label: 'Live sync…', run: () => openSyncSheet()},
     {label: 'Safety copies', hint: String(safetyCount), run: () => openSafetyCopies()},
     '-',
     {label: 'Export as Excel', run: () => exportExcel()},
@@ -553,7 +553,7 @@ async function openBackup(anchor){
     </button>
     <button class="backup-btn" onclick="openSyncSheet()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg>
-      <div><div class="t1">Sync with another device</div><div class="t2">Encrypted file via AirDrop — merges changes both ways</div></div>
+      <div><div class="t1">Live sync</div><div class="t2">Keeps your phone, iPad and computer up to date, encrypted</div></div>
     </button>
     <button class="backup-btn" onclick="openSafetyCopies()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>

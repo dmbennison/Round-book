@@ -1,18 +1,16 @@
-/* 08b-sync.js -- Sync between two of your own devices (e.g. phone <-> iPad) with no server.
-   One device builds an ENCRYPTED file (AirDrop / Messages / Files), the other receives it and
-   MERGES it with what it already has. Photos travel in extra encrypted files alongside it.
+/* 08b-sync.js -- the engine behind live sync (08c-live-sync.js): the encryption, the three-way merge and the photo
+   bookkeeping, plus the Live sync screen. (There used to be a send-a-file / receive-a-file version of sync for AirDrop;
+   live sync and password-protected backups replaced it.)
    Part of Round Book's split JS bundle; loaded in numeric order from index.html.
 
-   How the merge works (three-way): each device remembers the last file it received from the
-   other one (the "base"). On the next receive it compares base / this device / the incoming file:
+   How the merge works (three-way): each device remembers the last state it received from the other one (the "base").
+   On the next sync it compares base / this device / the incoming data:
      - only one side changed something  -> take that change
      - both changed different things    -> keep both
-     - both changed the SAME field      -> a clash: file sync picks one automatically (the same one
-                                           on both devices); live sync asks the person (see 08c-live-sync.js)
+     - both changed the SAME field      -> a clash: live sync asks the person (see 08c-live-sync.js)
      - lists inside a customer (cleans, payments, messages...) are merged entry by entry, so
        a clean marked on the phone and a note typed on the iPad both survive.
-   A safety copy is always taken first, and the person sees a summary and confirms before
-   anything changes. */
+   A safety copy is always taken first. */
 
 /* ---------- storage for the sync passphrase key + merge base ----------
    Kept in its OWN IndexedDB database so it never ends up in backups or exports. */
@@ -312,13 +310,7 @@ function syncSummaryText(res){
 }
 
 /* ---------- photos ----------
-   The pictures live in their own IndexedDB store, so they travel in separate encrypted
-   files (about 8 MB each) next to the data file. Only photos the other device doesn't
-   already have are sent: each file lists the photos its sender holds, so after a
-   round trip nothing is sent twice. A send is capped (~40 MB) to keep the phone's
-   memory happy; anything left over goes next time. */
-const SYNC_PHOTO_PART_BYTES = 8 * 1024 * 1024;
-const SYNC_PHOTO_SEND_BYTES = 40 * 1024 * 1024;
+   The pictures live in their own IndexedDB store, apart from the data. */
 function syncPhotoRefs(){
   const out = [];
   (data.customers||[]).forEach(c => (c.photos||[]).forEach(p => { if(p && p.id) out.push(p); }));
@@ -331,45 +323,7 @@ function syncHeldPhotoIds(){
   syncPhotoRefs().forEach(p => { if(photoUrlCache.has(p.id)) seen.add(p.id); });
   return Array.from(seen);
 }
-function syncMissingPhotoCount(){
-  const missing = new Set();
-  syncPhotoRefs().forEach(p => { if(!photoUrlCache.has(p.id)) missing.add(p.id); });
-  return missing.size;
-}
-function syncPhotosToSend(meta){
-  const peerHas = new Set(meta.peerPhotoIds || []);
-  const sent = meta.sentPhotos || {};
-  const heardSince = meta.lastPeerFileAt || 0;
-  const dateOf = new Map();
-  syncPhotoRefs().forEach(p => dateOf.set(p.id, p.date || ''));
-  return syncHeldPhotoIds()
-    // never sent, or sent but the other device has written back since and still doesn't list it
-    .filter(id => !peerHas.has(id) && (!sent[id] || heardSince > sent[id]))
-    .sort((a,b) => String(dateOf.get(b)).localeCompare(String(dateOf.get(a)))); // newest first
-}
-async function syncBuildPhotoFiles(ids, key, salt, header, stamp){
-  const parts = [], sentIds = [];
-  let part = [], partBytes = 0, total = 0, i = 0;
-  const flush = () => { if(part.length){ parts.push(part); part = []; partBytes = 0; } };
-  for(; i < ids.length && total < SYNC_PHOTO_SEND_BYTES; i++){
-    if(i % 5 === 0) toast(`Preparing photos… ${i} of ${ids.length}`);
-    let blob = null;
-    try{ blob = await idbGetPhoto(ids[i]); }catch(e){}
-    if(!blob) continue;
-    part.push({id: ids[i], type: blob.type || 'image/jpeg', b64: syncB64(new Uint8Array(await blob.arrayBuffer()))});
-    sentIds.push(ids[i]);
-    partBytes += blob.size; total += blob.size;
-    if(partBytes >= SYNC_PHOTO_PART_BYTES) flush();
-  }
-  flush();
-  const items = [];
-  for(let p = 0; p < parts.length; p++){
-    const payload = Object.assign({}, header, {kind:'photos', part:p+1, parts:parts.length, photos:parts[p]});
-    items.push({text: await syncEncrypt(payload, key, salt, {compress:false}), filename: `round-book-sync-${stamp}-photos-${p+1}of${parts.length}.json`, mime:'application/json'});
-  }
-  return {items, sentIds, remaining: ids.length - i};
-}
-// Stores photos received in sync files. Protected from the orphan clean-up for two
+// Stores photos received from the other device. Protected from the orphan clean-up for two
 // weeks (meta.pendingPhotos) until a merged customer or job refers to them.
 async function syncStoreReceivedPhotos(photoPayloads, meta){
   let stored = 0;
@@ -389,14 +343,7 @@ async function syncStoreReceivedPhotos(photoPayloads, meta){
   meta.pendingPhotos = pending;
   return stored;
 }
-function syncPrunePending(meta){
-  const referenced = new Set(syncPhotoRefs().map(p => p.id));
-  const pending = {};
-  Object.keys(meta.pendingPhotos || {}).forEach(id => { if(!referenced.has(id)) pending[id] = meta.pendingPhotos[id]; });
-  meta.pendingPhotos = pending;
-}
-
-/* ---------- sending ---------- */
+/* ---------- passphrase prompts (used by live sync) ---------- */
 function syncAskNewPassphrase(){
   return new Promise(resolve => {
     appConfirm('Choose a passphrase to protect your synced data. Make it long — four random words is good. You\'ll type it once on your other device. It can\'t be recovered if you lose it.', {
@@ -418,67 +365,6 @@ function syncAskNewPassphrase(){
     });
   });
 }
-async function syncSendFile(){
-  let meta = await syncMetaGet();
-  let freshKey = false;
-  if(!meta.salt || !meta.key){
-    if(meta.salt && !meta.key){
-      appAlert('This device can\'t remember the passphrase, so sending needs it to be set up again. Use Forget pairing in Sync, then try again.', {title:'Send to other device'});
-      return;
-    }
-    const pw = await syncAskNewPassphrase();
-    if(!pw) return;
-    toast('Securing…');
-    const salt = syncB64(crypto.getRandomValues(new Uint8Array(16)));
-    const key = await syncDeriveKey(pw, salt);
-    meta = Object.assign({}, meta, {salt, key, base:null, peerDeviceId:null, lastPeerFileAt:0});
-    freshKey = true;
-  }
-  const state = syncBuildState();
-  const createdAt = Date.now();
-  const header = {v:1, appVersion:APP_VERSION, createdAt, deviceId:syncDeviceId(), setId:createdAt.toString(36)};
-  const d = new Date(createdAt);
-  const stamp = `${todayISO()}-${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}`;
-  const photos = await syncBuildPhotoFiles(syncPhotosToSend(meta), meta.key, meta.salt, header, stamp);
-  const payload = Object.assign({}, header, {kind:'state', photoParts:photos.items.length, heldPhotoIds:syncHeldPhotoIds(), state});
-  const items = [{text: await syncEncrypt(payload, meta.key, meta.salt), filename:`round-book-sync-${stamp}.json`, mime:'application/json'}].concat(photos.items);
-  const finish = async () => {
-    const ok = await deliverTextFiles(items, 'Round Book sync');
-    if(!ok) return;
-    // The first file this device sends is what the other device will start from, so
-    // it is also the shared starting point for the first merge back.
-    const latest = Object.assign({}, await syncMetaGet(), meta);
-    if(!latest.base) latest.base = state;
-    latest.lastExportAt = Date.now();
-    latest.sentPhotos = Object.assign({}, latest.sentPhotos || {});
-    photos.sentIds.forEach(id => { latest.sentPhotos[id] = createdAt; });
-    await syncMetaSave(latest);
-    const more = photos.remaining > 0 ? ` ${syncPlural(photos.remaining, 'more photo')} will follow — send again once the other device has received these.` : '';
-    toast(items.length > 1
-      ? `Sent the data plus ${syncPlural(photos.sentIds.length, 'photo')} in ${items.length-1} file${items.length===2?'':'s'}. On the other device, choose all the files together.${more}`
-      : 'Sync file ready — open Round Book on your other device and tap Receive');
-  };
-  if(freshKey || items.length > 1){
-    // Key stretching and photo preparation take a while; ask for one more tap so the
-    // share sheet opens from a fresh tap.
-    const mb = Math.max(1, Math.round(items.reduce((n, it) => n + it.text.length, 0) / 1048576));
-    appConfirm(items.length > 1
-      ? `Your sync files are ready: the data plus ${syncPlural(photos.sentIds.length, 'photo')} (about ${mb} MB). Send them all to your other device — AirDrop works well.${photos.remaining > 0 ? ` ${syncPlural(photos.remaining, 'more photo')} will follow next time.` : ''}`
-      : 'Your sync file is ready. Send it to your other device (AirDrop works well).',
-      {title:'Send to other device', confirmLabel:'Share', danger:false, onConfirm: finish});
-  } else {
-    await finish();
-  }
-}
-// Safety valve: if photos went missing on the other device, offer them all again.
-async function syncResendAllPhotos(){
-  const meta = await syncMetaGet();
-  if(!meta.salt){ toast('Nothing paired yet'); return; }
-  await syncMetaSave(Object.assign({}, meta, {sentPhotos:{}, peerPhotoIds:[]}));
-  toast('The next send will include every photo again');
-}
-
-/* ---------- receiving ---------- */
 function syncAskPassphrase(){
   return new Promise(resolve => {
     appConfirm('Enter the sync passphrase you chose on the other device.', {
@@ -489,199 +375,16 @@ function syncAskPassphrase(){
     });
   });
 }
-async function syncReceiveFiles(fileList){
-  const files = Array.from(fileList);
-  const envs = [];
-  for(const f of files){
-    let env = null;
-    try{ env = JSON.parse(await f.text()); }catch(e){}
-    if(env && env.app === 'round-book-sync' && env.v === 1 && env.salt && env.iv && env.ct) envs.push(env);
-  }
-  if(!envs.length){
-    appAlert('That isn\'t a Round Book sync file. (Backup files are restored from Backup & restore → Import backup.)', {title:'Receive from other device'});
-    return;
-  }
-  const salt = envs[0].salt;
-  if(envs.some(e => e.salt !== salt)){
-    appAlert('Those files come from different sync set-ups, so they can\'t be received together. Choose just the files from one send.', {title:'Receive from other device'});
-    return;
-  }
-  let meta = await syncMetaGet();
-  const sameVault = !!meta.salt && meta.salt === salt;
-  let key = sameVault ? meta.key : null;
-  let first = key ? await syncDecrypt(envs[0], key) : null;
-  if(!first){
-    const pw = await syncAskPassphrase();
-    if(!pw) return;
-    toast('Unlocking…');
-    key = await syncDeriveKey(pw, salt);
-    first = await syncDecrypt(envs[0], key);
-    if(!first){
-      appAlert('That passphrase didn\'t unlock the files (or a file is damaged). Nothing was changed.', {title:'Receive from other device'});
-      return;
-    }
-  }
-  const payloads = [first];
-  for(let i = 1; i < envs.length; i++){
-    const p = await syncDecrypt(envs[i], key);
-    if(!p){ appAlert('One of the files couldn\'t be read — it may be damaged. Nothing was changed.', {title:'Receive from other device'}); return; }
-    payloads.push(p);
-  }
-  if(payloads.some(p => versionNewerThanMine(p.appVersion))){
-    appAlert('Those files came from a newer version of Round Book. Close and reopen the app here to update it, then try again.', {title:'Receive from other device'});
-    return;
-  }
-  if(payloads.some(p => p.deviceId === syncDeviceId())){
-    appAlert('Those files were made on this device. Receive the files the other device sends.', {title:'Receive from other device'});
-    return;
-  }
-  const photoPayloads = payloads.filter(p => p.kind === 'photos');
-  const statePayloads = payloads.filter(p => p.kind !== 'photos' && p.state && p.createdAt).sort((a,b) => b.createdAt - a.createdAt);
-  if(!photoPayloads.length && !statePayloads.length){
-    appAlert('Those sync files are incomplete. Nothing was changed.', {title:'Receive from other device'});
-    return;
-  }
-  // Photos first: they're additive and harmless, and the data merge below can then show them straight away.
-  let photosStored = 0;
-  if(photoPayloads.length){
-    if(!photoStorageAvailable){
-      appAlert('This device can\'t store photos right now, so the photos in these files were skipped.', {title:'Receive from other device'});
-    } else {
-      toast('Saving photos…');
-      photosStored = await syncStoreReceivedPhotos(photoPayloads, meta);
-    }
-  }
-  const photoNote = () => {
-    const bits = [];
-    if(photosStored) bits.push(syncPlural(photosStored, 'photo') + ' received');
-    const missing = syncMissingPhotoCount();
-    if(missing) bits.push(syncPlural(missing, 'photo') + ' still to come');
-    return bits.length ? ' · ' + bits.join(' · ') : '';
-  };
-  if(!statePayloads.length){
-    syncPrunePending(meta);
-    await syncMetaSave(Object.assign({}, meta, {salt, key}));
-    render();
-    toast(photosStored ? `${syncPlural(photosStored, 'photo')} received` + photoNote().replace(/^ · \d+ photos? received/, '') : 'Those photos were already on this device');
-    return;
-  }
-  const payload = statePayloads[0];
-  const knownBase = sameVault ? meta.base : null;
-  if(sameVault && meta.lastPeerFileAt && payload.createdAt <= meta.lastPeerFileAt){
-    await syncMetaSave(Object.assign({}, meta, {salt, key}));
-    render();
-    appAlert('You\'ve already received this data, or newer data from the other device, so it was not merged again.' + (photosStored ? ` ${syncPlural(photosStored, 'photo')} from these files were saved.` : ''), {title:'Receive from other device'});
-    return;
-  }
-  const remote = payload.state;
-  const when = new Date(payload.createdAt).toLocaleString('en-GB', {weekday:'short', day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'});
-  const commit = async (newData, doneToast) => {
-    await takeSafetyCopy('Before syncing');
-    data = migrateData(newData);
-    await saveData();
-    const next = Object.assign({}, meta, {
-      salt, key, base: remote, peerDeviceId: payload.deviceId,
-      lastPeerFileAt: payload.createdAt, lastSyncAt: Date.now()
-    });
-    if(Array.isArray(payload.heldPhotoIds)) next.peerPhotoIds = payload.heldPhotoIds;
-    syncPrunePending(next);
-    await syncMetaSave(next);
-    closeSheet();
-    render();
-    toast(doneToast + photoNote());
-  };
-  const adopt = () => {
-    const nd = Object.assign({}, data);
-    nd.customers = syncClone(remote.customers || []);
-    nd.oneOffJobs = syncClone(remote.oneOffJobs || []);
-    nd.quotes = syncClone(remote.quotes || []);
-    nd.mileageLog = syncClone(remote.mileageLog || []);
-    nd.settings = syncClone(remote.settings || {});
-    return nd;
-  };
-  if(syncLocalIsEmpty()){
-    appConfirm(`Set this device up from the other device's data (${syncPlural((remote.customers||[]).length, 'customer')}, sent ${when})?`, {
-      title:'Receive from other device', confirmLabel:'Set up this device', danger:false,
-      onConfirm: () => commit(adopt(), `${syncPlural((remote.customers||[]).length, 'customer')} received`)
-    });
-    return;
-  }
-  if(!knownBase){
-    appConfirm(`This device already has its own data and hasn't been synced with the other one before, so the two can't be safely merged. Replace everything here with the other device's data (${syncPlural((remote.customers||[]).length, 'customer')}, sent ${when})? A safety copy is saved first.`, {
-      title:'Replace this device\'s data?', confirmLabel:'Replace', danger:true,
-      onConfirm: () => commit(adopt(), 'This device now matches the other one')
-    });
-    return;
-  }
-  const ctx = {preferRemote: payload.deviceId > syncDeviceId()};
-  const res = syncMergeStates(knownBase, syncBuildState(data), remote, ctx);
-  const parts = syncSummaryText(res);
-  const apply = () => {
-    const nd = Object.assign({}, data);
-    nd.customers = res.merged.customers; nd.oneOffJobs = res.merged.oneOffJobs; nd.quotes = res.merged.quotes;
-    nd.mileageLog = res.merged.mileageLog; nd.settings = res.merged.settings;
-    return nd;
-  };
-  if(!parts.length){
-    await commit(apply(), 'Already up to date');
-    return;
-  }
-  appConfirm(`Merge the other device's changes (sent ${when})? ${parts.join(' ')} A safety copy is saved first.`, {
-    title:'Merge changes', confirmLabel:'Merge', danger:false,
-    onConfirm: () => commit(apply(), 'Merged — devices are in step')
-  });
-}
 
 /* ---------- the Sync screen ---------- */
-function syncWhenText(ms){
-  if(!ms) return 'never';
-  const d = new Date(ms);
-  return d.toLocaleDateString('en-GB', {weekday:'short', day:'numeric', month:'short'}) + ' · ' + d.toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'});
-}
+// The Live sync screen (More > Live sync, and the cloud chip at the top of the screen).
 async function openSyncSheet(){
   const meta = await syncMetaGet();
-  const paired = !!meta.salt;
-  const missing = syncMissingPhotoCount();
   openSheet(`
     <div class="sheet-head">
-      <h2 style="flex:1; min-width:0;">Sync with another device</h2>
+      <h2 style="flex:1; min-width:0;">Live sync</h2>
       <button class="sheet-close" onclick="closeSheet()" aria-label="Close">✕</button>
     </div>
     ${liveSyncSectionHtml(meta)}
-    <p style="color:var(--ink-muted); font-size:0.8438rem; line-height:1.5; margin:0 2px 14px;">
-      Prefer no cloud at all? Keep your phone and iPad in step with no internet account. One device makes encrypted files, you AirDrop them across, and the other device merges them in — data and photos. Nothing readable ever leaves your devices. When you receive, choose all the files from the send together.
-    </p>
-    <p style="color:var(--ink-muted); font-size:0.7812rem; font-weight:700; line-height:1.6; margin:0 2px 16px;">
-      Last sent from this device: ${syncWhenText(meta.lastExportAt)}<br>
-      Last received from the other device: ${syncWhenText(meta.lastPeerFileAt)}<br>
-      ${paired ? '🔒 Passphrase set on this device' : 'No passphrase yet — you\'ll create one the first time you send'}
-      ${missing ? `<br><span style="color:var(--amber);">${syncPlural(missing, 'photo')} on this device ${missing===1?'hasn\'t':'haven\'t'} arrived yet — ask the other device to send again</span>` : ''}
-    </p>
-    <button class="backup-btn" onclick="syncSendFile()">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3M7 8l5-5 5 5"/><path d="M5 12v8h14v-8"/></svg>
-      <div><div class="t1">Send to other device</div><div class="t2">Makes encrypted files (data and new photos) to AirDrop across</div></div>
-    </button>
-    <button class="backup-btn" onclick="document.getElementById('syncFile').click()">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M5 12v8h14v-8"/></svg>
-      <div><div class="t1">Receive from other device</div><div class="t2">Pick all the files you were sent and merge them in</div></div>
-    </button>
-    ${paired ? `<button class="btn btn-clean" style="width:100%; border:none; margin-top:6px;" onclick="syncResendAllPhotos()">Send every photo again next time</button>
-    <button class="btn btn-clean" style="width:100%; border:none; margin-top:10px;" onclick="syncConfirmForget()">Forget pairing on this device</button>` : ''}
   `, () => openBackup());
 }
-function syncConfirmForget(){
-  appConfirm('This device will forget the file-sync passphrase and what it knows about the other device (live sync, if you use it, is separate and isn\'t affected). Your customers and data are not touched. To sync again you\'d set up the pairing again.', {
-    title:'Forget pairing', confirmLabel:'Forget pairing',
-    onConfirm: async () => {
-      try{ const m = await syncMetaGet(); await syncMetaPut({ live: m.live, liveUrl: m.liveUrl }); }catch(e){}
-      toast('Pairing forgotten');
-      openSyncSheet();
-    }
-  });
-}
-document.getElementById('syncFile').addEventListener('change', function(e){
-  const files = Array.from(e.target.files || []);
-  e.target.value = '';
-  if(!files.length) return;
-  syncReceiveFiles(files).catch(() => appAlert('Something went wrong reading those files. Nothing was changed.', {title:'Receive from other device'}));
-});

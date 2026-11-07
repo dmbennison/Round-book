@@ -1,7 +1,7 @@
 /* 08c-live-sync.js -- Live sync: keeps two devices in step through a small "mailbox" on the
    person's OWN free Cloudflare account (see cloudflare-worker.js). Everything is encrypted
    on the device first, so the mailbox only ever holds scrambled data.
-   It reuses the AirDrop sync engine in 08b-sync.js (encryption, three-way merge, photo
+   It uses the sync engine in 08b-sync.js (encryption, three-way merge, photo
    storage) — only the transport is new. Loaded after 08b-sync.js, before 09-boot.js.
    Part of Round Book's split JS bundle; loaded in numeric order from index.html. */
 
@@ -71,7 +71,7 @@ function liveAgo(ts){
   return new Date(ts).toLocaleDateString('en-GB', {day:'numeric', month:'short'});
 }
 
-/* ---------- stored settings (kept in the sync database, alongside the AirDrop pairing) ---------- */
+/* ---------- stored settings (kept in the sync database, alongside the device id) ---------- */
 async function liveMeta(){ const m = await syncMetaGet(); return m.live || null; }
 async function liveSave(meta, live){
   try{ await syncMetaPut(Object.assign({}, meta, { live })); }
@@ -295,7 +295,7 @@ async function livePullInner(opts){
   if(!peerId){ if(liveStatus.state !== 'ok') liveSetStatus('waiting'); return { ok:true, waiting:true }; }
   const headAt = devs[peerId].updatedAt || 0;
   if(live.base == null && !syncLocalIsEmpty() && !opts.adopt){
-    liveSetStatus('attention', 'This device\'s data can\'t be merged automatically yet. Open Backup → Sync → Live sync and choose what to do.');
+    liveSetStatus('attention', 'This device\'s data can\'t be merged automatically yet. Open Backup → Live sync → Live sync and choose what to do.');
     return { ok:false };
   }
   let more = false;
@@ -624,13 +624,13 @@ async function liveSyncInit(){
   // Resolves once the first check has finished, so startup can hold its questions back until this device is up to date.
   if(liveMem.key){ try{ await liveSyncNow(); }catch(e){} }
 }
-// Called by the AirDrop sync code when a backup is restored: this device's data has jumped
+// Called when a backup is restored: this device's data has jumped
 // in time, so merging against the old shared copy could undo or delete things on the other device.
 async function liveForgetBase(){
   const meta = await syncMetaGet();
   if(!meta.live || !meta.live.enabled) return;
   await liveSave(meta, Object.assign({}, meta.live, { base:null, lastPeerCreatedAt:0, seenHeadAt:0, lastPushHash:null }));
-  liveSetStatus('attention', 'This device\'s data was restored from a backup, so it can no longer be merged automatically. Open Backup → Sync → Live sync and choose what to do.');
+  liveSetStatus('attention', 'This device\'s data was restored from a backup, so it can no longer be merged automatically. Open Backup → Live sync → Live sync and choose what to do.');
 }
 
 /* ---------- set-up flows ---------- */
@@ -667,7 +667,7 @@ async function liveSetupFirst(){
   await liveEnable({ url, roomId: room.roomId, token: room.token, salt, key, base: syncBuildState(data) });
   closeSheet();
   await liveSyncNow({ force:true });
-  appAlert('Live sync is on. On your other device open Backup → Sync → Join live sync and enter the same passphrase.', {title:'Live sync on'});
+  appAlert('Live sync is on. On your other device open Backup → Live sync → Join live sync and enter the same passphrase.', {title:'Live sync on'});
 }
 
 async function liveJoin(){
@@ -787,7 +787,7 @@ function liveDeleteCloud(){
     }
   });
 }
-/* ---------- the "Live sync" block at the top of Backup → Sync ---------- */
+/* ---------- the "Live sync" block at the top of Backup → Live sync ---------- */
 function liveSyncSectionHtml(meta){
   const live = meta && meta.live;
   const box = 'background:var(--blue-dim); border:1px solid var(--box-border); border-radius:14px; padding:14px; margin-bottom:18px;';
