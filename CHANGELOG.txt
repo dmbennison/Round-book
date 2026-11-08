@@ -4,6 +4,20 @@ ROUND BOOK - RELEASE NOTES
 Newest first. This file is not part of the app and is not loaded by it; it ships alongside the code files.
 To add a release: raise APP_VERSION in js/01-data.js and CACHE_NAME in sw.js to the same number, then put a new entry at the top of this list.
 
+Version 1.350
+  - Live sync now works with more than two devices (up to 6, which is what your Cloudflare mailbox already allowed - the
+    worker needs no change). Until now the app kept track of just one "other device"; it now keeps a separate record of each
+    one and merges in the changes from every device as they arrive. Join each extra device the same way as the second
+    (Backup > Live sync > Join live sync, same passphrase). Existing two-device setups carry on unchanged
+  - A device now always sends its result after merging in changes from another device. Before, it skipped sending when its
+    data happened to match the other device's copy, which left the mailbox with an older version of it, and a later
+    deletion could then be mistaken for a clash and the customer would come back on the other devices
+  - Wording: messages and prompts now say "another device" / "your other devices" instead of "your other device"; Message
+    other device is now Message your other devices; a message is read once it is dismissed on any one device
+  - Checked by running three and four simulated devices through the real sync code against a copy of the mailbox
+    (different edits on each, deletes, edits made offline, a device joining late): they all end up with the same data. One
+    edit costs about 3 sends to the mailbox with three devices
+
 Version 1.349
   - Removed sync by file / AirDrop (Send to other device, Receive from other device, Forget pairing, and the file picker
     behind them). Live sync and password-protected backups cover it. The sync screen is now just Live sync, and its menu
