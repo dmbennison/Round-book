@@ -362,7 +362,7 @@ function refreshMissingMileagePrompt(){
   const e = (data.mileageLog || []).find(x => x.date === missingMileageSheetDate);
   if(e && e.start != null && e.end == null) return; // still genuinely missing
   closeSheet();
-  toast('End mileage was already logged on your other device');
+  toast('End mileage was already logged on another device');
 }
 function openMissingMileagePrompt(entry){
   openSheet(`

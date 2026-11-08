@@ -346,7 +346,7 @@ async function syncStoreReceivedPhotos(photoPayloads, meta){
 /* ---------- passphrase prompts (used by live sync) ---------- */
 function syncAskNewPassphrase(){
   return new Promise(resolve => {
-    appConfirm('Choose a passphrase to protect your synced data. Make it long — four random words is good. You\'ll type it once on your other device. It can\'t be recovered if you lose it.', {
+    appConfirm('Choose a passphrase to protect your synced data. Make it long — four random words is good. You\'ll type it once on each of your other devices. It can\'t be recovered if you lose it.', {
       title:'Create sync passphrase', confirmLabel:'Next', danger:false,
       input:{type:'password', placeholder:'Passphrase (8+ characters)'},
       onCancel: () => resolve(null),
@@ -367,7 +367,7 @@ function syncAskNewPassphrase(){
 }
 function syncAskPassphrase(){
   return new Promise(resolve => {
-    appConfirm('Enter the sync passphrase you chose on the other device.', {
+    appConfirm('Enter the sync passphrase you chose on your first device.', {
       title:'Sync passphrase', confirmLabel:'Unlock', danger:false,
       input:{type:'password', placeholder:'Passphrase'},
       onCancel: () => resolve(null),

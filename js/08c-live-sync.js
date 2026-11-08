@@ -139,7 +139,7 @@ async function liveFail(res){
   } else if(res.status === 403){
     liveSetStatus('error', 'The mailbox refused this device (passphrase mismatch). Turn live sync off here and set it up again.');
   } else if(res.status === 409){
-    liveSetStatus('error', 'The mailbox already has the maximum number of devices.');
+    liveSetStatus('error', 'The mailbox already has the maximum of 6 devices.');
   } else if(res.status === 413){
     liveSetStatus('error', 'Your data is too large for the mailbox.');
   } else {
@@ -208,7 +208,7 @@ function livePromptClashes(list){
     const n = list.length;
     openSheet(`
       <div class="sheet-head"><h2>Choose which to keep</h2><button class="sheet-close" onclick="liveClashLater()" aria-label="Close">✕</button></div>
-      <p style="font-size:0.8438rem; line-height:1.55; margin:0 2px 12px; color:var(--ink);">${n === 1 ? 'One detail was' : n + ' details were'} changed differently on this device and your other device. Choose the version to keep${n === 1 ? '' : ' for each'}. Everything else has merged normally.</p>
+      <p style="font-size:0.8438rem; line-height:1.55; margin:0 2px 12px; color:var(--ink);">${n === 1 ? 'One detail was' : n + ' details were'} changed differently on this device and another device. Choose the version to keep${n === 1 ? '' : ' for each'}. Everything else has merged normally.</p>
       ${n > 1 ? `<div style="display:flex; gap:8px; margin-bottom:12px;"><button class="lc-all" onclick="liveClashAll('local')">Keep this device for all</button><button class="lc-all" onclick="liveClashAll('remote')">Keep other device for all</button></div>` : ''}
       ${list.map((c, i) => `
         <div class="lc-card">
@@ -249,6 +249,28 @@ function liveHeadPeer(devs){
   const others = Object.keys(devs).filter(id => id !== me).sort((a,b) => (devs[b].updatedAt||0) - (devs[a].updatedAt||0));
   return others.length ? others[0] : null;
 }
+// Devices other than this one that have stored data in the mailbox, the one updated longest ago first.
+function liveOtherDevices(devs){
+  const me = syncDeviceId();
+  return Object.keys(devs).filter(id => id !== me).sort((a,b) => (devs[a].updatedAt||0) - (devs[b].updatedAt||0));
+}
+// What this device remembers about ONE other device: the last state it merged in from it (the starting point, or "base",
+// for the next three-way merge), when that copy was made, and the mailbox's update time for it then. With more than two
+// devices each one needs its own, because changes arrive from each at different times.
+function livePeerRecord(live, id){
+  const p = live.peers && live.peers[id];
+  if(p) return p;
+  // Remembered by an earlier version, which kept just one other device
+  if(live.peerDeviceId === id && live.base != null) return { base: live.base, createdAt: live.lastPeerCreatedAt || 0, headAt: live.seenHeadAt || 0 };
+  return null;
+}
+// The peers map with one record added or replaced, dropping devices that have left the mailbox.
+function livePeersWith(live, devs, id, rec){
+  const out = {}, me = syncDeviceId();
+  Object.keys(devs || {}).forEach(d => { if(d === me) return; const r = d === id ? rec : livePeerRecord(live, d); if(r) out[d] = r; });
+  if(!out[id]) out[id] = rec;
+  return out;
+}
 function liveAdoptState(remote){
   const nd = Object.assign({}, data);
   nd.customers = JSON.parse(JSON.stringify(remote.customers || []));
@@ -264,16 +286,20 @@ async function liveSafetyCopyMaybe(live){
   await liveUpdate({ lastSafetyAt: Date.now() });
 }
 // Replaces this device's data with the other device's (set-up / re-join / after a restore).
-async function liveApplyAdopt(live, payload, headAt){
+async function liveApplyAdopt(live, payload, headAt, devs){
   await liveSafetyCopyMaybe(live);
   liveApplying = true;
   try{
     data = migrateData(liveAdoptState(payload.state));
     await saveData();
   } finally { liveApplying = false; }
+  // Every device already in the mailbox is taken to be in step with the one we copied from (it has been merging with it).
+  const peers = {}, me = syncDeviceId();
+  Object.keys(devs || {}).forEach(id => { if(id !== me) peers[id] = { base: payload.state, createdAt: id === payload.deviceId ? payload.createdAt : 0, headAt: devs[id].updatedAt || 0 }; });
+  peers[payload.deviceId] = { base: payload.state, createdAt: payload.createdAt, headAt };
   await liveUpdate({
-    base: payload.state, peerDeviceId: payload.deviceId, lastPeerCreatedAt: payload.createdAt,
-    seenHeadAt: headAt, lastPullAt: Date.now(), lastPushHash: null, lastSummary: 'Set up from the other device'
+    base: payload.state, peers, peerDeviceId: payload.deviceId, lastPeerCreatedAt: payload.createdAt,
+    seenHeadAt: headAt, lastPullAt: Date.now(), lastPushHash: null, lastSummary: 'Set up from another device'
   });
   render();
 }
@@ -291,49 +317,64 @@ async function livePullInner(opts){
   try{ head = await liveApi(live, 'GET', '/head'); }catch(e){ liveSetStatus('offline'); return { ok:false }; }
   if(!head.ok){ await liveFail(head); return { ok:false }; }
   const devs = (head.json && head.json.devices) || {};
-  const peerId = liveHeadPeer(devs);
-  if(!peerId){ if(liveStatus.state !== 'ok') liveSetStatus('waiting'); return { ok:true, waiting:true }; }
-  const headAt = devs[peerId].updatedAt || 0;
+  const others = liveOtherDevices(devs);
+  if(!others.length){ if(liveStatus.state !== 'ok') liveSetStatus('waiting'); return { ok:true, waiting:true }; }
   if(live.base == null && !syncLocalIsEmpty() && !opts.adopt){
     liveSetStatus('attention', 'This device\'s data can\'t be merged automatically yet. Open Backup → Live sync → Live sync and choose what to do.');
     return { ok:false };
   }
   let more = false;
-  if(!(live.seenHeadAt === headAt && live.peerDeviceId === peerId)){
+  // A device that has never synced (it holds no data) starts from the most recently updated device; otherwise every
+  // other device is checked in turn and anything new from it is merged in.
+  const order = live.base == null ? [others[others.length - 1]] : others;
+  for(const peerId of order){
+    live = await liveMeta();
+    const headAt = devs[peerId].updatedAt || 0;
+    let rec = livePeerRecord(live, peerId);
+    if(rec && rec.headAt === headAt) continue; // nothing new from this one
     let st;
     try{ st = await liveApi(live, 'GET', '/state/' + peerId); }catch(e){ liveSetStatus('offline'); return { ok:false }; }
-    if(!st.ok){ if(st.status === 404) return { ok:true }; await liveFail(st); return { ok:false }; }
+    if(!st.ok){ if(st.status === 404) continue; await liveFail(st); return { ok:false }; }
     const env = st.json;
-    if(!env || env.app !== 'round-book-sync'){ return { ok:true }; }
+    if(!env || env.app !== 'round-book-sync') continue;
     if(env.salt !== live.salt){
-      liveSetStatus('error', 'Live sync was set up again on the other device. Turn it off here, then use "Join" to reconnect.');
+      liveSetStatus('error', 'Live sync was set up again on another device. Turn it off here, then use "Join" to reconnect.');
       return { ok:false };
     }
     const payload = await syncDecrypt(env, key);
     if(!payload || !payload.state){
-      liveSetStatus('error', 'Couldn\'t read the other device\'s data — check both devices use the same passphrase.');
+      liveSetStatus('error', 'Couldn\'t read another device\'s data — check all your devices use the same passphrase.');
       return { ok:false };
     }
     if(payload.appVersion && versionNewerThanMine(payload.appVersion)){
-      liveSetStatus('error', 'The other device has a newer version of Round Book. Close and reopen the app here to update, then sync will continue.');
+      liveSetStatus('error', 'Another device has a newer version of Round Book. Close and reopen the app here to update, then sync will continue.');
       return { ok:false };
     }
     // Cloudflare can briefly serve an older copy; wait for the next check rather than going backwards.
-    if(live.peerDeviceId === payload.deviceId && live.lastPeerCreatedAt && payload.createdAt <= live.lastPeerCreatedAt){
-      return { ok:true };
+    if(rec && rec.createdAt && payload.createdAt <= rec.createdAt) continue;
+    if(!rec && live.base != null){
+      const firstOther = !live.peers || !Object.keys(live.peers).length; // the very first other device to appear after set-up
+      if(firstOther && live.peerDeviceId == null){
+        rec = { base: live.base, createdAt: 0, headAt: 0 }; // merge against our own state from set-up, so nothing it did is lost
+      } else {
+        // A device we haven't met before (a third, fourth ... device). It copied its data from one of the others and has been
+        // merging with them, so its data is taken as already included. From now on its changes are merged as they come.
+        await liveUpdate({ peers: livePeersWith(live, devs, peerId, { base: payload.state, createdAt: payload.createdAt, headAt }) });
+        continue;
+      }
     }
-    const r = await liveMergeIn(live, payload, headAt, opts);
+    const r = await liveMergeIn(live, payload, headAt, opts, rec, devs);
     // deferred only counts as "held back by an open screen" when one really is open (a clash waiting for an answer is different)
     if(r === 'deferred') return { ok:true, deferred: liveUiBusy() && !opts.force };
-    live = await liveMeta();
   }
+  live = await liveMeta();
   const pp = await livePullPhotos(live, key);
   more = pp.more;
   if(pp.stored){ render(); }
   return { ok:true, more };
 }
 
-async function liveMergeIn(live, payload, headAt, opts){
+async function liveMergeIn(live, payload, headAt, opts, rec, devs){
   const remote = payload.state;
   const local = syncBuildState(data);
   const markers = { peerDeviceId: payload.deviceId, lastPeerCreatedAt: payload.createdAt, seenHeadAt: headAt, lastPullAt: Date.now() };
@@ -342,12 +383,12 @@ async function liveMergeIn(live, payload, headAt, opts){
 
   if(live.base == null){
     // Only reachable when this device holds no data (see livePullInner) — nothing to lose.
-    await liveApplyAdopt(live, payload, headAt);
-    toast('Live sync: set up from your other device');
+    await liveApplyAdopt(live, payload, headAt, devs);
+    toast('Live sync: set up from another device');
     return 'adopted';
   }
   const ctx = { preferRemote: payload.deviceId > syncDeviceId() };
-  const res = syncMergeStates(live.base, local, remote, ctx);
+  const res = syncMergeStates(rec ? rec.base : live.base, local, remote, ctx);
   const m = res.merged;
   const now = Date.now(), me = syncDeviceId();
 
@@ -406,21 +447,19 @@ async function liveMergeIn(live, payload, headAt, opts){
     const parts = syncSummaryText(Object.assign({}, res, { clashes: [] }));
     if(chosen) parts.push(`${chosen} clash${chosen === 1 ? '' : 'es'} resolved as you chose`);
     summary = parts.join(' · ');
-    toast('Synced from your other device' + (parts.length ? ': ' + parts[0] : '') + (parts.length > 1 ? ' (+' + (parts.length - 1) + ' more)' : ''));
+    toast('Synced from another device' + (parts.length ? ': ' + parts[0] : '') + (parts.length > 1 ? ' (+' + (parts.length - 1) + ' more)' : ''));
     render();
     if(typeof refreshMissingMileagePrompt === 'function') refreshMissingMileagePrompt();
   } else if(chosen){
     summary = `${chosen} clash${chosen === 1 ? '' : 'es'} resolved as you chose`;
-    toast(`Clash resolved — your choice will be sent to your other device`);
+    toast(`Clash resolved — your choice will be sent to your other devices`);
   }
-  // If the merged result is exactly what the other device already has, there is nothing to send back.
+  // Our merged result is sent on whenever it changed anything here (the normal push check does that by comparing it with what
+  // we last sent). Skipping the send when it happened to match the other device's copy would leave the mailbox holding an
+  // older version of this device than it really has, and the other devices then mistake a later deletion for a clash.
   let lastPushHash = live.lastPushHash;
-  try{
-    const mine = await liveHashState(syncBuildState(data));
-    if(mine === await liveHashState(remote)) lastPushHash = mine;
-    else if(chosen) lastPushHash = null; // send our answers across even if our own data didn't change
-  }catch(e){}
-  await liveUpdate(Object.assign({ base: remote, lastPushHash, lastSummary: summary || live.lastSummary || '',
+  if(chosen) lastPushHash = null; // send our answers across even if our own data didn't change
+  await liveUpdate(Object.assign({ base: remote, peers: livePeersWith(live, devs, payload.deviceId, { base: remote, createdAt: payload.createdAt, headAt }), lastPushHash, lastSummary: summary || live.lastSummary || '',
     resolutions: myRes.slice(-200), appliedRes: applied.slice(-300) }, markers));
   return same ? 'nochange' : 'merged';
 }
@@ -629,7 +668,7 @@ async function liveSyncInit(){
 async function liveForgetBase(){
   const meta = await syncMetaGet();
   if(!meta.live || !meta.live.enabled) return;
-  await liveSave(meta, Object.assign({}, meta.live, { base:null, lastPeerCreatedAt:0, seenHeadAt:0, lastPushHash:null }));
+  await liveSave(meta, Object.assign({}, meta.live, { base:null, peers:{}, lastPeerCreatedAt:0, seenHeadAt:0, lastPushHash:null }));
   liveSetStatus('attention', 'This device\'s data was restored from a backup, so it can no longer be merged automatically. Open Backup → Live sync → Live sync and choose what to do.');
 }
 
@@ -667,7 +706,7 @@ async function liveSetupFirst(){
   await liveEnable({ url, roomId: room.roomId, token: room.token, salt, key, base: syncBuildState(data) });
   closeSheet();
   await liveSyncNow({ force:true });
-  appAlert('Live sync is on. On your other device open Backup → Live sync → Join live sync and enter the same passphrase.', {title:'Live sync on'});
+  appAlert('Live sync is on. On each of your other devices (up to 6 in all) open Backup → Live sync → Join live sync and enter the same passphrase.', {title:'Live sync on'});
 }
 
 async function liveJoin(){
@@ -684,26 +723,26 @@ async function liveJoin(){
   if(!peerId){ appAlert('Nothing was found for that passphrase yet. Check it matches exactly, and that you have turned on "Set up live sync" on your other device first.', {title:'Join live sync'}); return; }
   let st;
   try{ st = await liveApi(probe, 'GET', '/state/' + peerId); }catch(e){ appAlert('Couldn\'t download the data — check your signal and try again.', {title:'Join live sync'}); return; }
-  if(!st.ok || !st.json){ appAlert('Couldn\'t download the other device\'s data. Try again in a minute.', {title:'Join live sync'}); return; }
+  if(!st.ok || !st.json){ appAlert('Couldn\'t download another device\'s data. Try again in a minute.', {title:'Join live sync'}); return; }
   const key = await syncDeriveKey(pw, st.json.salt);
   const payload = await syncDecrypt(st.json, key);
-  if(!payload || !payload.state){ appAlert('That passphrase didn\'t unlock the data. Check it matches the other device exactly.', {title:'Join live sync'}); return; }
-  if(payload.appVersion && versionNewerThanMine(payload.appVersion)){ appAlert('The other device has a newer version of Round Book. Close and reopen the app here to update it, then try again.', {title:'Join live sync'}); return; }
+  if(!payload || !payload.state){ appAlert('That passphrase didn\'t unlock the data. Check it matches your other devices exactly.', {title:'Join live sync'}); return; }
+  if(payload.appVersion && versionNewerThanMine(payload.appVersion)){ appAlert('Another device has a newer version of Round Book. Close and reopen the app here to update it, then try again.', {title:'Join live sync'}); return; }
   const n = (payload.state.customers || []).length;
   const proceed = async () => {
     const live = { enabled:true, url, roomId: room.roomId, token: room.token, salt: st.json.salt, key, base: null, uploaded:{}, lastPushHash:null };
     liveMem.key = key;
     await liveSave(await syncMetaGet(), live);
-    await liveApplyAdopt(live, payload, devs[peerId].updatedAt || 0);
+    await liveApplyAdopt(live, payload, devs[peerId].updatedAt || 0, devs);
     await liveEnable(Object.assign({}, await liveMeta(), { enabled:true, key }));
     closeSheet();
     toast('Live sync is on');
     liveSyncNow({ force:true });
   };
   if(syncLocalIsEmpty()){
-    appConfirm(`Set this device up from your other device's data (${n} customer${n===1?'':'s'})?`, { title:'Join live sync', confirmLabel:'Set up', danger:false, onConfirm: proceed });
+    appConfirm(`Set this device up from another device's data (${n} customer${n===1?'':'s'})?`, { title:'Join live sync', confirmLabel:'Set up', danger:false, onConfirm: proceed });
   } else {
-    appConfirm(`This device already has its own data. Joining replaces ALL of it with your other device's data (${n} customer${n===1?'':'s'}). A safety copy is taken first and can be restored from Backup.`, { title:'Replace data on this device?', confirmLabel:'Replace and join', danger:true, onConfirm: proceed });
+    appConfirm(`This device already has its own data. Joining replaces ALL of it with another device's data (${n} customer${n===1?'':'s'}). A safety copy is taken first and can be restored from Backup.`, { title:'Replace data on this device?', confirmLabel:'Replace and join', danger:true, onConfirm: proceed });
   }
 }
 
@@ -716,14 +755,14 @@ async function liveAdoptPeer(){
   try{ head = await liveApi(live, 'GET', '/head'); }catch(e){ toast(OFFLINE_MSG); return; }
   const devs = (head.json && head.json.devices) || {};
   const peerId = liveHeadPeer(devs);
-  if(!head.ok || !peerId){ toast('The other device hasn\'t sent any data yet'); return; }
+  if(!head.ok || !peerId){ toast('No other device has sent any data yet'); return; }
   const st = await liveApi(live, 'GET', '/state/' + peerId);
   const payload = st.ok && st.json ? await syncDecrypt(st.json, key) : null;
-  if(!payload || !payload.state){ toast('Couldn\'t read the other device\'s data'); return; }
-  appConfirm('Replace everything on this device with the other device\'s data? A safety copy is taken first.', {
-    title:'Use the other device\'s data', confirmLabel:'Replace', danger:true,
+  if(!payload || !payload.state){ toast('Couldn\'t read another device\'s data'); return; }
+  appConfirm('Replace everything on this device with another device\'s data? A safety copy is taken first.', {
+    title:'Use another device\'s data', confirmLabel:'Replace', danger:true,
     onConfirm: async () => {
-      await liveApplyAdopt(live, payload, devs[peerId].updatedAt || 0);
+      await liveApplyAdopt(live, payload, devs[peerId].updatedAt || 0, devs);
       closeSheet();
       toast('Done — live sync is back in step');
       liveSyncNow({ force:true });
@@ -767,7 +806,7 @@ function liveTurnOff(){
   });
 }
 function liveDeleteCloud(){
-  appConfirm('Delete the encrypted copy from your Cloudflare mailbox and turn live sync off here? Nothing on this device changes. The other device will need to set up again if you want to restart.', {
+  appConfirm('Delete the encrypted copy from your Cloudflare mailbox and turn live sync off here? Nothing on this device changes. Your other devices will need to set up again if you want to restart.', {
     title:'Delete cloud copy', confirmLabel:'Delete', danger:true,
     onConfirm: async () => {
       const live = await liveMeta();
@@ -803,13 +842,13 @@ function liveSyncSectionHtml(meta){
   const s = liveStatus;
   const lines = [];
   lines.push(`<div style="font-weight:800;">⚡ Live sync is on</div>`);
-  const stateText = { syncing:'Syncing…', ok: s.okAt ? 'Up to date — checked ' + liveAgo(s.okAt) : 'On', waiting:'On — waiting for your other device to join', offline:'Offline — will sync when you\'re back online', locked:'Locked — enter your passphrase to resume', attention:'Needs your attention', error:'Problem' }[s.state] || 'On';
+  const stateText = { syncing:'Syncing…', ok: s.okAt ? 'Up to date — checked ' + liveAgo(s.okAt) : 'On', waiting:'On — waiting for another device to join', offline:'Offline — will sync when you\'re back online', locked:'Locked — enter your passphrase to resume', attention:'Needs your attention', error:'Problem' }[s.state] || 'On';
   lines.push(`<div style="font-size:0.8125rem; margin-top:4px;">${escapeHtml(stateText)}</div>`);
   if(s.text) lines.push(`<div style="font-size:0.8125rem; margin-top:6px; color:var(--red); line-height:1.5;">${escapeHtml(s.text)}</div>`);
   if(live.lastPushAt) lines.push(`<div style="font-size:0.75rem; margin-top:6px; color:var(--ink-muted);">Last sent ${liveAgo(live.lastPushAt)}${live.lastPullAt ? ' · last received ' + liveAgo(live.lastPullAt) : ''}${live.lastSummary ? ' · ' + escapeHtml(live.lastSummary) : ''}</div>`);
   let actions = '';
   if(!(live.key || liveMem.key)) actions += btn('🔒 Unlock with passphrase', 'liveUnlock()', 'background:var(--navy); color:#fff;');
-  if(live.base == null) actions += btn('Use the other device\'s data on this device', 'liveAdoptPeer()', 'background:var(--navy); color:#fff;');
+  if(live.base == null) actions += btn('Use another device\'s data on this device', 'liveAdoptPeer()', 'background:var(--navy); color:#fff;');
   actions += btn('Sync now', 'liveSyncNowButton()');
   actions += btn('Re-check photos', 'liveReuploadPhotos()');
   actions += btn('Turn off live sync on this device', 'liveTurnOff()', 'background:var(--red-dim); color:var(--red);');

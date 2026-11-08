@@ -32,7 +32,7 @@ function msgBannerHtml(pinned){
       <div style="font-size:1.125rem; line-height:1.2;">\u2709\ufe0f</div>
       <div style="flex:1; min-width:0;">
         <div style="font-size:0.9375rem; font-weight:800; line-height:1.35; overflow-wrap:anywhere;">${escapeHtml(m.text)}</div>
-        <div style="font-size:0.6875rem; font-weight:700; opacity:0.75; margin-top:3px;">From your other device \u00b7 ${escapeHtml(msgWhen(m.at))}</div>
+        <div style="font-size:0.6875rem; font-weight:700; opacity:0.75; margin-top:3px;">From another of your devices \u00b7 ${escapeHtml(msgWhen(m.at))}</div>
       </div>
       <button class="btn-primary" style="flex:none; padding:8px 12px; font-size:0.8125rem;" onclick="msgDismiss('${escapeAttr(m.id)}')">Got it</button>
     </div>`).join('');
@@ -68,7 +68,7 @@ function msgSend(){
   msgPrune();
   saveData();
   liveSyncNow();
-  toast(liveActive ? 'Message sent' : 'Saved \u2014 it will reach your other device when you next sync');
+  toast(liveActive ? 'Message sent' : 'Saved \u2014 it will reach your other devices when you next sync');
   openMessageDevice();
 }
 
@@ -77,10 +77,10 @@ function openMessageDevice(){
   const status = m => m.readAt ? `<span style="color:var(--green); font-weight:800;">\u2713 Read ${escapeHtml(msgWhen(m.readAt))}</span>` : `<span style="color:var(--ink-muted); font-weight:700;">Waiting to be read</span>`;
   openSheet(`
     <div class="sheet-head">
-      <h2>Message other device</h2>
+      <h2>Message your other devices</h2>
       <button class="sheet-close" onclick="closeSheet()" aria-label="Close">\u2715</button>
     </div>
-    <p style="color:var(--ink-muted); font-size:0.8125rem; line-height:1.45; margin:0 0 10px;">Pops up as a card at the top of Today on your other device until it is dismissed, and you'll be told when it has been read.${liveActive ? '' : ' Live sync isn\u2019t switched on here, so it only gets there when you next sync.'}</p>
+    <p style="color:var(--ink-muted); font-size:0.8125rem; line-height:1.45; margin:0 0 10px;">Pops up as a card at the top of Today on your other devices until it is dismissed on one of them, and you'll be told when it has been read.${liveActive ? '' : ' Live sync isn\u2019t switched on here, so it only gets there when you next sync.'}</p>
     <textarea id="msgText" maxlength="${MSG_MAX_LEN}" rows="3" placeholder="e.g. Mrs Patel wants the gutters done too"></textarea>
     <button class="btn-primary" style="width:100%; margin-top:10px;" onclick="msgSend()">Send</button>
     ${sent.length ? `<div class="section-label" style="margin:18px 2px 8px;">Sent</div>` + sent.map(m => `
@@ -102,13 +102,13 @@ function msgAfterRender(){
   const fresh = msgIncoming().filter(m => seen.n.indexOf(m.id) < 0);
   if(fresh.length){
     seen.n = seen.n.concat(fresh.map(m => m.id)).slice(-60); changed = true;
-    toast(fresh.length === 1 ? '\u2709\ufe0f New message from your other device' : `\u2709\ufe0f ${fresh.length} new messages from your other device`);
+    toast(fresh.length === 1 ? '\u2709\ufe0f New message from another device' : `\u2709\ufe0f ${fresh.length} new messages from your other devices`);
     if(typeof haptic === 'function') haptic([18, 50, 18]);
   }
   const read = msgSentList().filter(m => m.readAt && seen.r.indexOf(m.id) < 0);
   if(read.length){
     seen.r = seen.r.concat(read.map(m => m.id)).slice(-60); changed = true;
-    if(!fresh.length) toast('\u2713 Read on your other device: ' + msgSnippet(read[0].text, 40));
+    if(!fresh.length) toast('\u2713 Read on another device: ' + msgSnippet(read[0].text, 40));
   }
   if(changed){ try{ localStorage.setItem(MSG_SEEN_KEY, JSON.stringify(seen)); }catch(e){} }
   if(msgPrune()) saveData();

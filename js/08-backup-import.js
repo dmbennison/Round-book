@@ -146,7 +146,7 @@ function openMoreMenu(anchor){
     {label: 'Reports…', run: () => openReports(anchor)},
     {label: 'Photo gallery', run: () => openPhotoGallery()},
     {label: 'Backup…', run: () => openBackup(anchor)},
-    {label: 'Message other device', run: () => openMessageDevice()},
+    {label: 'Message your other devices', run: () => openMessageDevice()},
     '-',
     {label: 'Check for updates', hint: 'v' + formatVersion(APP_VERSION), run: () => checkForUpdates()},
     {label: 'About', run: () => openInfo()}
@@ -240,7 +240,7 @@ const FOCUSED_HELP = {
       helpList([
         'The big card is on the left with the Text and Mileage tiles under it, and the customers who owe are on the right, most overdue first. There is no Start / Stop here.'
       ]),
-      helpP('<b>Messages from your other device</b> (⋯ menu > <b>Message other device</b>) show as a card at the top until you tap <b>Got it</b>. The sender is then told it has been read.'),
+      helpP('<b>Messages from your other devices</b> (⋯ menu > <b>Message your other devices</b>) show as a card at the top until you tap <b>Got it</b>. The sender is then told it has been read.'),
       helpList([
         '<b>Mileage</b> – tap in the morning to log your start reading, and again in the evening for your end reading.',
         'A 📝 note you left on today in the Schedule shows above the big card and stays there as you scroll the list.',
@@ -369,7 +369,8 @@ const FOCUSED_HELP = {
     body: () => [
       helpP('To keep a phone, an iPad and a computer in step, open <b>Backup → Live sync</b>.'),
       helpList([
-        '<b>Live sync</b> – on the first device tap <b>Set up live sync</b> and choose a passphrase. On the second tap <b>Join live sync</b> and enter the same passphrase. Changes then arrive within a minute while the app is open.',
+        '<b>Live sync</b> – on the first device tap <b>Set up live sync</b> and choose a passphrase. On every other device (<b>up to 6 in all</b>, for example a phone, an iPad and a computer) tap <b>Join live sync</b> and enter the same passphrase. Changes then arrive within a minute while the app is open, from whichever device they were made on.',
+        'A device you no longer use still counts towards the 6 until its copy expires from the mailbox (about a year after it last synced).',
         '<b>Set up on the device that has your up-to-date data.</b> The device that joins is replaced by it.',
         'If both devices change the same detail, you are shown both versions and tap the one to keep.',
         'To move everything across <b>without</b> live sync, use a <b>password-protected backup</b>: export it on one device (Backup &gt; Export password-protected backup), send it over (AirDrop, Messages or Files) and restore it on the other.'
