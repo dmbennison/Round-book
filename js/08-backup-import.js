@@ -349,7 +349,7 @@ const FOCUSED_HELP = {
   reports: {
     title: 'Reports',
     body: () => [
-      helpP('Tap the printer icon for a list of reports. Every report, invoice, quote and receipt opens in a preview first, with <b>Print</b>, <b>Share PDF</b> and <b>Share doc</b> (a Word file laid out like the PDF: same fonts, colours, tables and invoice boxes, so it can be edited in Word or Pages) along the bottom (down the left side on iPad and computer, with the zoom buttons).')
+      helpP('Tap the printer icon for a list of reports. Every report, invoice, quote and receipt opens in a preview first, with <b>Print</b>, <b>Share PDF</b> and <b>Word doc</b> (a Word file, which can be shared or saved to the device, laid out like the PDF: same fonts, colours, tables and invoice boxes, so it can be edited in Word or Pages) along the bottom (down the left side on iPad and computer, with the zoom buttons).')
     ]
   },
   backup: {

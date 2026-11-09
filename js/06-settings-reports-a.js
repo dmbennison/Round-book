@@ -1235,7 +1235,7 @@ function openReports(anchor){
       <button class="sheet-close" onclick="closeSheet()" aria-label="Close">✕</button>
     </div>
     <p style="color:var(--ink-muted); font-size:0.8438rem; line-height:1.5; margin:0 2px 16px;">
-      Opens a preview you can zoom and scroll, with buttons to Print, Share PDF or Share doc — works offline too.
+      Opens a preview you can zoom and scroll, with buttons to Print, Share PDF or Word doc — works offline too.
     </p>
     <button class="backup-btn" onclick="printRoundsLastCleaned()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4M16 2v4M3 10h18"/><rect x="3" y="4" width="18" height="18" rx="2"/></svg>
@@ -1564,7 +1564,7 @@ function rpLabelShareButtons(){
     if(n && n.nodeType === 3) n.nodeValue = can ? shareText : saveText;
   };
   label('rpBtnPdf', canShareFile('report.pdf', 'application/pdf'), 'Share PDF', 'Save PDF');
-  label('rpBtnDoc', canShareFile('report.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'), 'Share doc', 'Save doc');
+  label('rpBtnDoc', canShareFile('report.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'), 'Word doc', 'Save doc');
 }
 let rpToken = 0;
 // True while the preview is drawn in the right-hand pane of the wide split view rather than full screen. Only the
@@ -2060,9 +2060,19 @@ function rpDownloadDocx(built){
   a.href = url; a.download = built.filename;
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   setTimeout(()=>URL.revokeObjectURL(url), 2000);
-  toast('Word document saved');
+  toast('Word document saved — open it from Downloads');
 }
-async function exportPendingReportDocx(){
+// The Word button: where the device can share files it offers Share or Save; elsewhere it just saves.
+function rpDocButton(btn){
+  let canShare = false;
+  try{ canShare = !!(navigator.canShare && navigator.canShare({ files:[new File(['x'], 'report.docx', { type: DOCX_MIME })] })); }catch(e){}
+  if(!canShare){ exportPendingReportDocx('save'); return; }
+  openDropdown(btn, [
+    { label: 'Share…', run: () => exportPendingReportDocx('share') },
+    { label: 'Save to this device', run: () => exportPendingReportDocx('save') }
+  ], 'Word document');
+}
+async function exportPendingReportDocx(mode){
   rpSetBusy('rpBtnDoc', true);
   try{
     let built = rpDocxPromise ? await rpDocxPromise : null; // normally already built: no wait, so the tap is still fresh
@@ -2071,6 +2081,7 @@ async function exportPendingReportDocx(){
       built = await buildPendingReportDocx();
     }
     if(!built){ toast(LIB_NEEDS_SIGNAL); rpSetBusy('rpBtnDoc', false); return; }
+    if(mode === 'save'){ rpDownloadDocx(built); rpSetBusy('rpBtnDoc', false); return; }
     const file = new File([built.blob], built.filename, { type: DOCX_MIME });
     if(navigator.canShare && navigator.canShare({files:[file]})){
       try{
