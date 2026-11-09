@@ -4,6 +4,13 @@ ROUND BOOK - RELEASE NOTES
 Newest first. This file is not part of the app and is not loaded by it; it ships alongside the code files.
 To add a release: raise APP_VERSION in js/01-data.js and CACHE_NAME in sw.js to the same number, then put a new entry at the top of this list.
 
+Version 1.351
+  - Word documents can now be saved straight to the device instead of going through the share sheet: the report
+    preview's Share doc button is now Word doc, and on a phone or iPad it offers Share... or Save to this device (a
+    computer, which has no share sheet, still just saves). Saved files go to Downloads, where tapping the file previews it
+    with an Open in Pages button. Apps cannot open a document in Pages directly - iOS decides which apps the share sheet
+    offers, and a web app has no way to hand a file to one particular app
+
 Version 1.350
   - Live sync now works with more than two devices (up to 6, which is what your Cloudflare mailbox already allowed - the
     worker needs no change). Until now the app kept track of just one "other device"; it now keeps a separate record of each
