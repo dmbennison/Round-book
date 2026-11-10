@@ -4,6 +4,19 @@ ROUND BOOK - RELEASE NOTES
 Newest first. This file is not part of the app and is not loaded by it; it ships alongside the code files.
 To add a release: raise APP_VERSION in js/01-data.js and CACHE_NAME in sw.js to the same number, then put a new entry at the top of this list.
 
+Version 1.352
+  - Backup reminder: when the app opens it now first checks for a new version (and if one has just been installed it
+    reloads itself straight away, as nothing is open yet), then lets live sync bring this device up to date, and only
+    then allows the backup reminder, so out-of-date data is never what gets backed up. Each step is capped (about 8
+    seconds for the update check, 20 for the sync) and skipped when offline, so the reminder is never held back for long.
+    The reminder also waits while the "new version is ready" banner or any other screen is open
+  - Imported customers: the "Needs review (imported)" round is left out of every total, average and statistic until they
+    have been checked and moved: the Rounds overview (grand totals, round count, due and owing lists), the statistics
+    boxes, property-type and price-review averages, the reports (rounds, due, money owed, full rounds, price review,
+    property types, schedule), the Excel summary, the iPad / computer dashboard, and Today (to do, cleaned and paid
+    totals, progress, the Start list). Its own round card says "waiting to be checked" and its own screen shows no
+    figures. Earnings and the accounting export still include their payment history, as those are real records
+
 Version 1.351
   - Word documents can now be saved straight to the device instead of going through the share sheet: the report
     preview's Share doc button is now Word doc, and on a phone or iPad it offers Share... or Save to this device (a
