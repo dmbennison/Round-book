@@ -7,7 +7,7 @@ const STORE_KEY = 'roundBookData_v1';
 // bump by 0.001 for every change. formatVersion always renders it to exactly three decimals.
 // Earlier releases were numbered 3.xx (the last was 3.38), so versionRank() maps those onto the same scale
 // (3.38 -> 1.338) and the two kinds can still be compared when a device that has not updated yet syncs.
-const APP_VERSION = 1.351;
+const APP_VERSION = 1.352;
 function formatVersion(v){ return Number(v).toFixed(3); }
 function versionRank(v){ v = Number(v) || 0; return v >= 2 ? 1.3 + (v - 3) / 10 : v; }
 function versionNewerThanMine(v){ return versionRank(v) - versionRank(APP_VERSION) > 0.0004; }
@@ -863,7 +863,7 @@ let roundPhaseCache = null; // cleared on every save and every render
 function roundPhases(){
   if(roundPhaseCache) return roundPhaseCache;
   const groups = {};
-  (data.customers || []).forEach(c => {
+  (statCustomers() || []).forEach(c => {
     if(c.paused || (c.frequencyWeeks || 4) !== 4) return;
     const last = lastDateOf(c.cleanHistory);
     if(!last) return;
@@ -924,7 +924,7 @@ function naturalNextDueISO(c){
 // alphabetically (they're ISO dates, so that's also chronologically first).
 function roundMajorityDueDate(roundName){
   const counts = {};
-  data.customers.forEach(c=>{
+  statCustomers().forEach(c=>{
     if(c.paused) return;
     if((c.round||'Unassigned') !== roundName) return;
     const due = nextDueISO(c);
@@ -1055,10 +1055,17 @@ let darkMode = themeMode === 'auto'
 let transparencyLevel = (()=>{ const v = parseInt(localStorage.getItem('roundBookTransparency'),10); return (Number.isFinite(v) && v>=0 && v<=100) ? v : 0; })();
 let textSize = (()=>{ const v = parseInt(localStorage.getItem('roundBookTextSize'),10); return (Number.isFinite(v) && v>=15 && v<=24) ? v : 18; })();
 let bannerDismissed = false;
+// The backup reminder waits until the app has started up properly: updated if a new version was waiting, and synced if live
+// sync is on (09-boot.js sets this), so it never backs up out-of-date data.
+let backupPromptReady = false;
 let marketingFollowUpDismissed = false;
 let jobAnniversaryDismissed = false;
 let importReviewDismissed = false;
 const IMPORT_HOLDING_ROUND = 'Needs review (imported)';
+// Customers imported from a spreadsheet wait in that round until they have been checked. Until then they are left out of
+// every total, average and statistic (and the Today lists), so unchecked data can't skew the figures.
+function inStats(c){ return (c.round || 'Unassigned') !== IMPORT_HOLDING_ROUND; }
+function statCustomers(){ return (data.customers || []).filter(inStats); }
 const BACKUP_REMINDER_HOURS = 24; // daily
 
 function daysSinceBackup(){
@@ -1275,6 +1282,10 @@ function renderLastActionBanner(){
 // as long as the underlying 24-hour condition still holds.
 function renderBackupBanner(){
   if(bannerDismissed || !data.customers.length || !backupReminderDue()){ removeBackupPopup(); return; }
+  if(!backupPromptReady) return; // still updating / syncing: don't back up old data
+  if(document.getElementById('updatePopup')) return; // a new version is ready: update first, then the reminder comes back
+  const ov = document.getElementById('overlay');
+  if(ov && ov.classList.contains('show')) return; // something is already open
   if(document.getElementById('backupPopup')) return; // already showing — don't recreate on every render()
   const el = document.createElement('div');
   el.id = 'backupPopup';

@@ -55,7 +55,7 @@ function pdSumPrice(list){ return list.reduce((s, x) => s + Number(x.price || 0)
 function paneDashRounds(){
   // Inside one round the panel is about that round; everywhere else it covers all of them.
   const scopeName = (currentTab === 'rounds' && currentRound) ? currentRound : null;
-  const all = scopeName ? data.customers.filter(c => (c.round || 'Unassigned') === scopeName) : data.customers;
+  const all = scopeName ? statCustomers().filter(c => (c.round || 'Unassigned') === scopeName) : statCustomers();
   if(!all.length){
     return `<h2 class="pd-title">Rounds</h2><div class="pd-empty">Add your first customer and a summary of your rounds will show here.</div>`;
   }

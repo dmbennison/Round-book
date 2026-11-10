@@ -2,7 +2,7 @@
    Part of Round Book's split JS bundle; loaded in numeric order from index.html. */
 
 function printRoundsLastCleaned(){
-  const rounds = groupByRound(data.customers);
+  const rounds = groupByRound(statCustomers());
   const roundNames = Object.keys(rounds).sort((a,b)=>a.localeCompare(b));
   if(!roundNames.length){
     runPrint('Round Cleaning Dates', '<div class="rpt-empty-note">No rounds yet.</div>', false, false, null);
@@ -45,7 +45,7 @@ function printRoundsLastCleaned(){
 }
 
 function printRoundsLastCleanedCalendar(){
-  if(!data.customers.length){
+  if(!statCustomers().length){
     runPrint('Round Cleaning Dates — Calendar', '<div class="rpt-empty-note">No rounds yet.</div>', false, false, null);
     return;
   }
@@ -60,7 +60,7 @@ function printRoundsLastCleanedCalendar(){
   gridStart.setDate(gridStart.getDate() - rsDiffToMonday);
 
   const countsByDate = {}; // date -> {round: count of customers cleaned}
-  data.customers.forEach(c=>{
+  statCustomers().forEach(c=>{
     if((c.frequencyWeeks || 4) !== 4) return; // 4-weekly customers only
     (c.cleanHistory||[]).forEach(e=>{
       if(!e.date) return;
@@ -103,7 +103,7 @@ function printRoundsLastCleanedCalendar(){
 }
 
 function printWindowsDue(){
-  const rounds = groupByRound(data.customers);
+  const rounds = groupByRound(statCustomers());
   const roundNames = Object.keys(rounds).sort((a,b)=>a.localeCompare(b));
   let body = '';
   let anyRoundShown = false;
@@ -134,7 +134,7 @@ function printWindowsDue(){
 }
 
 function printMoneyOwed(){
-  const owedCusts = data.customers.filter(c=>custStatus(c).owed);
+  const owedCusts = statCustomers().filter(c=>custStatus(c).owed);
   const rounds = groupByRound(owedCusts);
   const roundNames = Object.keys(rounds).sort((a,b)=>a.localeCompare(b));
   let total = 0;
@@ -163,7 +163,7 @@ function printMoneyOwed(){
 }
 
 function printFullRounds(){
-  const rounds = groupByRound(data.customers);
+  const rounds = groupByRound(statCustomers());
   const roundNames = Object.keys(rounds).sort((a,b)=>a.localeCompare(b));
   let body = '';
   let grandTotal = 0;
@@ -514,7 +514,7 @@ function earliestCleanDate(c){
 
 function printPriceReview(){
   const flagged = [];
-  data.customers.forEach(c=>{
+  statCustomers().forEach(c=>{
     const lastIncrease = getLastPriceIncreaseDate(c);
     if(!lastIncrease) return;
     const target = nextDueISO(c) || todayISO();
@@ -529,7 +529,7 @@ function printPriceReview(){
   // property type — same >15% threshold as the "💷 Low" badge on the customer
   // card (see priceReviewBenchmark), so the report and the badge always agree.
   const belowAvg = [];
-  data.customers.forEach(c=>{
+  statCustomers().forEach(c=>{
     if(c.paused) return;
     const benchmark = priceReviewBenchmark(c);
     if(benchmark == null || benchmark <= 0) return;
@@ -592,7 +592,7 @@ const UPSELL_UPLIFT = {
 function upsellOpportunitiesList(){
   const today = todayISO();
   const opportunities = [];
-  data.customers.forEach(c=>{
+  statCustomers().forEach(c=>{
     if(c.paused) return;
     const firstClean = earliestCleanDate(c);
     let reason = null, uplift = 0;
@@ -642,7 +642,7 @@ function printUpsellOpportunities(){
 function printPropertyTypesReport(){
   // Paused customers are left out, matching how round counts/values are worked
   // out everywhere else (e.g. the Rounds tab, the exported summary sheet).
-  const active = data.customers.filter(c=>!c.paused);
+  const active = statCustomers().filter(c=>!c.paused);
   if(!active.length){
     runPrint('Property Types Report', '<div class="rpt-empty-note">No customers recorded yet.</div>', false, false, null);
     return;
@@ -925,12 +925,12 @@ function printSchedule(){
   // Rounds that actually span more than one visit day get a "(Day N)" suffix on their chip,
   // so a round split across several days shows up correctly on each of those days rather
   // than as one ambiguous chip. Single-day rounds are shown exactly as before.
-  const roundsAll = groupByRound(data.customers);
+  const roundsAll = groupByRound(statCustomers());
   const multiDayRounds = new Set(Object.keys(roundsAll).filter(rn => roundDaysUsed(roundsAll[rn]).length > 1));
 
   // Which rounds have a customer next due on each date, within the next 30 days
   const dueByDate = {};
-  data.customers.forEach(c=>{
+  statCustomers().forEach(c=>{
     if(c.paused) return;
     const next = nextDueISO(c);
     if(!next) return;

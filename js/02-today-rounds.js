@@ -41,7 +41,7 @@ function textFirstTap(id){
 }
 function textBeforeDueList(){
   const today = todayISO();
-  const rounds = groupByRound(data.customers);
+  const rounds = groupByRound(statCustomers());
   const roundNames = Object.keys(rounds).sort((a,b)=>a.localeCompare(b));
   const byRound = {};
   let all = [];
@@ -79,7 +79,7 @@ function textBeforeOverdueCount(){
 function valueOfWorkDoneToday(){
   const today = todayISO();
   let total = 0;
-  data.customers.forEach(c=>{
+  statCustomers().forEach(c=>{
     (c.cleanHistory||[]).forEach(e=>{ if(e.date === today) total += Number(e.amount||0); });
   });
   (data.oneOffJobs||[]).forEach(j=>{
@@ -93,7 +93,7 @@ function valueOfWorkDoneToday(){
 function valueOfPaymentsReceivedToday(){
   const today = todayISO();
   let total = 0;
-  data.customers.forEach(c=>{
+  statCustomers().forEach(c=>{
     (c.paymentHistory||[]).forEach(p=>{ if(p.date === today) total += Number(p.amount||0); });
   });
   (data.oneOffJobs||[]).forEach(j=>{
@@ -106,11 +106,11 @@ function valueOfPaymentsReceivedToday(){
 // the Today tab.
 function cleanedTodayCountForRound(rn){
   const today = todayISO();
-  return data.customers.filter(c=>(c.round||'Unassigned')===rn && (c.cleanHistory||[]).some(e=>e.date===today)).length;
+  return statCustomers().filter(c=>(c.round||'Unassigned')===rn && (c.cleanHistory||[]).some(e=>e.date===today)).length;
 }
 function renderTodayHome(main){
   const today = todayISO();
-  const rounds = groupByRound(data.customers);
+  const rounds = groupByRound(statCustomers());
   const roundNames = Object.keys(rounds).sort((a,b)=>a.localeCompare(b));
 
   // Reset the round the Today tab is tracking at the start of each new day —
@@ -144,7 +144,7 @@ function renderTodayHome(main){
   const textBeforeOverdue = textBeforeOverdueCount();
   const todaysJobs = (data.oneOffJobs||[]).filter(j=>!j.done && j.date===today);
   // Paused customers owing for more than 120 days are left off this tile (they stay in the full Owed list).
-  const owedCustomers = data.customers.filter(c=>custStatus(c).owed && !hideFromTodayOwing(c));
+  const owedCustomers = statCustomers().filter(c=>custStatus(c).owed && !hideFromTodayOwing(c));
   // Bucketed by how long the balance has been outstanding — see
   // daysSinceLastPayment for what "days" means when there's no per-invoice
   // tracking, just a running balance.
@@ -1417,11 +1417,11 @@ function avgPricePerHouseForType(list, cat){
 function priceReviewBenchmark(c){
   const cat = c.propertyType || 'Not recorded';
   const roundName = c.round || 'Unassigned';
-  const roundTypeCusts = data.customers.filter(x=>!x.paused && (x.round||'Unassigned')===roundName && (x.propertyType||'Not recorded')===cat);
+  const roundTypeCusts = statCustomers().filter(x=>!x.paused && (x.round||'Unassigned')===roundName && (x.propertyType||'Not recorded')===cat);
   if(roundTypeCusts.length >= 4){
     return avgPricePerHouseForType(roundTypeCusts, cat);
   }
-  const globalTypeCusts = data.customers.filter(x=>!x.paused && (x.propertyType||'Not recorded')===cat);
+  const globalTypeCusts = statCustomers().filter(x=>!x.paused && (x.propertyType||'Not recorded')===cat);
   return avgPricePerHouseForType(globalTypeCusts, cat);
 }
 function propertyTypeAvgSummaryHtml(list){
@@ -1473,7 +1473,7 @@ function statisticsDropdownHtml(innerHtml){
 /* The old Work landing page (Rounds / Jobs / Schedule buttons) is gone — those are now the Work sub tabs and the
    Schedule tab. Its Statistics box now sits at the top of the Rounds overview (see renderRoundsList). */
 function workStatisticsHtml(){
-  const activeCustomers = data.customers.filter(c=>!c.paused);
+  const activeCustomers = statCustomers().filter(c=>!c.paused);
   const totalCustomers = activeCustomers.length;
   const totalValue = activeCustomers.reduce((sum,c)=>sum+Number(c.price||0),0);
   const totalOwed = activeCustomers.reduce((sum,c)=>{ const s=custStatus(c); return sum + (s.owed ? s.balance : 0); },0);
@@ -1527,29 +1527,30 @@ function renderRoundsList(main){
         if(s.cleanBadge && s.cleanBadge.type==='due') due++;
         if(s.owed) owed++;
       });
-      grandCustomers += activeAll.length;
-      grandValue += activeValue;
-      grandOwed += activeOwed;
+      const holding = rn === IMPORT_HOLDING_ROUND; // waiting to be checked: shown, but not counted in any total
+      if(!holding){ grandCustomers += activeAll.length; grandValue += activeValue; grandOwed += activeOwed; }
       const daysUsed = roundDaysUsed(all);
       html += `<div class="round-card" data-ctx-kind="round" data-ctx-id="${escapeAttr(rn)}" onclick="openRound('${escapeAttr(rn)}')">
         <div>
           <div class="rname">${escapeHtml(rn)}</div>
-          <div class="rcount">${activeAll.length} customer${activeAll.length===1?'':'s'} · ${roundValueOwedHtml(activeValue, activeOwed)}${daysUsed.length>1?` · ${daysUsed.length} days`:''}</div>
+          <div class="rcount">${activeAll.length} customer${activeAll.length===1?'':'s'} · ${holding ? 'waiting to be checked' : roundValueOwedHtml(activeValue, activeOwed)}${daysUsed.length>1?` · ${daysUsed.length} days`:''}</div>
         </div>
         <div class="badges">
-          ${due?`<span class="badge due">${due} due</span>`:''}
+          ${holding ? `<span class="badge due">Needs review</span>` : `${due?`<span class="badge due">${due} due</span>`:''}
           ${owed?`<span class="badge owed">${owed} owe</span>`:''}
           ${paused?`<span class="badge paused">${paused} paused</span>`:''}
-          ${(!due&&!owed)?`<span class="badge ok">All clear</span>`:''}
+          ${(!due&&!owed)?`<span class="badge ok">All clear</span>`:''}`}
           <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 6l6 6-6 6"/></svg>
         </div>
       </div>`;
     });
-    html += listTotalHtml(`${roundNames.length} round${roundNames.length===1?'':'s'} · ${grandCustomers} customer${grandCustomers===1?'':'s'} · ${roundValueOwedHtml(grandValue, grandOwed)}`);
+    const liveRounds = roundNames.filter(rn => rn !== IMPORT_HOLDING_ROUND).length;
+    html += listTotalHtml(`${liveRounds} round${liveRounds===1?'':'s'} · ${grandCustomers} customer${grandCustomers===1?'':'s'} · ${roundValueOwedHtml(grandValue, grandOwed)}`);
   } else if(roundsViewMode === 'due'){
     let anyDue = false;
     let dueGrandCount = 0, dueGrandValue = 0;
     roundNames.forEach(rn=>{
+      if(rn === IMPORT_HOLDING_ROUND) return; // not counted until checked
       const dueCusts = rounds[rn].filter(c=>{
         const s = custStatus(c);
         return !c.paused && s.cleanBadge && s.cleanBadge.type==='due';
@@ -1608,6 +1609,7 @@ function renderRoundsList(main){
     let grandTotal = 0;
     let owedGrandCount = 0;
     roundNames.forEach(rn=>{
+      if(rn === IMPORT_HOLDING_ROUND) return; // not counted until checked
       const owedCusts = rounds[rn].filter(c=>custStatus(c).owed && matchesOwedAgeFilter(c))
         .sort((a,b)=> (daysSinceLastPayment(b)-daysSinceLastPayment(a)) || (custStatus(b).balance-custStatus(a).balance));
       if(!owedCusts.length) return;
@@ -1810,7 +1812,7 @@ function renderRoundDetail(main, rn){
     return;
   }
 
-  if(allInRound.length){
+  if(allInRound.length && rn !== IMPORT_HOLDING_ROUND){
     const activeInRound = allInRound.filter(c=>!c.paused);
     const roundTotal = activeInRound.reduce((sum,c)=>sum+Number(c.price||0),0);
     const roundOwed = activeInRound.reduce((sum,c)=>{ const s=custStatus(c); return sum + (s.owed ? s.balance : 0); },0);
@@ -1863,11 +1865,11 @@ function renderRoundDetail(main, rn){
     // what's actually still left to do, not what's already been done.
     const remaining = custs.filter(c=>!c.paused && custStatus(c).lastClean !== todayISO());
     const remainingTotal = remaining.reduce((sum,c)=>sum+Number(c.price||0),0);
-    shellHtml += listTotalHtml(`${remaining.length} remaining · ${money(remainingTotal)}`);
+    shellHtml += listTotalHtml(rn === IMPORT_HOLDING_ROUND ? `${remaining.length} remaining` : `${remaining.length} remaining · ${money(remainingTotal)}`);
   } else {
     const activeCusts = custs.filter(c=>!c.paused);
     const listTotal = activeCusts.reduce((sum,c)=>sum+Number(c.price||0),0);
-    shellHtml += listTotalHtml(`${activeCusts.length} customer${activeCusts.length===1?'':'s'} · ${money(listTotal)}`);
+    shellHtml += listTotalHtml(`${activeCusts.length} customer${activeCusts.length===1?'':'s'}${rn === IMPORT_HOLDING_ROUND ? '' : ` · ${money(listTotal)}`}`);
   }
   main.innerHTML = shellHtml;
 }

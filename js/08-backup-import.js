@@ -278,7 +278,7 @@ const FOCUSED_HELP = {
       helpList([
         '<b>Tap</b> a card for a quick info box (tap <b>Open full details</b> in it for the whole record). The green button calls the customer and the blue button gives directions. At the top of the box, the <b>camera</b> button takes a photo straight into that customer and opens it ready to annotate or send.',
         '<b>Owed</b> – tap <b>✉️ Chase</b> on a card to send a reminder text, or <b>Remind all</b>. <b>Text first</b> – tap a customer’s badge to text them, or <b>Text all</b>.',
-        'After a spreadsheet import, tapping a customer in the <b>Needs review (imported)</b> round opens their <b>Edit customer</b> screen straight away, so you can check and fix them one after another. A round’s <b>⋯</b> menu (top right of the round) has <b>Delete round…</b> (it deletes the round and all its customers, after a safety copy, with <b>Undo</b> on the red bar), <b>Show map</b>, <b>Start round</b> (directions to every stop), <b>Print</b>, <b>Defer</b> and <b>Apply price uplift</b>. <b>Reorder</b> sets your visiting order.',
+        'After a spreadsheet import, tapping a customer in the <b>Needs review (imported)</b> round opens their <b>Edit customer</b> screen straight away, so you can check and fix them one after another. Until they are moved into a real round they are <b>left out of every total, average and statistic</b> (round values, Avg / customer, property-type averages, reports, Today and the dashboard), so unchecked data can’t skew your figures. A round’s <b>⋯</b> menu (top right of the round) has <b>Delete round…</b> (it deletes the round and all its customers, after a safety copy, with <b>Undo</b> on the red bar), <b>Show map</b>, <b>Start round</b> (directions to every stop), <b>Print</b>, <b>Defer</b> and <b>Apply price uplift</b>. <b>Reorder</b> sets your visiting order.',
         'The <b>pencil</b> next to a round’s name adds a note to the round.'
       ])
     ]
@@ -357,6 +357,7 @@ const FOCUSED_HELP = {
     body: () => [
       helpP('Your data is stored on this device, so back it up regularly: ⋯ menu → <b>Backup</b> → <b>Export backup</b>. Keep the file somewhere safe, such as iCloud Drive.'),
       helpList([
+        'The <b>backup reminder</b> (when there are changes that haven’t been backed up for 24 hours) appears after the app has checked for a new version (and updated itself if there is one) and live sync has brought this device up to date, so a backup is never made from old data.',
         '<b>Export password-protected backup</b> locks the file with a password you choose (strong encryption). Restore asks for the password. It can’t be recovered if you forget it, so keep it somewhere safe. Excel, CSV and contacts exports can’t be password-protected here, so keep those somewhere private.',
         '<b>Restore</b> brings everything back from a backup file.',
         '<b>Safety copies</b> are made automatically about once a day and before any restore, so you can undo a mistake.',
@@ -998,7 +999,7 @@ async function exportExcel(){
     return final;
   }
 
-  const summaryRows = roundNames.map(rn=>{
+  const summaryRows = roundNames.filter(rn => rn !== IMPORT_HOLDING_ROUND).map(rn=>{ // the imported "needs review" round is left out of the totals
     const custs = rounds[rn].filter(c=>!c.paused);
     const total = custs.reduce((sum,c)=>sum+Number(c.price||0),0);
     const avg = custs.length ? total/custs.length : 0;
@@ -1009,7 +1010,7 @@ async function exportExcel(){
       'Average / Customer': Math.round(avg * 100) / 100
     };
   });
-  const activeOverall = data.customers.filter(c=>!c.paused);
+  const activeOverall = statCustomers().filter(c=>!c.paused);
   const overallCustomers = activeOverall.length;
   const overallValue = activeOverall.reduce((sum,c)=>sum+Number(c.price||0),0);
   summaryRows.push({

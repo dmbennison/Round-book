@@ -42,7 +42,7 @@ function todayRunActive(){ return !!todayRunState() && currentTab === 'today'; }
 function todayEligibleRows(scope){
   const today = todayISO();
   const rows = [];
-  data.customers.forEach(c => {
+  statCustomers().forEach(c => {
     const rn = c.round || 'Unassigned';
     if(scope && rn !== scope) return;
     const done = lastDateOf(c.cleanHistory) === today;

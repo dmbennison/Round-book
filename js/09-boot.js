@@ -391,6 +391,7 @@ initStorage().catch(()=>{}).finally(()=>{
   // end mileage?" before the other device's answer had arrived was the nag you'd already dealt with — and the
   // question itself kept the sync from finishing. With live sync off this carries straight on.
   const firstSync = (typeof liveSyncInit === 'function') ? Promise.resolve().then(liveSyncInit).catch(() => {}) : Promise.resolve();
+  startupBackupGate(firstSync);
   Promise.race([firstSync, new Promise(r => setTimeout(r, 6000))]).then(() => {
     const ov = document.getElementById('overlay');
     if(ov && ov.classList.contains('show')) return; // they've already opened something: don't replace it
@@ -403,6 +404,19 @@ document.addEventListener('visibilitychange', () => {
   if(document.visibilityState === 'visible'){ maybeAutoSafetyCopy(); }
 });
 
+// While the app is starting up, a new version that has just been installed is applied straight away (nothing is open yet,
+// so nothing can be lost). Later in the session it only offers the "tap to update" banner, as before. It reloads at most
+// once a minute, so a problem with an update can't turn into a loop.
+let startingUp = true;
+const swHadController = ('serviceWorker' in navigator) && !!navigator.serviceWorker.controller; // false the very first time it is installed
+function startupAutoReloadOk(){
+  try{
+    const last = Number(sessionStorage.getItem('roundBookAutoReloadAt') || 0);
+    if(Date.now() - last < 60000) return false;
+    sessionStorage.setItem('roundBookAutoReloadAt', String(Date.now()));
+  }catch(e){ return false; }
+  return true;
+}
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js').then(reg => {
@@ -413,6 +427,7 @@ if ('serviceWorker' in navigator) {
       // someone mid-form, just show a small "tap to update" banner once a
       // new version has actually taken over.
       navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if(startingUp && swHadController && startupAutoReloadOk()){ window.location.reload(); return; }
         showUpdateBanner();
       });
       // Safari can leave a home-screen PWA sitting open for a long time
@@ -688,4 +703,29 @@ if(/[?&#]test(?:[=&#]|$)/i.test(location.search + location.hash)){
     const r = await runSelfTests();
     toast(r.failed.length ? `Tests: ${r.passed} passed, ${r.failed.length} FAILED (details in the console)` : `Tests: all ${r.passed} passed`);
   }, 1500));
+}
+
+/* ---------- the backup reminder waits for the update and the sync ----------
+   On opening: first look for a new version (and if one is on its way, let it take over: the app reloads itself), then let
+   live sync bring this device up to date, and only then allow the backup reminder, so a backup is never made from
+   out-of-date data. Each step is capped (and skipped when offline) so the reminder is never held back for long. */
+async function startupBackupGate(firstSync){
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  try{
+    if(navigator.onLine !== false && 'serviceWorker' in navigator){
+      const reg = await navigator.serviceWorker.getRegistration();
+      if(reg){
+        await Promise.race([reg.update().catch(() => {}), wait(8000)]);
+        if(reg.installing || reg.waiting){
+          // A new version is arriving. When it takes over the page reloads itself (see controllerchange above); if that
+          // doesn't happen the update banner is shown and the reminder holds back until it has been dealt with.
+          await Promise.race([new Promise(r => navigator.serviceWorker.addEventListener('controllerchange', () => setTimeout(r, 3000), { once: true })), wait(25000)]);
+        }
+      }
+    }
+    await Promise.race([firstSync, wait(20000)]);
+  }catch(e){}
+  startingUp = false;
+  backupPromptReady = true;
+  renderBackupBanner();
 }
