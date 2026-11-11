@@ -103,7 +103,7 @@ function todayProgressHtml(model){
 // The two small buttons under the hero (and, when one round is picked, a way back to all of them — the hero's round
 // chips only ever pick a round, so without this a list narrowed to one round couldn't be widened again).
 function todayRunBarHtml(running){
-  if(!todayRunAvailable()) return '';
+  if(!todayRunAvailable()) return todayWideListBarHtml();
   return `<div class="today-run-bar">
       <button class="run-btn start" onclick="startTodayRun()"${running ? ' disabled' : ''}>▶ Start</button>
       <button class="run-btn stop" onclick="stopTodayRun()"${running ? '' : ' disabled'}>■ Stop</button>
@@ -139,6 +139,79 @@ function todayRunListHtml(model, note){
     }).join('');
   });
   return html + '</div>';
+}
+
+/* ---------- read-only work list on the wide split view ----------
+   On an iPad held sideways or a computer there is no Start / Stop run (todayRunAvailable), because cleans and payments are
+   marked on the phone. What the wide Today screen can do instead is show the day's work list, view only: the same people
+   in the same visiting order as the phone's list, grouped by round, with nothing on it that can be tapped, swiped or
+   right-clicked, so a clean or a payment can't be marked from here by accident. Whether it is showing is remembered on this
+   device only (localStorage). */
+const TODAY_WIDE_LIST_KEY = 'roundBookTodayWideList';
+function todayWideListOn(){
+  if(todayRunAvailable()) return false;
+  try{ return localStorage.getItem(TODAY_WIDE_LIST_KEY) === '1'; }catch(e){ return false; }
+}
+function toggleTodayWideList(){
+  try{ localStorage.setItem(TODAY_WIDE_LIST_KEY, todayWideListOn() ? '0' : '1'); }catch(e){}
+  render();
+}
+function todayWideListBarHtml(){
+  const on = todayWideListOn();
+  return `<div class="today-run-bar">
+      <button class="run-btn ${on ? 'stop' : 'start'}" onclick="toggleTodayWideList()">${on ? '✕ Hide work list' : '📋 Show work list'}</button>
+      ${todaySelectedRound ? `<button class="run-btn all" onclick="clearTodayRound()" title="Show every round again">${escapeHtml(todaySelectedRound)} ✕</button>` : ''}
+    </div>`;
+}
+function todayReadOnlyListHtml(model){
+  const note = `<div class="ro-note">👁 View only — nothing on this list can be marked as cleaned or paid from here.</div>`;
+  if(!model.total){
+    return `<div class="today-ro-list">${note}<div class="empty"><b>Nothing to do today</b><p>Nobody is due and there are no jobs booked for today.</p></div></div>`;
+  }
+  const groups = {};
+  model.rows.forEach(r => (groups[r.round] = groups[r.round] || []).push(r));
+  const names = Object.keys(groups).sort((a, b) => (a === 'Jobs') - (b === 'Jobs') || a.localeCompare(b));
+  let html = `<div class="today-ro-list">${note}`;
+  names.forEach(rn => {
+    const rows = groups[rn];
+    const doneN = rows.filter(r => r.done).length;
+    const head = `<span style="font-weight:600; color:var(--ink-muted); text-transform:none; letter-spacing:0;">(${doneN} of ${rows.length} done)</span>`;
+    html += `<div class="round-group-header" style="display:flex; align-items:center; margin:18px 2px 8px;"><div class="section-label" style="margin:0;">${rn === 'Jobs' ? 'One-off jobs' : escapeHtml(rn)} ${head}</div></div>`;
+    html += rows.map(r => r.type === 'j' ? todayReadOnlyJobHtml(r.obj, r.done) : todayReadOnlyCustHtml(r.obj, r.done)).join('');
+  });
+  return html + '</div>';
+}
+function todayReadOnlyCustHtml(c, done){
+  const s = custStatus(c);
+  const roundCustomers = data.customers.filter(x => (x.round || 'Unassigned') === (c.round || 'Unassigned'));
+  const showDay = roundDaysUsed(roundCustomers).length > 1;
+  const badges = [];
+  if(done) badges.push(`<span class="badge ok">✓ Cleaned</span>`);
+  else if(s.cleanBadge && s.cleanBadge.type === 'due') badges.push(`<span class="badge due">${escapeHtml(s.cleanBadge.text)}</span>`);
+  if(s.owed) badges.push(`<span class="badge owed">Owes ${money(s.balance)}</span>`);
+  if(c.frontsOnly) badges.push(`<span class="badge paused">Fronts only</span>`);
+  if(c.textBeforeVisit) badges.push(`<span class="badge paused">💬 Text first</span>`);
+  if(showDay) badges.push(`<span class="badge anniversary">Day ${c.visitDay || 1}</span>`);
+  if(typeof couldntCleanActive === 'function' && couldntCleanActive(c)) badges.push(`<span class="badge escalate">🚫 Couldn’t clean last time</span>`);
+  const who = [c.name || '', c.phone || ''].filter(Boolean).map(escapeHtml).join(' · ');
+  return `<div class="ro-card${done ? ' done' : ''}">
+      <div class="ro-top">
+        <div style="min-width:0;"><div class="ro-addr">${escapeHtml(c.address || 'No address')}</div>${who ? `<div class="ro-sub">${who}</div>` : ''}${c.notes ? `<div class="ro-note-line">📝 ${escapeHtml(c.notes)}</div>` : ''}</div>
+        <div class="ro-price">${money(c.price)}</div>
+      </div>
+      ${badges.length ? `<div class="ro-meta">${badges.join('')}</div>` : ''}
+    </div>`;
+}
+function todayReadOnlyJobHtml(j, done){
+  const when = (j.date ? fmtDate(j.date) : '') + (j.time ? ` at ${fmtTime(j.time)}` : '');
+  const who = [j.name || '', j.phone || ''].filter(Boolean).map(escapeHtml).join(' · ');
+  return `<div class="ro-card${done ? ' done' : ''}">
+      <div class="ro-top">
+        <div style="min-width:0;"><div class="ro-addr">${escapeHtml(j.address || 'No address')}</div>${who ? `<div class="ro-sub">${who}</div>` : ''}${when ? `<div class="ro-sub">${escapeHtml(when)}</div>` : ''}</div>
+        <div class="ro-price">${money(j.price)}</div>
+      </div>
+      <div class="ro-meta">${done ? '<span class="badge ok">Done</span>' : '<span class="badge due">Not done</span>'}${j.paid ? '<span class="badge ok">Paid</span>' : ''}</div>
+    </div>`;
 }
 
 /* ---------- Start / Stop ---------- */

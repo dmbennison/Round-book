@@ -7,7 +7,7 @@ const STORE_KEY = 'roundBookData_v1';
 // bump by 0.001 for every change. formatVersion always renders it to exactly three decimals.
 // Earlier releases were numbered 3.xx (the last was 3.38), so versionRank() maps those onto the same scale
 // (3.38 -> 1.338) and the two kinds can still be compared when a device that has not updated yet syncs.
-const APP_VERSION = 1.352;
+const APP_VERSION = 1.353;
 function formatVersion(v){ return Number(v).toFixed(3); }
 function versionRank(v){ v = Number(v) || 0; return v >= 2 ? 1.3 + (v - 3) / 10 : v; }
 function versionNewerThanMine(v){ return versionRank(v) - versionRank(APP_VERSION) > 0.0004; }
@@ -898,7 +898,16 @@ function dueOverrideISO(c){
 }
 // The date a customer is due: a hand-set date if there is one, otherwise the calculated date.
 function nextDueISO(c){
-  return dueOverrideISO(c) || computedDueISO(c);
+  return dueOverrideISO(c) || plannedAheadISO(c, 1) || computedDueISO(c);
+}
+/* A date planned in advance in the Schedule editor for a clean further ahead than the next one (see "plan ahead" there).
+   c.aheadPlan = { dates: { <clean number>: 'YYYY-MM-DD' } }, where the clean number counts from the start of the clean
+   history (the 5th clean ever is 5). Keying it by number rather than by date means a planned 2nd clean quietly becomes the
+   next one once the 1st is done, and it lapses by itself when that number has passed. n = 1 is the next clean. */
+function plannedAheadISO(c, n){
+  const p = c && c.aheadPlan && c.aheadPlan.dates;
+  if(!p) return null;
+  return p[(c.cleanHistory || []).length + (n || 1)] || null;
 }
 function computedDueISO(c){
   const natural = naturalNextDueISO(c);

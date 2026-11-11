@@ -238,7 +238,8 @@ const FOCUSED_HELP = {
       ]),
       helpP('<b>On an iPad held sideways or a computer</b>'),
       helpList([
-        'The big card is on the left with the Text and Mileage tiles under it, and the customers who owe are on the right, most overdue first. There is no Start / Stop here.'
+        'The big card is on the left with the Text and Mileage tiles under it, and the customers who owe are on the right, most overdue first. There is no Start / Stop here.',
+        'Tap <b>📋 Show work list</b> under the big card to see today’s work list under the tiles (<b>✕ Hide work list</b> puts it away; this device remembers your choice). It is <b>view only</b> – the same people in your visiting order, grouped by round, but nothing on it can be swiped, tapped or marked as cleaned or paid. Do that on your phone. Tapping a round’s chip on the big card shows just that round.'
       ]),
       helpP('<b>Messages from your other devices</b> (⋯ menu > <b>Message your other devices</b>) show as a card at the top until you tap <b>Got it</b>. The sender is then told it has been read.'),
       helpList([
@@ -258,6 +259,7 @@ const FOCUSED_HELP = {
         '<b>Commit</b> (top right) shows what will change, then applies it. <b>Reject</b> throws your changes away. <b>↶ Undo</b> takes back your last move.',
         
         '<b>⋯ More…</b> has <b>☔ Push back</b> (for a rained-off day), <b>☑ Multi</b> (move several tiles at once), <b>👥 Split</b> (move some of a round’s customers), <b>＋ Job</b> (add a one-off job to a day), <b>📝 Note</b> (leave a reminder on a day) and <b>🚫 Days off</b> (set your days off and holidays). Tap the day first for Job and Note.',
+        '<b>📆 Plan ahead</b> – the button beside Undo shows the <b>next clean</b>, the <b>next 2 cleans</b> or the <b>next 3 cleans</b> of every round (tap it to change; the calendar widens to fit). The 2nd and 3rd are <b>dashed outline tiles marked ② and ③</b>, a cleaning cycle after the clean before. Drag them like any other tile to plan where they will go. Move a clean and the dashed tiles after it move too, unless you have given them a day of their own. Each day also shows how many are <b>planned</b> as well as how many are due. <b>Commit</b> keeps the days you gave them, and when the clean before one is done, its planned day becomes that customer’s next due date.',
         'A new customer who has not been cleaned yet waits on today in <b>green</b> 🆕. Move them to the day of their first clean, then Commit.',
         '<b>Looking back</b> – tap <b>◀ Show 4 earlier weeks</b> above the calendar to see past days (and <b>＋ Show 4 more weeks</b> below it to look further ahead – the same on phone, iPad and computer). Each green ✓ tile is a round that was cleaned, or the one-off jobs done, that day. Tap one to see who was cleaned and what they paid. They can’t be moved.',
         'The <b>printer icon</b> next to the help icon (top right) prints the calendar as you are looking at it, including any weeks you have looked back at.'

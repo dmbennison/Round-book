@@ -9,6 +9,10 @@
    review step before committing, a "+4 weeks" button to look further ahead, a "4 earlier weeks" button to look back at
    what was cleaned on past days (read-only green tiles; tap one for the list), a note on any day, and first cleans:
    a new customer or round that hasn't been cleaned yet can be given a day before its first clean.
+   Plan ahead: the 📆 button shows the next 1, 2 or 3 cleans of everyone. The 2nd and 3rd are outline placeholders (②, ③) a
+   cleaning cycle after the one before; they can be moved like any tile, and moving a clean moves the placeholders after it
+   unless they have been given a day of their own. A placeholder given its own day is kept (customer.aheadPlan, see
+   plannedAheadISO in 01-data.js) and becomes the customer's next due date once the clean before it is done.
    The calendar is a draft that lives on in the background: switching to another tab hides it and coming back
    shows it just as it was, changes and all, until it is committed or rejected.
    Part of Round Book's split JS bundle; loaded in numeric order from index.html. */
@@ -20,6 +24,8 @@ const SE_MAX_WEEKS = 52;      // furthest the calendar can be extended
 const SE_BACK_WEEKS = 4;      // weeks added by the "earlier weeks" button
 const SE_MAX_BACK_WEEKS = 104; // furthest back the calendar can be extended (two years)
 const SE_ZOOM_KEY = 'roundBookScheduleZoom';
+const SE_AHEAD_KEY = 'roundBookScheduleAhead'; // how many cleans ahead the calendar shows per customer (1 to 3), kept on this device
+const SE_MAX_AHEAD = 3;
 const SE_ZOOM_MIN = 0.45, SE_ZOOM_MAX = 2.6, SE_ZOOM_DEFAULT = 1.4;
 let se = null;      // editor state while open (see openScheduleEditor)
 let seBound = false;
@@ -65,6 +71,68 @@ function sePrevWorking(iso, n){
 // Every device opens with the same number of weeks (SE_WEEKS); "＋ Show 4 more weeks" looks further ahead.
 function seStartWeeks(){ return SE_WEEKS; }
 function sePlural(n, w){ return n + ' ' + w + (n === 1 ? '' : 's'); }
+const SE_ORD = { 2:'②', 3:'③' };
+// Has this item been moved from where the data has it? A placeholder that is only following an earlier clean it
+// is a cycle after has not been moved in its own right: nothing needs writing for it.
+function seItemMoved(it){
+  if(it.isNew) return false;
+  if(it.ahead && it.follow) return false;
+  return it.date !== it.dispDate;
+}
+// Every change of an item's day goes through here, so the placeholders behind a clean follow it when it moves.
+function seSetDate(it, iso){
+  const old = it.date;
+  it.date = iso;
+  if(it.ahead) it.follow = false;
+  if(it.kind !== 'c' || old === iso) return;
+  const delta = isoToDays(iso) - isoToDays(old);
+  se.items.forEach(o => { if(o.kind === 'c' && o.key === it.key && o.ahead && o.follow && o.n > (it.n || 1)) o.date = seAddDays(o.date, delta); });
+}
+// Adds the 2nd / 3rd clean placeholders for everyone with a booked next clean (and takes away any beyond the number
+// being shown). Runs on every redraw: cheap, and means a first clean that has just been given a day gets its placeholders.
+function seSyncAhead(){
+  if(!se) return;
+  se.items = se.items.filter(it => !(it.ahead && it.n > se.ahead));
+  const custs = new Map(data.customers.map(c => [c.id, c]));
+  const chains = {};
+  se.items.forEach(it => { if(it.kind === 'c') (chains[it.key] = chains[it.key] || []).push(it); });
+  Object.keys(chains).forEach(key => {
+    const c = custs.get(key), chain = chains[key];
+    const base = chain.find(i => !i.ahead);
+    if(!c || !base || seIsParked(base)) return;
+    let prev = base;
+    for(let n = 2; n <= se.ahead; n++){
+      let g = chain.find(i => i.ahead && i.n === n);
+      if(!g){
+        const planned = plannedAheadISO(c, n);
+        const date = planned || seAddDays(prev.date, freqDays(c));
+        if(date > se.capISO) break;
+        g = { kind:'c', key, n, ahead:true, follow:!planned, label:base.label, dispDate:date, date, overdue:false, due:date, price:base.price, first:false, parked:false };
+        se.items.push(g); chain.push(g);
+      }
+      prev = g;
+    }
+  });
+}
+// Planning 2 or 3 cleans ahead needs more weeks on screen than the usual 5 (a 4-weekly customer's 3rd clean is 8 weeks after the 1st).
+function seWidenForAhead(){
+  const need = SE_WEEKS + 4 * (se.ahead - 1);
+  if(se.weeks < need) se.weeks = Math.min(SE_MAX_WEEKS, need);
+}
+function seAheadLabel(){ return se.ahead <= 1 ? '📆 Next clean' : '📆 Next ' + se.ahead + ' cleans'; }
+function seCycleAhead(){
+  if(!se) return;
+  const next = se.ahead >= SE_MAX_AHEAD ? 1 : se.ahead + 1;
+  if(next < se.ahead && se.items.some(it => it.ahead && it.n > next && seItemMoved(it))){
+    toast('Commit or undo the planned cleans you have moved before showing fewer');
+    return;
+  }
+  se.ahead = next;
+  try{ localStorage.setItem(SE_AHEAD_KEY, String(next)); }catch(e){}
+  seWidenForAhead();
+  renderScheduleEditor();
+  toast(next === 1 ? 'Showing the next clean only' : `Showing the next ${next} cleans — the dashed tiles are planned ahead`);
+}
 
 function openScheduleEditor(){
   const keepBack = se ? (se.weeksBack || 0) : 0; // a rebuilt calendar stays as far back as it was
@@ -114,11 +182,14 @@ function openScheduleEditor(){
   let zoom = SE_ZOOM_DEFAULT;
   try{ const z = parseFloat(localStorage.getItem(SE_ZOOM_KEY)); if(z >= SE_ZOOM_MIN && z <= SE_ZOOM_MAX) zoom = z; }catch(e){}
   const notes = Object.assign({}, st.dayNotes || {});
-  se = { zoom, items, sel:[], multi:false, selDay:null, startISO, capISO, todayStr, weeks:seStartWeeks(), weeksBack:keepBack, multiRounds:multi,
+  let ahead = se ? se.ahead : 1;
+  if(!se){ try{ const a = parseInt(localStorage.getItem(SE_AHEAD_KEY), 10); if(a >= 1 && a <= SE_MAX_AHEAD) ahead = a; }catch(e){} }
+  se = { zoom, ahead, items, sel:[], multi:false, selDay:null, startISO, capISO, todayStr, weeks:seStartWeeks(), weeksBack:keepBack, multiRounds:multi,
          offWeekdays, blocked, origOff:offWeekdays.slice(), origBlocked:blocked.slice(),
          notes, origNotes:Object.assign({}, notes),
          builtVersion:seDataVersion(), builtDay:todayStr,
          history:[], drag:null, chipIndex:{}, ignoreClickUntil:0, pendingRender:false, offPending:null };
+  seWidenForAhead();
   const { scroll } = seEls();
   seSetMoreTools(false); // Push back / Multi / Split / Job start tucked away behind ⋯ More…
   seBind();
@@ -170,13 +241,13 @@ function seBuildChips(){
       out.push({ id:'j|' + it.key, kind:'job', label:it.label, date:it.date, dispDate:it.dispDate, overdue:!!it.overdue, isNew:!!it.isNew, items:[it] });
       return;
     }
-    const k = `r|${it.label}|${it.date}|${it.dispDate}|${it.overdue ? 1 : 0}|${it.first ? 1 : 0}`;
-    if(!map[k]){ map[k] = { id:k, kind:'round', label:(it.first ? '🆕 ' : '') + it.label, date:it.date, dispDate:it.dispDate, overdue:!!it.overdue, first:!!it.first, parked:!!it.parked, isNew:false, items:[] }; out.push(map[k]); }
+    const k = `r|${it.label}|${it.date}|${it.dispDate}|${it.overdue ? 1 : 0}|${it.first ? 1 : 0}` + (it.ahead ? `|a${it.n}${it.follow ? 'f' : 'x'}` : '');
+    if(!map[k]){ map[k] = { id:k, kind:'round', label:(it.ahead ? SE_ORD[it.n] + ' ' : '') + (it.first ? '🆕 ' : '') + it.label, date:it.date, dispDate:it.dispDate, overdue:!!it.overdue, first:!!it.first, parked:!!it.parked, ahead:!!it.ahead, n:it.n || 1, isNew:false, items:[] }; out.push(map[k]); }
     map[k].items.push(it);
   });
   se.chipIndex = {};
   out.forEach(ch => {
-    ch.moved = !ch.isNew && ch.date !== ch.dispDate;
+    ch.moved = !ch.isNew && ch.items.some(seItemMoved);
     ch.minDue = ch.items.reduce((m, i) => (!m || i.due < m) ? i.due : m, '');
     se.chipIndex[ch.id] = ch;
   });
@@ -186,10 +257,10 @@ function seBuildChips(){
 function seDayStats(chips){
   const st = {};
   chips.forEach(ch => {
-    const s = st[ch.date] = st[ch.date] || { cust:0, jobs:0, value:0 };
+    const s = st[ch.date] = st[ch.date] || { cust:0, jobs:0, value:0, ahead:0, aheadValue:0 };
     ch.items.forEach(it => {
       if(seIsParked(it)) return; // waiting for a day: not today's work yet
-      if(it.kind === 'c') s.cust++; else s.jobs++;
+      if(it.ahead){ s.ahead++; s.aheadValue += it.price || 0; return; } // planned ahead: counted apart from the work that is due
       s.value += it.price || 0;
     });
   });
@@ -197,15 +268,16 @@ function seDayStats(chips){
 }
 
 function seChangeSummary(){
-  const movedC = se.items.filter(i => !i.isNew && i.kind === 'c' && i.date !== i.dispDate).length;
-  const movedJ = se.items.filter(i => !i.isNew && i.kind === 'j' && i.date !== i.dispDate).length;
+  const movedC = se.items.filter(i => !i.ahead && i.kind === 'c' && seItemMoved(i)).length;
+  const movedA = se.items.filter(i => i.ahead && seItemMoved(i)).length;
+  const movedJ = se.items.filter(i => i.kind === 'j' && seItemMoved(i)).length;
   const newJ = se.items.filter(i => i.isNew).length;
   const offAdded = se.blocked.filter(d => !se.origBlocked.includes(d));
   const offRemoved = se.origBlocked.filter(d => !se.blocked.includes(d));
   const wdChanged = se.offWeekdays.slice().sort().join() !== se.origOff.slice().sort().join();
   const noteDays = Array.from(new Set(Object.keys(se.notes).concat(Object.keys(se.origNotes)))).filter(d => (se.notes[d] || '') !== (se.origNotes[d] || '')).sort();
-  return { movedC, movedJ, newJ, offAdded, offRemoved, wdChanged, noteDays,
-           total: movedC + movedJ + newJ + offAdded.length + offRemoved.length + (wdChanged ? 1 : 0) + noteDays.length };
+  return { movedC, movedA, movedJ, newJ, offAdded, offRemoved, wdChanged, noteDays,
+           total: movedC + movedA + movedJ + newJ + offAdded.length + offRemoved.length + (wdChanged ? 1 : 0) + noteDays.length };
 }
 
 /* ---------- history: what was actually cleaned on past days ----------
@@ -256,6 +328,7 @@ function seHistOpen(iso){
 function renderScheduleEditor(){
   if(!se) return;
   se.pendingRender = false;
+  seSyncAhead();
   const { grid, count, commit, undo, multi, split, more, earlier } = seEls();
   grid.style.setProperty('--z', se.zoom);
   const chips = seBuildChips();
@@ -265,7 +338,7 @@ function renderScheduleEditor(){
   // "Heavy day" tint: compare each day's load (value, or customer count if nothing has a price)
   // with the typical busy day.
   const useValue = Object.keys(stats).some(d => stats[d].value > 0);
-  const loadOf = s => useValue ? s.value : (s.cust + s.jobs);
+  const loadOf = s => useValue ? s.value + s.aheadValue : (s.cust + s.jobs + s.ahead);
   const loads = Object.keys(stats).filter(d => d >= se.todayStr && loadOf(stats[d]) > 0).map(d => loadOf(stats[d])).sort((a, b) => a - b);
   const median = loads.length >= 3 ? loads[Math.floor(loads.length / 2)] : 0;
 
@@ -289,7 +362,11 @@ function renderScheduleEditor(){
       if(l >= median * 1.75) cls = ' load-vhi'; else if(l >= median * 1.35) cls = ' load-hi';
     }
     const h = iso <= se.todayStr ? hist[iso] : null;
-    let meta = (s && !past) ? `${s.cust + s.jobs}${s.value > 0 ? ' · ' + money(s.value) : ''}` : '';
+    let meta = '';
+    if(s && !past){
+      const real = s.cust + s.jobs;
+      meta = (real ? `${real}${s.value > 0 ? ' · ' + money(s.value) : ''}` : '') + (s.ahead ? `${real ? ' · ' : ''}+${s.ahead} planned` : '');
+    }
     if(h && past) meta = `✓ ${h.count}${h.value > 0 ? ' · ' + money(h.value) : ''}`;
     const histHtml = h ? Object.keys(h.rounds).sort((a, b) => a.localeCompare(b)).map(n => `<div class="se-hist" data-hist="${iso}" title="${escapeAttr('Cleaned: ' + n)}"><span class="se-chip-label">✓ ${escapeHtml(n)}</span><span class="se-chip-n">${h.rounds[n].rows.length}</span></div>`).join('')
       + (h.jobs.length ? `<div class="se-hist job" data-hist="${iso}" title="Jobs done"><span class="se-chip-label">✓ 🔧 Jobs</span><span class="se-chip-n">${h.jobs.length}</span></div>` : '') : '';
@@ -298,8 +375,8 @@ function renderScheduleEditor(){
       ${off ? '<div class="se-off">🚫 Off</div>' : ''}${meta ? `<div class="se-meta"><span>${meta}</span></div>` : ''}${se.notes[iso] ? `<div class="se-daynote" data-note="${iso}" title="Tap to edit this note">📝 ${escapeHtml(se.notes[iso])}</div>` : ''}
       ${histHtml}${here.map(ch => {
         const n = ch.kind === 'round' ? ch.items.length : '';
-        const tip = ch.label + (ch.moved ? ' — moved from ' + fmtDate(ch.dispDate) : '') + (ch.isNew ? ' — new job' : '') + (ch.overdue ? ' — overdue since ' + fmtDate(ch.minDue) : '') + (ch.parked && !ch.moved ? ' — first clean, not booked yet: move it to a day' : '');
-        return `<div class="se-chip ${ch.kind}${ch.moved ? ' moved' : ''}${ch.isNew ? ' new' : ''}${ch.overdue ? ' overdue' : ''}${ch.first ? ' first' : ''}${se.sel.includes(ch.id) ? ' sel' : ''}" data-id="${escapeAttr(ch.id)}" title="${escapeAttr(tip)}"><span class="se-chip-label">${ch.overdue ? '⚠ ' : ''}${escapeHtml(ch.label)}</span>${n !== '' ? `<span class="se-chip-n">${n}</span>` : ''}</div>`;
+        const tip = ch.label + (ch.ahead ? ' — planned ' + (ch.n === 2 ? 'second' : 'third') + ' clean ahead' : '') + (ch.moved ? ' — moved from ' + fmtDate(ch.dispDate) : '') + (ch.isNew ? ' — new job' : '') + (ch.overdue ? ' — overdue since ' + fmtDate(ch.minDue) : '') + (ch.parked && !ch.moved ? ' — first clean, not booked yet: move it to a day' : '');
+        return `<div class="se-chip ${ch.kind}${ch.ahead ? ' ahead n' + ch.n : ''}${ch.moved ? ' moved' : ''}${ch.isNew ? ' new' : ''}${ch.overdue ? ' overdue' : ''}${ch.first ? ' first' : ''}${se.sel.includes(ch.id) ? ' sel' : ''}" data-id="${escapeAttr(ch.id)}" title="${escapeAttr(tip)}"><span class="se-chip-label">${ch.overdue ? '⚠ ' : ''}${escapeHtml(ch.label)}</span>${n !== '' ? `<span class="se-chip-n">${n}</span>` : ''}</div>`;
       }).join('')}
     </div>`;
   }
@@ -308,6 +385,7 @@ function renderScheduleEditor(){
   const sum = seChangeSummary();
   const parts = [];
   if(sum.movedC) parts.push(sePlural(sum.movedC, 'customer') + ' moved');
+  if(sum.movedA) parts.push(sePlural(sum.movedA, 'planned clean') + ' moved');
   if(sum.movedJ) parts.push(sePlural(sum.movedJ, 'job') + ' moved');
   if(sum.newJ) parts.push(sePlural(sum.newJ, 'new job'));
   if(sum.offAdded.length || sum.offRemoved.length || sum.wdChanged) parts.push('days off changed');
@@ -318,6 +396,8 @@ function renderScheduleEditor(){
   const parkedN = se.items.filter(seIsParked).length;
   count.textContent = [state, parts.join(' · ')].filter(Boolean).join(' · ') || (parkedN ? `No changes yet · ${sePlural(parkedN, 'first clean')} to book` : 'No changes yet');
   commit.style.opacity = sum.total ? '1' : '0.45';
+  const aheadBtn = document.getElementById('seAheadBtn');
+  if(aheadBtn){ aheadBtn.textContent = seAheadLabel(); aheadBtn.classList.toggle('active', se.ahead > 1); }
 
   undo.disabled = !se.history.length;
   multi.classList.toggle('active', se.multi);
@@ -349,7 +429,7 @@ function seMoveChips(ids, iso){
   if(seIsOff(iso) && !chips.every(ch => ch.dispDate === iso)){ toast('That day is marked as off'); return; }
   if(chips.every(ch => ch.date === iso)){ se.sel = []; renderScheduleEditor(); return; }
   sePush();
-  chips.forEach(ch => ch.items.forEach(it => { it.date = iso; }));
+  chips.forEach(ch => ch.items.forEach(it => seSetDate(it, iso)));
   se.sel = []; se.selDay = null;
   renderScheduleEditor();
 }
@@ -757,7 +837,7 @@ function sePushBackApply(){
   if(p.error){ toast(p.error); return; }
   if(!p.moves.length){ toast('Nothing is booked then'); return; }
   sePush();
-  p.moves.forEach(m => { m.it.date = m.to; });
+  p.moves.forEach(m => seSetDate(m.it, m.to));
   se.sel = []; se.selDay = null;
   seCloseModal();
   renderScheduleEditor();
@@ -796,7 +876,7 @@ function seSplitApply(){
   if(!iso || iso < se.todayStr){ toast('Choose today or a later day'); return; }
   if(seIsOff(iso)){ toast('That day is marked as off'); return; }
   sePush();
-  ch.items.forEach(it => { if(keys.has(it.key)) it.date = iso; });
+  ch.items.forEach(it => { if(keys.has(it.key)) seSetDate(it, iso); });
   se.sel = []; se.selDay = null;
   seCloseModal();
   renderScheduleEditor();
@@ -951,7 +1031,7 @@ function seAfterOffChange(pred){
 }
 function seMoveOffItems(){
   const stuck = se.offPending || [];
-  if(stuck.length){ sePush(); stuck.forEach(it => { it.date = seNextWorking(it.date, 1); }); }
+  if(stuck.length){ sePush(); stuck.forEach(it => seSetDate(it, seNextWorking(it.date, 1))); }
   se.offPending = null;
   renderScheduleEditor();
   seModal(seDaysOffHtml());
@@ -964,14 +1044,14 @@ function seReviewOpen(){
   const sum = seChangeSummary();
   if(!sum.total){ toast('Nothing has been changed yet'); return; }
   const groups = {};
-  se.items.filter(i => !i.isNew && i.kind === 'c' && i.date !== i.dispDate).forEach(i => {
-    const k = i.label + '|' + i.dispDate + '|' + i.date + '|' + (i.parked ? 1 : 0);
-    (groups[k] = groups[k] || { label:(i.first ? '🆕 ' : '') + i.label, from:i.dispDate, to:i.date, n:0, parked:!!i.parked }).n++;
+  se.items.filter(i => i.kind === 'c' && seItemMoved(i)).forEach(i => {
+    const k = (i.ahead ? i.n + '|' : '') + i.label + '|' + i.dispDate + '|' + i.date + '|' + (i.parked ? 1 : 0);
+    (groups[k] = groups[k] || { label:(i.ahead ? SE_ORD[i.n] + ' ' : '') + (i.first ? '🆕 ' : '') + i.label, from:i.dispDate, to:i.date, n:0, parked:!!i.parked }).n++;
   });
   const lines = [];
   Object.values(groups).sort((a, b) => a.from.localeCompare(b.from) || a.label.localeCompare(b.label)).forEach(g =>
     lines.push(`<li><b>${escapeHtml(g.label)}</b> — ${sePlural(g.n, 'customer')}<br><span class="se-from">${g.parked ? 'first clean, not booked' : seFmtDay(g.from)}</span> → <b>${seFmtDay(g.to)}</b></li>`));
-  se.items.filter(i => !i.isNew && i.kind === 'j' && i.date !== i.dispDate).forEach(i =>
+  se.items.filter(i => i.kind === 'j' && seItemMoved(i)).forEach(i =>
     lines.push(`<li><b>${escapeHtml(i.label)}</b><br><span class="se-from">${seFmtDay(i.dispDate)}</span> → <b>${seFmtDay(i.date)}</b></li>`));
   se.items.filter(i => i.isNew).forEach(i =>
     lines.push(`<li><b>New:</b> ${escapeHtml(i.label)}<br>on <b>${seFmtDay(i.date)}</b></li>`));
@@ -1017,8 +1097,8 @@ function commitSchedule(){
   if(!se) return;
   const sum = seChangeSummary();
   if(!sum.total){ toast('Nothing has been changed yet'); return; }
-  let customers = 0, jobs = 0, added = 0;
-  const snap = { cust:[], jobs:[], addedJobs:[], settings:null, notes:null }; // how things were, so the commit can be undone
+  let customers = 0, jobs = 0, added = 0, planned = 0;
+  const snap = { cust:[], jobs:[], addedJobs:[], plans:[], settings:null, notes:null }; // how things were, so the commit can be undone
   se.items.forEach(it => {
     if(it.isNew){
       it.job.date = it.date;
@@ -1027,7 +1107,7 @@ function commitSchedule(){
       added++;
       return;
     }
-    if(it.date === it.dispDate) return;
+    if(!seItemMoved(it)) return;
     if(it.kind === 'j'){
       const j = (data.oneOffJobs || []).find(x => x.id === it.key);
       if(j){ snap.jobs.push({ id:j.id, date:j.date }); j.date = it.date; jobs++; }
@@ -1035,6 +1115,19 @@ function commitSchedule(){
     }
     const c = data.customers.find(x => x.id === it.key);
     if(!c) return;
+    if(it.ahead){
+      // A planned 2nd / 3rd clean given a day of its own. If it is just a cycle after the clean before it, nothing needs keeping.
+      if(!snap.plans.some(o => o.id === c.id)) snap.plans.push({ id:c.id, had:('aheadPlan' in c), aheadPlan: c.aheadPlan == null ? c.aheadPlan : JSON.parse(JSON.stringify(c.aheadPlan)) });
+      const prev = se.items.find(o => o.kind === 'c' && o.key === it.key && (o.n || 1) === it.n - 1);
+      const def = prev ? seAddDays(prev.date, freqDays(c)) : null;
+      const len = (c.cleanHistory || []).length;
+      c.aheadPlan = c.aheadPlan || { dates:{} };
+      c.aheadPlan.dates = c.aheadPlan.dates || {};
+      if(def && it.date === def) delete c.aheadPlan.dates[len + it.n]; else c.aheadPlan.dates[len + it.n] = it.date;
+      Object.keys(c.aheadPlan.dates).forEach(k => { if(Number(k) <= len) delete c.aheadPlan.dates[k]; }); // numbers already passed
+      planned++;
+      return;
+    }
     snap.cust.push({ id:c.id, had:('dueOverride' in c), dueOverride: c.dueOverride == null ? c.dueOverride : JSON.parse(JSON.stringify(c.dueOverride)), deferUntil: c.deferUntil });
     // Back onto the day the normal rules would give? Then no hand-set date is needed.
     if(it.date === computedDueISO(c)) c.dueOverride = null;
@@ -1064,6 +1157,7 @@ function commitSchedule(){
   if(customers) bits.push(sePlural(customers, 'customer'));
   if(jobs) bits.push(sePlural(jobs, 'job'));
   let msg = bits.length ? `Schedule updated — ${bits.join(' and ')} moved` : 'Schedule updated';
+  if(planned) msg += `${bits.length ? ', ' : ' — '}${sePlural(planned, 'planned clean')} set`;
   if(added) msg += `${bits.length ? ', ' : ' — '}${sePlural(added, 'job')} added`;
   toast(msg, 'Undo', () => seUndoCommit(snap), 15000); // a long-ish window, in case it was done by accident
 }
@@ -1074,6 +1168,11 @@ function seUndoCommit(snap){
     if(!c) return;
     if(o.had) c.dueOverride = o.dueOverride; else delete c.dueOverride;
     c.deferUntil = o.deferUntil;
+  });
+  (snap.plans || []).forEach(o => {
+    const c = data.customers.find(x => x.id === o.id);
+    if(!c) return;
+    if(o.had) c.aheadPlan = o.aheadPlan; else delete c.aheadPlan;
   });
   snap.jobs.forEach(o => { const j = (data.oneOffJobs || []).find(x => x.id === o.id); if(j) j.date = o.date; });
   if(snap.addedJobs.length) data.oneOffJobs = (data.oneOffJobs || []).filter(j => !snap.addedJobs.includes(j.id));

@@ -172,6 +172,9 @@ function renderTodayHome(main){
   const mFinishText = (mEntry && mEntry.start!=null) ? ((mEntry.end!=null) ? mEntry.end : 'Tap to log') : '—';
   const mTotalText = (mEntry && mEntry.start!=null && mEntry.end!=null) ? (mEntry.end - mEntry.start).toFixed(1) : '—';
 
+  // Wide screens (iPad sideways / computer): an optional view-only copy of the day's list, under the tiles (02b-today-run.js).
+  const wideListHtml = (!todayRunOn && todayWideListOn()) ? todayReadOnlyListHtml(todayModel) : '';
+
   main.innerHTML = `
     ${todayRunOn ? '' : '<div class="today-cols"><div class="today-left">'}
     ${(!todayRunOn && typeof msgBannerHtml === 'function') ? msgBannerHtml(false) : ''}
@@ -228,6 +231,7 @@ function renderTodayHome(main){
         <div class="lbl">Job${todaysJobs.length===1?'':'s'} today</div>
       </div>` : ''}
     </div>
+    ${wideListHtml}
     </div><div class="today-right"><div class="today-owed">
       <div class="today-tile" onclick="setTab('rounds'); setRoundsView('owed');">
         <div class="num">${owedCustomers.length}</div>

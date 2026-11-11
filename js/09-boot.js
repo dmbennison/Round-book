@@ -552,6 +552,20 @@ async function runSelfTests(){
     });
   });
 
+  group('plannedAheadISO', () => {
+    const c = cust({ cleanHistory: [clean('2025-01-06')], aheadPlan: { dates: { 2: '2025-03-12', 3: '2025-04-09' } } });
+    withData([c], () => {
+      eq('plannedAheadISO: nothing planned gives null', plannedAheadISO(cust({ cleanHistory: [clean('2025-01-06')] }), 2), null);
+      eq('plannedAheadISO: the 2nd clean ahead of one done is clean number 2', plannedAheadISO(c, 1), '2025-03-12');
+      eq('plannedAheadISO: the clean after that', plannedAheadISO(c, 2), '2025-04-09');
+      eq('nextDueISO: a date planned ahead is used for the next clean', nextDueISO(c), '2025-03-12');
+      c.cleanHistory.push(clean('2025-03-12'));
+      eq('nextDueISO: a planned date steps forward once the clean before it is done', nextDueISO(c), '2025-04-09');
+      c.cleanHistory.push(clean('2025-04-09'));
+      eq('nextDueISO: a planned date lapses once its number has passed', nextDueISO(c), '2025-05-07');
+    });
+  });
+
   group('roundPhases', () => {
     const ph = last => (((isoToDays(last) + 28) % 28) + 28) % 28;
     withData([], () => eq('roundPhases: no customers gives no rounds', roundPhases(), {}));
