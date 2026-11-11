@@ -4,6 +4,22 @@ ROUND BOOK - RELEASE NOTES
 Newest first. This file is not part of the app and is not loaded by it; it ships alongside the code files.
 To add a release: raise APP_VERSION in js/01-data.js and CACHE_NAME in sw.js to the same number, then put a new entry at the top of this list.
 
+Version 1.354
+  - Today on an iPad held sideways or a computer: the work list, when shown, now takes the place of the Text and Mileage tiles
+    (and the Jobs today tile, as one-off jobs are on the list). Hide work list brings the tiles back. The big card shows the Done
+    count beside To do while the list is showing, along with the Cleaned and Paid amounts and the progress bar, as on the phone
+  - Keeping the iPad up to date: while the work list is on screen the iPad now checks for the phone's changes every 20 seconds
+    instead of every minute, so a clean or payment marked on the phone shows in the list and the big card within about half a
+    minute (the phone sends its changes about 20 seconds after they are made)
+  - New Map button on Today, on the phone (beside Start / Stop) and on the iPad / computer (beside Show work list). It shows
+    a map with a numbered pin for everyone still to do, in visiting order (round by round), with the route line joining them, and
+    the "Start round - directions" button opens the same people in Google Maps. People already cleaned drop off it, one-off jobs
+    are not shown (they have no saved pin). The map and the directions code are the round map's, now shared
+  - New Reorder button on the phone only, beside Start / Stop: a sheet listing everyone still to do, by round, to change the
+    order you visit by dragging the dots or with the up / down arrows. It changes the round's visiting order for next time too
+    (the same order Rounds > Reorder sets), anyone already done keeps their place, and nobody can be moved into another visit day
+  - Added self-checks for the map list and the reorder
+
 Version 1.353
   - Today on an iPad held sideways or a computer: a new "Show work list" button under the big card (and "Hide work list" to put
     it away) shows today's work list under the tiles, view only. It is the same people in the same visiting order as the phone's
