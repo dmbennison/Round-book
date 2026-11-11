@@ -1420,8 +1420,12 @@ function buildMapsLink(addrs){
 // (the Day and All/Due/Owed filters), so filter first to get directions for just
 // one day or just the customers that are due.
 function startRoundDirections(rn){
-  const custs = roundScopeList(rn).filter(c=>!c.paused);
-  const addrs = custs.filter(c=>c.address).map(c=>c.address);
+  const addrs = roundScopeList(rn).filter(c=>!c.paused).filter(c=>c.address).map(c=>c.address);
+  startDirectionsFor(addrs, rn, () => openRound(rn));
+}
+// Directions through a list of addresses in order, split into legs when there are more stops than one link holds.
+// title names the trip in the legs sheet; afterClose (optional) runs when that sheet is closed.
+function startDirectionsFor(addrs, title, afterClose){
   if(!addrs.length){ toast('No addresses to get directions to'); return; }
 
   const batches = [];
@@ -1436,7 +1440,7 @@ function startRoundDirections(rn){
   // in turn as you physically make your way through the round.
   openSheet(`
     <div class="sheet-head">
-      <h2 style="flex:1; min-width:0;">${escapeHtml(rn)} — directions</h2>
+      <h2 style="flex:1; min-width:0;">${escapeHtml(title)} — directions</h2>
       <button class="sheet-close" onclick="closeSheet()" aria-label="Close">✕</button>
     </div>
     <p style="color:var(--ink-muted); font-size:0.8125rem; margin:0 2px 16px; line-height:1.5;">
@@ -1448,7 +1452,7 @@ function startRoundDirections(rn){
         <div><div class="t1">Leg ${i+1} of ${batches.length}</div><div class="t2">${batch.length} stop${batch.length===1?'':'s'}</div></div>
       </button>
     `).join('')}
-  `, () => openRound(rn));
+  `, afterClose || null);
 }
 
 // Dials a customer/job's saved number via the device's phone app. Unlike the

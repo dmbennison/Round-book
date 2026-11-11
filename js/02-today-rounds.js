@@ -172,7 +172,7 @@ function renderTodayHome(main){
   const mFinishText = (mEntry && mEntry.start!=null) ? ((mEntry.end!=null) ? mEntry.end : 'Tap to log') : '—';
   const mTotalText = (mEntry && mEntry.start!=null && mEntry.end!=null) ? (mEntry.end - mEntry.start).toFixed(1) : '—';
 
-  // Wide screens (iPad sideways / computer): an optional view-only copy of the day's list, under the tiles (02b-today-run.js).
+  // Wide screens (iPad sideways / computer): an optional view-only copy of the day's list, which takes the place of the Text and Mileage tiles (02b-today-run.js).
   const wideListHtml = (!todayRunOn && todayWideListOn()) ? todayReadOnlyListHtml(todayModel) : '';
 
   main.innerHTML = `
@@ -189,7 +189,7 @@ function renderTodayHome(main){
         <div>
           <div style="display:flex; align-items:baseline; gap:16px;">
             <div><div class="num">${heroDueCusts.length}</div><div class="lbl" style="margin-top:2px;">To do</div></div>
-            ${heroCleanedToday!=null ? `<div><div class="num" style="font-size:1.75rem;">${heroCleanedToday}</div><div class="lbl" style="margin-top:2px;">Done</div></div>` : ''}
+            ${(heroCleanedToday!=null || wideListHtml) ? `<div><div class="num" style="font-size:1.75rem;">${heroCleanedToday!=null ? heroCleanedToday : todayModel.done}</div><div class="lbl" style="margin-top:2px;">Done</div></div>` : ''}
           </div>
           ${todaySelectedRound ? `<div class="lbl" style="margin-top:8px; color:#fff;">${escapeHtml(todaySelectedRound)}</div>` : ''}
         </div>
@@ -207,7 +207,7 @@ function renderTodayHome(main){
     </div>
     ${todayRunBarHtml(todayRunOn)}
     </div>
-    ${todayRunOn ? todayRunListHtml(todayModel) : `<div class="today-grid">
+    ${todayRunOn ? todayRunListHtml(todayModel) : wideListHtml ? wideListHtml : `<div class="today-grid">
       <div class="today-tile text-tile" onclick="setTab('rounds'); setRoundsView('text');">
         <div class="num">${textBefore.unsent.length}</div>
         <div class="lbl">Text before visit${textBeforeOverdue ? ` · ${textBeforeOverdue} overdue` : ''}</div>
@@ -231,7 +231,6 @@ function renderTodayHome(main){
         <div class="lbl">Job${todaysJobs.length===1?'':'s'} today</div>
       </div>` : ''}
     </div>
-    ${wideListHtml}
     </div><div class="today-right"><div class="today-owed">
       <div class="today-tile" onclick="setTab('rounds'); setRoundsView('owed');">
         <div class="num">${owedCustomers.length}</div>
@@ -1167,7 +1166,11 @@ let roundMapWatchId = null; // live location watch for the "you are here" pin
 async function showRoundMap(rn){
   // Maps exactly what the round list is showing (Day and All/Due/Owed filters), minus
   // paused customers. With nothing filtered that's the whole round.
-  const custs = roundScopeList(rn).filter(c=>!c.paused);
+  return showCustomersMap(roundScopeList(rn).filter(c=>!c.paused), { rn });
+}
+// The map itself, for any list of customers in visiting order: a round's own list, or the people still to do on Today's list.
+// ctx is { rn } for a round, or { title, directions } for Today (directions = the code the button runs).
+async function showCustomersMap(custs, ctx){
   const withAddress = custs.filter(c=>c.address);
   if(!withAddress.length){ toast('No addresses to map for this view'); return; }
 
@@ -1200,7 +1203,7 @@ async function showRoundMap(rn){
     });
   }
 
-  renderRoundMapSheet(rn, withAddress, fallbackCoords);
+  renderRoundMapSheet(ctx, withAddress, fallbackCoords);
 }
 function destroyRoundMap(){
   if(roundMapWatchId !== null && navigator.geolocation){ navigator.geolocation.clearWatch(roundMapWatchId); }
@@ -1208,11 +1211,15 @@ function destroyRoundMap(){
   if(roundMapLeafletInstance){ roundMapLeafletInstance.remove(); roundMapLeafletInstance = null; }
   roundMapRouteLine = null;
 }
-function renderRoundMapSheet(rn, customers, fallbackCoords){
+function renderRoundMapSheet(ctx, customers, fallbackCoords){
+  if(typeof ctx === 'string') ctx = { rn: ctx };
+  const rn = ctx.rn;
   const approxCount = fallbackCoords.size;
+  const mapTitle = ctx.title || `${rn} — map${roundScopeLabel(rn) ? ` · ${roundScopeLabel(rn)}` : ''}`;
+  const dirCall = ctx.directions || `startRoundDirections('${escapeAttr(rn)}')`;
   openSheet(`
     <div class="sheet-head">
-      <h2 style="flex:1; min-width:0;">${escapeHtml(rn)} — map${roundScopeLabel(rn) ? ` · ${escapeHtml(roundScopeLabel(rn))}` : ''}</h2>
+      <h2 style="flex:1; min-width:0;">${escapeHtml(mapTitle)}</h2>
       <button class="sheet-close" onclick="destroyRoundMap(); closeSheet();" aria-label="Close">✕</button>
     </div>
     ${approxCount ? `<p style="color:var(--amber); font-size:0.75rem; margin:0 2px 10px; line-height:1.4; font-weight:700;">📍 ${approxCount} address${approxCount===1?'':'es'} couldn't be found automatically — shown as a grey dashed pin near the others. Drag ${approxCount===1?'it':'them'} to the right spot to fix.</p>` : ''}
@@ -1224,7 +1231,7 @@ function renderRoundMapSheet(rn, customers, fallbackCoords){
       ${approxCount ? `<span><span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:${PIN_COLOUR_APPROX}; margin-right:5px;"></span>Approximate</span>` : ''}
     </div>
     <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 14px; line-height:1.4;">Numbered in your current visiting order. Tap a pin for the address, or drag any pin to correct its spot — dragging locks it there so it won't move again.</p>
-    <button class="btn btn-primary" style="width:100%;" onclick="startRoundDirections('${escapeAttr(rn)}')">Start round — directions</button>
+    <button class="btn btn-primary" style="width:100%;" onclick="${dirCall}">Start round — directions</button>
   `, destroyRoundMap);
   // The sheet needs to finish laying out (real, non-zero size) before Leaflet
   // measures its container, or the map renders as a grey box.

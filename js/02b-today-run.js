@@ -107,6 +107,8 @@ function todayRunBarHtml(running){
   return `<div class="today-run-bar">
       <button class="run-btn start" onclick="startTodayRun()"${running ? ' disabled' : ''}>▶ Start</button>
       <button class="run-btn stop" onclick="stopTodayRun()"${running ? '' : ' disabled'}>■ Stop</button>
+      <button class="run-btn tool" onclick="showTodayMap()" title="Map and route of who is still to do">🗺 Map</button>
+      <button class="run-btn tool" onclick="openTodayReorder()" title="Change the visiting order">⇅ Reorder</button>
       ${todaySelectedRound ? `<button class="run-btn all" onclick="clearTodayRound()" title="Show every round again">${escapeHtml(todaySelectedRound)} ✕</button>` : ''}
     </div>`;
 }
@@ -160,11 +162,12 @@ function todayWideListBarHtml(){
   const on = todayWideListOn();
   return `<div class="today-run-bar">
       <button class="run-btn ${on ? 'stop' : 'start'}" onclick="toggleTodayWideList()">${on ? '✕ Hide work list' : '📋 Show work list'}</button>
+      <button class="run-btn tool" onclick="showTodayMap()" title="Map and route of who is still to do">🗺 Map</button>
       ${todaySelectedRound ? `<button class="run-btn all" onclick="clearTodayRound()" title="Show every round again">${escapeHtml(todaySelectedRound)} ✕</button>` : ''}
     </div>`;
 }
 function todayReadOnlyListHtml(model){
-  const note = `<div class="ro-note">👁 View only — nothing on this list can be marked as cleaned or paid from here.</div>`;
+  const note = `<div class="ro-note">👁 View only — nothing on this list can be marked as cleaned or paid from here. It updates by itself when your phone syncs.</div>`;
   if(!model.total){
     return `<div class="today-ro-list">${note}<div class="empty"><b>Nothing to do today</b><p>Nobody is due and there are no jobs booked for today.</p></div></div>`;
   }
@@ -213,6 +216,158 @@ function todayReadOnlyJobHtml(j, done){
       <div class="ro-meta">${done ? '<span class="badge ok">Done</span>' : '<span class="badge due">Not done</span>'}${j.paid ? '<span class="badge ok">Paid</span>' : ''}</div>
     </div>`;
 }
+
+/* ---------- map and route of who is still to do ----------
+   The same map as a round's (showCustomersMap, 02-today-rounds.js) with a pin for everyone on today's list who has not been
+   done yet, numbered in visiting order and joined by the route line; the "Start round — directions" button opens the same
+   people in Google Maps. Round by round (A to Z) like the list itself, each in its own route order. Customers only: a
+   one-off job has no saved pin. Finishing someone takes them off the map next time it is opened. */
+function todayToDoCustomers(){
+  const groups = {};
+  todayListModel().rows.forEach(r => { if(r.type === 'c' && !r.done && !r.obj.paused) (groups[r.round] = groups[r.round] || []).push(r.obj); });
+  return groups;
+}
+function todayMapCustomers(){
+  const groups = todayToDoCustomers();
+  return Object.keys(groups).sort((a, b) => a.localeCompare(b)).reduce((all, rn) => all.concat(groups[rn].filter(c => c.address)), []);
+}
+async function showTodayMap(){
+  const custs = todayMapCustomers();
+  if(!custs.length){
+    toast(todayListModel().total ? 'Nobody left to do on today’s list' : 'Nothing to map — nobody is due today');
+    return;
+  }
+  await showCustomersMap(custs, { title: (todaySelectedRound ? todaySelectedRound + ' — ' : '') + 'To do today', directions: 'startTodayDirections()' });
+}
+function startTodayDirections(){
+  startDirectionsFor(todayMapCustomers().map(c => c.address), 'To do today', null);
+}
+
+/* ---------- reorder (phone only) ----------
+   ⇅ Reorder, beside Start / Stop, opens a sheet with everyone still to do, grouped by round: drag the ⠿ handle or use ▲ ▼.
+   It changes the round's own visiting order (the same order Rounds > Reorder sets, via reorderRoundSubset), so it is kept for
+   next time too. Anyone already done keeps their place; nobody can be moved into another visit day's stretch. */
+let todayReorderOpen = false, todayReorderDrag = null;
+function openTodayReorder(){
+  if(!todayRunAvailable()) return;
+  if(!Object.keys(todayToDoCustomers()).length){ toast('Nobody left to reorder on today’s list'); return; }
+  todayReorderOpen = true;
+  openSheet(`
+    <div class="sheet-head">
+      <h2 style="flex:1; min-width:0;">Reorder today’s list</h2>
+      <button class="sheet-close" onclick="closeSheet()" aria-label="Close">✕</button>
+    </div>
+    <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 12px; line-height:1.4;">Drag the dots, or use ▲ ▼, to change the order you visit. This changes the round’s visiting order for next time too. Anyone already done keeps their place.</p>
+    <div id="reorderList">${todayReorderRowsHtml()}</div>
+  `, () => { todayReorderOpen = false; todayReorderDrag = null; render(); });
+}
+function todayReorderRowsHtml(){
+  const groups = todayToDoCustomers();
+  const names = Object.keys(groups).sort((a, b) => a.localeCompare(b));
+  return names.map(rn => {
+    const list = groups[rn];
+    let html = names.length > 1 ? `<div class="section-label" style="margin:14px 2px 8px;">${escapeHtml(rn)}</div>` : '';
+    const dayN = {};
+    list.forEach((c, i) => {
+      const day = c.visitDay || 1;
+      dayN[day] = (dayN[day] || 0) + 1;
+      const first = i === 0 || (list[i-1].visitDay || 1) !== day;
+      const last = i === list.length - 1 || (list[i+1].visitDay || 1) !== day;
+      html += `
+      <div class="cust-card reorder-row" data-id="${c.id}" data-rn="${escapeAttr(rn)}" data-day="${escapeAttr(rn + '|' + day)}" style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+        <button type="button" onpointerdown="todayReorderDragStart(event,'${c.id}')" style="background:none; border:none; padding:6px; margin:-6px; color:var(--ink-muted); cursor:grab; touch-action:none; flex-shrink:0;" aria-label="Drag to reorder">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>
+        </button>
+        <div style="flex:1; min-width:0;">
+          <div class="cust-addr" style="font-size:0.9375rem; font-weight:800;">${dayN[day]}. ${escapeHtml(c.address || 'No address')}</div>
+          ${c.name ? `<div class="cust-name" style="font-size:0.8125rem; color:var(--ink-muted); margin-top:2px;">${escapeHtml(c.name)}</div>` : ''}
+        </div>
+        <div style="display:flex; flex-direction:column; gap:6px;">
+          <button class="btn-open icon-plain" style="width:34px; height:28px; padding:0; opacity:${first ? '0.3' : '1'};" onclick="todayReorderMove('${c.id}','up')">▲</button>
+          <button class="btn-open icon-plain" style="width:34px; height:28px; padding:0; opacity:${last ? '0.3' : '1'};" onclick="todayReorderMove('${c.id}','down')">▼</button>
+        </div>
+      </div>`;
+    });
+    return html;
+  }).join('');
+}
+function todayReorderRefresh(){
+  const el = document.getElementById('reorderList');
+  if(!el){ return; }
+  el.innerHTML = todayReorderRowsHtml();
+}
+// Puts one round's to-do customers in the order given (anyone not in the list keeps their place), then saves.
+function todayReorderApply(rn, ordered){
+  reorderRoundSubset(rn, ordered);
+  saveData();
+}
+function todayReorderMove(id, dir){
+  const c = data.customers.find(x => x.id === id);
+  if(!c) return;
+  const rn = c.round || 'Unassigned';
+  const list = todayToDoCustomers()[rn] || [];
+  const idx = list.findIndex(x => x.id === id);
+  const swap = dir === 'up' ? idx - 1 : idx + 1;
+  if(idx < 0 || swap < 0 || swap >= list.length) return;
+  if((list[idx].visitDay || 1) !== (list[swap].visitDay || 1)){ toast('That’s the edge of the day — use the Day button on the round to move someone to another day'); return; }
+  const ordered = list.slice();
+  const t = ordered[idx]; ordered[idx] = ordered[swap]; ordered[swap] = t;
+  todayReorderApply(rn, ordered);
+  todayReorderRefresh();
+}
+// Dragging by the handle. The row follows the finger with a transform (no fixed positioning, so it works inside the sheet)
+// and swaps past its neighbours in its own round and visit day; letting go saves the new order.
+function todayReorderDragStart(e, id){
+  e.preventDefault();
+  const list = document.getElementById('reorderList');
+  const row = list && list.querySelector(`.reorder-row[data-id="${id}"]`);
+  if(!row) return;
+  todayReorderDrag = { row, list, startY: e.clientY, grabTop: row.getBoundingClientRect().top };
+  row.style.position = 'relative'; row.style.zIndex = '5'; row.style.boxShadow = '0 8px 24px rgba(0,0,0,0.25)';
+  document.addEventListener('pointermove', todayReorderDragMove);
+  document.addEventListener('pointerup', todayReorderDragEnd, { once:true });
+  document.addEventListener('pointercancel', todayReorderDragEnd, { once:true });
+}
+function todayReorderDragMove(e){
+  const d = todayReorderDrag;
+  if(!d) return;
+  const { row, list } = d;
+  row.style.transform = '';
+  const h = row.getBoundingClientRect().height;
+  const wantTop = d.grabTop + (e.clientY - d.startY);
+  const mid = wantTop + h / 2;
+  const sibs = [...list.querySelectorAll('.reorder-row')].filter(x => x !== row && x.dataset.day === row.dataset.day);
+  let before = null;
+  for(const x of sibs){ const r = x.getBoundingClientRect(); if(mid < r.top + r.height / 2){ before = x; break; } }
+  if(before){ if(before !== row.nextElementSibling) list.insertBefore(row, before); }
+  else if(sibs.length){ const last = sibs[sibs.length - 1]; if(last.nextElementSibling !== row) last.after(row); }
+  row.style.transform = `translateY(${wantTop - row.getBoundingClientRect().top}px)`;
+}
+function todayReorderDragEnd(){
+  const d = todayReorderDrag;
+  document.removeEventListener('pointermove', todayReorderDragMove);
+  if(!d) return;
+  todayReorderDrag = null;
+  d.row.style.transform = ''; d.row.style.position = ''; d.row.style.zIndex = ''; d.row.style.boxShadow = '';
+  const byRound = {};
+  [...d.list.querySelectorAll('.reorder-row')].forEach(el => {
+    const c = data.customers.find(x => x.id === el.dataset.id);
+    if(c) (byRound[el.dataset.rn] = byRound[el.dataset.rn] || []).push(c);
+  });
+  Object.keys(byRound).forEach(rn => todayReorderApply(rn, byRound[rn]));
+  todayReorderRefresh();
+}
+
+/* ---------- keeping the iPad's work list up to date ----------
+   The phone's changes reach the iPad through live sync, which checks every minute. While the work list is on screen the
+   iPad checks every 20 seconds instead, so a clean or payment marked on the phone shows up (in the list and in the big card's
+   numbers) within about half a minute of being made. These are reads of the shared copy; a check that finds nothing new
+   costs nothing and sends nothing. */
+setInterval(() => {
+  try{
+    if(typeof liveActive !== 'undefined' && liveActive && currentTab === 'today' && document.visibilityState === 'visible' && todayWideListOn()) liveSyncNow();
+  }catch(e){}
+}, 20 * 1000);
 
 /* ---------- Start / Stop ---------- */
 function startTodayRun(){

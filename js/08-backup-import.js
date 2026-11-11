@@ -231,6 +231,8 @@ const FOCUSED_HELP = {
       helpP('<b>On a phone (or an iPad held upright)</b>'),
       helpList([
         'Press <b>▶ Start</b> under the big card to swap the tiles for today’s to-do list, in the order you visit them. Swipe the cards just like on the Rounds screen. <b>■ Stop</b> brings the tiles back.',
+        '<b>🗺 Map</b> (beside Start and Stop) shows a map with a numbered pin for everyone still to do, in visiting order, with the route joining them; <b>Start round – directions</b> on it opens the same people in Google Maps. Anyone you have already cleaned drops off it.',
+        '<b>⇅ Reorder</b> (phone only, beside Map) lets you change the order you visit the people still to do: drag the dots, or use ▲ ▼. It also changes the round’s visiting order for next time. Anyone already done keeps their place.',
         'When the progress bar reaches 100% fireworks celebrate a finished day.',
         'While the list is running the big card shrinks to the totals and a progress bar showing how much of today is done.',
         'A customer can only be marked cleaned once a day, so swiping right on a finished card does nothing: swipe left, or use Mark paid, to record the payment.',
@@ -239,7 +241,7 @@ const FOCUSED_HELP = {
       helpP('<b>On an iPad held sideways or a computer</b>'),
       helpList([
         'The big card is on the left with the Text and Mileage tiles under it, and the customers who owe are on the right, most overdue first. There is no Start / Stop here.',
-        'Tap <b>📋 Show work list</b> under the big card to see today’s work list under the tiles (<b>✕ Hide work list</b> puts it away; this device remembers your choice). It is <b>view only</b> – the same people in your visiting order, grouped by round, but nothing on it can be swiped, tapped or marked as cleaned or paid. Do that on your phone. Tapping a round’s chip on the big card shows just that round.'
+        'Tap <b>📋 Show work list</b> under the big card to see today’s work list <b>in place of the Text and Mileage tiles</b> (<b>✕ Hide work list</b> brings the tiles back; this device remembers your choice). While it is showing, this screen checks for your phone’s changes every 20 seconds, so a clean or payment marked on the phone appears in the list and in the big card’s numbers within about half a minute. It is <b>view only</b> – the same people in your visiting order, grouped by round, but nothing on it can be swiped, tapped or marked as cleaned or paid. Do that on your phone. Tapping a round’s chip on the big card shows just that round. <b>🗺 Map</b> beside it shows the people still to do on a map with the route, as on the phone.'
       ]),
       helpP('<b>Messages from your other devices</b> (⋯ menu > <b>Message your other devices</b>) show as a card at the top until you tap <b>Got it</b>. The sender is then told it has been read.'),
       helpList([
