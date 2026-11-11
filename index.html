@@ -413,6 +413,11 @@
   .se-chip.first{background:var(--green); color:#fff;} /* a first clean — a new customer or round that hasn't been cleaned yet */
   .se-daynote{margin:0 1px 3px; padding:2px 5px; border-radius:6px; background:var(--amber-dim); color:var(--ink); font-size:max(0.5625rem, calc(0.625rem * var(--z,1.4))); font-weight:var(--fw-bold); line-height:1.3; overflow-wrap:anywhere; cursor:pointer;}
   .se-chip.new{border:2px dashed #fff;}
+  /* a planned-ahead (2nd / 3rd) clean: an outline placeholder rather than a solid tile */
+  .se-chip.ahead{background:transparent; color:var(--ink); border:2px dashed var(--blue); box-shadow:none;}
+  .se-chip.ahead.n3{border-style:dotted; opacity:0.85;}
+  .se-chip.ahead .se-chip-n{background:var(--blue); color:#fff;}
+  .se-chip.ahead.moved{border-color:var(--amber); box-shadow:0 0 0 2px var(--amber-dim);}
   .se-chip.moved.new{box-shadow:0 0 0 2px var(--green), 0 1px 3px rgba(0,0,0,0.25);}
   .se-cell.off{background:repeating-linear-gradient(135deg, transparent 0 6px, var(--line) 6px 7px);}
   .se-cell.selday{outline:2px solid var(--blue); outline-offset:-2px;}
@@ -1055,6 +1060,17 @@
   .hero-progress-lbl{display:flex; justify-content:space-between; margin-top:5px; font-size:0.6875rem; font-weight:var(--fw-bold); color:#B9D2E2;}
   .today-done .swipe-wrap, .swipe-wrap.today-done{opacity:0.6;}
   .today-run-list > .round-group-header:first-child{margin-top:4px !important;}
+  /* view-only work list on the wide Today screen (02b-today-run.js) */
+  .today-ro-list > .round-group-header:first-child{margin-top:4px !important;}
+  .ro-note{margin:14px 0 4px; padding:8px 10px; border-radius:10px; background:var(--amber-dim); color:var(--ink); font-size:0.75rem; font-weight:var(--fw-bold);}
+  .ro-card{margin:0 0 8px; padding:12px 14px; border-radius:var(--radius); background:var(--card, #fff); border:1px solid var(--line); cursor:default; user-select:text; -webkit-user-select:text;}
+  .ro-card.done{opacity:0.6;}
+  .ro-top{display:flex; align-items:flex-start; justify-content:space-between; gap:12px;}
+  .ro-addr{font-size:1rem; font-weight:800; color:var(--ink);}
+  .ro-sub{font-size:0.8125rem; font-weight:600; color:var(--ink-muted); margin-top:2px;}
+  .ro-note-line{font-size:0.75rem; color:var(--ink-muted); margin-top:4px; line-height:1.4;}
+  .ro-price{flex:none; font-size:1rem; font-weight:800; color:var(--ink);}
+  .ro-meta{display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;}
   /* the calendar button in Search, and the rows of "everything on this date" */
   .day-pick{position:relative; flex:none; width:48px; height:48px; border-radius:14px; display:flex; align-items:center; justify-content:center; font-size:1.25rem; background:var(--glass-fill-strong); box-shadow:var(--glass-hi); -webkit-backdrop-filter:var(--glass-blur); backdrop-filter:var(--glass-blur); cursor:pointer;}
   .day-row{display:flex; align-items:center; gap:10px; width:100%; text-align:left; margin:0 0 6px; padding:10px 12px; border:none; border-radius:12px; background:var(--glass-fill); box-shadow:var(--glass-hi); color:var(--ink); font:inherit; cursor:pointer;}
@@ -1214,6 +1230,7 @@
       <button class="se-tool" onclick="seZoomBy(1/1.25)" aria-label="Zoom out">🔍−</button>
     </div>
     <button class="se-tool" id="seUndo" onclick="seUndo()">↶ Undo</button>
+    <button class="se-tool" id="seAheadBtn" onclick="seCycleAhead()" title="How many cleans ahead to show for each round">📆 Next clean</button>
     <button class="se-tool" id="seMoreToolsBtn" onclick="seToggleMoreTools()" aria-expanded="false">⋯ More…</button>
     <button class="se-tool se-extra" onclick="sePushBackOpen()">☔ Push back</button>
     <button class="se-tool se-extra" id="seMultiBtn" onclick="seToggleMulti()">☑ Multi</button>

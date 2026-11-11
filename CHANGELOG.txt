@@ -4,6 +4,24 @@ ROUND BOOK - RELEASE NOTES
 Newest first. This file is not part of the app and is not loaded by it; it ships alongside the code files.
 To add a release: raise APP_VERSION in js/01-data.js and CACHE_NAME in sw.js to the same number, then put a new entry at the top of this list.
 
+Version 1.353
+  - Today on an iPad held sideways or a computer: a new "Show work list" button under the big card (and "Hide work list" to put
+    it away) shows today's work list under the tiles, view only. It is the same people in the same visiting order as the phone's
+    list, grouped by round and with one-off jobs, showing the price, any note, due / owes / fronts only / text first badges and
+    a tick for those already cleaned. Nothing on it can be swiped, tapped, right-clicked or marked as cleaned or paid, so cleans
+    and payments can only be recorded from the phone. Tapping a round's chip on the big card narrows it to that round. The
+    choice is remembered on that device only. The phone's Start / Stop list is unchanged
+  - Schedule: plan ahead. A new button beside Undo (Next clean / Next 2 cleans / Next 3 cleans) shows the coming cleans of every
+    round, not just the next one. The 2nd and 3rd are dashed placeholder tiles marked 2 and 3 (a cleaning cycle after the one
+    before; 4-weekly customers four weeks apart and so on), counted on each day as "planned" and included in the heavy-day
+    shading. They can be moved, split, pushed back and printed like any tile. Moving a clean moves the placeholders after it
+    with it, unless one has been given a day of its own. The calendar widens by itself to fit (13 weeks for 3 cleans), and the
+    choice is remembered on that device. The review step and the Commit message list planned cleans separately, and Undo after
+    Commit puts them back
+  - A planned day is kept on the customer (aheadPlan, keyed by clean number) and used as the next due date once the clean
+    before it has been done, so Today, Due and the reports follow it; once that number has passed it lapses by itself. A
+    placeholder left on its normal cycle writes nothing. Added self-tests for the planned dates
+
 Version 1.352
   - Backup reminder: when the app opens it now first checks for a new version (and if one has just been installed it
     reloads itself straight away, as nothing is open yet), then lets live sync bring this device up to date, and only
