@@ -74,10 +74,16 @@ function liveAgo(ts){
 /* ---------- stored settings (kept in the sync database, alongside the device id) ---------- */
 async function liveMeta(){ const m = await syncMetaGet(); return m.live || null; }
 async function liveSave(meta, live){
+  // A copy of the settings that has lost the key (the stored one was dropped once, say) must not overwrite a key this
+  // device is holding in memory: put it back, so it is saved again rather than staying lost.
+  if(!live.key && liveMem.key) live = Object.assign({}, live, { key: liveMem.key });
   try{ await syncMetaPut(Object.assign({}, meta, { live })); }
   catch(e){
-    // Some browsers can't store the key object — keep it in memory and ask again next launch.
-    try{ await syncMetaPut(Object.assign({}, meta, { live: Object.assign({}, live, { key: null }) })); }catch(e2){}
+    // A save can fail for a passing reason (the database busy or closing), and dropping the key on the first failure meant the
+    // passphrase was asked for again at every launch from then on. So try once more before giving the key up.
+    try{ await new Promise(r => setTimeout(r, 300)); await syncMetaPut(Object.assign({}, meta, { live })); return; }catch(e2){}
+    // Some browsers can't store the key object at all — keep it in memory and ask again next launch.
+    try{ await syncMetaPut(Object.assign({}, meta, { live: Object.assign({}, live, { key: null }) })); }catch(e3){}
   }
 }
 // Read-modify-write of just the live settings. patch is an object, or a function of the current settings.
@@ -776,8 +782,13 @@ async function liveUnlock(){
   const room = await liveDeriveRoom(pw);
   if(room.roomId !== live.roomId){ appAlert('That isn\'t the passphrase live sync was set up with.', {title:'Unlock live sync'}); return; }
   liveMem.key = await syncDeriveKey(pw, live.salt);
+  // Keep the key on this device, so the passphrase is not asked for again the next time the app is opened. (Until now an
+  // unlock only lasted until the app was closed.)
+  let kept = false;
+  try{ await liveUpdate({ key: liveMem.key }); const again = await liveMeta(); kept = !!(again && again.key); }catch(e){}
   liveSetStatus('syncing');
   closeSheet();
+  if(!kept) toast('Unlocked — but this browser can’t remember the passphrase, so it will ask again after the app is closed');
   liveSyncNow({ force:true });
 }
 async function liveSyncNowButton(){
@@ -795,6 +806,7 @@ function liveTurnOff(){
   appConfirm('Stop live sync on this device? Your data stays exactly as it is here. The encrypted copy stays in your Cloudflare mailbox until you delete it.', {
     title:'Turn off live sync', confirmLabel:'Turn off', danger:true,
     onConfirm: async () => {
+      liveMem.key = null;
       liveActive = false; clearTimeout(livePushTimer); liveFirstDirtyAt = 0;
       const meta = await syncMetaGet();
       delete meta.live;
