@@ -4,6 +4,28 @@ ROUND BOOK - RELEASE NOTES
 Newest first. This file is not part of the app and is not loaded by it; it ships alongside the code files.
 To add a release: raise APP_VERSION in js/01-data.js and CACHE_NAME in sw.js to the same number, then put a new entry at the top of this list.
 
+Version 1.358
+  - Remove from list (Live sync screen) now deletes the device from the Cloudflare mailbox as well, which frees one of its 6
+    places. This needs the updated worker: worker.js, in the separate round-book-sync folder (it is pasted into the Worker in the
+    Cloudflare dashboard, not uploaded with the app), gains DELETE /v1/{room}/state/{device}. Until the worker is updated the
+    button still works but only hides the device on your own devices, and says so. A device that is still in use puts itself
+    back the next time it sends
+
+Version 1.357
+  - Live sync screen: the devices are now named, so you can tell which is which. Each device shows what it is (iPhone, iPad,
+    Mac, Android, Windows PC, and whether it is the home-screen app or a browser tab, which keep separate storage and so count
+    as separate devices) or a name you give it: tap "Name this device" and call it "Phone", "iPad", "iMac" and so on. The name is
+    sent inside the encrypted copy each device sends, so the other devices show it and the Cloudflare mailbox never sees it
+  - The screen shows "This device" first, then each of the others, newest first, with its name, the version of the app it runs,
+    when it last sent and any problem, and flags one not used for over a week as probably an old one. A device that has not
+    been updated to this version has no name yet and shows as "Unnamed device" with the last four characters of its code; it
+    names itself the first time it syncs after being updated
+  - New "Remove from list" button on each of the other devices, for old ones left behind (for instance by clearing a browser's
+    data, reinstalling the app, or opening it in a browser tab as well as from the home screen, each of which makes a new device).
+    A removed device is ignored by all your devices (the removal is sent to the others), and if it turns out to be still in use
+    it comes back by itself the next time it sends. It is taken off the list only: the mailbox itself still holds its copy and
+    still counts it towards its limit of 6 devices, which would need a change to the Cloudflare worker
+
 Version 1.356
   - Live sync: changes made on one device could fail to reach the others with nothing to show for it. Three causes found and
     fixed. (1) Each device's changes are checked to be newer than the last ones received from it, using the clock of the device
