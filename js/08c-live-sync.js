@@ -33,6 +33,12 @@ let liveApplying = false;
 // liveUiBusy). It is NOT "in sync" — the chip says so, and closing the screen triggers an immediate retry.
 let liveDeferred = false;
 const liveMem = { key: null };
+/* What this device last saw of each OTHER device in the mailbox, for the sync screen: which version of the app it runs, when it
+   sent, whether its changes were taken in, and anything wrong with it. Memory only (it is rebuilt on every check). */
+const livePeerInfo = {};
+const liveStale = {}; // peerId -> { headAt, since }: an "older copy" that has not changed since it was first seen
+const LIVE_STALE_PATIENCE_MS = 3*60*1000;
+function liveNotePeer(id, info){ livePeerInfo[id] = Object.assign({}, livePeerInfo[id] || {}, info, { checkedAt: Date.now() }); }
 const liveNotYet = new Map();              // photo id -> when the cloud last said "not there yet"
 let liveStatus = { state: 'off', text: '', okAt: 0 };
 
@@ -62,6 +68,12 @@ function liveUiFreed(){
 async function liveHashState(state){
   const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(syncStable(state)));
   return liveHex(new Uint8Array(d));
+}
+function liveSpan(ms){
+  const m = Math.round(ms / 60000);
+  if(m < 90) return m + ' minutes';
+  const h = Math.round(m / 60);
+  return h < 48 ? h + ' hours' : Math.round(h / 24) + ' days';
 }
 function liveAgo(ts){
   const s = Math.max(0, Math.round((Date.now() - ts) / 1000));
@@ -329,7 +341,7 @@ async function livePullInner(opts){
     liveSetStatus('attention', 'This device\'s data can\'t be merged automatically yet. Open Backup → Live sync → Live sync and choose what to do.');
     return { ok:false };
   }
-  let more = false;
+  let more = false, problem = false;
   // A device that has never synced (it holds no data) starts from the most recently updated device; otherwise every
   // other device is checked in turn and anything new from it is merged in.
   const order = live.base == null ? [others[others.length - 1]] : others;
@@ -337,27 +349,44 @@ async function livePullInner(opts){
     live = await liveMeta();
     const headAt = devs[peerId].updatedAt || 0;
     let rec = livePeerRecord(live, peerId);
-    if(rec && rec.headAt === headAt) continue; // nothing new from this one
+    if(rec && rec.headAt === headAt){ liveNotePeer(peerId, { headAt, note: '' }); continue; } // nothing new from this one
     let st;
     try{ st = await liveApi(live, 'GET', '/state/' + peerId); }catch(e){ liveSetStatus('offline'); return { ok:false }; }
     if(!st.ok){ if(st.status === 404) continue; await liveFail(st); return { ok:false }; }
     const env = st.json;
     if(!env || env.app !== 'round-book-sync') continue;
+    // A problem with one device no longer stops the others being merged in: it is noted, shown on the sync screen, and the
+    // rest carry on (nothing is sent from here until it is cleared, as before).
     if(env.salt !== live.salt){
       liveSetStatus('error', 'Live sync was set up again on another device. Turn it off here, then use "Join" to reconnect.');
-      return { ok:false };
+      liveNotePeer(peerId, { headAt, note: 'set up again — turn live sync off here and Join again' });
+      problem = true; continue;
     }
     const payload = await syncDecrypt(env, key);
     if(!payload || !payload.state){
       liveSetStatus('error', 'Couldn\'t read another device\'s data — check all your devices use the same passphrase.');
-      return { ok:false };
+      liveNotePeer(peerId, { headAt, note: 'couldn’t be read — check the passphrase matches' });
+      problem = true; continue;
     }
+    // How far that device's clock is from the mailbox's (a device with a wrong date or time confuses the "older copy" check below)
+    const skew = headAt && payload.createdAt ? payload.createdAt - headAt : 0;
+    const clockNote = Math.abs(skew) > 10*60*1000 ? ` · its clock is about ${liveSpan(Math.abs(skew))} ${skew < 0 ? 'behind' : 'ahead'}` : '';
+    liveNotePeer(peerId, { appVersion: payload.appVersion, sentAt: payload.createdAt, headAt, note: '', clock: clockNote });
     if(payload.appVersion && versionNewerThanMine(payload.appVersion)){
       liveSetStatus('error', 'Another device has a newer version of Round Book. Close and reopen the app here to update, then sync will continue.');
-      return { ok:false };
+      liveNotePeer(peerId, { note: 'is on a newer version (' + payload.appVersion + ') — close and reopen the app here to update' });
+      problem = true; continue;
     }
-    // Cloudflare can briefly serve an older copy; wait for the next check rather than going backwards.
-    if(rec && rec.createdAt && payload.createdAt <= rec.createdAt) continue;
+    // Cloudflare can briefly serve an older copy; wait for the next check rather than going backwards. But if the copy is still
+    // "older" three minutes on while the mailbox says the device sent something new, it is that device's clock that went back
+    // (set wrongly then corrected, say), not a stale copy: its changes were being ignored for good. Take it from then on.
+    if(rec && rec.createdAt && payload.createdAt <= rec.createdAt){
+      const st = liveStale[peerId];
+      if(!st || st.headAt !== headAt){ liveStale[peerId] = { headAt, since: Date.now() }; liveNotePeer(peerId, { note: 'waiting — the mailbox shows an older copy' }); continue; }
+      if(Date.now() - st.since < LIVE_STALE_PATIENCE_MS){ continue; }
+      liveNotePeer(peerId, { note: 'its clock had gone back — taking its changes anyway' });
+    }
+    delete liveStale[peerId];
     if(!rec && live.base != null){
       const firstOther = !live.peers || !Object.keys(live.peers).length; // the very first other device to appear after set-up
       if(firstOther && live.peerDeviceId == null){
@@ -370,9 +399,11 @@ async function livePullInner(opts){
       }
     }
     const r = await liveMergeIn(live, payload, headAt, opts, rec, devs);
+    liveNotePeer(peerId, { note: r === 'deferred' ? 'held back — a screen is open here, or a clash needs an answer' : r === 'merged' ? 'changes taken in' : '' });
     // deferred only counts as "held back by an open screen" when one really is open (a clash waiting for an answer is different)
     if(r === 'deferred') return { ok:true, deferred: liveUiBusy() && !opts.force };
   }
+  if(problem) return { ok:false };
   live = await liveMeta();
   const pp = await livePullPhotos(live, key);
   more = pp.more;
@@ -858,6 +889,14 @@ function liveSyncSectionHtml(meta){
   lines.push(`<div style="font-size:0.8125rem; margin-top:4px;">${escapeHtml(stateText)}</div>`);
   if(s.text) lines.push(`<div style="font-size:0.8125rem; margin-top:6px; color:var(--red); line-height:1.5;">${escapeHtml(s.text)}</div>`);
   if(live.lastPushAt) lines.push(`<div style="font-size:0.75rem; margin-top:6px; color:var(--ink-muted);">Last sent ${liveAgo(live.lastPushAt)}${live.lastPullAt ? ' · last received ' + liveAgo(live.lastPullAt) : ''}${live.lastSummary ? ' · ' + escapeHtml(live.lastSummary) : ''}</div>`);
+  const peers = Object.keys(livePeerInfo);
+  if(peers.length){
+    lines.push(`<div style="font-size:0.75rem; margin-top:10px; font-weight:800;">Your other devices</div>` + peers.map(id => {
+      const p = livePeerInfo[id];
+      const bits = [`app ${p.appVersion || '?'}`, p.sentAt ? 'sent ' + liveAgo(p.sentAt) : (p.headAt ? 'updated ' + liveAgo(p.headAt) : '')].filter(Boolean).join(' · ');
+      return `<div style="font-size:0.75rem; margin-top:4px; color:var(--ink-muted); line-height:1.45;">…${escapeHtml(String(id).slice(-4))} · ${escapeHtml(bits)}${escapeHtml(p.clock || '')}${p.note ? ' · <b>' + escapeHtml(p.note) + '</b>' : ''}</div>`;
+    }).join(''));
+  }
   let actions = '';
   if(!(live.key || liveMem.key)) actions += btn('🔒 Unlock with passphrase', 'liveUnlock()', 'background:var(--navy); color:#fff;');
   if(live.base == null) actions += btn('Use another device\'s data on this device', 'liveAdoptPeer()', 'background:var(--navy); color:#fff;');
