@@ -4,6 +4,19 @@ ROUND BOOK - RELEASE NOTES
 Newest first. This file is not part of the app and is not loaded by it; it ships alongside the code files.
 To add a release: raise APP_VERSION in js/01-data.js and CACHE_NAME in sw.js to the same number, then put a new entry at the top of this list.
 
+Version 1.356
+  - Live sync: changes made on one device could fail to reach the others with nothing to show for it. Three causes found and
+    fixed. (1) Each device's changes are checked to be newer than the last ones received from it, using the clock of the device
+    that sent them; if that clock had been wrong and then corrected (an old computer's date or time, say), everything it sent
+    afterwards looked "older" and was ignored for good. A copy that is still "older" three minutes on, while the mailbox says
+    the device sent something new, is now taken. (2) A problem with one device (a newer version of the app, a passphrase that
+    doesn't match) stopped the changes of the other devices being merged in as well; now the rest carry on and the problem is
+    shown. (3) None of this was visible: the sync screen (Backup > Live sync) now lists your other devices with the version of
+    the app each one is running, when it last sent, whether its changes were taken in, and anything wrong, including a clock
+    that is far out
+  - A device that finds another one on a newer version of the app still doesn't send its own changes until it has been closed
+    and reopened to update; the sync screen now says which device that is
+
 Version 1.355
   - Live sync no longer keeps asking for the passphrase. Unlocking with the passphrase only held the key until the app was
     closed (it was never saved on the device), so after the app had been closed and reopened - which an iPad or phone does
