@@ -38,6 +38,101 @@ const liveMem = { key: null };
 const livePeerInfo = {};
 const liveStale = {}; // peerId -> { headAt, since }: an "older copy" that has not changed since it was first seen
 const LIVE_STALE_PATIENCE_MS = 3*60*1000;
+let liveRemoved = {};   // devices taken off the list on this or another device: id -> { at, headAt } (see liveRemoveDevice)
+let liveLastDevs = {};  // the mailbox's list of devices as of the last check: id -> { updatedAt }
+const liveInfoTried = {}; // devices whose name / app version has already been looked up this session
+const LIVE_NAME_KEY = 'roundBookDeviceName';
+
+/* ---------- telling the devices apart ----------
+   Every device gets a name that the others show: the one it was given (Rename, on the sync screen), or else what it is
+   (iPhone, iPad, Mac...) and whether it is the home-screen app or a browser tab, which keep separate storage and so count as
+   different devices. The name travels inside the encrypted copy each device sends, so the mailbox never sees it. */
+function liveAutoDeviceLabel(){
+  const ua = navigator.userAgent || '';
+  const touch = (navigator.maxTouchPoints || 0) > 1;
+  let kind = 'Device';
+  if(/iPhone/.test(ua)) kind = 'iPhone';
+  else if(/iPad/.test(ua) || (/Macintosh/.test(ua) && touch)) kind = 'iPad'; // an iPad asks for the Mac's page, but has a touch screen
+  else if(/Android/.test(ua)) kind = 'Android';
+  else if(/Macintosh|Mac OS/.test(ua)) kind = 'Mac';
+  else if(/Windows/.test(ua)) kind = 'Windows PC';
+  let standalone = false;
+  try{ standalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true; }catch(e){}
+  return kind + (standalone ? ' (home-screen app)' : ' (browser)');
+}
+function liveCustomDeviceName(){ try{ return (localStorage.getItem(LIVE_NAME_KEY) || '').trim(); }catch(e){ return ''; } }
+function liveDeviceName(){ return liveCustomDeviceName() || liveAutoDeviceLabel(); }
+function liveRenameDevice(){
+  appConfirm('What should this device be called on your other devices? For example “Phone”, “iPad” or “iMac”. Leave it empty to go back to the automatic name.', {
+    title:'Name this device', confirmLabel:'Save', danger:false,
+    input:{ type:'text', value: liveCustomDeviceName(), placeholder:'e.g. Phone' },
+    onConfirm: async (v) => {
+      try{ localStorage.setItem(LIVE_NAME_KEY, String(v || '').trim().slice(0, 40)); }catch(e){}
+      await liveUpdate({ nameSent: null }); // the next check sends the new name across
+      toast('Named');
+      openSyncSheet();
+      liveSyncNow({ force:true });
+    }
+  });
+}
+function liveIsRemoved(id, devs){
+  const r = liveRemoved[id];
+  return !!r && ((devs && devs[id] && devs[id].updatedAt) || 0) <= (r.headAt || 0); // one that has sent something since comes back by itself
+}
+// Notes a device's name and app version from a copy it sent, and the devices it has taken off the list.
+async function liveRememberPeer(id, payload){
+  const me = syncDeviceId();
+  await liveUpdate(cur => {
+    const names = Object.assign({}, cur.peerNames || {});
+    names[id] = { name: payload.deviceName || '', appVersion: payload.appVersion || null, sentAt: payload.createdAt || 0 };
+    const removed = Object.assign({}, cur.removed || {});
+    Object.keys(payload.removed || {}).forEach(r => {
+      const inc = payload.removed[r];
+      if(r === me || !inc || typeof inc !== 'object') return;
+      if(!removed[r] || (inc.at || 0) > (removed[r].at || 0)) removed[r] = { at: inc.at || 0, headAt: inc.headAt || 0 };
+    });
+    return { peerNames: names, removed };
+  });
+}
+// A device that has nothing new to merge isn't downloaded, so its name and version are looked up once, the first time they're wanted.
+async function liveLearnPeers(live, key, devs, ids){
+  let n = 0;
+  for(const id of ids){
+    if(liveInfoTried[id] || (live.peerNames && live.peerNames[id])) continue;
+    liveInfoTried[id] = true;
+    if(++n > 6) break;
+    try{
+      const st = await liveApi(live, 'GET', '/state/' + id);
+      if(!st.ok || !st.json || st.json.app !== 'round-book-sync' || st.json.salt !== live.salt) continue;
+      const payload = await syncDecrypt(st.json, key);
+      if(payload && payload.state) await liveRememberPeer(id, payload);
+    }catch(e){}
+  }
+}
+async function liveRemoveDevice(id){
+  const live = await liveMeta(); if(!live) return;
+  const known = (live.peerNames && live.peerNames[id]) || {};
+  const headAt = (liveLastDevs[id] && liveLastDevs[id].updatedAt) || 0;
+  const name = known.name || 'Unnamed device';
+  appConfirm(`Remove “${name}” (…${String(id).slice(-4)}), last used ${headAt ? liveAgo(headAt) : 'a while ago'}? Its copy is deleted from the mailbox and every one of your devices stops using it. If it is still in use it comes back by itself the next time it syncs.`, {
+    title:'Remove device', confirmLabel:'Remove', danger:true,
+    onConfirm: async () => {
+      // Deleted from the mailbox too, which frees one of its 6 places. A mailbox that hasn't been updated for this (its worker
+      // answers "not found") can't, so the device is only ignored by your devices instead. Either way it is hidden at once,
+      // as the mailbox's list can take up to a minute to catch up.
+      let outcome = 'deleted';
+      try{
+        const r = await liveApi(live, 'DELETE', '/state/' + id);
+        if(!r.ok) outcome = (r.status === 404 || r.status === 405) ? 'old' : 'failed';
+      }catch(e){ toast(OFFLINE_MSG); return; }
+      const upd = await liveUpdate(cur => ({ removed: Object.assign({}, cur.removed || {}, { [id]: { at: Date.now(), headAt } }), lastPushHash: null }));
+      liveRemoved = upd.removed || {};
+      toast(outcome === 'deleted' ? 'Device removed' : outcome === 'old' ? 'Device hidden on your devices — update the Cloudflare worker to delete it from the mailbox too' : 'Device hidden on your devices — the mailbox couldn’t delete it just now');
+      openSyncSheet();
+      liveSyncNow({ force:true }); // tells the other devices
+    }
+  });
+}
 function liveNotePeer(id, info){ livePeerInfo[id] = Object.assign({}, livePeerInfo[id] || {}, info, { checkedAt: Date.now() }); }
 const liveNotYet = new Map();              // photo id -> when the cloud last said "not there yet"
 let liveStatus = { state: 'off', text: '', okAt: 0 };
@@ -264,13 +359,13 @@ function liveClashLater(){
 /* ---------- pulling in the other device's changes ---------- */
 function liveHeadPeer(devs){
   const me = syncDeviceId();
-  const others = Object.keys(devs).filter(id => id !== me).sort((a,b) => (devs[b].updatedAt||0) - (devs[a].updatedAt||0));
+  const others = Object.keys(devs).filter(id => id !== me && !liveIsRemoved(id, devs)).sort((a,b) => (devs[b].updatedAt||0) - (devs[a].updatedAt||0));
   return others.length ? others[0] : null;
 }
 // Devices other than this one that have stored data in the mailbox, the one updated longest ago first.
 function liveOtherDevices(devs){
   const me = syncDeviceId();
-  return Object.keys(devs).filter(id => id !== me).sort((a,b) => (devs[a].updatedAt||0) - (devs[b].updatedAt||0));
+  return Object.keys(devs).filter(id => id !== me && !liveIsRemoved(id, devs)).sort((a,b) => (devs[a].updatedAt||0) - (devs[b].updatedAt||0));
 }
 // What this device remembers about ONE other device: the last state it merged in from it (the starting point, or "base",
 // for the next three-way merge), when that copy was made, and the mailbox's update time for it then. With more than two
@@ -327,6 +422,7 @@ async function livePullInner(opts){
   opts = opts || {};
   let live = await liveMeta();
   if(!live || !live.enabled) return { ok:false };
+  liveRemoved = live.removed || {};
   const key = live.key || liveMem.key;
   if(!key){ liveSetStatus('locked'); return { ok:false }; }
   if(live.pausedUntil && Date.now() < live.pausedUntil){ return { ok:false }; }
@@ -335,8 +431,10 @@ async function livePullInner(opts){
   try{ head = await liveApi(live, 'GET', '/head'); }catch(e){ liveSetStatus('offline'); return { ok:false }; }
   if(!head.ok){ await liveFail(head); return { ok:false }; }
   const devs = (head.json && head.json.devices) || {};
+  liveLastDevs = devs;
   const others = liveOtherDevices(devs);
   if(!others.length){ if(liveStatus.state !== 'ok') liveSetStatus('waiting'); return { ok:true, waiting:true }; }
+  await liveLearnPeers(live, key, devs, others);
   if(live.base == null && !syncLocalIsEmpty() && !opts.adopt){
     liveSetStatus('attention', 'This device\'s data can\'t be merged automatically yet. Open Backup → Live sync → Live sync and choose what to do.');
     return { ok:false };
@@ -372,6 +470,7 @@ async function livePullInner(opts){
     const skew = headAt && payload.createdAt ? payload.createdAt - headAt : 0;
     const clockNote = Math.abs(skew) > 10*60*1000 ? ` · its clock is about ${liveSpan(Math.abs(skew))} ${skew < 0 ? 'behind' : 'ahead'}` : '';
     liveNotePeer(peerId, { appVersion: payload.appVersion, sentAt: payload.createdAt, headAt, note: '', clock: clockNote });
+    await liveRememberPeer(peerId, payload);
     if(payload.appVersion && versionNewerThanMine(payload.appVersion)){
       liveSetStatus('error', 'Another device has a newer version of Round Book. Close and reopen the app here to update, then sync will continue.');
       liveNotePeer(peerId, { note: 'is on a newer version (' + payload.appVersion + ') — close and reopen the app here to update' });
@@ -579,14 +678,16 @@ async function livePushInner(opts){
   if(live.pausedUntil && Date.now() < live.pausedUntil) return { ok:false };
   if(!navigator.onLine){ liveSetStatus('offline'); return { ok:false }; }
   const versionAtStart = liveDataVersion;
-  const unchanged = !opts.force && !!live.lastPushHash && liveCleanVersion === versionAtStart && liveCleanHash === live.lastPushHash;
+  const myName = liveDeviceName();
+  const nameChanged = live.nameSent !== myName; // the first send after an update, or a rename, carries the name across
+  const unchanged = !opts.force && !nameChanged && !!live.lastPushHash && liveCleanVersion === versionAtStart && liveCleanHash === live.lastPushHash;
   let state = null, hash = live.lastPushHash;
   if(!unchanged){
     state = syncBuildState(data);
     hash = await liveHashState(state);
     if(!opts.force && hash === live.lastPushHash){ liveCleanVersion = versionAtStart; liveCleanHash = hash; }
   }
-  if(!unchanged && (opts.force || hash !== live.lastPushHash)){
+  if(!unchanged && (opts.force || nameChanged || hash !== live.lastPushHash)){
     const day = liveDay(), now = Date.now();
     const used = live.pushDay === day ? (live.pushCount || 0) : 0;
     if(used >= LIVE_DAILY_PUSH_CAP){
@@ -599,7 +700,7 @@ async function livePushInner(opts){
       liveSetStatus('error', 'Live sync paused for 30 minutes because the devices kept updating each other. It will retry automatically.');
       return { ok:false };
     }
-    const payload = { v:1, appVersion: APP_VERSION, createdAt: now, deviceId: syncDeviceId(), setId: now.toString(36), kind:'state', state,
+    const payload = { v:1, appVersion: APP_VERSION, createdAt: now, deviceId: syncDeviceId(), deviceName: myName, removed: live.removed || {}, setId: now.toString(36), kind:'state', state,
       resolved: (live.resolutions || []).filter(r => r && now - r.at < LIVE_RES_KEEP_MS) };
     const text = await syncEncrypt(payload, key, live.salt);
     let res;
@@ -607,7 +708,7 @@ async function livePushInner(opts){
     if(!res.ok){ await liveFail(res); return { ok:false }; }
     livePushTimes.push(now);
     liveLastPushAt = now;
-    await liveUpdate({ lastPushHash: hash, lastPushAt: now, pushDay: day, pushCount: used + 1 });
+    await liveUpdate({ lastPushHash: hash, lastPushAt: now, pushDay: day, pushCount: used + 1, nameSent: myName });
     if(liveDataVersion === versionAtStart){ liveCleanVersion = versionAtStart; liveCleanHash = hash; }
   }
   let up;
@@ -889,12 +990,33 @@ function liveSyncSectionHtml(meta){
   lines.push(`<div style="font-size:0.8125rem; margin-top:4px;">${escapeHtml(stateText)}</div>`);
   if(s.text) lines.push(`<div style="font-size:0.8125rem; margin-top:6px; color:var(--red); line-height:1.5;">${escapeHtml(s.text)}</div>`);
   if(live.lastPushAt) lines.push(`<div style="font-size:0.75rem; margin-top:6px; color:var(--ink-muted);">Last sent ${liveAgo(live.lastPushAt)}${live.lastPullAt ? ' · last received ' + liveAgo(live.lastPullAt) : ''}${live.lastSummary ? ' · ' + escapeHtml(live.lastSummary) : ''}</div>`);
-  const peers = Object.keys(livePeerInfo);
-  if(peers.length){
-    lines.push(`<div style="font-size:0.75rem; margin-top:10px; font-weight:800;">Your other devices</div>` + peers.map(id => {
-      const p = livePeerInfo[id];
-      const bits = [`app ${p.appVersion || '?'}`, p.sentAt ? 'sent ' + liveAgo(p.sentAt) : (p.headAt ? 'updated ' + liveAgo(p.headAt) : '')].filter(Boolean).join(' · ');
-      return `<div style="font-size:0.75rem; margin-top:4px; color:var(--ink-muted); line-height:1.45;">…${escapeHtml(String(id).slice(-4))} · ${escapeHtml(bits)}${escapeHtml(p.clock || '')}${p.note ? ' · <b>' + escapeHtml(p.note) + '</b>' : ''}</div>`;
+  // This device, then the others, so each can be told apart (and an old one that is no longer used taken off the list).
+  const me = syncDeviceId();
+  lines.push(`<div style="font-size:0.75rem; margin-top:12px; font-weight:800;">This device</div>
+    <div style="font-size:0.8125rem; margin-top:4px; line-height:1.45;"><b>${escapeHtml(liveDeviceName())}</b> <span style="color:var(--ink-muted);">…${escapeHtml(String(me).slice(-4))}</span></div>
+    <button class="btn" style="width:auto; padding:6px 12px; font-size:0.75rem; margin-top:6px;" onclick="liveRenameDevice()">✏️ Name this device</button>`);
+  const removedMap = live.removed || {};
+  const headOf = id => (liveLastDevs[id] && liveLastDevs[id].updatedAt) || 0;
+  const peerIds = (Object.keys(liveLastDevs).length ? Object.keys(liveLastDevs) : Object.keys(live.peerNames || {}))
+    .filter(id => id !== me && !(removedMap[id] && headOf(id) <= (removedMap[id].headAt || 0)))
+    .sort((x, y) => headOf(y) - headOf(x));
+  if(peerIds.length){
+    lines.push(`<div style="font-size:0.75rem; margin-top:14px; font-weight:800;">Your other devices (${peerIds.length})</div>` + peerIds.map(id => {
+      const known = (live.peerNames && live.peerNames[id]) || {};
+      const p = livePeerInfo[id] || {};
+      const name = known.name || '';
+      const ver = known.appVersion || p.appVersion;
+      const last = headOf(id) || known.sentAt || 0;
+      const idle = last && Date.now() - last > 7*24*3600*1000;
+      const bits = [ver ? 'app ' + ver : 'app version not known yet', last ? 'last sent ' + liveAgo(last) : ''].filter(Boolean).join(' · ');
+      const hint = !name ? '<div style="font-size:0.6875rem; margin-top:2px; color:var(--ink-muted);">No name yet — a device on an older version of the app gives itself one once it has been updated.</div>' : '';
+      const old = idle ? `<div style="font-size:0.6875rem; margin-top:2px; color:var(--red); font-weight:800;">Not used for ${escapeHtml(liveSpan(Date.now() - last))} — probably an old one you can remove.</div>` : '';
+      return `<div style="margin-top:8px; padding:10px 12px; border-radius:12px; background:var(--surface); border:1px solid var(--box-border);">
+        <div style="font-size:0.8125rem; font-weight:800;">${escapeHtml(name || 'Unnamed device')} <span style="font-weight:600; color:var(--ink-muted);">…${escapeHtml(String(id).slice(-4))}</span></div>
+        <div style="font-size:0.75rem; margin-top:3px; color:var(--ink-muted); line-height:1.45;">${escapeHtml(bits)}${escapeHtml(p.clock || '')}${p.note ? ' · <b>' + escapeHtml(p.note) + '</b>' : ''}</div>
+        ${hint}${old}
+        <button class="btn" style="width:auto; padding:6px 12px; font-size:0.75rem; margin-top:8px; background:var(--red-dim); color:var(--red);" onclick="liveRemoveDevice('${escapeAttr(id)}')">Remove from list</button>
+      </div>`;
     }).join(''));
   }
   let actions = '';
