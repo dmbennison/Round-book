@@ -386,5 +386,5 @@ async function openSyncSheet(){
       <button class="sheet-close" onclick="closeSheet()" aria-label="Close">✕</button>
     </div>
     ${liveSyncSectionHtml(meta)}
-  `, () => openBackup());
+  `);
 }
