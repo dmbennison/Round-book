@@ -4,6 +4,15 @@ ROUND BOOK - RELEASE NOTES
 Newest first. This file is not part of the app and is not loaded by it; it ships alongside the code files.
 To add a release: raise APP_VERSION in js/01-data.js and CACHE_NAME in sw.js to the same number, then put a new entry at the top of this list.
 
+Version 1.360
+  - Houses that spill over come back together. When a few houses of a round have to be done the day after the rest, their next
+    clean used to fall a day after the others' too, so the round was split over two days again in the Schedule (and in the Due
+    lists). A 4-weekly customer cleaned 1 to 3 days after the rest of their round is now due on the round's day instead, so the
+    whole round is one group again. It only applies to a small minority (no more than a third as many customers as are on the
+    round's day), so two groups of similar size, a day four or more days apart, houses cleaned earlier than the rest, another
+    round or visit day, and customers whose date was set by hand in the Schedule are left alone. The round's day is the day most
+    of its 4-weekly customers fall on, as for the 8 and 12 weekly customers already lined up with them. Added self-tests
+
 Version 1.359
   - Closing the Live sync screen now just closes it. It used to open the Back up and restore screen behind it, whether it had been
     opened from there, from the cloud chip at the top, or from the More menu
