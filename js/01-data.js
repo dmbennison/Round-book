@@ -7,7 +7,7 @@ const STORE_KEY = 'roundBookData_v1';
 // bump by 0.001 for every change. formatVersion always renders it to exactly three decimals.
 // Earlier releases were numbered 3.xx (the last was 3.38), so versionRank() maps those onto the same scale
 // (3.38 -> 1.338) and the two kinds can still be compared when a device that has not updated yet syncs.
-const APP_VERSION = 1.359;
+const APP_VERSION = 1.360;
 function formatVersion(v){ return Number(v).toFixed(3); }
 function versionRank(v){ v = Number(v) || 0; return v >= 2 ? 1.3 + (v - 3) / 10 : v; }
 function versionNewerThanMine(v){ return versionRank(v) - versionRank(APP_VERSION) > 0.0004; }
@@ -852,7 +852,14 @@ function isCashJob(j){
    either side. The round's rhythm is the most common "next due" day-in-a-28-day-cycle among its
    4-weekly customers; a longer-cycle customer's natural due date (last clean + their interval) is
    moved to the nearest date on that rhythm — never more than 14 days either way. Customers on any
-   other frequency, and rounds with no 4-weekly customers, are untouched. */
+   other frequency, and rounds with no 4-weekly customers, are untouched.
+
+   Spill-over: when a few houses of a round had to be done the day after the rest, their next clean falls a day after the
+   others' too, and the round would be split over two days again. A 4-weekly customer whose natural due date is 1 to 3 days
+   AFTER the round's rhythm date, and who is one of a small minority (at most a third as many as are on the rhythm date), is
+   due on the rhythm date instead, so the whole round comes back together. Anything bigger than that, or earlier, is left
+   alone, as is anyone with a date set by hand in the Schedule editor. */
+const SPILL_MAX_DAYS = 3;
 function isoToDays(iso){ const p = iso.split('-').map(Number); return Math.round(Date.UTC(p[0], p[1]-1, p[2]) / 86400000); }
 function daysToISO(n){
   const d = new Date(n * 86400000);
@@ -860,6 +867,7 @@ function daysToISO(n){
 }
 function roundGroupKey(c){ return (c.round || 'Unassigned') + '|' + (c.visitDay || 1); }
 let roundPhaseCache = null; // cleared on every save and every render
+let roundPhaseDist = {};    // round|day -> { day-in-28-day-cycle: { count, latest } } for the 4-weekly customers, kept with roundPhaseCache
 function roundPhases(){
   if(roundPhaseCache) return roundPhaseCache;
   const groups = {};
@@ -886,6 +894,7 @@ function roundPhases(){
     if(best) out[k] = best.ph;
   });
   roundPhaseCache = out;
+  roundPhaseDist = groups;
   return out;
 }
 /* A date set by hand in the Schedule editor. It is only honoured while the customer's latest
@@ -913,7 +922,18 @@ function computedDueISO(c){
   const natural = naturalNextDueISO(c);
   if(!natural) return null;
   const f = c.frequencyWeeks || 4;
-  if(f <= 4 || f % 4 !== 0) return natural;
+  if(f === 4){
+    // Houses that spilled into the next day last time come back to the round's day (see Spill-over, above).
+    const k = roundGroupKey(c), ph0 = roundPhases()[k];
+    if(ph0 != null){
+      const n0 = isoToDays(natural);
+      const back = (((n0 - ph0) % 28) + 28) % 28; // days after the round's rhythm date
+      const dist = roundPhaseDist[k] || {};
+      if(back >= 1 && back <= SPILL_MAX_DAYS && ((dist[((n0 % 28) + 28) % 28] || {}).count || 0) * 3 <= ((dist[ph0] || {}).count || 0)) return daysToISO(n0 - back);
+    }
+    return natural;
+  }
+  if(f < 4 || f % 4 !== 0) return natural;
   const ph = roundPhases()[roundGroupKey(c)];
   if(ph == null) return natural;
   const n = isoToDays(natural);

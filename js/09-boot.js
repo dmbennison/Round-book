@@ -552,6 +552,37 @@ async function runSelfTests(){
     });
   });
 
+  group('spill-over regrouping', () => {
+    const mon = '2025-03-03', tue = '2025-03-04';
+    const mk = (n, d, extra) => Array.from({ length: n }, () => cust(Object.assign({ round:'A', cleanHistory:[clean(d)] }, extra || {})));
+    const main = mk(9, mon), spill = mk(2, tue);
+    withData(main.concat(spill), () => {
+      eq('spill-over: main group is due 28 days on', nextDueISO(main[0]), '2025-03-31');
+      eq('spill-over: houses cleaned a day later come back to the round\'s day', nextDueISO(spill[0]), '2025-03-31');
+    });
+    const fri = mk(9, '2025-03-07'), mon2 = mk(2, '2025-03-10'), wed = mk(2, '2025-03-12');
+    withData(fri.concat(mon2, wed), () => {
+      eq('spill-over: Friday round, Monday spill (3 days later) comes back', nextDueISO(mon2[0]), nextDueISO(fri[0]));
+      eq('spill-over: 5 days later is a different day, left alone', nextDueISO(wed[0]), '2025-04-09');
+    });
+    const half = mk(6, mon).concat(mk(6, tue));
+    withData(half, () => {
+      eq('spill-over: two groups of the same size are not merged', nextDueISO(half[11]), '2025-04-01');
+    });
+    const held = mk(9, mon), moved = cust({ round:'A', cleanHistory:[clean(tue)], dueOverride:{ date:'2025-04-02', base: tue } });
+    withData(held.concat([moved]), () => {
+      eq('spill-over: a date set by hand is kept', nextDueISO(moved), '2025-04-02');
+    });
+    const early = mk(9, tue), sat = mk(2, mon);
+    withData(early.concat(sat), () => {
+      eq('spill-over: houses cleaned earlier are left alone', nextDueISO(sat[0]), '2025-03-31');
+    });
+    const w8 = mk(9, mon), other = mk(2, tue, { round:'B' });
+    withData(w8.concat(other), () => {
+      eq('spill-over: another round is not pulled to this one', nextDueISO(other[0]), '2025-04-01');
+    });
+  });
+
   group('plannedAheadISO', () => {
     const c = cust({ cleanHistory: [clean('2025-01-06')], aheadPlan: { dates: { 2: '2025-03-12', 3: '2025-04-09' } } });
     withData([c], () => {
