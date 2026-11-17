@@ -552,6 +552,24 @@ async function runSelfTests(){
     });
   });
 
+  group('colour schemes', () => {
+    // The newer schemes must keep the contrast the Settings comment promises: text 7:1, secondary text and accent 4.5:1, white on the header 7:1.
+    const lum = h => { const c = [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255).map(v => v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
+    const ratio = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+    ['lagoon', 'cherry'].forEach(k => {
+      const t = THEMES[k];
+      yes(`colour scheme ${t.name}: white on the header is at least 7:1`, ratio('#FFFFFF', t.navy) >= 7);
+      ['light', 'dark'].forEach(mode => {
+        const p = t[mode], acc = mode === 'dark' && t.blueDark ? t.blueDark : t.blue;
+        const worstInk = Math.min(ratio(p.ink, p.bg), ratio(p.ink, p.surface));
+        const worstMuted = Math.min(ratio(p.muted, p.bg), ratio(p.muted, p.surface));
+        const worstAcc = Math.min(ratio(acc, p.bg), ratio(acc, p.surface));
+        yes(`colour scheme ${t.name} (${mode}): text 7:1, secondary text and accent 4.5:1`, worstInk >= 7 && worstMuted >= 4.5 && worstAcc >= 4.5);
+      });
+    });
+    yes('colour schemes: Lagoon and Cherry are offered', !!THEMES.lagoon && !!THEMES.cherry);
+  });
+
   group('spill-over regrouping', () => {
     const mon = '2025-03-03', tue = '2025-03-04';
     const mk = (n, d, extra) => Array.from({ length: n }, () => cust(Object.assign({ round:'A', cleanHistory:[clean(d)] }, extra || {})));

@@ -5,7 +5,7 @@
 /* Each colour scheme has its own personality, not just a different header: its own accent, a "glow" colour
    for the soft light behind the glass, and a full set of page / card / text colours for light AND dark mode.
    The light-mode surfaces deliberately differ in temperature — cool blue-white (Ocean), neutral stone (Slate),
-   warm sand (Rust), green-gold parchment (Forest), lilac-white (Plum), pure white (High contrast).
+   warm sand (Rust), green-gold parchment (Forest), lilac-white (Plum), sea-glass (Lagoon), blush (Cherry), pure white (High contrast).
      navy     = header / tab bar / dark chrome (white text sits on it)
      blue     = the accent: fills (buttons, tiles) AND text/icons that carry meaning, so in LIGHT mode it is
                 dark enough to pass WCAG AA (4.5:1) against both the page and the card colour
@@ -38,6 +38,14 @@ const THEMES = {
   plum: { name:'Plum', navy:'#68218A', blue:'#0B6B63', blueDark:'#4FD1C5', glow:'#A25CC4', tint:0.45, orb:0.6,
     light:{ bg:'#F2EFF3', surface:'#FFFDFF', ink:'#2D1B33', muted:'#6A5871', line:'#E2DCE4' },
     dark: { bg:'#131014', surface:'#1C181F', ink:'#F1E8F4', muted:'#A891B1', line:'#302933' } },
+  // LAGOON — deep teal header on a pale sea-glass page, with a bright raspberry-magenta accent against the teal.
+  lagoon: { name:'Lagoon', navy:'#08606A', blue:'#AE1D5B', blueDark:'#FF86B8', glow:'#2BB3BF', tint:0.45, orb:0.6,
+    light:{ bg:'#E8F2F3', surface:'#FFFFFF', ink:'#0B2A2E', muted:'#4D6E72', line:'#D3E1E3' },
+    dark: { bg:'#0A1517', surface:'#101F22', ink:'#EAF6F7', muted:'#9CBFC3', line:'#25383B' } },
+  // CHERRY — deep crimson header on a pale blush page with warm-white cards, and a cool indigo accent against the red.
+  cherry: { name:'Cherry', navy:'#961830', blue:'#3B3FA3', blueDark:'#B3B6FF', glow:'#E0506B', tint:0.45, orb:0.6,
+    light:{ bg:'#F6ECEE', surface:'#FFFCFC', ink:'#2D0B12', muted:'#74464E', line:'#E6D3D6' },
+    dark: { bg:'#150A0C', surface:'#201215', ink:'#FBEEF0', muted:'#C9A0A8', line:'#3A262A' } },
   // HIGH CONTRAST — for outdoor and gloved use: pure black and white, hard borders, solid (non-glass) cards, no glow.
   // Light: black on white with a cobalt accent. Dark: white on black with a signal-yellow accent. See `flat` handling in applyTheme.
   contrast: { name:'High contrast', navy:'#000000', blue:'#0033CC', blueDark:'#FFD60A', glow:'#FFFFFF',
@@ -56,6 +64,10 @@ THEMES.forest.solid = { light:{ bg:'#D8EEDD', surface:'#FBFEFA', ink:'#0E2A18', 
   dark:{ bg:'#08140C', surface:'#112418', ink:'#EAF3E6', muted:'#A5C9AB', line:'#48935F' } };
 THEMES.plum.solid = { light:{ bg:'#E8D8F1', surface:'#FFFDFF', ink:'#26122C', muted:'#5B3F6B', line:'#9559B2' },
   dark:{ bg:'#120816', surface:'#1F1126', ink:'#F6EBF9', muted:'#C7A4D6', line:'#9059AD' } };
+THEMES.lagoon.solid = { light:{ bg:'#D4EDEE', surface:'#FFFFFF', ink:'#06282C', muted:'#2B5F63', line:'#38929A' },
+  dark:{ bg:'#061719', surface:'#0C2A2E', ink:'#EEF9FA', muted:'#A9D0D3', line:'#3A9097' } };
+THEMES.cherry.solid = { light:{ bg:'#F7DEE1', surface:'#FFFBFB', ink:'#2D0B12', muted:'#6A3039', line:'#BF5A6A' },
+  dark:{ bg:'#180709', surface:'#2A0F14', ink:'#FBEEF0', muted:'#D2A5AD', line:'#B54A5C' } };
 // Every scheme is drawn solid (flat, hard borders, like High contrast): its solid palette is the one used.
 Object.keys(THEMES).forEach(k => { if(THEMES[k].solid){ THEMES[k].light = THEMES[k].solid.light; THEMES[k].dark = THEMES[k].solid.dark; } });
 let themeName = localStorage.getItem('roundBookTheme') || 'ocean';
