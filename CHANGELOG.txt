@@ -4,6 +4,12 @@ ROUND BOOK - RELEASE NOTES
 Newest first. This file is not part of the app and is not loaded by it; it ships alongside the code files.
 To add a release: raise APP_VERSION in js/01-data.js and CACHE_NAME in sw.js to the same number, then put a new entry at the top of this list.
 
+Version 1.362
+  - Three colour schemes darkened slightly to meet the contrast the Settings notes promise for every scheme: the Rust header
+    (#9A431E to #933F1B) and the Forest header (#11693B to #0F6338), so white lettering on them reaches 7:1, and the coral accent
+    in Ocean's light mode (#B83E27 to #B33C26), so it reaches 4.5:1 on the page. The change is a touch; they look the same
+    at a glance. The contrast self-test now covers every scheme, not just the newer ones
+
 Version 1.361
   - Two new colour schemes in Settings > Colour scheme, taking it to eight. Lagoon: a deep teal header on a pale sea-glass page,
     with a raspberry-magenta accent. Cherry: a deep crimson header on a pale blush page, with a cool indigo accent. Like the others
