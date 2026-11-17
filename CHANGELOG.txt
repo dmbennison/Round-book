@@ -4,6 +4,12 @@ ROUND BOOK - RELEASE NOTES
 Newest first. This file is not part of the app and is not loaded by it; it ships alongside the code files.
 To add a release: raise APP_VERSION in js/01-data.js and CACHE_NAME in sw.js to the same number, then put a new entry at the top of this list.
 
+Version 1.361
+  - Two new colour schemes in Settings > Colour scheme, taking it to eight. Lagoon: a deep teal header on a pale sea-glass page,
+    with a raspberry-magenta accent. Cherry: a deep crimson header on a pale blush page, with a cool indigo accent. Like the others
+    they come in light and dark, and follow the Transparency setting. Both keep the contrast the other schemes are held to (text
+    7:1, secondary text and accent 4.5:1, white on the header 7:1), and a self-test now checks that for every scheme
+
 Version 1.360
   - Houses that spill over come back together. When a few houses of a round have to be done the day after the rest, their next
     clean used to fall a day after the others' too, so the round was split over two days again in the Schedule (and in the Due
