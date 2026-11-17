@@ -18,7 +18,7 @@ const THEMES = {
   // OCEAN — clear sea-blue header on a cool, near-neutral grey page with white cards. The only strong colours are the
   // header and a warm coral accent that stands out against the blue (the same recipe as Slate: neutral base, one contrasting accent).
   // `tint` and `orb` (both 0-1) scale how much accent colour washes into cards and the soft page glow; Slate keeps the full amount.
-  ocean: { name:'Ocean', navy:'#0A5A94', blue:'#B83E27', blueDark:'#FF8C74', glow:'#2F8FD0', tint:0.45, orb:0.6,
+  ocean: { name:'Ocean', navy:'#0A5A94', blue:'#B33C26', blueDark:'#FF8C74', glow:'#2F8FD0', tint:0.45, orb:0.6,
     light:{ bg:'#EEF1F3', surface:'#FFFFFF', ink:'#14283A', muted:'#556B7C', line:'#D9DFE3' },
     dark: { bg:'#0F1418', surface:'#171E24', ink:'#EAF1F6', muted:'#93A8B9', line:'#2A343C' } },
   // SLATE — professional and neutral: true charcoal header, stone-grey pages, and one warm copper accent for contrast.
@@ -27,11 +27,11 @@ const THEMES = {
     light:{ bg:'#ECECEA', surface:'#FAFAF8', ink:'#212427', muted:'#62656A', line:'#D6D6D2' },
     dark: { bg:'#101112', surface:'#1B1D1F', ink:'#ECEAE6', muted:'#A09D97', line:'#303234' } },
   // RUST — brown-terracotta header on a warm-grey page with cream cards, and a clear cobalt-blue accent that contrasts with the clay.
-  rust: { name:'Rust', navy:'#9A431E', blue:'#1D5FA8', blueDark:'#7DB4F2', glow:'#C8704A', tint:0.45, orb:0.6,
+  rust: { name:'Rust', navy:'#933F1B', blue:'#1D5FA8', blueDark:'#7DB4F2', glow:'#C8704A', tint:0.45, orb:0.6,
     light:{ bg:'#F1EEEA', surface:'#FFFCF8', ink:'#33201A', muted:'#6F5A50', line:'#E1DAD1' },
     dark: { bg:'#151210', surface:'#1F1B18', ink:'#F3E9DD', muted:'#B49C8A', line:'#38302B' } },
   // FOREST — rich green header on a soft stone page with off-white cards, and a golden ochre accent against the green.
-  forest: { name:'Forest', navy:'#11693B', blue:'#7A5806', blueDark:'#E8B94C', glow:'#35A667', tint:0.45, orb:0.6,
+  forest: { name:'Forest', navy:'#0F6338', blue:'#7A5806', blueDark:'#E8B94C', glow:'#35A667', tint:0.45, orb:0.6,
     light:{ bg:'#EEF0EA', surface:'#FBFCF8', ink:'#1C2B20', muted:'#576852', line:'#D9DDD0' },
     dark: { bg:'#0F1311', surface:'#181E1A', ink:'#E7EFE2', muted:'#94AA94', line:'#2B342D' } },
   // PLUM — vivid purple header on a quiet grey-lilac page with white cards, and a teal accent that contrasts with the purple.
