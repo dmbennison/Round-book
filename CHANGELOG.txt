@@ -4,6 +4,26 @@ ROUND BOOK - RELEASE NOTES
 Newest first. This file is not part of the app and is not loaded by it; it ships alongside the code files.
 To add a release: raise APP_VERSION in js/01-data.js and CACHE_NAME in sw.js to the same number, then put a new entry at the top of this list.
 
+Version 1.363
+  - Website enquiries: a third Sales tab, Enquiries, beside Quotes and Marketing. The enquiry form on the website (name, phone,
+    email, which services, area, an optional "somewhere else" area, and a free text box) is encrypted in the visitor's browser
+    with a public key, sent to the Cloudflare worker's new inbox, and collected here. Only your devices hold the private key, so
+    Cloudflare only ever holds scrambled data (kept up to 45 days if nobody collects it). The key pair is made in the app
+    (Sales > Enquiries > Set up website enquiries) and lives in the settings, so it reaches your other devices through live sync
+    and is in your backups. The settings for the website are copied from the same screen into the website's enquiry-config.js
+  - The app collects the inbox when it opens, when you come back to it, every 5 minutes while it is open and on screen, and when
+    you tap the refresh button; nothing is collected and no alert is sent while it is closed. A red dot on the Sales tab and a
+    number on Enquiries show what is waiting. The list is kept on the device, so it is there offline
+  - Tap an enquiry to Call, Text or Email, to Add as customer (name, phone, email and what they asked for are filled in; you add the
+    address, round and price) or Make a quote. Either one takes the enquiry off the list and deletes it from the inbox, so it goes
+    from all your devices. Remove enquiry deletes it without making anything. Everything in an enquiry is treated as untrusted
+    text: cleaned, cut to length and always escaped
+  - Worker (worker.js, separate from the app): new inbox routes (claim, public submit, list, delete one, delete all), limits so
+    the form can't be used to fill the inbox or use up the free daily allowance (4 per visitor per hour, 40 a day, 100 waiting),
+    optional Cloudflare Turnstile checking (set TURNSTILE_SECRET), and ALLOWED_ORIGIN may now list several websites separated by
+    commas. Needs redeploying before Set up website enquiries will work
+  - Added a user guide topic for the new screen (the ? button on it) and updated the guide's description of the tabs
+
 Version 1.362
   - Three colour schemes darkened slightly to meet the contrast the Settings notes promise for every scheme: the Rust header
     (#9A431E to #933F1B) and the Forest header (#11693B to #0F6338), so white lettering on them reaches 7:1, and the coral accent

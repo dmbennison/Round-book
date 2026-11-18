@@ -382,6 +382,9 @@
      tab can be reached — and a pop-up opened from the header shown — while a schedule is still being worked on. */
   .sched-editor{position:fixed; top:var(--header-h, 170px); bottom:var(--tabbar-h, 64px); left:0; right:0; z-index:12; display:none; flex-direction:column; background:transparent; color:var(--ink);} /* glass: the page shows through the panes below */
   body[data-tab="schedule"] main, body[data-tab="schedule"] .fab{display:none;} /* the editor is this tab's page */
+  body[data-tab="enquiries"] .fab{display:none;} /* enquiries arrive from the website; nothing to add by hand */
+  .tab.has-badge::after{content:''; position:absolute; top:7px; left:calc(50% + 22px); width:9px; height:9px; border-radius:50%; background:var(--red, #D64545); box-shadow:0 0 0 2px var(--bar-bg, rgba(0,0,0,0.2));}
+  .subtab-badge{display:inline-block; min-width:18px; margin-left:6px; padding:0 5px; border-radius:9px; background:var(--red, #D64545); color:#fff; font-size:0.6875rem; font-weight:800; line-height:18px; text-align:center;}
   .sched-editor.show{display:flex;}
   .se-bar{flex:none; display:flex; align-items:center; gap:8px; padding:8px 14px; background:var(--bg); border-bottom:1px solid var(--glass-edge-soft);}
   .se-bar-text{flex:1; min-width:0;}
@@ -1274,6 +1277,7 @@
 <script src="./js/08d-desktop.js" defer></script>
 <script src="./js/08e-messages.js" defer></script>
 <script src="./js/08f-privacy.js" defer></script>
+<script src="./js/08g-enquiries.js" defer></script>
 <script src="./js/09-boot.js" defer></script>
 </body>
 </html>
