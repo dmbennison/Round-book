@@ -387,6 +387,7 @@ initStorage().catch(()=>{}).finally(()=>{
   initSwipeHandlers();
   requestPersistentStorage();
   maybeAutoSafetyCopy();
+  if(typeof enquiriesCheckStarted === 'function') enquiriesCheckStarted(); // website enquiries (08g-enquiries.js): collected while the app is open
   // Live sync gets the first go, and the start-up questions wait for it (at most 6 seconds). Asking "what was your
   // end mileage?" before the other device's answer had arrived was the nag you'd already dealt with — and the
   // question itself kept the sync from finishing. With live sync off this carries straight on.

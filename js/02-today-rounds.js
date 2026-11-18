@@ -597,17 +597,17 @@ function cycleVisitDay(id){
 function setRoundDayFilter(day){ roundDayFilter = day; render(); }
 
 /* ---------- tabs and sub tabs ----------
-   Four tabs along the bar: Today, Schedule, Work (sub tabs Rounds / Jobs) and Sales (sub tabs Quotes / Marketing).
-   The screens themselves keep their old names — currentTab is one of today, schedule, rounds, jobs, quotes, marketing —
+   Four tabs along the bar: Today, Schedule, Work (sub tabs Rounds / Jobs) and Sales (sub tabs Quotes / Marketing / Enquiries).
+   The screens themselves keep their old names — currentTab is one of today, schedule, rounds, jobs, quotes, marketing, enquiries —
    and tabGroupOf says which bar tab a screen belongs under. The sub tabs are a fixed bar under the header (see
    renderSubTabs); switching between them, or to another tab and back, puts you back where you were: which round, which
    Due / Text first / Owed view, which day, and how far down the list you had scrolled (screenView).
    Tapping the tab you're already on goes to the top of that screen. */
-const SCREEN_GROUP = { today:'today', schedule:'schedule', rounds:'work', jobs:'work', quotes:'sales', marketing:'sales' };
+const SCREEN_GROUP = { today:'today', schedule:'schedule', rounds:'work', jobs:'work', quotes:'sales', marketing:'sales', enquiries:'sales' };
 function tabGroupOf(screen){ return SCREEN_GROUP[screen] || screen; }
 const SUB_TABS = {
   work:  [['rounds', 'Rounds'], ['jobs', 'Jobs']],
-  sales: [['quotes', 'Quotes'], ['marketing', 'Marketing']]
+  sales: [['quotes', 'Quotes'], ['marketing', 'Marketing'], ['enquiries', 'Enquiries']]
 };
 let lastScreenIn = { work: 'rounds', sales: 'quotes' }; // the sub tab each of those was last on
 const screenView = {};                                  // per screen: where you were when you left it
@@ -663,7 +663,7 @@ function renderSubTabs(){
   else {
     bar.hidden = false;
     bar.innerHTML = defs.map(([id, label]) =>
-      `<button class="subtab${currentTab === id ? ' active' : ''}" onclick="setTab('${id}', true)">${label}</button>`).join('');
+      `<button class="subtab${currentTab === id ? ' active' : ''}" onclick="setTab('${id}', true)">${label}${id === 'enquiries' && typeof enqCount === 'function' && enqCount() ? `<span class="subtab-badge">${enqCount()}</span>` : ''}</button>`).join('');
   }
   if(wasHidden !== bar.hidden && typeof window.syncHeaderHeights === 'function') window.syncHeaderHeights();
 }
@@ -1389,11 +1389,15 @@ function render(){
     renderQuotes(main);
   } else if(currentTab === 'marketing'){
     renderMarketing(main);
+  } else if(currentTab === 'enquiries'){
+    renderEnquiries(main); // 08g-enquiries.js
   }
   // iPad / desktop extras (08d-desktop.js): the right-pane summary and the keyboard-selected card follow every redraw.
   if(typeof desktopAfterRender === 'function') desktopAfterRender();
   if(typeof todayRunAfterRender === 'function') todayRunAfterRender();
   if(typeof msgAfterRender === 'function') msgAfterRender(); // notes between your two devices (08e-messages.js)
+  if(typeof enquiriesCheckStarted === 'function') enquiriesCheckStarted(); // website enquiries set up on another device arrive through live sync (08g-enquiries.js)
+  if(typeof enqMarkSalesTab === 'function') enqMarkSalesTab();
   if(typeof todayCelebrateAfterRender === 'function') todayCelebrateAfterRender(); // fireworks when the day's list reaches 100% (02b-today-run.js)
 }
 

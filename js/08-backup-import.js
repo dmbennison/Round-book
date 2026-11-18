@@ -351,6 +351,19 @@ const FOCUSED_HELP = {
       ])
     ]
   },
+  enquiries: {
+    title: 'Website enquiries',
+    body: () => [
+      helpP('The enquiry form on your website sends each enquiry here. It is <b>encrypted on the visitor’s device</b> before it is sent, so Cloudflare, which carries it, can’t read it; only your own devices can.'),
+      helpList([
+        '<b>Setting up</b> – open <b>Sales → Enquiries</b> and tap <b>Set up website enquiries</b>, then <b>Copy settings for the website</b> and paste them into <b>enquiry-config.js</b> on your website’s GitHub, as the screen explains. It needs the newest Cloudflare worker and a free Turnstile key (see the website’s README).',
+        '<b>Collecting them</b> – the app checks for new enquiries when it is opened, when you come back to it, every 5 minutes while it is open, and when you tap <b>↻</b>. Nothing is collected, and you are not alerted, while the app is closed. A red dot on the Sales tab and a number on Enquiries show that something is waiting.',
+        '<b>Each enquiry</b> – tap one to <b>Call</b>, <b>Text</b> or <b>Email</b>, to <b>Add as customer</b> (name, phone, email and what they asked for are filled in; you add the address, round and price) or <b>Make a quote</b>. Either one removes the enquiry from the list. <b>Remove enquiry</b> deletes it without making anything.',
+        'An enquiry stays in the list on <b>all</b> your devices until it is dealt with on one of them. Ones nobody collects are deleted from the inbox after 45 days.',
+        '<b>⚙︎</b> shows the settings for the website again, and <b>Turn off website enquiries</b> deletes the inbox. The key that unlocks the enquiries is kept in your settings, so it goes to your other devices with live sync, and is in your backups.'
+      ])
+    ]
+  },
   reports: {
     title: 'Reports',
     body: () => [
@@ -399,7 +412,7 @@ const FOCUSED_HELP = {
     ]
   }
 };
-const FOCUSED_HELP_ORDER = ['today','schedule','rounds','jobs','customer','photos','quotes','marketing','reports','backup','sync','settings'];
+const FOCUSED_HELP_ORDER = ['today','schedule','rounds','jobs','customer','photos','quotes','marketing','enquiries','reports','backup','sync','settings'];
 
 function openFocusedHelp(topic, explicitReturnTo){
   const h = FOCUSED_HELP[topic];
@@ -431,7 +444,7 @@ function openHelp(returnTo){
     ${helpH('Getting around')}
     ${helpList([
       'Install it as an app: in Safari tap Share → <b>Add to Home Screen</b>.',
-      'The four tabs are <b>Today</b>, <b>Schedule</b>, <b>Work</b> (with <b>Rounds</b> and <b>Jobs</b> underneath) and <b>Sales</b> (with <b>Quotes</b> and <b>Marketing</b> underneath).',
+      'The four tabs are <b>Today</b>, <b>Schedule</b>, <b>Work</b> (with <b>Rounds</b> and <b>Jobs</b> underneath) and <b>Sales</b> (with <b>Quotes</b>, <b>Marketing</b> and <b>Enquiries</b> underneath).',
       'The blue <b>+</b> button adds a customer, job or quote, depending on the screen you are on.',
       'Menus all open as drop-downs under the button you tapped, in the same style (a <b>…</b> after a name means it asks for a little more first); tap the button again, or anywhere else, to close them. Where a screen has a lot of buttons, they are gathered into an <b>Actions</b> drop-down (customers, jobs and quotes) or a <b>⋯</b> button (photos) to leave more room. The top bar has <b>Search</b> (it forgives typos, treats Rd as Road and so on, and lists the closest matches first; tap <b>📅</b> beside the box, or type a date like 14/10, to see everything recorded on that day), the <b>⋯</b> menu (Reports, Photo gallery, Backup, <b>Message other device</b>, <b>Check for updates</b> and About) and <b>Settings</b>.',
       'Tap the <b>🎤</b> in any text box to speak instead of typing.',

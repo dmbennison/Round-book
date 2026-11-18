@@ -183,8 +183,8 @@ function openCustomerEdit(id){
   const c = data.customers.find(x => x.id === id);
   if(c) openCustomerForm(c);
 }
-function openCustomerForm(existing){
-  const c = existing || {};
+function openCustomerForm(existing, prefill){
+  const c = existing || prefill || {}; // prefill: a new customer started from a website enquiry (08g-enquiries.js)
   const rounds = [...new Set(data.customers.map(x=>x.round).filter(Boolean))];
   openSheet(`
     <div class="sheet-head">
@@ -195,6 +195,7 @@ function openCustomerForm(existing){
       <label style="margin:0;">Address</label>
       <button type="button" onclick="useCurrentLocation()" style="background:none; border:none; color:var(--blue); font-size:0.7812rem; font-weight:700; padding:2px;">📍 Use my location</button>
     </div>
+    ${prefill && prefill.enquiryId ? `<input type="hidden" id="f_enquiryId" value="${escapeAttr(prefill.enquiryId)}"><p style="color:var(--green); font-size:0.75rem; font-weight:700; margin:0 2px 10px;">✅ From a website enquiry — add the address, round and price</p>` : ''}
     <input type="text" id="f_address" value="${escapeAttr(c.address||'')}" placeholder="e.g. 12 Elm Grove">
     <label>Name <span style="text-transform:none; font-weight:500; opacity:0.7;">(optional)</span></label>
     <input type="text" id="f_name" value="${escapeAttr(c.name||'')}" placeholder="e.g. Mrs Patterson">
@@ -427,6 +428,8 @@ function finishSavingCustomerForm(id, afterAttempt){
     if(majorityDue && majorityDue > todayISO()) newCust.deferUntil = majorityDue;
     data.customers.push(newCust);
     toast('Customer added' + (newCust.deferUntil ? ` — due ${fmtDate(newCust.deferUntil)} with the rest of the round` : ''));
+    const fromEnquiry = document.getElementById('f_enquiryId');
+    if(fromEnquiry && fromEnquiry.value && typeof enquiryHandled === 'function') enquiryHandled(fromEnquiry.value); // the website enquiry is dealt with: off the list and out of the inbox
   }
   if(dupeAccount){
     // Fires after the "Customer added/updated" toast above (same reasoning as the

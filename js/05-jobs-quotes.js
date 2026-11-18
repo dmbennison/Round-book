@@ -789,6 +789,8 @@ function openQuoteForm(existing, prefill, returnTo){
     </div>
     <input type="hidden" id="q_fromJobId" value="${escapeAttr((prefill&&prefill.fromJobId)||'')}">
     <input type="hidden" id="q_marketingCustomerId" value="${escapeAttr((existing&&existing.marketingCustomerId)||(prefill&&prefill.marketingCustomerId)||'')}">
+    <input type="hidden" id="q_enquiryId" value="${escapeAttr((prefill&&prefill.enquiryId)||'')}">
+    ${prefill&&prefill.enquiryId?`<p style="color:var(--green); font-size:0.75rem; font-weight:700; margin:0 2px 14px;">✅ From a website enquiry — add the address and price</p>`:''}
     ${prefill&&prefill.fromJobId?`<p style="color:var(--green); font-size:0.75rem; font-weight:700; margin:0 2px 14px;">✅ New quote for repeat work — prefilled from a past job</p>`:''}
     <label style="margin-top:0">Address</label>
     <input type="text" id="q_address" value="${escapeAttr(q.address||'')}" placeholder="e.g. 5 Oak Close">
@@ -903,6 +905,8 @@ function saveQuoteForm(id){
     if(marketingCustomerField && marketingCustomerField.value) payload.marketingCustomerId = marketingCustomerField.value;
     const newQuote = Object.assign({id: uid()}, payload);
     data.quotes.push(newQuote);
+    const fromEnquiry = document.getElementById('q_enquiryId');
+    if(fromEnquiry && fromEnquiry.value && typeof enquiryHandled === 'function') enquiryHandled(fromEnquiry.value); // the website enquiry is dealt with (08g-enquiries.js)
     // If this quote was started from a marketing response card's "Quote" button,
     // creating it counts as having done that pending action — reflect that on the card.
     if(newQuote.marketingCustomerId){
