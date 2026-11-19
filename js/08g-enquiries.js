@@ -16,6 +16,9 @@
      per enquiry   the browser makes a one-off ECDH key, agrees a secret with the public key, and turns it into an AES-256-GCM
                    key with SHA-256(secret + its own public key + your public key + label). Sent: its public key, the iv,
                    the ciphertext. Nothing in what is sent can be read without your private key.
+   An enquiry can also be added by hand (the + button on the tab: a phone call, a word-of-mouth tip). It is encrypted with the same
+   public key and posted to the same inbox, with the inbox token so the bot check and visitor limits don't apply, so it behaves exactly
+   like one from the website: it is on all your devices and is dealt with the same way.
    Everything that comes out of an enquiry is treated as untrusted text (anyone can send one): it is cleaned, cut to length,
    and always escaped before it is shown.
    ===================================================================== */
@@ -25,6 +28,8 @@ const ENQ_DELETING_KEY = 'roundBookEnquiriesDeleting';
 const ENQ_MIN_GAP_MS = 20 * 1000;
 const ENQ_POLL_MS = 5 * 60 * 1000;
 const ENQ_SERVICES = ['Window cleaning', 'Gutter cleaning', 'Fascia & soffit cleaning'];
+const ENQ_AREAS = ['South Tyneside', 'Cleadon', 'Boldon', 'Washington', 'Newcastle', 'Sunderland', 'Seaham', 'Murton'];
+const ENQ_SOURCES = ['Phone call', 'Text message', 'Word of mouth', 'Facebook', 'Leaflet', 'Knocked on door'];
 const enq = { items: [], at: 0, busy: false, error: '', unreadable: 0, deleting: [] };
 
 function enqCfg(){
@@ -43,6 +48,18 @@ async function enqAesKey(bits, epkRaw, pubRaw, usage){
   all.set(new Uint8Array(bits), 0); all.set(epkRaw, bits.byteLength); all.set(pubRaw, bits.byteLength + epkRaw.length); all.set(label, bits.byteLength + epkRaw.length + pubRaw.length);
   const raw = await crypto.subtle.digest('SHA-256', all);
   return crypto.subtle.importKey('raw', raw, { name: 'AES-GCM' }, false, usage);
+}
+// The same scheme as the website form's, using this inbox's own public key.
+async function enqEncrypt(obj, pubB64){
+  const enc = new TextEncoder(), label = enc.encode(ENQ_LABEL), pubRaw = enqUnb64(pubB64);
+  const pub = await crypto.subtle.importKey('raw', pubRaw, { name: 'ECDH', namedCurve: 'P-256' }, false, []);
+  const eph = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
+  const bits = await crypto.subtle.deriveBits({ name: 'ECDH', public: pub }, eph.privateKey, 256);
+  const epkRaw = new Uint8Array(await crypto.subtle.exportKey('raw', eph.publicKey));
+  const key = await enqAesKey(bits, epkRaw, pubRaw, ['encrypt']);
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: label }, key, enc.encode(JSON.stringify(obj)));
+  return { app: 'round-book-enquiry', v: 1, epk: enqB64(epkRaw), iv: enqB64(iv), ct: enqB64(ct) };
 }
 async function enqGenerateKeys(){
   const pair = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
@@ -68,7 +85,7 @@ function enqClean(o, id, at){
   // The time shown is when the inbox received it (its clock), never anything the sender put in.
   return { id, at: Number(at) || Date.now(), sent: Number(at) || Date.now(),
     name: str(o.name, 100), phone: str(o.phone, 40), email: str(o.email, 120),
-    services, area: str(o.area, 60), areaOther: str(o.areaOther, 80), message: str(o.message, 1500) };
+    services, area: str(o.area, 60), areaOther: str(o.areaOther, 80), message: str(o.message, 1500), source: str(o.source, 60) };
 }
 
 /* ---------- the inbox ---------- */
@@ -79,10 +96,10 @@ function enqLoadCache(){
 function enqSaveCache(){
   try{ localStorage.setItem(ENQ_CACHE_KEY, JSON.stringify(enq.items)); localStorage.setItem(ENQ_DELETING_KEY, JSON.stringify(enq.deleting)); }catch(e){}
 }
-async function enqApi(cfg, method, path, body){
+async function enqApi(cfg, method, path, body, asOwner){
   const base = String(cfg.url || LIVE_SYNC_DEFAULT_URL).replace(/\/+$/, '');
   const headers = {};
-  if(method !== 'POST') headers['X-Write-Token'] = cfg.token;
+  if(method !== 'POST' || asOwner) headers['X-Write-Token'] = cfg.token; // a visitor's POST carries no token; the app's own does
   if(body != null) headers['Content-Type'] = 'text/plain';
   const res = await fetch(`${base}/v1/inbox/${cfg.inboxId}${path}`, { method, headers, body: body != null ? body : undefined, cache: 'no-store' });
   let json = null;
@@ -215,6 +232,7 @@ function enquiryCardHtml(e){
           <div class="cust-addr" style="font-size:1rem; font-weight:800; color:var(--ink);">${escapeHtml(e.name || 'No name given')}</div>
           ${contact ? `<div class="cust-name" style="font-size:0.8125rem; font-weight:600; color:var(--ink-muted); margin-top:2px;">${contact}</div>` : ''}
           ${what ? `<div style="font-size:0.8125rem; margin-top:4px; font-weight:700;">${what}</div>` : ''}
+          ${e.source ? `<div style="font-size:0.75rem; margin-top:2px; color:var(--ink-muted);">Via ${escapeHtml(e.source)}</div>` : ''}
           ${e.message ? `<div style="font-size:0.8125rem; margin-top:4px; color:var(--ink-muted); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">${escapeHtml(e.message)}</div>` : ''}
           <div style="font-size:0.75rem; color:var(--ink-muted); margin-top:4px;">${escapeHtml(enqTime(e.sent || e.at))}</div>
         </div>
@@ -253,6 +271,7 @@ function openEnquiry(id){
     <div style="margin:0 2px 10px; font-weight:700;">${e.services.length ? escapeHtml(e.services.join(', ')) : 'Not said'}</div>
     <label>Area</label>
     <div style="margin:0 2px 10px; font-weight:700;">${escapeHtml(enqAreaText(e) || 'Not said')}</div>
+    ${e.source ? `<label>How they got in touch</label><div style="margin:0 2px 10px; font-weight:700;">${escapeHtml(e.source)}</div>` : ''}
     ${e.message ? `<label>Message</label><div style="margin:0 2px 14px; white-space:pre-wrap; line-height:1.5;">${escapeHtml(e.message)}</div>` : ''}
     <div class="form-actions" style="display:flex; flex-direction:column; gap:8px;">
       <button class="btn-primary" onclick="enquiryToCustomer('${escapeAttr(e.id)}')">Add as customer</button>
@@ -264,7 +283,7 @@ function openEnquiry(id){
 function enquiryToCustomer(id){
   const e = enq.items.find(x => x.id === id);
   if(!e) return;
-  openCustomerForm(null, { name: e.name, phone: e.phone, email: e.email, notes: 'Website enquiry: ' + enqNotes(e).replace(/\n/g, ' — '), enquiryId: e.id });
+  openCustomerForm(null, { name: e.name, phone: e.phone, email: e.email, notes: (e.source ? 'Enquiry via ' + e.source : 'Website enquiry') + ': ' + enqNotes(e).replace(/\n/g, ' — '), enquiryId: e.id });
 }
 function enquiryToQuote(id){
   const e = enq.items.find(x => x.id === id);
@@ -276,6 +295,68 @@ function enquiryRemove(id){
     title: 'Remove enquiry', confirmLabel: 'Remove', danger: true,
     onConfirm: () => { closeSheet(); enquiryHandled(id); toast('Enquiry removed'); }
   });
+}
+
+/* ---------- adding one by hand ---------- */
+function openEnquiryForm(){
+  if(!enqCfg()){ enquiriesSetUp(); return; }
+  const chk = (id, val) => `<label style="display:flex; align-items:center; gap:8px; margin:6px 2px; font-weight:600;"><input type="checkbox" class="enqSvc" value="${escapeAttr(val)}" style="width:18px; height:18px; margin:0;"> ${escapeHtml(val)}</label>`;
+  openSheet(`
+    <div class="sheet-head">
+      <h2 style="flex:1; min-width:0;">Add enquiry</h2>
+      <button class="sheet-close" onclick="closeSheet()" aria-label="Close">✕</button>
+    </div>
+    <p style="font-size:0.75rem; color:var(--ink-muted); margin:0 2px 12px; line-height:1.45;">For someone who got in touch another way, such as a phone call or a word of mouth tip. It goes in the list with the website ones, on all your devices.</p>
+    <label style="margin-top:0;">Name</label>
+    <input type="text" id="enqF_name" maxlength="100" autocomplete="off">
+    <label>Phone</label>
+    <input type="tel" id="enqF_phone" maxlength="40" inputmode="tel" autocomplete="off">
+    <label>Email</label>
+    <input type="email" id="enqF_email" maxlength="120" inputmode="email" autocomplete="off" autocapitalize="none">
+    <label>How did they get in touch? <span style="font-weight:500; color:var(--ink-muted);">(optional)</span></label>
+    <input type="text" id="enqF_source" maxlength="60" list="enqSources" placeholder="e.g. Phone call" autocomplete="off">
+    <datalist id="enqSources">${ENQ_SOURCES.map(s => `<option value="${escapeAttr(s)}">`).join('')}</datalist>
+    <label>Interested in</label>
+    ${ENQ_SERVICES.map(s => chk('', s)).join('')}
+    <label>Area</label>
+    <select id="enqF_area" onchange="document.getElementById('enqF_otherWrap').style.display = this.value === 'Other' ? '' : 'none'">
+      <option value="">Not said</option>
+      ${ENQ_AREAS.map(a => `<option>${escapeHtml(a)}</option>`).join('')}
+      <option value="Other">Somewhere else</option>
+    </select>
+    <div id="enqF_otherWrap" style="display:none;"><label>Which area?</label><input type="text" id="enqF_other" maxlength="80" autocomplete="off"></div>
+    <label>Notes <span style="font-weight:500; color:var(--ink-muted);">(optional)</span></label>
+    <textarea id="enqF_message" rows="4" maxlength="1500"></textarea>
+    <div class="form-actions" style="margin-top:14px;">
+      <button class="btn-primary" id="enqF_save" onclick="saveEnquiryForm()">Add enquiry</button>
+    </div>
+  `);
+}
+async function saveEnquiryForm(){
+  const cfg = enqCfg(); if(!cfg) return;
+  const v = id => (document.getElementById(id) || {}).value || '';
+  const name = v('enqF_name').trim(), phone = v('enqF_phone').trim(), email = v('enqF_email').trim();
+  if(!name && !phone && !email){ toast('Add a name, phone number or email'); return; }
+  const area = v('enqF_area');
+  if(area === 'Other' && !v('enqF_other').trim()){ toast('Which area is it?'); return; }
+  const payload = { v: 1, name, phone, email,
+    services: Array.from(document.querySelectorAll('.enqSvc:checked')).map(x => x.value),
+    area, areaOther: area === 'Other' ? v('enqF_other').trim() : '',
+    message: v('enqF_message').trim(), source: v('enqF_source').trim() || 'Added by hand' };
+  const btn = document.getElementById('enqF_save');
+  if(btn){ btn.disabled = true; btn.textContent = 'Adding…'; }
+  const again = () => { if(btn){ btn.disabled = false; btn.textContent = 'Add enquiry'; } };
+  try{
+    const body = await enqEncrypt(payload, cfg.publicKey);
+    const r = await enqApi(cfg, 'POST', '', JSON.stringify(body), true);
+    if(r.ok){ closeSheet(); toast('Enquiry added'); enquiriesRefresh({ force: true }); return; }
+    if(r.status === 403) toast('Your Cloudflare worker needs the newest worker.js before the app can add enquiries by hand');
+    else if(r.status === 409) toast('The inbox is full — deal with some enquiries first');
+    else toast('Couldn’t add it just now — try again');
+  }catch(e){
+    toast(navigator.onLine === false ? OFFLINE_MSG : 'Couldn’t add it just now — try again');
+  }
+  again();
 }
 
 /* ---------- setting it up ---------- */
@@ -322,13 +403,15 @@ function openEnquirySettings(){
       <b>The inbox is on.</b> ${enq.at ? 'Last checked ' + escapeHtml(enqTime(enq.at).toLowerCase()) + '.' : 'Not checked yet.'}
       Enquiries are encrypted on the visitor’s device; only your devices can read them.
     </div>
-    <label style="margin-top:0;">Settings file for your website</label>
-    <p style="font-size:0.75rem; color:var(--ink-muted); margin:0 2px 8px; line-height:1.45;">Copy this, then on GitHub open <b>enquiry-config.js</b> in your website’s folder, replace everything in it with this, and commit. Add your Turnstile site key where it says.</p>
-    <textarea id="enqConfigText" rows="9" readonly style="font-family:ui-monospace, Menlo, monospace; font-size:0.6875rem; line-height:1.4;">${escapeHtml(enqWebsiteConfigText(cfg))}</textarea>
-    <div class="form-actions" style="display:flex; flex-direction:column; gap:8px; margin-top:10px;">
-      <button class="btn-primary" onclick="enqCopyConfig()">Copy settings for the website</button>
-      <button class="btn-primary" style="background:var(--blue-dim); color:var(--blue-deep);" onclick="closeSheet(); enquiriesRefresh({force:true});">Check the inbox now</button>
+    <div class="form-actions" style="display:flex; flex-direction:column; gap:8px;">
+      <button class="btn-primary" onclick="closeSheet(); enquiriesRefresh({force:true});">Check the inbox now</button>
     </div>
+    <details style="margin:16px 2px 4px;">
+      <summary style="cursor:pointer; font-weight:800; font-size:0.875rem;">Website settings <span style="font-weight:600; color:var(--ink-muted);">(only needed if you change your website)</span></summary>
+      <p style="font-size:0.75rem; color:var(--ink-muted); margin:10px 0 8px; line-height:1.45;">If you ever move the website or start it again, copy this, open <b>enquiry-config.js</b> in the website’s folder on GitHub, replace everything in it with this, and commit. Add your Turnstile site key where it says.</p>
+      <textarea id="enqConfigText" rows="9" readonly style="font-family:ui-monospace, Menlo, monospace; font-size:0.6875rem; line-height:1.4;">${escapeHtml(enqWebsiteConfigText(cfg))}</textarea>
+      <button class="btn-primary" style="margin-top:10px;" onclick="enqCopyConfig()">Copy settings for the website</button>
+    </details>
     <button class="btn-danger-text" onclick="enquiriesTurnOff()">Turn off website enquiries…</button>
   `);
 }

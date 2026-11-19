@@ -2292,7 +2292,7 @@ function handleFabClick(btn){
   if(currentTab === 'jobs') openJobForm();
   else if(currentTab === 'quotes') openQuoteForm();
   else if(currentTab === 'marketing') openGroupMarketingText();
-  else if(currentTab === 'enquiries') return; // nothing to add by hand: they come from the website
+  else if(currentTab === 'enquiries') openEnquiryForm(); // one that came by phone or word of mouth (08g-enquiries.js)
   else if(currentTab === 'today') openAddChoice(btn);
   else openCustomerForm();
 }
