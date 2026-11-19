@@ -4,6 +4,17 @@ ROUND BOOK - RELEASE NOTES
 Newest first. This file is not part of the app and is not loaded by it; it ships alongside the code files.
 To add a release: raise APP_VERSION in js/01-data.js and CACHE_NAME in sw.js to the same number, then put a new entry at the top of this list.
 
+Version 1.364
+  - Enquiries: the blue + button on the Enquiries screen now adds an enquiry by hand, for someone who phoned, texted or was
+    recommended: name, phone, email, how they got in touch (phone call, word of mouth, Facebook... or anything you type), which
+    services, the area and notes. It is encrypted with the same key and posted to the same inbox, so it is on all your devices
+    and is dealt with like a website one (Call, Text, Email, Add as customer, Make a quote, Remove). The list shows how each one
+    got in touch, and the customer's notes start "Enquiry via ..." instead of "Website enquiry". Needs a connection
+  - The website settings (the copy-and-paste for enquiry-config.js) are now tucked away under "Website settings" in the settings
+    sheet (the cog), as they are only needed if the website is moved; the sheet leads with "Check the inbox now"
+  - Worker (worker.js): the app, which holds the inbox token, can now post an enquiry without the bot check or the per-visitor
+    limits, which is what lets it add one by hand. Needs redeploying; until then Add enquiry says so
+
 Version 1.363
   - Website enquiries: a third Sales tab, Enquiries, beside Quotes and Marketing. The enquiry form on the website (name, phone,
     email, which services, area, an optional "somewhere else" area, and a free text box) is encrypted in the visitor's browser
