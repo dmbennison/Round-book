@@ -4,6 +4,14 @@ ROUND BOOK - RELEASE NOTES
 Newest first. This file is not part of the app and is not loaded by it; it ships alongside the code files.
 To add a release: raise APP_VERSION in js/01-data.js and CACHE_NAME in sw.js to the same number, then put a new entry at the top of this list.
 
+Version 1.366
+  - Today: tapping a round's chip on the big card now just selects that round on Today (the card, the list, Start, Map and Reorder
+    narrow to it, ready to press Start) instead of jumping to that round in the Rounds tab. Tapping the same chip again, or
+    the round's ✕ beside Start, goes back to every round. The choice lasts for the day, as before. Tapping the big numbers still
+    opens that round's Due list
+  - Add enquiry: the phone and email boxes were drawn small (they were the browser's own kinds of box, which the app's styling
+    didn't cover); they are now the same size and look as the other boxes, and still bring up the phone-number and email keyboards
+
 Version 1.365
   - iPad / desktop: the tab bar under the header (Today, Schedule, Work, Sales) is slimmer, with less space above and below the
     tabs (the space around the row goes from 8 and 12 to 3 and 5, and each tab's own padding from 10 to 6, about 16px of height
