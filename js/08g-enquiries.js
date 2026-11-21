@@ -310,9 +310,9 @@ function openEnquiryForm(){
     <label style="margin-top:0;">Name</label>
     <input type="text" id="enqF_name" maxlength="100" autocomplete="off">
     <label>Phone</label>
-    <input type="tel" id="enqF_phone" maxlength="40" inputmode="tel" autocomplete="off">
+    <input type="text" id="enqF_phone" maxlength="40" inputmode="tel" autocomplete="off">
     <label>Email</label>
-    <input type="email" id="enqF_email" maxlength="120" inputmode="email" autocomplete="off" autocapitalize="none">
+    <input type="text" id="enqF_email" maxlength="120" inputmode="email" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false">
     <label>How did they get in touch? <span style="font-weight:500; color:var(--ink-muted);">(optional)</span></label>
     <input type="text" id="enqF_source" maxlength="60" list="enqSources" placeholder="e.g. Phone call" autocomplete="off">
     <datalist id="enqSources">${ENQ_SOURCES.map(s => `<option value="${escapeAttr(s)}">`).join('')}</datalist>

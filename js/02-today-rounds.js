@@ -1671,14 +1671,15 @@ function goToRoundDue(rn){
   render();
   pageScrollTo(0);
 }
-// Tapping a round chip on the Today hero both jumps straight to that round's
-// Due list (goToRoundDue) and remembers the choice so the Today tab itself
-// stays scoped to that round next time you're back on it — see
-// todaySelectedRound above for how/when that resets.
+// Tapping a round chip on the Today hero picks that round right here on Today: the big card, the list and Start / Map / Reorder
+// all narrow to it, ready to press Start, with no jump to the Rounds tab. Tapping the same chip again (or the round's ✕ beside
+// Start) goes back to every round. The choice lasts for the day — see todaySelectedRound above for how/when that resets.
+// (Tapping the big numbers still opens that round's Due list.)
 function selectTodayRound(rn){
+  if(todaySelectedRound === rn){ clearTodayRound(); return; }
   todaySelectedRound = rn;
   todaySelectedRoundDate = todayISO();
-  goToRoundDue(rn);
+  render();
 }
 function backToRounds(){ currentRound = null; reorderMode = false; roundFilterMode = 'all'; roundDayFilter = 'all'; render(); pageScrollTo(0); }
 function setRoundFilterMode(v){ roundFilterMode = v; render(); }
