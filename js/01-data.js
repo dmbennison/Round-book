@@ -7,7 +7,7 @@ const STORE_KEY = 'roundBookData_v1';
 // bump by 0.001 for every change. formatVersion always renders it to exactly three decimals.
 // Earlier releases were numbered 3.xx (the last was 3.38), so versionRank() maps those onto the same scale
 // (3.38 -> 1.338) and the two kinds can still be compared when a device that has not updated yet syncs.
-const APP_VERSION = 1.366;
+const APP_VERSION = 1.367;
 function formatVersion(v){ return Number(v).toFixed(3); }
 function versionRank(v){ v = Number(v) || 0; return v >= 2 ? 1.3 + (v - 3) / 10 : v; }
 function versionNewerThanMine(v){ return versionRank(v) - versionRank(APP_VERSION) > 0.0004; }
@@ -306,6 +306,11 @@ const DEFAULT_MARKETING_CAMPAIGNS = [
   { id: 'winback', name: "We've missed you", body: DEFAULT_WINBACK_TEMPLATE },
   { id: 'seasonal', name: 'Seasonal reminder', body: DEFAULT_SEASONAL_TEMPLATE }
 ];
+// Asking a happy customer for a Google review (sent from a customer's actions menu: "Ask for a Google review…").
+// {reviewlink} is the link in Settings > Business details, which starts as the business's own Google review page.
+const DEFAULT_REVIEW_LINK = "https://g.page/r/CcrS7bdH_LkEEBM/review";
+const DEFAULT_REVIEW_TEMPLATE = "Hi {name}, thanks for choosing {company}! If you're happy with the work, would you mind leaving us a quick Google review? It really helps a small local business like ours: {reviewlink}\n\nThanks,\n{yourname}\n{company}";
+function reviewLink(){ return ((data && data.settings && data.settings.reviewLink) || '').trim() || DEFAULT_REVIEW_LINK; }
 const DEFAULT_CLEANED_TODAY_TEMPLATE = "Hi {name}, your windows have been cleaned today! The amount now owing is {amount}.\n\n{bankdetails}Thanks,\n{yourname}\n{company}";
 function migrateData(parsed){
   parsed.customers = parsed.customers || [];

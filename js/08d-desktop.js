@@ -25,7 +25,7 @@ function hasFinePointer(){
    ===================================================================== */
 function paneDashKind(){
   if(currentTab === 'rounds') return 'rounds';
-  if(currentTab === 'jobs' || currentTab === 'quotes' || currentTab === 'marketing') return currentTab;
+  if(currentTab === 'jobs' || currentTab === 'quotes' || currentTab === 'marketing' || currentTab === 'enquiries') return currentTab;
   return null;
 }
 function ensurePaneDash(){
@@ -179,6 +179,33 @@ function paneDashMarketing(){
     ${rows || `<div class="pd-empty">No replies are waiting on you.</div>`}`;
 }
 
+function paneDashEnquiries(){
+  // Website enquiries (08g-enquiries.js): what is waiting, how it arrived, and the ones that have waited longest.
+  if(!enqCfg()) return `<h2 class="pd-title">Enquiries</h2><div class="pd-empty">Set up website enquiries on the left and the ones that arrive will be summarised here.</div>`;
+  const items = enq.items;
+  const now = Date.now();
+  const ageDays = e => Math.max(0, Math.floor((now - (e.sent || e.at)) / 86400000));
+  const web = items.filter(e => !e.source), hand = items.filter(e => e.source);
+  const oldest = items.slice().sort((a, b) => (a.sent || a.at) - (b.sent || b.at));
+  const rows = oldest.slice(0, 6).map(e => pdRow({
+    click: `openEnquiry('${escapeAttr(e.id)}')`,
+    title: escapeHtml(e.name || e.phone || e.email || 'Enquiry'),
+    sub: [e.services.join(', '), enqAreaText(e), `${ageDays(e)}d waiting`].filter(Boolean).map(escapeHtml).join(' · ')
+  })).join('');
+  const status = enq.error ? `<div class="pd-note" style="margin:0 0 10px;">${escapeHtml(enq.error)}</div>` : (enq.at ? `<div class="pd-note" style="margin:0 0 10px;">Checked ${escapeHtml(enqTime(enq.at).toLowerCase())}</div>` : '');
+  return `<h2 class="pd-title">Enquiries</h2>
+    <div class="pd-sub">Pick an enquiry on the left to open it here</div>
+    <div class="pd-stats">
+      ${pdStat(items.length, 'Waiting', items.length ? 'not yet dealt with' : 'Nothing waiting', items.length ? 'warn' : 'good')}
+      ${pdStat(web.length, 'From the website')}
+      ${pdStat(hand.length, 'Added by hand')}
+      ${pdStat(items.length ? ageDays(oldest[0]) + 'd' : '–', 'Longest wait', items.length ? 'oldest enquiry' : '', items.length && ageDays(oldest[0]) >= 3 ? 'bad' : '')}
+    </div>
+    ${status}
+    <div class="section-label" style="margin-top:0;">Waiting longest</div>
+    ${rows || `<div class="pd-empty">No enquiries are waiting for a reply.</div>`}`;
+}
+
 // Draws the panel for the current tab. Called after every render(), when a sheet closes (it may have changed the
 // numbers) and when the window changes shape. While a sheet is open the CSS hides the panel, so there's nothing to
 // draw — closeSheet() brings it up to date again.
@@ -187,10 +214,11 @@ function renderPaneDash(){
   if(!ov) return;
   const kind = isWideSplitView() ? paneDashKind() : null;
   ov.classList.toggle('has-dash', !!kind); // tells the CSS to drop the plain "Select something" prompt
-  if(!kind || ov.classList.contains('show')) return;
+  if(!kind){ const old = document.getElementById('paneDash'); if(old) old.innerHTML = ''; return; } // no panel for this tab: never leave the last tab's one showing
+  if(ov.classList.contains('show')) return;
   const el = ensurePaneDash();
   if(!el) return;
-  const build = { rounds: paneDashRounds, jobs: paneDashJobs, quotes: paneDashQuotes, marketing: paneDashMarketing }[kind];
+  const build = { rounds: paneDashRounds, jobs: paneDashJobs, quotes: paneDashQuotes, marketing: paneDashMarketing, enquiries: paneDashEnquiries }[kind];
   el.innerHTML = build();
 }
 

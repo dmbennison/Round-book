@@ -417,6 +417,7 @@ const TEMPLATE_DEFS = [
   { key: 'upsellFasciasTemplate', label: 'Photo offer — fascias & soffits', default: DEFAULT_UPSELL_FASCIAS_TEMPLATE },
   { key: 'upsellOtherTemplate', label: 'Photo offer — something else', default: DEFAULT_UPSELL_OTHER_TEMPLATE },
   { key: 'cleanedTodayTemplate', label: 'Windows cleaned today', default: DEFAULT_CLEANED_TODAY_TEMPLATE },
+  { key: 'reviewTemplate', label: 'Google review request', default: DEFAULT_REVIEW_TEMPLATE },
   { key: 'receiptTemplate', label: 'Receipt', default: DEFAULT_RECEIPT_TEMPLATE },
   { key: 'quoteTemplate', label: 'Quote (new enquiry)', default: DEFAULT_QUOTE_TEMPLATE },
   { key: 'repeatQuoteTemplate', label: 'Quote (repeat work)', default: DEFAULT_REPEAT_QUOTE_TEMPLATE },
@@ -430,7 +431,7 @@ function openMessageTemplates(){
       <h2 style="flex:1; min-width:0;">Message templates</h2>
       <button class="sheet-close" onclick="closeSheet()" aria-label="Close">✕</button>
     </div>
-    <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 12px; line-height:1.5;">Tap a message to edit its wording. Use <b>{name}</b>, <b>{amount}</b>, <b>{date}</b> (receipts), <b>{work}</b> (quotes), <b>{daysoverdue}</b> (payment reminders), <b>{price}</b> (photo offers — becomes "for £X" if you enter a price), <b>{company}</b>, <b>{yourname}</b>, and <b>{bankdetails}</b> (only appears if you've added bank details under Business details). The payment reminder automatically switches to the "2nd+ chase" wording from the second reminder onwards for that customer or job, and quote follow-ups get progressively softer the same way.</p>
+    <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 12px; line-height:1.5;">Tap a message to edit its wording. Use <b>{name}</b>, <b>{amount}</b>, <b>{date}</b> (receipts), <b>{work}</b> (quotes), <b>{daysoverdue}</b> (payment reminders), <b>{price}</b> (photo offers — becomes "for £X" if you enter a price), <b>{company}</b>, <b>{yourname}</b>, <b>{reviewlink}</b> (the review request), and <b>{bankdetails}</b> (only appears if you've added bank details under Business details). The payment reminder automatically switches to the "2nd+ chase" wording from the second reminder onwards for that customer or job, and quote follow-ups get progressively softer the same way.</p>
     ${TEMPLATE_DEFS.map(def=>{
       const val = (data.settings[def.key] || def.default).replace(/\s+/g,' ').trim();
       return `<button class="backup-btn" onclick="openEditTemplate('${def.key}')">
@@ -524,6 +525,9 @@ function openBusinessDetails(){
     <div class="section-label">Your name</div>
     <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 10px; line-height:1.5;">Used to sign off texts more personally — available as the <b>{yourname}</b> token.</p>
     <input type="text" id="yourNameInput" value="${escapeAttr(data.settings.yourName||'')}" placeholder="e.g. Dave">
+    <div class="section-label">Google review link</div>
+    <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 10px; line-height:1.5;">Where the “Ask for a Google review…” text sends people, available as the <b>{reviewlink}</b> token. Leave it as it is unless your Google review link changes.</p>
+    <input type="text" id="reviewLinkInput" value="${escapeAttr(data.settings.reviewLink || DEFAULT_REVIEW_LINK)}" placeholder="https://g.page/r/…/review" inputmode="url" autocapitalize="none" autocorrect="off" spellcheck="false">
     <div class="section-label">Bank details</div>
     <p style="color:var(--ink-muted); font-size:0.75rem; margin:0 2px 10px; line-height:1.5;">Added automatically to payment reminders and "windows cleaned today" texts via the <b>{bankdetails}</b> token, so customers can pay by bank transfer. Their address is included as a payment reference, so it's easy to see who a transfer's from once it lands in your bank. Left blank, that token just disappears.</p>
     <label style="margin-top:0;">Payee Name</label>
@@ -542,6 +546,8 @@ function saveBusinessDetails(){
   data.settings.companyAddress = document.getElementById('companyAddressInput').value.trim();
   data.settings.companyPhone = document.getElementById('companyPhoneInput').value.trim();
   data.settings.yourName = document.getElementById('yourNameInput').value.trim();
+  const rl = document.getElementById('reviewLinkInput').value.trim();
+  data.settings.reviewLink = (rl && rl !== DEFAULT_REVIEW_LINK) ? rl : ''; // empty means the built-in link
   data.settings.bankPayeeName = document.getElementById('bankPayeeInput').value.trim();
   data.settings.bankAccountNumber = document.getElementById('bankAccountInput').value.trim();
   data.settings.bankSortCode = document.getElementById('bankSortCodeInput').value.trim();

@@ -1274,7 +1274,7 @@ function bankDetailsBlock(address){
 }
 // Human-readable labels for the message log shown on a customer/job's screen.
 const MESSAGE_LOG_LABELS = {
-  clean: 'Cleaning reminder', textBefore: 'Text before visit', cleanedToday: 'Windows cleaned today', pay: 'Payment reminder',
+  clean: 'Cleaning reminder', review: 'Google review request', textBefore: 'Text before visit', cleanedToday: 'Windows cleaned today', pay: 'Payment reminder',
   receipt: 'Receipt', upsell: 'Photo offer sent', quote: 'Quote', repeatQuote: 'Repeat work quote', quoteFollowUp: 'Quote follow-up', quoteCall: 'Follow-up call made', quotePdf: 'Quote sent as PDF', marketing: 'Marketing text'
 };
 // Marketing response pipeline — tracked manually, since there's no way for the app
@@ -1328,6 +1328,7 @@ function applyTemplate(tpl, tokens){
     .replace(/\{company\}/g, tokens.company || '')
     .replace(/\{date\}/g, tokens.date || '')
     .replace(/\{yourname\}/g, tokens.yourname || '')
+    .replace(/\{reviewlink\}/g, tokens.reviewlink || reviewLink())
     .replace(/\{work\}/g, tokens.work || 'your window cleaning')
     .replace(/\{daysoverdue\}/g, tokens.daysoverdue != null ? String(tokens.daysoverdue) : '')
     // Cash customers don't need bank details: the token simply disappears for them.
@@ -1795,6 +1796,16 @@ function sendTemplate(id, kind, returnTo){
   if(kind === 'clean'){
     msg = applyTemplate(data.settings.cleanTemplate, {name: firstName, company, yourname});
     title = 'Cleaning reminder';
+  } else if(kind === 'review'){
+    // Asking for a Google review: the wording is a template, the link comes from Business details. Remembers when, so the
+    // customer's menu can show that they've already been asked.
+    msg = applyTemplate(data.settings.reviewTemplate || DEFAULT_REVIEW_TEMPLATE, {name: firstName, company, yourname, reviewlink: reviewLink()});
+    title = 'Google review request';
+    afterSend = () => {
+      c.reviewRequestedDate = todayISO();
+      saveData();
+      render();
+    };
   } else if(kind === 'cleanedToday'){
     // Uses the customer's real running balance (all charges minus all payments and
     // credit), not just this clean's price — so someone who owes a previous clean, or

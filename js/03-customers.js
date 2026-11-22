@@ -802,6 +802,7 @@ function openCustomerActionsMenu(id, anchor){
     mobile ? '-' : null,
     mobile ? {label: 'Send cleaning reminder…', run: () => sendTemplate(id, 'clean', back)} : null,
     mobile ? {label: 'Send payment reminder…', run: () => sendTemplate(id, 'pay', back)} : null,
+    mobile ? {label: c.reviewRequestedDate ? `Ask for a Google review… (asked ${fmtDate(c.reviewRequestedDate)})` : 'Ask for a Google review…', run: () => sendTemplate(id, 'review', back)} : null,
     '-',
     !c.paused ? {label: 'Defer…', run: () => openDeferSheet('customer', id, anchor)} : null,
     !c.paused ? {label: 'Couldn\u2019t clean \u2014 defer to next clean', run: () => markCouldntClean(id)} : null,

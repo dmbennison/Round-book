@@ -304,7 +304,7 @@ const FOCUSED_HELP = {
     body: () => [
       helpP('Tap a customer to open them: their round, price, how often they are cleaned, what they owe and their notes.'),
       helpList([
-        'Under the customer’s details are two buttons: <b>Actions</b> and <b>History</b>. <b>Actions</b> has Add a clean, Add a payment, the cleaning and payment reminder texts, Defer, Couldn’t clean, Pause or Resume, Apply price uplift, Get a quote, Schedule a one-off job and <b>Export their data</b>. (To mark someone cleaned or paid today, swipe their card on Today or Rounds.)',
+        'Under the customer’s details are two buttons: <b>Actions</b> and <b>History</b>. <b>Actions</b> has Add a clean, Add a payment, the cleaning and payment reminder texts, <b>Ask for a Google review…</b> (a text with your review link, ready to send; it shows when they were last asked), Defer, Couldn’t clean, Pause or Resume, Apply price uplift, Get a quote, Schedule a one-off job and <b>Export their data</b>. (To mark someone cleaned or paid today, swipe their card on Today or Rounds.)',
         '<b>Export their data</b> (in Actions) gives a customer everything held about them, for a data request: a <b>PDF</b> to read or a portable <b>data file</b>, either with an optional password.',
         '<b>History</b> opens a drop-down: Clean history, Payment history, One-off jobs, Price history and Messages. Tap any entry to edit or remove it, or send a receipt.',
         '<b>Delete customer</b> (at the bottom of Edit) asks first, then shows a red bar with <b>Undo</b>. Jobs and quotes work the same way.',
@@ -406,7 +406,7 @@ const FOCUSED_HELP = {
         '<b>Messaging app</b> – Messages or WhatsApp. A customer can have their own under <b>Message by</b> when you edit them.',
         '<b>Swipe to text</b> – turns the “Windows cleaned today” text on or off.',
         '<b>Privacy</b> – <b>Delete after 2 years</b> removes customers (and one-off jobs and quotes that belong to no customer) with no activity for 2 years. You get a 30-day warning on Today and can <b>Keep</b> them; anyone who still owes money is never deleted, a safety copy is taken first, and your tax records are kept separately. <b>Keep everything</b> turns it off.',
-        '<b>Business details</b> – your name, company and bank details, used on invoices and texts.',
+        '<b>Business details</b> – your name, company, bank details and Google review link, used on invoices and texts.',
         '<b>Message templates</b> – the wording of every text.',
         '<b>Mileage rates</b> – the allowance rates for the tax year.'
       ])
