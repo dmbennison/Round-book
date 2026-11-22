@@ -553,6 +553,20 @@ async function runSelfTests(){
     });
   });
 
+  group('schedule day totals', () => {
+    // The total shown at the top of each scheduled day: customers and jobs due, their value, and planned-ahead cleans counted apart.
+    const item = (kind, price, extra) => Object.assign({ kind, key:'k' + Math.random(), label:'R', price, date:'2025-03-03', dispDate:'2025-03-03', parked:false }, extra || {});
+    const chip = (date, items) => ({ date, items });
+    const st = seDayStats([
+      chip('2025-03-03', [item('c', 20), item('c', 25), item('j', 40)]),
+      chip('2025-03-03', [item('c', 15, { ahead:true, n:2 })]),
+      chip('2025-03-04', [item('c', 30)])
+    ]);
+    eq('schedule totals: customers, jobs and value for a day', [st['2025-03-03'].cust, st['2025-03-03'].jobs, st['2025-03-03'].value], [2, 1, 85]);
+    eq('schedule totals: planned-ahead cleans are counted apart', [st['2025-03-03'].ahead, st['2025-03-03'].aheadValue], [1, 15]);
+    eq('schedule totals: another day', [st['2025-03-04'].cust, st['2025-03-04'].value], [1, 30]);
+  });
+
   group('colour schemes', () => {
     // Every scheme must keep the contrast the Settings comment promises (checked on the solid palette each is drawn with): text 7:1, secondary text and accent 4.5:1, white on the header 7:1.
     const lum = h => { const c = [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255).map(v => v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };

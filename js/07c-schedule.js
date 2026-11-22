@@ -261,6 +261,7 @@ function seDayStats(chips){
     ch.items.forEach(it => {
       if(seIsParked(it)) return; // waiting for a day: not today's work yet
       if(it.ahead){ s.ahead++; s.aheadValue += it.price || 0; return; } // planned ahead: counted apart from the work that is due
+      if(it.kind === 'c') s.cust++; else s.jobs++;
       s.value += it.price || 0;
     });
   });
