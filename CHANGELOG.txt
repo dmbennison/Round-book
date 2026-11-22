@@ -4,6 +4,12 @@ ROUND BOOK - RELEASE NOTES
 Newest first. This file is not part of the app and is not loaded by it; it ships alongside the code files.
 To add a release: raise APP_VERSION in js/01-data.js and CACHE_NAME in sw.js to the same number, then put a new entry at the top of this list.
 
+Version 1.368
+  - Schedule: the totals at the top of each scheduled day (the number of customers and jobs due and their value, such as "5 · £100",
+    as the "✓ 5 · £100" already shows on days that have been cleaned) had stopped appearing on days still to do. A line that counts
+    the customers and jobs was lost when planning ahead was added in version 1.353. Restored, and a self-test now checks it. Days
+    that also have planned-ahead cleans show them after the total ("5 · £100 · +3 planned")
+
 Version 1.367
   - Ask for a Google review: a new "Ask for a Google review…" in a customer's actions menu (the ⋯ on their detail screen, beside
     the cleaning and payment reminders) opens a text to them with your Google review link, ready to send (to a mobile number, as
