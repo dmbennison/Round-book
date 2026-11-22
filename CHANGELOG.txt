@@ -4,6 +4,17 @@ ROUND BOOK - RELEASE NOTES
 Newest first. This file is not part of the app and is not loaded by it; it ships alongside the code files.
 To add a release: raise APP_VERSION in js/01-data.js and CACHE_NAME in sw.js to the same number, then put a new entry at the top of this list.
 
+Version 1.369
+  - Schedule: a new 📋 List button (beside Undo) shows who is in the tile you have selected: its customers in their visiting
+    order with their prices and the total, marking anyone overdue, on a first clean, fronts only or text first. With Multi on it
+    lists every selected tile, and it works for planned-ahead tiles and one-off job tiles too. It is read only; Split, under
+    More, is still the one that moves some of a round's customers
+  - The user guide and the empty-screen prompts no longer say the + button and the round tiles are "blue" whatever the colour
+    scheme. Those take the scheme's accent colour (coral in Ocean, copper in Slate, blue in Rust, ochre in Forest, teal in Plum,
+    raspberry in Lagoon, indigo in Cherry, and in dark mode the lighter version of each), so the guide now names the colour that is
+    on screen for the scheme and mode in use. Green, red and amber (cleaned, owing or overdue, one-off jobs) and the blue directions
+    button are the same in every scheme, so those are still named as they were
+
 Version 1.368
   - Schedule: the totals at the top of each scheduled day (the number of customers and jobs due and their value, such as "5 · £100",
     as the "✓ 5 · £100" already shows on days that have been cleaned) had stopped appearing on days still to do. A line that counts
