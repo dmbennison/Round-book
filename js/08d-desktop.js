@@ -92,7 +92,7 @@ function paneDashRounds(){
 
 function paneDashJobs(){
   const jobs = data.oneOffJobs || [];
-  if(!jobs.length) return `<h2 class="pd-title">One-off jobs</h2><div class="pd-empty">Tap the blue + button to add a job and its summary will show here.</div>`;
+  if(!jobs.length) return `<h2 class="pd-title">One-off jobs</h2><div class="pd-empty">Tap the ${accentName()} + button to add a job and its summary will show here.</div>`;
   const today = todayISO();
   // Monday to Sunday, the same week the earnings reports use (mondayOfWeek is in 07-reports-b.js).
   const wkStart = mondayOfWeek(today), wkEnd = addDaysISO(wkStart, 6);
@@ -123,7 +123,7 @@ function paneDashJobs(){
 
 function paneDashQuotes(){
   const quotes = data.quotes || [];
-  if(!quotes.length) return `<h2 class="pd-title">Quotes</h2><div class="pd-empty">Tap the blue + button to note down a quote and its summary will show here.</div>`;
+  if(!quotes.length) return `<h2 class="pd-title">Quotes</h2><div class="pd-empty">Tap the ${accentName()} + button to note down a quote and its summary will show here.</div>`;
   const today = todayISO();
   const by = st => quotes.filter(q => (q.status || 'pending') === st);
   const pending = by('pending'), converted = by('converted'), accepted = by('accepted'), declined = by('declined');

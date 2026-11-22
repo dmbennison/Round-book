@@ -867,6 +867,38 @@ function seSplitOpen(){
     <div class="se-btn-row"><button class="se-btn primary" onclick="seSplitApply()">Move ticked</button></div>
   `);
 }
+/* --- 📋 List: who is in the selected tile(s) ---
+   Read only: for each selected tile, the customers in it in their visiting order, with their price, so you can see what is
+   behind a tile without opening anything. (Split, under More, is the one that moves some of them.) */
+function seListOpen(){
+  if(!se) return;
+  const chips = se.sel.map(id => se.chipIndex[id]).filter(Boolean);
+  if(!chips.length){ toast('Tap a tile first, then List shows who is in it'); return; }
+  const section = ch => {
+    let rows = [], total = 0;
+    if(ch.kind === 'round'){
+      const byId = new Map(data.customers.map(c => [c.id, c]));
+      const found = ch.items.map(it => byId.get(it.key)).filter(Boolean);
+      const itemOf = new Map(ch.items.map(it => [it.key, it]));
+      rows = sortByRoute(found).map(c => {
+        const it = itemOf.get(c.id) || {};
+        total += it.price || 0;
+        const notes = [];
+        if(it.overdue) notes.push('overdue');
+        if(it.first) notes.push('first clean');
+        if(c.frontsOnly) notes.push('fronts only');
+        if(c.textBeforeVisit) notes.push('text first');
+        return { name: c.address || c.name || 'Customer', sub: [c.address ? c.name : '', notes.join(', ')].filter(Boolean).join(' · '), price: it.price };
+      });
+    } else {
+      rows = ch.items.map(it => { total += it.price || 0; return { name: it.label || 'Job', sub: 'One-off job', price: it.price }; });
+    }
+    return `<div style="margin:14px 2px 6px; font-weight:800; font-size:0.9375rem;">${escapeHtml(ch.label)} <span style="font-weight:600; color:var(--ink-muted);">· ${escapeHtml(seFmtDay(ch.date))}</span></div>
+      <p class="se-note" style="margin-top:0;">${sePlural(rows.length, ch.kind === 'round' ? 'customer' : 'job')}${total ? ' · ' + money(total) : ''}</p>
+      <div class="se-list">${rows.map((r, i) => `<label class="se-row" style="cursor:default;"><span class="se-row-name">${ch.kind === 'round' ? (i + 1) + '. ' : ''}${escapeHtml(r.name)}${r.sub ? `<span style="display:block; font-size:0.75rem; font-weight:500; color:var(--ink-muted);">${escapeHtml(r.sub)}</span>` : ''}</span>${r.price ? `<span class="se-row-price">${money(r.price)}</span>` : ''}</label>`).join('')}</div>`;
+  };
+  seModal(`<h3>📋 ${chips.length === 1 ? 'Who is in this tile' : 'Who is in these tiles'}</h3>${chips.map(section).join('')}<div class="se-btn-row"><button class="se-btn" onclick="seCloseModal()">Close</button></div>`);
+}
 function seSplitTick(on){ document.querySelectorAll('.seSplitChk').forEach(c => { c.checked = on; }); }
 function seSplitApply(){
   const ch = se.chipIndex[se.splitChipId];

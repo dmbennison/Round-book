@@ -197,8 +197,13 @@ function openInfo(){
 function helpH(text){
   return `<div style="font-size:1.0625rem; font-weight:800; color:var(--ink); margin:26px 2px 10px; padding-top:16px; border-top:1px solid var(--line);">${text}</div>`;
 }
+// {accent} / {Accent} in help text stand for the colour the chosen colour scheme's accent really is (coral, copper, teal...).
+function helpColours(text){
+  const a = accentName();
+  return String(text).replace(/\{Accent\}/g, a.charAt(0).toUpperCase() + a.slice(1)).replace(/\{accent\}/g, a);
+}
 function helpP(text){
-  return `<p style="color:var(--ink); font-size:0.8438rem; line-height:1.6; margin:0 2px 12px;">${text}</p>`;
+  return `<p style="color:var(--ink); font-size:0.8438rem; line-height:1.6; margin:0 2px 12px;">${helpColours(text)}</p>`;
 }
 let helpReturnCallback = null;
 // Same "?" help icon as helpIconBtn, but sized/styled for a main tab screen's own
@@ -216,7 +221,7 @@ function helpIconBtn(topic, returnTo){
 }
 // Bullet list used by the guide sections below.
 function helpList(items){
-  return `<ul style="margin:0 2px 14px; padding-left:20px; color:var(--ink); font-size:0.8438rem; line-height:1.6;">${items.map(i => `<li style="margin-bottom:6px;">${i}</li>`).join('')}</ul>`;
+  return `<ul style="margin:0 2px 14px; padding-left:20px; color:var(--ink); font-size:0.8438rem; line-height:1.6;">${items.map(i => `<li style="margin-bottom:6px;">${helpColours(i)}</li>`).join('')}</ul>`;
 }
 
 // Single source of truth for help content — the full User Guide is these sections one after
@@ -255,11 +260,12 @@ const FOCUSED_HELP = {
   schedule: {
     title: 'Schedule',
     body: () => [
-      helpP('A calendar of the coming weeks. Blue tiles are rounds on the day they are due, amber tiles are one-off jobs, and anyone overdue shows in red on today. <b>Nothing changes until you tap Commit.</b> You can look at other tabs and come back – your changes are still there.'),
+      helpP('A calendar of the coming weeks. {Accent} tiles are rounds on the day they are due, amber tiles are one-off jobs, and anyone overdue shows in red on today. <b>Nothing changes until you tap Commit.</b> You can look at other tabs and come back – your changes are still there.'),
       helpList([
         '<b>Move a tile</b> – press and hold it, then drag it to another day. Or tap the tile, then tap the day.',
         '<b>Commit</b> (top right) shows what will change, then applies it. <b>Reject</b> throws your changes away. <b>↶ Undo</b> takes back your last move.',
         
+        '<b>📋 List</b> (beside Undo) shows who is in the tile you have selected: the customers in their visiting order with their prices and the total, and anyone overdue or on a first clean. With <b>☑ Multi</b> on, it lists every tile you have selected.',
         '<b>⋯ More…</b> has <b>☔ Push back</b> (for a rained-off day), <b>☑ Multi</b> (move several tiles at once), <b>👥 Split</b> (move some of a round’s customers), <b>＋ Job</b> (add a one-off job to a day), <b>📝 Note</b> (leave a reminder on a day) and <b>🚫 Days off</b> (set your days off and holidays). Tap the day first for Job and Note.',
         '<b>📆 Plan ahead</b> – the button beside Undo shows the <b>next clean</b>, the <b>next 2 cleans</b> or the <b>next 3 cleans</b> of every round (tap it to change; the calendar widens to fit). The 2nd and 3rd are <b>dashed outline tiles marked ② and ③</b>, a cleaning cycle after the clean before. Drag them like any other tile to plan where they will go. Move a clean and the dashed tiles after it move too, unless you have given them a day of their own. Each day also shows how many are <b>planned</b> as well as how many are due. <b>Commit</b> keeps the days you gave them, and when the clean before one is done, its planned day becomes that customer’s next due date.',
         '<b>Houses that spilled over come back together.</b> If a few houses of a round had to be done the day after the rest, their next clean is put back on the round’s day, so the whole round is one tile again instead of being split over two days. It only applies to a small number (no more than a third as many as the rest of the round) done 1 to 3 days later; a different day, a day earlier, a bigger group, or a customer you have moved by hand is left alone. Use <b>Split</b> if you want to separate them again.',
@@ -357,7 +363,7 @@ const FOCUSED_HELP = {
       helpP('The enquiry form on your website sends each enquiry here. It is <b>encrypted on the visitor’s device</b> before it is sent, so Cloudflare, which carries it, can’t read it; only your own devices can.'),
       helpList([
         '<b>Setting up</b> (once) – open <b>Sales → Enquiries</b> and tap <b>Set up website enquiries</b>, then <b>Copy settings for the website</b> and paste them into <b>enquiry-config.js</b> on your website’s GitHub. It needs the newest Cloudflare worker and a free Turnstile key (see the website’s README). After that you never need to look at it again; the website settings are tucked away under <b>⚙︎</b> in case you move the website.',
-        '<b>Adding one by hand</b> – tap the blue <b>+</b> on the Enquiries screen for someone who phoned, texted or was recommended: their name, phone and email, how they got in touch, what they want, the area and any notes. It goes in the list with the website ones, on all your devices, and is dealt with the same way. It needs a connection, and the newest worker.js.',
+        '<b>Adding one by hand</b> – tap the {accent} <b>+</b> on the Enquiries screen for someone who phoned, texted or was recommended: their name, phone and email, how they got in touch, what they want, the area and any notes. It goes in the list with the website ones, on all your devices, and is dealt with the same way. It needs a connection, and the newest worker.js.',
         '<b>Collecting them</b> – the app checks for new enquiries when it is opened, when you come back to it, every 5 minutes while it is open, and when you tap <b>↻</b>. Nothing is collected, and you are not alerted, while the app is closed. A red dot on the Sales tab and a number on Enquiries show that something is waiting.',
         '<b>Each enquiry</b> – tap one to <b>Call</b>, <b>Text</b> or <b>Email</b>, to <b>Add as customer</b> (name, phone, email and what they asked for are filled in; you add the address, round and price) or <b>Make a quote</b>. Either one removes the enquiry from the list. <b>Remove enquiry</b> deletes it without making anything.',
         'An enquiry stays in the list on <b>all</b> your devices until it is dealt with on one of them. Ones nobody collects are deleted from the inbox after 45 days.',
@@ -446,7 +452,7 @@ function openHelp(returnTo){
     ${helpList([
       'Install it as an app: in Safari tap Share → <b>Add to Home Screen</b>.',
       'The four tabs are <b>Today</b>, <b>Schedule</b>, <b>Work</b> (with <b>Rounds</b> and <b>Jobs</b> underneath) and <b>Sales</b> (with <b>Quotes</b>, <b>Marketing</b> and <b>Enquiries</b> underneath).',
-      'The blue <b>+</b> button adds a customer, job, quote or enquiry, depending on the screen you are on.',
+      'The {accent} <b>+</b> button adds a customer, job, quote or enquiry, depending on the screen you are on.',
       'Menus all open as drop-downs under the button you tapped, in the same style (a <b>…</b> after a name means it asks for a little more first); tap the button again, or anywhere else, to close them. Where a screen has a lot of buttons, they are gathered into an <b>Actions</b> drop-down (customers, jobs and quotes) or a <b>⋯</b> button (photos) to leave more room. The top bar has <b>Search</b> (it forgives typos, treats Rd as Road and so on, and lists the closest matches first; tap <b>📅</b> beside the box, or type a date like 14/10, to see everything recorded on that day), the <b>⋯</b> menu (Reports, Photo gallery, Backup, <b>Message other device</b>, <b>Check for updates</b> and About) and <b>Settings</b>.',
       'Tap the <b>🎤</b> in any text box to speak instead of typing.',
       'A <b>?</b> button next to a screen’s title opens help for just that screen.',

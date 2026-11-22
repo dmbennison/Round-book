@@ -24,7 +24,7 @@ function renderJobs(main){
     html += `<div class="empty">
       <svg viewBox="0 0 24 24" fill="none" stroke="#66798A" stroke-width="1.6"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
       <b>No one-off jobs yet</b>
-      <p>Tap the blue + button to add a gutter clean, one-time job, or anything outside your regular rounds — you can schedule it for any future date.</p>
+      <p>Tap the ${accentName()} + button to add a gutter clean, one-time job, or anything outside your regular rounds — you can schedule it for any future date.</p>
     </div>`;
     main.innerHTML = html;
     return;
@@ -427,7 +427,7 @@ function renderQuotes(main){
     html += `<div class="empty">
       <svg viewBox="0 0 24 24" fill="none" stroke="#66798A" stroke-width="1.6"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
       <b>No quotes yet</b>
-      <p>Tap the blue + button to note down a quote — you can turn it into a customer or a one-off job later.</p>
+      <p>Tap the ${accentName()} + button to note down a quote — you can turn it into a customer or a one-off job later.</p>
     </div>`;
     main.innerHTML = html;
     return;

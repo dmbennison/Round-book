@@ -151,6 +151,14 @@ function refreshStatusStrip(){
   el.remove();
   requestAnimationFrame(() => { parent.insertBefore(clone, parent.firstChild); });
 }
+/* The colour each scheme's accent (the + bubble, Start, the round tiles, the active buttons) really shows, in words, in light and
+   in dark mode, so help text and prompts can say what is on screen instead of always saying "blue". Green, red and amber (done,
+   owes / overdue, jobs) and the blue directions button are the same in every scheme, so those are named plainly. */
+const ACCENT_WORDS = {
+  ocean: ['coral', 'coral'], slate: ['copper', 'copper'], rust: ['blue', 'light blue'], forest: ['ochre', 'gold'],
+  plum: ['teal', 'teal'], lagoon: ['raspberry', 'pink'], cherry: ['indigo', 'lilac'], contrast: ['blue', 'yellow']
+};
+function accentName(){ const w = ACCENT_WORDS[themeName] || ACCENT_WORDS.ocean; return w[darkMode ? 1 : 0]; }
 function applyTheme(){
   const t = THEMES[themeName] || THEMES.ocean;
   const p = darkMode ? t.dark : t.light; // this scheme's page / card / text colours for the current mode
