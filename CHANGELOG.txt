@@ -4,6 +4,18 @@ ROUND BOOK - RELEASE NOTES
 Newest first. This file is not part of the app and is not loaded by it; it ships alongside the code files.
 To add a release: raise APP_VERSION in js/01-data.js and CACHE_NAME in sw.js to the same number, then put a new entry at the top of this list.
 
+Version 1.367
+  - Ask for a Google review: a new "Ask for a Google review…" in a customer's actions menu (the ⋯ on their detail screen, beside
+    the cleaning and payment reminders) opens a text to them with your Google review link, ready to send (to a mobile number, as
+    the other texts). The wording is under Settings > Message templates > "Google review request" and uses the new {reviewlink}
+    token, with {name}, {company} and {yourname} as usual. The link is under Settings > Business details > "Google review link",
+    and starts as your business's own review page, so it works straight away. After a send the customer's menu shows when they
+    were asked, and the send is in their message history
+  - iPad / desktop: the right-hand pane on the Enquiries screen listed Quotes instead of enquiries. It now has its own summary
+    (how many are waiting, how many came from the website and how many were added by hand, the longest wait, and the ones that
+    have waited longest, tap one to open it). Any screen without a summary panel now clears the pane rather than leaving the last
+    screen's panel showing, which is what let the Quotes one stay
+
 Version 1.366
   - Today: tapping a round's chip on the big card now just selects that round on Today (the card, the list, Start, Map and Reorder
     narrow to it, ready to press Start) instead of jumping to that round in the Rounds tab. Tapping the same chip again, or
