@@ -4,6 +4,10 @@ ROUND BOOK - RELEASE NOTES
 Newest first. This file is not part of the app and is not loaded by it; it ships alongside the code files.
 To add a release: raise APP_VERSION in js/01-data.js and CACHE_NAME in sw.js to the same number, then put a new entry at the top of this list.
 
+Version 1.370
+  - Add enquiry (Sales > Enquiries > +): the area list now includes South Shields, Jarrow and Hebburn, to match the website's
+    enquiry form. (The website itself is changed separately, in the website folder, not in the app)
+
 Version 1.369
   - Schedule: a new 📋 List button (beside Undo) shows who is in the tile you have selected: its customers in their visiting
     order with their prices and the total, marking anyone overdue, on a first clean, fronts only or text first. With Multi on it
