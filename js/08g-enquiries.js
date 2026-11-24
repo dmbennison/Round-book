@@ -16,6 +16,10 @@
      per enquiry   the browser makes a one-off ECDH key, agrees a secret with the public key, and turns it into an AES-256-GCM
                    key with SHA-256(secret + its own public key + your public key + label). Sent: its public key, the iv,
                    the ciphertext. Nothing in what is sent can be read without your private key.
+   The same inbox carries a WEBSITE OFFER: a line of text and an end date that this app publishes to the worker and the website
+   shows as a banner (see openWebsiteOffer). It is public by design (every visitor sees it), so it is not encrypted and must
+   never hold anything private.
+
    An enquiry can also be added by hand (the + button on the tab: a phone call, a word-of-mouth tip). It is encrypted with the same
    public key and posted to the same inbox, with the inbox token so the bot check and visitor limits don't apply, so it behaves exactly
    like one from the website: it is on all your devices and is dealt with the same way.
@@ -204,6 +208,7 @@ function renderEnquiries(main){
   }
   const tools = `<div style="display:flex; align-items:center; justify-content:flex-end; gap:8px; margin-bottom:8px;">
     ${mainScreenHelpBtn('enquiries', "()=>setTab('enquiries')")}
+    <button class="btn-open icon-plain" style="width:38px; height:38px; padding:0;" onclick="openWebsiteOffer()" aria-label="Special offer banner on the website" title="Special offer banner on the website">📣</button>
     <button class="btn-open icon-plain" style="width:38px; height:38px; padding:0;" onclick="enquiriesRefresh({force:true})" aria-label="Check for new enquiries">↻</button>
     <button class="btn-open icon-plain" style="width:38px; height:38px; padding:0;" onclick="openEnquirySettings()" aria-label="Website enquiry settings">⚙︎</button>
   </div>`;
@@ -294,6 +299,92 @@ function enquiryRemove(id){
   appConfirm('Remove this enquiry? It is deleted from the inbox, so it disappears on all your devices. This can’t be undone.', {
     title: 'Remove enquiry', confirmLabel: 'Remove', danger: true,
     onConfirm: () => { closeSheet(); enquiryHandled(id); toast('Enquiry removed'); }
+  });
+}
+
+/* ---------- the website offer banner ---------- */
+function enqEndsText(until){
+  if(!until) return '';
+  const d = new Date(until + 'T12:00:00');
+  return isNaN(d) ? '' : 'Ends ' + d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' });
+}
+async function openWebsiteOffer(){
+  const cfg = enqCfg();
+  if(!cfg){ toast('Set up website enquiries first'); return; }
+  let current = null, problem = '';
+  openSheet(`<div class="sheet-head"><h2 style="flex:1;">Website offer</h2><button class="sheet-close" onclick="closeSheet()" aria-label="Close">✕</button></div><p style="color:var(--ink-muted); margin:0 2px;">Checking what is on the website…</p>`);
+  try{
+    const r = await enqApi(cfg, 'GET', '/notice');
+    if(r.status === 404) problem = 'Your Cloudflare worker needs the newest worker.js before offers can be shown on the website.';
+    else if(r.ok && r.json) current = r.json.notice || null;
+    else problem = 'Couldn’t check the website just now.';
+  }catch(e){ problem = navigator.onLine === false ? OFFLINE_MSG : 'Couldn’t reach the website’s service just now.'; }
+  const today = todayISO();
+  openSheet(`
+    <div class="sheet-head">
+      <h2 style="flex:1; min-width:0;">Website offer</h2>
+      <button class="sheet-close" onclick="closeSheet()" aria-label="Close">✕</button>
+    </div>
+    <p style="font-size:0.75rem; color:var(--ink-muted); margin:0 2px 12px; line-height:1.5;">A banner across the top of your website, ahead of everything else. Everyone who visits can read it, so keep to the offer itself, nothing private. It goes by itself after the last day, and can take a minute or two to appear or disappear.</p>
+    ${problem ? `<div style="margin:0 2px 12px; padding:10px 12px; border-radius:12px; background:var(--amber-dim); font-size:0.8125rem; font-weight:700;">${escapeHtml(problem)}</div>` : ''}
+    <div style="margin:0 2px 14px; font-size:0.8125rem; font-weight:700;">${current ? `On the website now: “${escapeHtml(current.text)}”${current.until ? ' · ' + escapeHtml(enqEndsText(current.until).toLowerCase()) : ''}` : (problem ? '' : 'No offer is showing on the website.')}</div>
+    <label style="margin-top:0;">Offer wording</label>
+    <textarea id="offerText" rows="3" maxlength="200" oninput="offerPreview()" placeholder="e.g. 10% off gutter cleaning when you book before 30 April">${escapeHtml(current ? current.text : '')}</textarea>
+    <label>Last day <span style="font-weight:500; color:var(--ink-muted);">(optional)</span></label>
+    <input type="date" id="offerUntil" min="${escapeAttr(today)}" value="${escapeAttr(current ? current.until : '')}" oninput="offerPreview()">
+    <p style="font-size:0.75rem; color:var(--ink-muted); margin:4px 2px 12px;">Leave it empty to keep the offer up until you take it down.</p>
+    <label>How it will look</label>
+    <div style="background:linear-gradient(90deg,#0b2a5b,#0a4a9e); color:#fff; border-radius:12px; padding:12px; text-align:center; margin:0 0 14px;">
+      <span style="background:#e0161c; color:#fff; font-weight:800; font-size:0.6875rem; letter-spacing:0.08em; text-transform:uppercase; padding:3px 10px; border-radius:999px;">Special offer</span>
+      <div id="offerPrev" style="font-weight:800; font-size:1rem; margin-top:8px; line-height:1.3;"></div>
+      <div id="offerPrevUntil" style="font-size:0.8125rem; opacity:0.9; margin-top:2px;"></div>
+    </div>
+    <div class="form-actions" style="display:flex; flex-direction:column; gap:8px;">
+      <button class="btn-primary" id="offerPublish" onclick="publishOffer()">Publish offer</button>
+    </div>
+    ${current ? '<button class="btn-danger-text" onclick="takeDownOffer()">Take the offer down</button>' : ''}
+  `);
+  offerPreview();
+}
+function offerPreview(){
+  const t = (document.getElementById('offerText') || {}).value || '';
+  const u = (document.getElementById('offerUntil') || {}).value || '';
+  const p = document.getElementById('offerPrev'), pu = document.getElementById('offerPrevUntil');
+  if(p) p.textContent = t.trim() || 'Your offer wording appears here';
+  if(pu) pu.textContent = enqEndsText(u);
+}
+async function publishOffer(){
+  const cfg = enqCfg(); if(!cfg) return;
+  const text = ((document.getElementById('offerText') || {}).value || '').replace(/\s+/g, ' ').trim();
+  const until = (document.getElementById('offerUntil') || {}).value || '';
+  if(text.length < 3){ toast('Write the offer first'); return; }
+  if(until && until < todayISO()){ toast('The last day can’t be in the past'); return; }
+  const btn = document.getElementById('offerPublish');
+  if(btn){ btn.disabled = true; btn.textContent = 'Publishing…'; }
+  const again = () => { if(btn){ btn.disabled = false; btn.textContent = 'Publish offer'; } };
+  try{
+    const r = await enqApi(cfg, 'PUT', '/notice', JSON.stringify({ text, until }));
+    if(r.ok){ closeSheet(); toast('Offer published — it shows on the website within a minute or two'); return; }
+    if(r.status === 404) toast('Your Cloudflare worker needs the newest worker.js first');
+    else if(r.status === 403) toast('The website’s service refused this device');
+    else if(r.status === 400) toast('That wording or date isn’t accepted — keep it under 200 characters');
+    else toast('Couldn’t publish just now — try again');
+  }catch(e){
+    toast(navigator.onLine === false ? OFFLINE_MSG : 'Couldn’t publish just now — try again');
+  }
+  again();
+}
+function takeDownOffer(){
+  appConfirm('Take the offer down from your website?', {
+    title: 'Take the offer down', confirmLabel: 'Take down', danger: true,
+    onConfirm: async () => {
+      const cfg = enqCfg(); if(!cfg) return;
+      try{
+        const r = await enqApi(cfg, 'DELETE', '/notice');
+        if(r.ok){ closeSheet(); toast('Offer taken down — it can take a minute or two to disappear'); }
+        else toast('Couldn’t take it down just now — try again');
+      }catch(e){ toast(navigator.onLine === false ? OFFLINE_MSG : 'Couldn’t take it down just now'); }
+    }
   });
 }
 
