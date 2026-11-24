@@ -4,6 +4,19 @@ ROUND BOOK - RELEASE NOTES
 Newest first. This file is not part of the app and is not loaded by it; it ships alongside the code files.
 To add a release: raise APP_VERSION in js/01-data.js and CACHE_NAME in sw.js to the same number, then put a new entry at the top of this list.
 
+Version 1.371
+  - Website offer: a new 📣 button on the Enquiries screen publishes a special offer as a prominent banner across the top of the
+    website. Type the wording (up to 200 characters), choose a last day (or none), check the preview and tap Publish offer. It
+    shows within a minute or two and ends by itself after the last day (the last day is included); "Take the offer down" removes
+    it sooner. The screen shows what is on the website now. It is public (every visitor reads it), so it is not encrypted, and
+    the screen says to keep it to the offer itself
+  - Worker (worker.js): new GET / PUT / DELETE /v1/inbox/{inbox}/notice. Reading is public and cached for a minute; publishing
+    and removing need the inbox token. Wording is tidied and limited to 200 characters, and an end date must be a real date that
+    isn't in the past. Needs redeploying; until then the screen says so
+  - Website: a banner above the header, with a "Special offer" label, the wording, "Ends 30 April", a Get a free quote button
+    and a close button (hidden for that visit only). Shown as plain text, so nothing in an offer can run as code. It appears only
+    when an offer is published and enquiry-config.js has been filled in. Needs the new index.html on the website
+
 Version 1.370
   - Add enquiry (Sales > Enquiries > +): the area list now includes South Shields, Jarrow and Hebburn, to match the website's
     enquiry form. (The website itself is changed separately, in the website folder, not in the app)
