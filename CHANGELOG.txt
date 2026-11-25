@@ -4,6 +4,20 @@ ROUND BOOK - RELEASE NOTES
 Newest first. This file is not part of the app and is not loaded by it; it ships alongside the code files.
 To add a release: raise APP_VERSION in js/01-data.js and CACHE_NAME in sw.js to the same number, then put a new entry at the top of this list.
 
+Version 1.372
+  - Live sync now only runs on the newest version of the app. If another of your devices is on a newer version than this one, live
+    sync pauses here (nothing is sent or merged) until this device is updated, so an older version can't overwrite what a newer
+    one has done or write data in an old shape. The top bar says "Update this device to sync", and the Live sync screen
+    explains which device is ahead and has a "Check for updates now" button. A device on the same or an older version than the
+    newest does not stop the newest one syncing, and a device taken off the list is ignored (remove one you no longer use if it
+    is the one on a newer version). To let the others know, each device now sends its app version once after it is updated
+  - The top bar says more about live sync: "✓ Synced 2m ago" when everything is up to date, "📷 4 to send" and "📷 2 to get" after it
+    while photos are still going across ("(tomorrow)" when today's free photo allowance is used up), "Offline — will sync later",
+    "Sync problem — tap to see", "Unlock sync", and "Live sync on · no other device yet". On a computer, hovering over it gives a
+    fuller description. The Live sync screen shows the photo counts too, including how many photos to get have not been sent by
+    another device yet
+  - Added self-tests for the version rule and the top bar
+
 Version 1.371
   - Website offer: a new 📣 button on the Enquiries screen publishes a special offer as a prominent banner across the top of the
     website. Type the wording (up to 200 characters), choose a last day (or none), check the preview and tap Publish offer. It
