@@ -553,6 +553,28 @@ async function runSelfTests(){
     });
   });
 
+  group('live sync: newest version only, and the top bar', () => {
+    const devs = { me: { updatedAt: 5 }, other: { updatedAt: 9 }, gone: { updatedAt: 9 } };
+    const saved = { id: syncDeviceId, removed: liveRemoved };
+    syncDeviceId = () => 'me'; liveRemoved = {};
+    const live = v => ({ peerNames: { other: { name: 'iPad', appVersion: v } } });
+    yes('newer version elsewhere is found', liveNewerPeer(live(APP_VERSION + 0.001), devs) && liveNewerPeer(live(APP_VERSION + 0.001), devs).name === 'iPad');
+    yes('the same version does not pause this device', !liveNewerPeer(live(APP_VERSION), devs));
+    yes('an older version does not pause this device', !liveNewerPeer(live(APP_VERSION - 0.001), devs));
+    yes('no known version does not pause this device', !liveNewerPeer({ peerNames: {} }, devs));
+    liveRemoved = { other: { at: 1, headAt: 9 } };
+    yes('a device taken off the list does not pause this one', !liveNewerPeer(live(APP_VERSION + 1), devs));
+    syncDeviceId = saved.id; liveRemoved = saved.removed;
+    const keep = { s: Object.assign({}, liveStatus), p: Object.assign({}, livePhotoInfo) };
+    liveStatus = { state: 'ok', text: '', okAt: Date.now() };
+    Object.assign(livePhotoInfo, { up: 0, down: 0, other: 0, capped: false });
+    yes('top bar: a tick when synced', liveChipText().startsWith('✓ Synced'));
+    livePhotoInfo.up = 3; yes('top bar: photos to send', liveChipText().includes('📷 3 to send'));
+    livePhotoInfo.down = 2; yes('top bar: photos to send and get', liveChipText().includes('3 to send, 2 to get'));
+    liveStatus.state = 'update'; yes('top bar: update needed', liveChipText().startsWith('⬆'));
+    liveStatus = keep.s; Object.assign(livePhotoInfo, keep.p);
+  });
+
   group('schedule day totals', () => {
     // The total shown at the top of each scheduled day: customers and jobs due, their value, and planned-ahead cleans counted apart.
     const item = (kind, price, extra) => Object.assign({ kind, key:'k' + Math.random(), label:'R', price, date:'2025-03-03', dispDate:'2025-03-03', parked:false }, extra || {});

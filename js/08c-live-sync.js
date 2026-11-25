@@ -136,6 +136,25 @@ async function liveRemoveDevice(id){
 function liveNotePeer(id, info){ livePeerInfo[id] = Object.assign({}, livePeerInfo[id] || {}, info, { checkedAt: Date.now() }); }
 const liveNotYet = new Map();              // photo id -> when the cloud last said "not there yet"
 let liveStatus = { state: 'off', text: '', okAt: 0 };
+// Photos still to go, for the top bar and the sync screen: up = to send, down = to get, other = of those to get, ones no other
+// device has sent yet, capped = today's free photo allowance has been used. Updated each time photos are sent or collected.
+const livePhotoInfo = { up: 0, down: 0, other: 0, capped: false };
+/* Only the newest version of the app syncs. If another of your devices runs a newer version than this one, live sync here stops
+   (nothing is sent or merged) until this device is updated, so an older version can't write data the newer one has since
+   changed the shape of, or overwrite what it has done. The versions come from the devices' own copies, which each device
+   sends again when it is updated (see verSent). A device nobody uses any more but that is on a newer version would hold the
+   others back: remove it from the list on the sync screen. */
+function liveNewerPeer(live, devs){
+  const me = syncDeviceId();
+  let best = null;
+  Object.keys(devs || {}).forEach(id => {
+    if(id === me || liveIsRemoved(id, devs)) return;
+    const known = live.peerNames && live.peerNames[id];
+    const v = known && known.appVersion;
+    if(v && versionNewerThanMine(v) && (!best || Number(v) > Number(best.v))) best = { id, v, name: known.name || '' };
+  });
+  return best;
+}
 
 /* ---------- small helpers ---------- */
 function liveDay(){ return new Date().toISOString().slice(0,10); } // UTC, matching Cloudflare's daily reset
@@ -209,25 +228,46 @@ function liveSetStatus(state, text){
   if(state === 'ok') liveStatus.okAt = Date.now();
   liveRefreshChip();
 }
+// The photos part of the top bar: "📷 4 to send", "📷 2 to get", or both.
+function livePhotoBit(){
+  const p = livePhotoInfo;
+  if(p.up && p.down) return ` · 📷 ${p.up} to send, ${p.down} to get`;
+  if(p.up) return ` · 📷 ${p.up} to send${p.capped ? ' (tomorrow)' : ''}`;
+  if(p.down) return ` · 📷 ${p.down} to get`;
+  return '';
+}
 function liveChipText(){
   const s = liveStatus;
   switch(s.state){
     case 'off': return '';
-    case 'syncing': return '⟳ Syncing…';
-    case 'offline': return '☁️ Offline';
-    case 'error': return '⚠ Sync problem';
+    case 'syncing': return '⟳ Syncing…' + livePhotoBit();
+    case 'offline': return '☁️ Offline — will sync later' + livePhotoBit();
+    case 'error': return '⚠ Sync problem — tap to see';
     case 'locked': return '🔒 Unlock sync';
     case 'attention': return '⚠ Needs attention';
-    case 'waiting': return '☁️ Live sync on';
-    case 'deferred': return '☁️ Update waiting';
-    default: return s.okAt ? `☁️ Synced ${liveAgo(s.okAt)}` : '☁️ Live sync on';
+    case 'update': return '⬆ Update this device to sync';
+    case 'waiting': return '☁️ Live sync on · no other device yet';
+    case 'deferred': return '☁️ Update waiting' + livePhotoBit();
+    default: return s.okAt ? `✓ Synced ${liveAgo(s.okAt)}${livePhotoBit()}` : '☁️ Live sync on' + livePhotoBit();
   }
+}
+// The longer version, for hovering over the top bar on a computer.
+function liveChipTitle(){
+  const s = liveStatus, p = livePhotoInfo;
+  const bits = [];
+  if(s.state === 'ok' && s.okAt) bits.push('Everything is up to date. Last checked ' + liveAgo(s.okAt) + '.');
+  if(s.text) bits.push(s.text);
+  if(p.up) bits.push(p.up + ' photo' + (p.up === 1 ? '' : 's') + ' still to send' + (p.capped ? ' — today’s free photo allowance is used up, so they go tomorrow.' : '.'));
+  if(p.down) bits.push(p.down + ' photo' + (p.down === 1 ? '' : 's') + ' still to get' + (p.other ? ' (' + p.other + ' not sent by another device yet).' : '.'));
+  bits.push('Tap for details.');
+  return bits.join(' ');
 }
 function liveRefreshChip(){
   const el = document.getElementById('liveSyncChip');
   if(!el) return;
   const t = liveActive ? liveChipText() : '';
   el.textContent = t;
+  el.title = t ? liveChipTitle() : '';
   el.hidden = !t;
 }
 
@@ -435,6 +475,13 @@ async function livePullInner(opts){
   const others = liveOtherDevices(devs);
   if(!others.length){ if(liveStatus.state !== 'ok') liveSetStatus('waiting'); return { ok:true, waiting:true }; }
   await liveLearnPeers(live, key, devs, others);
+  live = await liveMeta();
+  const newer = liveNewerPeer(live, devs);
+  if(newer){
+    liveSetStatus('update', `Another of your devices${newer.name ? ' (' + newer.name + ')' : ''} is on version ${newer.v}, and this one is on ${APP_VERSION}. Live sync is paused here until this device is updated, so an older version can't overwrite what the newer one has done.`);
+    liveNotePeer(newer.id, { note: 'is on a newer version (' + newer.v + ')' });
+    return { ok:false, blocked:true };
+  }
   if(live.base == null && !syncLocalIsEmpty() && !opts.adopt){
     liveSetStatus('attention', 'This device\'s data can\'t be merged automatically yet. Open Backup → Live sync → Live sync and choose what to do.');
     return { ok:false };
@@ -472,7 +519,7 @@ async function livePullInner(opts){
     liveNotePeer(peerId, { appVersion: payload.appVersion, sentAt: payload.createdAt, headAt, note: '', clock: clockNote });
     await liveRememberPeer(peerId, payload);
     if(payload.appVersion && versionNewerThanMine(payload.appVersion)){
-      liveSetStatus('error', 'Another device has a newer version of Round Book. Close and reopen the app here to update, then sync will continue.');
+      liveSetStatus('update', `Another of your devices is on version ${payload.appVersion}, and this one is on ${APP_VERSION}. Live sync is paused here until this device is updated, so an older version can't overwrite what the newer one has done.`);
       liveNotePeer(peerId, { note: 'is on a newer version (' + payload.appVersion + ') — close and reopen the app here to update' });
       problem = true; continue;
     }
@@ -608,6 +655,7 @@ async function livePullPhotos(live, key){
   (data.customers||[]).forEach(c => (c.photos||[]).forEach(p => refs.add(p.id)));
   (data.oneOffJobs||[]).forEach(j => (j.photos||[]).forEach(p => refs.add(p.id)));
   const missing = [...refs].filter(id => !photoUrlCache.has(id));
+  livePhotoInfo.down = missing.length; livePhotoInfo.other = 0;
   if(!missing.length) return out;
   const payloads = [];
   let tried = 0;
@@ -629,6 +677,9 @@ async function livePullPhotos(live, key){
     if(meta.live) await liveSave(meta, meta.live); else await syncMetaSave(meta);
     out.stored = (typeof stored === 'number') ? stored : payloads.length;
   }
+  const stillMissing = missing.filter(id => !photoUrlCache.has(id));
+  livePhotoInfo.down = stillMissing.length;
+  livePhotoInfo.other = stillMissing.filter(id => { const t = liveNotYet.get(id); return t && Date.now() - t < 5*60*1000; }).length;
   return out;
 }
 async function liveUploadPhotos(live, key){
@@ -637,7 +688,7 @@ async function liveUploadPhotos(live, key){
   const uploaded = Object.assign({}, live.uploaded || {});
   const now = Date.now();
   const ids = syncHeldPhotoIds().filter(id => !uploaded[id] || now - uploaded[id] > LIVE_PHOTO_RECHECK_MS);
-  if(!ids.length) return { more:false };
+  if(!ids.length){ livePhotoInfo.up = 0; livePhotoInfo.capped = false; return { more:false }; }
   const need = [];
   for(let i = 0; i < ids.length; i += 150){
     const chunk = ids.slice(i, i + 150);
@@ -664,6 +715,8 @@ async function liveUploadPhotos(live, key){
     if(!r.ok){ await liveFail(r); break; }
     uploaded[id] = Date.now(); bytes += blob.size; n++; count++;
   }
+  livePhotoInfo.up = Math.max(0, need.length - n);
+  livePhotoInfo.capped = !more && livePhotoInfo.up > 0 && count >= LIVE_DAILY_PHOTO_CAP;
   await liveUpdate({ uploaded, photoDay: day, photoCount: count });
   return { more };
 }
@@ -679,7 +732,7 @@ async function livePushInner(opts){
   if(!navigator.onLine){ liveSetStatus('offline'); return { ok:false }; }
   const versionAtStart = liveDataVersion;
   const myName = liveDeviceName();
-  const nameChanged = live.nameSent !== myName; // the first send after an update, or a rename, carries the name across
+  const nameChanged = live.nameSent !== myName || live.verSent !== APP_VERSION; // the first send after an update, or a rename, carries the name and the app version across, so the other devices know
   const unchanged = !opts.force && !nameChanged && !!live.lastPushHash && liveCleanVersion === versionAtStart && liveCleanHash === live.lastPushHash;
   let state = null, hash = live.lastPushHash;
   if(!unchanged){
@@ -708,7 +761,7 @@ async function livePushInner(opts){
     if(!res.ok){ await liveFail(res); return { ok:false }; }
     livePushTimes.push(now);
     liveLastPushAt = now;
-    await liveUpdate({ lastPushHash: hash, lastPushAt: now, pushDay: day, pushCount: used + 1, nameSent: myName });
+    await liveUpdate({ lastPushHash: hash, lastPushAt: now, pushDay: day, pushCount: used + 1, nameSent: myName, verSent: APP_VERSION });
     if(liveDataVersion === versionAtStart){ liveCleanVersion = versionAtStart; liveCleanHash = hash; }
   }
   let up;
@@ -939,6 +992,7 @@ function liveTurnOff(){
     title:'Turn off live sync', confirmLabel:'Turn off', danger:true,
     onConfirm: async () => {
       liveMem.key = null;
+      livePhotoInfo.up = livePhotoInfo.down = livePhotoInfo.other = 0; livePhotoInfo.capped = false;
       liveActive = false; clearTimeout(livePushTimer); liveFirstDirtyAt = 0;
       const meta = await syncMetaGet();
       delete meta.live;
@@ -986,9 +1040,11 @@ function liveSyncSectionHtml(meta){
   const s = liveStatus;
   const lines = [];
   lines.push(`<div style="font-weight:800;">⚡ Live sync is on</div>`);
-  const stateText = { syncing:'Syncing…', ok: s.okAt ? 'Up to date — checked ' + liveAgo(s.okAt) : 'On', waiting:'On — waiting for another device to join', offline:'Offline — will sync when you\'re back online', locked:'Locked — enter your passphrase to resume', attention:'Needs your attention', error:'Problem' }[s.state] || 'On';
+  const stateText = { syncing:'Syncing…', ok: s.okAt ? 'Up to date — checked ' + liveAgo(s.okAt) : 'On', waiting:'On — waiting for another device to join', offline:'Offline — will sync when you\'re back online', locked:'Locked — enter your passphrase to resume', attention:'Needs your attention', error:'Problem', update:'Paused — this device needs updating' }[s.state] || 'On';
   lines.push(`<div style="font-size:0.8125rem; margin-top:4px;">${escapeHtml(stateText)}</div>`);
   if(s.text) lines.push(`<div style="font-size:0.8125rem; margin-top:6px; color:var(--red); line-height:1.5;">${escapeHtml(s.text)}</div>`);
+  if(s.state === 'update') lines.push(btn('⬆ Check for updates now', 'closeSheet(); checkForUpdates();', 'background:var(--navy); color:#fff;') + `<div style="font-size:0.75rem; margin-top:6px; color:var(--ink-muted); line-height:1.5;">If it says you are up to date, close the app completely and open it again. If the other device is no longer used, remove it from the list below.</div>`);
+  { const p = livePhotoInfo; if(p.up || p.down) lines.push(`<div style="font-size:0.8125rem; margin-top:6px;">📷 Photos: ${[p.up ? p.up + ' to send' + (p.capped ? ' (today’s free photo allowance is used up, so they go tomorrow)' : '') : '', p.down ? p.down + ' to get' + (p.other ? ' (' + p.other + ' not sent by another device yet)' : '') : ''].filter(Boolean).join(', ')}</div>`); }
   if(live.lastPushAt) lines.push(`<div style="font-size:0.75rem; margin-top:6px; color:var(--ink-muted);">Last sent ${liveAgo(live.lastPushAt)}${live.lastPullAt ? ' · last received ' + liveAgo(live.lastPullAt) : ''}${live.lastSummary ? ' · ' + escapeHtml(live.lastSummary) : ''}</div>`);
   // This device, then the others, so each can be told apart (and an old one that is no longer used taken off the list).
   const me = syncDeviceId();
