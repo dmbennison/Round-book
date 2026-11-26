@@ -4,6 +4,25 @@ ROUND BOOK - RELEASE NOTES
 Newest first. This file is not part of the app and is not loaded by it; it ships alongside the code files.
 To add a release: raise APP_VERSION in js/01-data.js and CACHE_NAME in sw.js to the same number, then put a new entry at the top of this list.
 
+Version 1.373
+  - Notifications for new website enquiries: Sales > Enquiries > ⚙︎ has a new 🔔 Notifications section with a "Turn on notifications"
+    button. On a device where it is on, a new enquiry from your website shows a "New website enquiry" alert, even when Round
+    Book is closed, and tapping it opens the Enquiries screen. It is set up separately on each device (your phone, say), and the
+    app renews it about once a day. The alert only says there is a new enquiry: nothing about it, not even who it is from, goes
+    through the notification service, so the enquiry stays encrypted as before. On an iPhone or iPad, add Round Book to the
+    Home Screen and open it from there first; the section says so if that is needed. Enquiries you add by hand do not send an alert
+  - While the app is open, a short message ("New enquiry from ..." or "2 new enquiries") now appears when new ones are collected,
+    and an alert that arrives while the app is open makes it collect them straight away
+  - Website offer: the 📣 button has moved from the Enquiries screen to the Marketing screen, which now has a "Website offer
+    banner" row at the top (under "On your website"). It works exactly as before, and still needs website enquiries to be set up.
+    The user guide for Marketing and Enquiries is updated to match, including notifications
+  - Worker (worker.js): new GET / PUT / DELETE /v1/inbox/{inbox}/push to register and remove a device, and an empty push is sent
+    to each registered device when the website form delivers an enquiry. The Worker makes its own push signing key the first
+    time it is needed and keeps it in KV, so there is nothing to add in Cloudflare (an optional PUSH_CONTACT variable can name
+    a contact address; leaving it out is fine). Needs redeploying; until then the notifications button says so
+  - Service worker (sw.js): shows the alert and opens the Enquiries screen when it is tapped
+  - Added self-tests for the notification key handling
+
 Version 1.372
   - Live sync now only runs on the newest version of the app. If another of your devices is on a newer version than this one, live
     sync pauses here (nothing is sent or merged) until this device is updated, so an older version can't overwrite what a newer

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'round-book-v1.372';
+const CACHE_NAME = 'round-book-v1.373';
 
 // The app itself. These are all-or-nothing: a new version only takes over once EVERY one of
 // these has downloaded fresh. If any fails (a dropped connection, a half-finished deploy) the
@@ -137,5 +137,37 @@ self.addEventListener('fetch', (event) => {
     }catch(e){
       return cached;
     }
+  })());
+});
+
+// A new website enquiry: the worker sends an empty push (nothing about the enquiry travels through it), so all this can
+// say is that something has arrived. An open copy of the app is told to collect it straight away. A notification is always
+// shown (iPhone and iPad require one for every push).
+self.addEventListener('push', (event) => {
+  event.waitUntil((async () => {
+    const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    wins.forEach((w) => w.postMessage({ type: 'rb-enquiry-push' }));
+    await self.registration.showNotification('New website enquiry', {
+      body: 'Someone has sent an enquiry through your website. Tap to see it.',
+      icon: './icon-192.png',
+      tag: 'rb-enquiry',
+      renotify: true
+    });
+  })());
+});
+
+// Tapping it brings the app forward on the Enquiries screen (opening it first if it was closed).
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  event.waitUntil((async () => {
+    const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const w of wins) {
+      if ('focus' in w) {
+        await w.focus();
+        w.postMessage({ type: 'rb-open-enquiries' });
+        return;
+      }
+    }
+    if (self.clients.openWindow) await self.clients.openWindow('./?go=enquiries');
   })());
 });
