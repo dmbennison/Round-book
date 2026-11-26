@@ -765,6 +765,13 @@ async function runSelfTests(){
     eq('lastOf / lastDateOf: empty or missing lists give null', [lastOf([]), lastDateOf(null), lastDateOf([])], [null, null, null]);
   });
 
+  group('enquiry notifications', () => {
+    const k = enqKeyBytes('AQID-_8'); // url-safe base64 without padding -> 01 02 03 fb ff
+    eq('push key decodes (url-safe, no padding)', Array.from(k), [1, 2, 3, 251, 255]);
+    yes('same key bytes recognised', enqSameBytes(new Uint8Array([1, 2, 3, 251, 255]).buffer, k));
+    yes('different key bytes not recognised', !enqSameBytes(new Uint8Array([1, 2, 3, 251, 254]).buffer, k));
+    yes('missing key is not the same', !enqSameBytes(null, k));
+  });
   group('mailtoAddress', () => {
     eq('mailtoAddress: an ordinary address is left alone', mailtoAddress('anna@example.com'), 'anna@example.com');
     eq('mailtoAddress: ? & # cannot be used to add recipients or headers', mailtoAddress('a@b.com?bcc=x@y.com&cc=z'), 'a@b.com%3Fbcc=x@y.com%26cc=z');

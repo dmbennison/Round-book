@@ -16,8 +16,12 @@
      per enquiry   the browser makes a one-off ECDH key, agrees a secret with the public key, and turns it into an AES-256-GCM
                    key with SHA-256(secret + its own public key + your public key + label). Sent: its public key, the iv,
                    the ciphertext. Nothing in what is sent can be read without your private key.
+   NOTIFICATIONS: a device that has turned them on (the bell section in the Enquiries ⚙︎ screen) registers its browser's push address
+   with the worker. When a website enquiry arrives the worker sends an EMPTY push, and sw.js shows a generic "New website enquiry"
+   alert, so it works with the app closed and nothing about the enquiry (not even who it is from) goes through the push service.
+   It is per device (not carried by live sync) and the app renews its registration about once a day.
    The same inbox carries a WEBSITE OFFER: a line of text and an end date that this app publishes to the worker and the website
-   shows as a banner (see openWebsiteOffer). It is public by design (every visitor sees it), so it is not encrypted and must
+   shows as a banner (see openWebsiteOffer, opened from the Marketing tab). It is public by design (every visitor sees it), so it is not encrypted and must
    never hold anything private.
 
    An enquiry can also be added by hand (the + button on the tab: a phone call, a word-of-mouth tip). It is encrypted with the same
@@ -94,6 +98,7 @@ function enqClean(o, id, at){
 
 /* ---------- the inbox ---------- */
 function enqLoadCache(){
+  try{ enq.hadCache = localStorage.getItem(ENQ_CACHE_KEY) !== null; }catch(e){}
   try{ const a = JSON.parse(localStorage.getItem(ENQ_CACHE_KEY) || '[]'); if(Array.isArray(a)) enq.items = a.map(x => enqClean(x, String(x.id || ''), x.at)).filter(x => x.id); }catch(e){}
   try{ const d = JSON.parse(localStorage.getItem(ENQ_DELETING_KEY) || '[]'); if(Array.isArray(d)) enq.deleting = d.filter(x => typeof x === 'string'); }catch(e){}
 }
@@ -145,7 +150,10 @@ async function enquiriesRefresh(opts){
         try{ out.push(enqClean(await enqDecrypt(it.env, cfg), it.id, it.at)); }catch(e){ unreadable++; }
       }
       out.sort((a, b) => (b.sent || b.at) - (a.sent || a.at));
+      const before = new Set(enq.items.map(x => x.id));
+      const fresh = (enq.at || enq.hadCache) ? out.filter(x => !before.has(x.id)) : [];
       enq.items = out; enq.unreadable = unreadable; enq.at = Date.now();
+      if(fresh.length && currentTab !== 'enquiries') toast(fresh.length === 1 ? '📩 New enquiry from ' + (fresh[0].name || 'the website') : '📩 ' + fresh.length + ' new enquiries');
     }
   }catch(e){
     enq.error = 'Couldn’t reach the inbox — check your connection.';
@@ -173,13 +181,133 @@ function enquiriesBoot(){
   enqLoadCache();
   enqMarkSalesTab();
   if(!enqCfg()) return;
-  setTimeout(() => enquiriesRefresh({ force: true }), 2500);
+  enqPushListen();
+  // Opened by tapping a notification while the app was closed: go straight to the enquiries.
+  if(/[?&]go=enquiries(?:&|$)/.test(location.search)){
+    try{ history.replaceState(null, '', location.pathname + location.hash); }catch(e){}
+    setTimeout(() => { setTab('enquiries', true); }, 600);
+  }
+  setTimeout(() => { enquiriesRefresh({ force: true }); enqPushRenew(); }, 2500);
   document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible') enquiriesRefresh({}); });
   setInterval(() => { if(document.visibilityState === 'visible') enquiriesRefresh({ force: true }); }, ENQ_POLL_MS);
 }
 // Set up on this device while the app is open (the settings arrived from another device through live sync, say).
 function enquiriesCheckStarted(){
   if(enqCfg() && !enq.started){ enq.started = true; enquiriesBoot(); }
+}
+
+/* ---------- notifications ---------- */
+const ENQ_PUSH_KEY = 'roundBookEnquiryPush';       // '1' on a device that has asked to be notified
+const ENQ_PUSH_AT_KEY = 'roundBookEnquiryPushAt';  // when this device last told the worker it is still listening
+function enqPushSupported(){ return ('serviceWorker' in navigator) && ('PushManager' in window) && ('Notification' in window); }
+function enqPushWanted(){ try{ return localStorage.getItem(ENQ_PUSH_KEY) === '1'; }catch(e){ return false; } }
+function enqPushOn(){ return enqPushWanted() && enqPushSupported() && Notification.permission === 'granted'; }
+// iPhone / iPad only allow notifications for an app that has been added to the Home Screen.
+function enqNeedsHomeScreen(){
+  const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const standalone = (navigator.standalone === true) || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+  return ios && !standalone;
+}
+function enqKeyBytes(b64url){
+  const b64 = String(b64url).replace(/-/g, '+').replace(/_/g, '/');
+  return enqUnb64(b64 + '='.repeat((4 - b64.length % 4) % 4));
+}
+function enqSameBytes(buf, bytes){
+  if(!buf) return false;
+  const a = new Uint8Array(buf);
+  if(a.length !== bytes.length) return false;
+  for(let i = 0; i < a.length; i++) if(a[i] !== bytes[i]) return false;
+  return true;
+}
+// Subscribe this device with the browser and tell the worker. Asks for nothing: permission must already be granted.
+async function enqPushSubscribe(cfg){
+  const kr = await enqApi(cfg, 'GET', '/push');
+  if(kr.status === 404) return { ok: false, why: 'worker' };
+  if(!kr.ok || !kr.json || !kr.json.key) return { ok: false, why: 'net' };
+  const keyBytes = enqKeyBytes(kr.json.key);
+  const reg = await navigator.serviceWorker.getRegistration();
+  if(!reg) return { ok: false, why: 'sw' };
+  let sub = await reg.pushManager.getSubscription();
+  if(sub && !enqSameBytes(sub.options && sub.options.applicationServerKey, keyBytes)){ try{ await sub.unsubscribe(); }catch(e){} sub = null; } // made for a different worker
+  if(!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes });
+  const put = await enqApi(cfg, 'PUT', '/push', JSON.stringify({ endpoint: sub.endpoint }));
+  if(put.status === 409) return { ok: false, why: 'full' };
+  if(!put.ok) return { ok: false, why: 'net' };
+  try{ localStorage.setItem(ENQ_PUSH_KEY, '1'); localStorage.setItem(ENQ_PUSH_AT_KEY, String(Date.now())); }catch(e){}
+  return { ok: true, reg };
+}
+async function enqPushEnable(){
+  const cfg = enqCfg(); if(!cfg) return;
+  if(!enqPushSupported()){ toast(enqNeedsHomeScreen() ? 'Add Round Book to your Home Screen first' : 'This browser can’t show notifications'); return; }
+  // The permission question has to be asked straight from the tap, before anything else is waited for.
+  let perm;
+  try{ perm = await Notification.requestPermission(); }catch(e){ perm = 'denied'; }
+  if(perm !== 'granted'){ toast('Notifications are blocked — allow them for Round Book in your device settings'); openEnquirySettings(); return; }
+  try{
+    const r = await enqPushSubscribe(cfg);
+    if(!r.ok){
+      toast(r.why === 'worker' ? 'Your Cloudflare worker needs the newest worker.js for notifications'
+        : r.why === 'sw' ? 'Notifications need the installed app — reopen Round Book and try again'
+        : r.why === 'full' ? 'Too many devices are set to be notified — turn it off on one you no longer use'
+        : 'Couldn’t switch notifications on — check your connection and try again');
+      openEnquirySettings(); return;
+    }
+    try{ await r.reg.showNotification('Round Book', { body: 'Notifications are on. You’ll be told when a new website enquiry arrives.', icon: './icon-192.png', tag: 'rb-test' }); }catch(e){}
+    toast('Notifications are on for this device');
+  }catch(e){
+    toast('Couldn’t switch notifications on here');
+  }
+  openEnquirySettings();
+}
+async function enqPushDisable(){
+  const cfg = enqCfg();
+  try{ localStorage.removeItem(ENQ_PUSH_KEY); localStorage.removeItem(ENQ_PUSH_AT_KEY); }catch(e){}
+  try{
+    const reg = enqPushSupported() ? await navigator.serviceWorker.getRegistration() : null;
+    const sub = reg ? await reg.pushManager.getSubscription() : null;
+    if(sub){
+      if(cfg){ try{ await enqApi(cfg, 'DELETE', '/push', JSON.stringify({ endpoint: sub.endpoint })); }catch(e){} }
+      await sub.unsubscribe();
+    }
+  }catch(e){}
+  toast('Notifications are off for this device');
+  openEnquirySettings();
+}
+// Once a day, quietly tell the worker this device is still listening (and put it back if the browser dropped it).
+async function enqPushRenew(){
+  if(!enqPushOn()) return;
+  let last = 0; try{ last = Number(localStorage.getItem(ENQ_PUSH_AT_KEY)) || 0; }catch(e){}
+  if(Date.now() - last < 24 * 3600 * 1000) return;
+  const cfg = enqCfg(); if(!cfg) return;
+  try{ await enqPushSubscribe(cfg); }catch(e){}
+}
+// A notification arriving (or being tapped) while the app is open or in the background tells the page.
+function enqPushListen(){
+  if(enq.pushListening || !('serviceWorker' in navigator)) return;
+  enq.pushListening = true;
+  navigator.serviceWorker.addEventListener('message', (e) => {
+    const t = e.data && e.data.type;
+    if(t === 'rb-enquiry-push') enquiriesRefresh({ force: true });
+    else if(t === 'rb-open-enquiries'){ setTab('enquiries', true); enquiriesRefresh({ force: true }); }
+  });
+}
+// The bell section of the Enquiries ⚙︎ screen.
+function enqPushSection(){
+  let text, btn = '';
+  if(!enqPushSupported()){
+    text = enqNeedsHomeScreen()
+      ? 'To get notifications on an iPhone or iPad, add Round Book to your Home Screen (Share, then <b>Add to Home Screen</b>), open it from there, then come back here.'
+      : 'This browser can’t show notifications.';
+  } else if(Notification.permission === 'denied'){
+    text = 'Notifications are blocked for Round Book on this device. Allow them in your device’s settings, then come back here.';
+  } else if(enqPushOn()){
+    text = '<b>Notifications are on for this device.</b> You’ll be told when a new enquiry arrives from your website, even when Round Book is closed.';
+    btn = '<button class="btn-open" style="margin-top:10px; width:100%;" onclick="enqPushDisable()">Turn off on this device</button>';
+  } else {
+    text = 'Get an alert on this device when a new enquiry arrives from your website, even when Round Book is closed. The alert only says there is a new enquiry. It never shows who it is from.';
+    btn = '<button class="btn-primary" style="margin-top:10px; width:100%;" onclick="enqPushEnable()">Turn on notifications</button>';
+  }
+  return `<div style="margin:0 2px 14px; padding:12px; border-radius:12px; background:var(--blue-dim); font-size:0.8125rem; line-height:1.5;"><div style="font-weight:800; margin-bottom:4px;">🔔 Notifications</div>${text}${btn}<div style="font-size:0.6875rem; color:var(--ink-muted); margin-top:8px;">Set up separately on each device.</div></div>`;
 }
 
 /* ---------- the tab ---------- */
@@ -208,7 +336,6 @@ function renderEnquiries(main){
   }
   const tools = `<div style="display:flex; align-items:center; justify-content:flex-end; gap:8px; margin-bottom:8px;">
     ${mainScreenHelpBtn('enquiries', "()=>setTab('enquiries')")}
-    <button class="btn-open icon-plain" style="width:38px; height:38px; padding:0;" onclick="openWebsiteOffer()" aria-label="Special offer banner on the website" title="Special offer banner on the website">📣</button>
     <button class="btn-open icon-plain" style="width:38px; height:38px; padding:0;" onclick="enquiriesRefresh({force:true})" aria-label="Check for new enquiries">↻</button>
     <button class="btn-open icon-plain" style="width:38px; height:38px; padding:0;" onclick="openEnquirySettings()" aria-label="Website enquiry settings">⚙︎</button>
   </div>`;
@@ -310,7 +437,7 @@ function enqEndsText(until){
 }
 async function openWebsiteOffer(){
   const cfg = enqCfg();
-  if(!cfg){ toast('Set up website enquiries first'); return; }
+  if(!cfg){ toast('Set up website enquiries first (Sales → Enquiries)'); return; }
   let current = null, problem = '';
   openSheet(`<div class="sheet-head"><h2 style="flex:1;">Website offer</h2><button class="sheet-close" onclick="closeSheet()" aria-label="Close">✕</button></div><p style="color:var(--ink-muted); margin:0 2px;">Checking what is on the website…</p>`);
   try{
@@ -494,6 +621,7 @@ function openEnquirySettings(){
       <b>The inbox is on.</b> ${enq.at ? 'Last checked ' + escapeHtml(enqTime(enq.at).toLowerCase()) + '.' : 'Not checked yet.'}
       Enquiries are encrypted on the visitor’s device; only your devices can read them.
     </div>
+    ${enqPushSection()}
     <div class="form-actions" style="display:flex; flex-direction:column; gap:8px;">
       <button class="btn-primary" onclick="closeSheet(); enquiriesRefresh({force:true});">Check the inbox now</button>
     </div>
@@ -520,6 +648,8 @@ function enquiriesTurnOff(){
     onConfirm: async () => {
       const cfg = enqCfg();
       if(cfg){ try{ await enqApi(cfg, 'DELETE', ''); }catch(e){ toast(OFFLINE_MSG); return; } }
+      try{ localStorage.removeItem(ENQ_PUSH_KEY); localStorage.removeItem(ENQ_PUSH_AT_KEY); }catch(e){}
+      try{ const reg = await navigator.serviceWorker.getRegistration(); const sub = reg && await reg.pushManager.getSubscription(); if(sub) await sub.unsubscribe(); }catch(e){}
       delete data.settings.enquiryInbox;
       enq.items = []; enq.deleting = []; enq.error = ''; enq.at = 0; enq.started = false;
       enqSaveCache();

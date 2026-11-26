@@ -595,7 +595,16 @@ function renderMarketing(main){
   html += `<div style="display:flex; align-items:center; justify-content:flex-end; gap:8px; margin-bottom:8px;">
     ${mainScreenHelpBtn('marketing', "()=>setTab('marketing')")}
   </div>`;
-  html += `<div class="section-label" style="margin-top:0;">Campaigns</div>`;
+  html += `<div class="section-label" style="margin-top:0;">On your website</div>
+    <button class="backup-btn" onclick="openWebsiteOffer()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20"/></svg>
+      <div style="flex:1; min-width:0;">
+        <div class="t1">Website offer banner</div>
+        <div class="t2" style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Show a special offer across the top of your website</div>
+      </div>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px; color:var(--ink-muted); flex-shrink:0;"><path d="M9 18l6-6-6-6"/></svg>
+    </button>`;
+  html += `<div class="section-label">Campaigns</div>`;
   html += campaigns.map(camp=>{
     const sentCount = data.customers.filter(c=>c.marketingCampaign===camp.id).length;
     const preview = (camp.body||'').replace(/\s+/g,' ').trim();
