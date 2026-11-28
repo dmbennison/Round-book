@@ -36,7 +36,7 @@ const ENQ_DELETING_KEY = 'roundBookEnquiriesDeleting';
 const ENQ_MIN_GAP_MS = 20 * 1000;
 const ENQ_POLL_MS = 5 * 60 * 1000;
 const ENQ_SERVICES = ['Window cleaning', 'Gutter cleaning', 'Fascia & soffit cleaning'];
-const ENQ_AREAS = ['South Tyneside', 'South Shields', 'Jarrow', 'Hebburn', 'Cleadon', 'Boldon', 'Washington', 'Newcastle', 'Sunderland', 'Seaham', 'Murton'];
+const ENQ_AREAS = ['South Tyneside', 'South Shields', 'Jarrow', 'Hebburn', 'Cleadon', 'Boldon', 'Washington', 'Newcastle', 'Sunderland', 'Seaham', 'Murton', 'East Durham'];
 const ENQ_SOURCES = ['Phone call', 'Text message', 'Word of mouth', 'Facebook', 'Leaflet', 'Knocked on door'];
 const enq = { items: [], at: 0, busy: false, error: '', unreadable: 0, deleting: [] };
 
